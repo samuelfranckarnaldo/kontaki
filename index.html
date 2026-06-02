@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Kontaki</title>
+  <link rel="stylesheet" href="/src/styles/base.css"/>
+  <link rel="stylesheet" href="/src/styles/layout.css"/>
+  <link rel="stylesheet" href="/src/styles/components.css"/>
+  <link rel="stylesheet" href="/src/styles/pages.css"/>
+  <script src="/assets/lucide.min.js"></script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-page">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-mark"><i data-lucide="zap"></i></div>
+      <h1>Kontaki</h1>
+      <p>Gestão de negócios offline-first</p>
+    </div>
+    <div class="login-card">
+      <div class="field">
+        <label>Utilizador</label>
+        <div class="input-icon-wrap">
+          <i data-lucide="user" class="input-icon"></i>
+          <input id="inp-user" placeholder="O seu utilizador" autocomplete="username"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Senha</label>
+        <div class="input-icon-wrap pw-wrap">
+          <i data-lucide="lock" class="input-icon"></i>
+          <input id="inp-pass" type="password" placeholder="A sua senha" autocomplete="current-password"/>
+          <button class="pw-toggle" id="pw-toggle">
+            <i data-lucide="eye" id="pw-eye"></i>
+          </button>
+        </div>
+      </div>
+      <div id="login-err" class="err-box">
+        <i data-lucide="alert-circle"></i>
+        <span id="login-err-msg"></span>
+      </div>
+      <button class="btn btn-primary btn-full btn-lg" id="btn-login">Entrar</button>
+    </div>
+    <p class="login-hint">admin / admin123 &nbsp;•&nbsp; caixa1 / caixa123</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+
+  <div id="topbar">
+    <span id="topbar-title">Kontaki</span>
+    <div style="display:flex;gap:4px">
+      <button class="topbar-side-btn" id="btn-topbar-quick" style="display:none" title="Modo Caixa Rápida">
+        <i data-lucide="zap"></i>
+      </button>
+      <button class="topbar-side-btn" id="btn-topbar-qr" style="display:none">
+        <i data-lucide="scan-qr-code"></i>
+      </button>
+      <button class="topbar-side-btn" id="btn-topbar-add" style="display:none">
+        <i data-lucide="plus"></i>
+      </button>
+    </div>
+  </div>
+
+  <div id="main">
+
+    <!-- VENDER -->
+    <div class="page" id="pg-vender">
+      <div class="page-inner">
+
+        <!-- Adicionar produto -->
+        <div class="vender-card">
+          <div class="vender-card-title">Adicionar produto</div>
+          <button class="scanner-btn" id="btn-scanner">
+            <i data-lucide="scan-line" class="scanner-icon"></i>
+            <div>
+              <div class="scanner-btn-title">Ler código (GTIN-13 / QR)</div>
+              <div class="scanner-btn-sub">Aponte a câmara para o produto</div>
+            </div>
+          </button>
+          <div class="or-divider"><span>ou</span></div>
+          <div class="search-bar">
+            <i data-lucide="search" class="search-icon"></i>
+            <input id="prod-search" placeholder="Pesquisar produto por nome ou código"/>
+          </div>
+          <div id="search-results"></div>
+        </div>
+
+        <!-- Recentes -->
+        <div class="vender-card" id="recent-products" style="display:none"></div>
+
+        <!-- Carrinho -->
+        <div class="vender-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div class="vender-card-title" style="margin-bottom:0">
+              Carrinho <span id="cart-count" style="background:#5b21b6;color:#fff;border-radius:20px;padding:1px 7px;font-size:11px;margin-left:4px">0</span>
+            </div>
+            <button onclick="window._limparCart()" style="background:none;border:none;font-size:12px;color:#dc2626;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">
+              <i data-lucide="trash-2" style="width:13px;height:13px"></i> Limpar
+            </button>
+          </div>
+          <div id="cart-items"></div>
+        </div>
+
+        <!-- Método pagamento -->
+        <div class="vender-card">
+          <div class="vender-card-title">Método de pagamento</div>
+          <div class="pay-methods">
+            <button class="pay-method-btn active" data-method="dinheiro">
+              <i data-lucide="banknote"></i>Dinheiro
+            </button>
+            <button class="pay-method-btn" data-method="transferencia">
+              <i data-lucide="landmark"></i>Transferência
+            </button>
+            <button class="pay-method-btn" data-method="multicaixa">
+              <i data-lucide="credit-card"></i>Multicaixa
+            </button>
+            <button class="pay-method-btn" data-method="fiado">
+              <i data-lucide="user-check"></i>Fiado
+            </button>
+          </div>
+          <div class="pay-method-desc" id="pay-method-desc">
+            <i data-lucide="info"></i> Pagamento em dinheiro no ato da venda.
+          </div>
+          <div id="fiado-client-wrap" style="display:none;margin-top:12px">
+            <div class="field">
+              <label>Nome do cliente (fiado)</label>
+              <div class="input-icon-wrap">
+                <i data-lucide="user" class="input-icon"></i>
+                <input id="fiado-client" placeholder="Nome completo do cliente"/>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Desconto -->
+        <div class="vender-card">
+          <div class="discount-row">
+            <span class="discount-label">Desconto (opcional)</span>
+            <div class="discount-input-wrap">
+              <input class="discount-input" type="number" id="disc-input" value="" placeholder="0" min="0"/>
+              <button class="discount-type-btn active" id="btn-disc-type">%</button>
+            </div>
+          </div>
+          <div id="disc-amt-row" style="display:none;justify-content:space-between;
+               align-items:center;margin-top:8px;font-size:13px">
+            <span style="color:#71717a">Desconto aplicado</span>
+            <span style="color:#dc2626;font-weight:600" id="disc-amt-val"></span>
+          </div>
+        </div>
+
+        <!-- Troco -->
+        <div class="vender-card" id="troco-wrap">
+          <div class="field">
+            <label>Valor recebido (Kz)</label>
+            <input type="number" id="valor-recebido" placeholder="0" oninput="window._calcTroco()"/>
+          </div>
+          <div class="troco-bar" id="troco-bar" style="display:none;margin-top:10px">
+            <span class="troco-label">Troco</span>
+            <span class="troco-value" id="troco-val">0,00 Kz</span>
+          </div>
+        </div>
+
+        <!-- Total -->
+        <div class="total-bar">
+          <span class="total-bar-label">Total a pagar</span>
+          <span class="total-bar-value" id="total-val">0,00 Kz</span>
+        </div>
+
+        <!-- Acções -->
+        <div class="vender-actions">
+          <button class="btn btn-ghost btn-lg" id="btn-limpar">
+            <i data-lucide="trash-2"></i> Limpar
+          </button>
+          <button class="btn btn-primary btn-lg" id="btn-finalizar">
+            <i data-lucide="check"></i> Finalizar venda
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PRODUTOS -->
+    <div class="page" id="pg-produtos">
+      <div class="page-inner">
+        <div class="search-bar">
+          <i data-lucide="search" class="search-icon"></i>
+          <input id="produtos-search" placeholder="Pesquisar produto por nome ou código"/>
+        </div>
+        <div style="background:#f4f4f5;border-radius:10px;padding:4px;display:flex;gap:2px" id="produtos-tabs"></div>
+        <div class="produtos-stats" id="produtos-stats"></div>
+        <div class="list-card" id="produtos-list"></div>
+      </div>
+    </div>
+
+    <!-- FIADOS -->
+    <div class="page" id="pg-fiados">
+      <div class="page-inner">
+        <div class="search-bar">
+          <i data-lucide="search" class="search-icon"></i>
+          <input id="fiados-search" placeholder="Pesquisar cliente..."/>
+        </div>
+        <div class="pill-group" id="fiados-filter-pills" style="margin-top:12px">
+          <button class="pill active" data-filter="all">Todos</button>
+          <button class="pill" data-filter="open">Em aberto</button>
+          <button class="pill" data-filter="paid">Pagos</button>
+        </div>
+        <div id="fiados-total-bar" style="font-size:13px;color:#71717a;margin-top:8px"></div>
+        <div class="list-card" id="fiados-list"></div>
+      </div>
+    </div>
+
+    <!-- HISTÓRICO -->
+    <div class="page" id="pg-historico">
+      <div class="page-inner">
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <div class="field" style="flex:1">
+            <label>De</label>
+            <input type="date" id="hist-from" class="date-input"/>
+          </div>
+          <div class="field" style="flex:1">
+            <label>Até</label>
+            <input type="date" id="hist-to" class="date-input"/>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-hist-filter">
+            <i data-lucide="search"></i>
+          </button>
+        </div>
+        <div id="historico-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px"></div>
+        <div id="historico-chart" class="vender-card" style="display:none;margin-top:0"></div>
+        <button id="btn-export-csv" class="btn btn-ghost btn-full btn-sm" style="display:none;margin-top:0"><i data-lucide="download"></i> Exportar CSV</button>
+        <div class="list-card" style="margin-top:0" id="historico-list"></div>
+      </div>
+    </div>
+
+    <!-- PERFIL -->
+    <div class="page" id="pg-perfil">
+      <div class="perfil-header" id="perfil-header">
+        <div class="perfil-avatar" id="perfil-avatar"></div>
+        <div class="perfil-name" id="perfil-name"></div>
+        <div class="perfil-role" id="perfil-role"></div>
+      </div>
+      <div id="perfil-menu"></div>
+
+      <!-- Subpáginas -->
+      <div id="subpage-stock" style="display:none">
+        <div class="page-inner">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <button class="btn btn-ghost btn-sm" id="btn-back-stock">← Voltar</button>
+            <button class="btn btn-primary btn-sm" id="btn-prod-add">
+              <i data-lucide="plus"></i> Produto
+            </button>
+          </div>
+          <div class="search-bar">
+            <i data-lucide="search" class="search-icon"></i>
+            <input id="stock-search" placeholder="Pesquisar..."/>
+          </div>
+          <div id="inv-alert" class="alert alert-warn" style="display:none">
+            <i data-lucide="alert-triangle"></i>
+            Modo Inventário — insira as contagens físicas.
+          </div>
+          <div class="list-card" id="stock-list"></div>
+          <div style="display:flex;gap:10px" id="inv-actions">
+            <button class="btn btn-ghost btn-full" id="btn-inv-toggle">
+              <i data-lucide="clipboard-list"></i> Modo Inventário
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="subpage-incidentes" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-incidentes">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 12px">Incidentes</div>
+          <div id="inc-list"></div>
+        </div>
+      </div>
+
+      <div id="subpage-equipa" style="display:none">
+        <div class="page-inner">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <button class="btn btn-ghost btn-sm" id="btn-back-equipa">← Voltar</button>
+            <button class="btn btn-primary btn-sm" id="btn-user-add">
+              <i data-lucide="user-plus"></i> Funcionário
+            </button>
+          </div>
+          <div class="list-card" id="users-list"></div>
+        </div>
+      </div>
+
+      <div id="subpage-loja" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-loja">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 16px">Dados da Loja</div>
+          <div class="vender-card" style="display:flex;flex-direction:column;gap:14px">
+            <div class="field"><label>Nome da Loja</label><input id="ss-name"/></div>
+            <div class="field"><label>Endereço</label><input id="ss-addr"/></div>
+            <div class="field"><label>Telefone</label><input id="ss-phone"/></div>
+            <button class="btn btn-primary btn-full" id="btn-save-loja">
+              <i data-lucide="save"></i> Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="subpage-seguranca" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-seguranca">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Segurança</div>
+          <div id="seguranca-content"></div>
+        </div>
+      </div>
+
+      <div id="subpage-turno" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-turno">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Meu Turno</div>
+          <div id="turno-content"></div>
+        </div>
+      </div>
+
+      <div id="subpage-fornecedores" style="display:none">
+        <div class="page-inner">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <button class="btn btn-ghost btn-sm" id="btn-back-fornecedores">← Voltar</button>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" id="btn-fornecedor-add">
+                <i data-lucide="user-plus"></i> Fornecedor
+              </button>
+              <button class="btn btn-primary btn-sm" id="btn-compra-add">
+                <i data-lucide="package-plus"></i> Compra
+              </button>
+            </div>
+          </div>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Fornecedores</div>
+          <div id="fornecedores-content"></div>
+        </div>
+      </div>
+
+      <div id="subpage-dashboard" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-dashboard">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Dashboard</div>
+          <div id="dash-content"></div>
+        </div>
+      </div>
+
+      <div id="subpage-senha" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-senha">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 16px">Alterar Senha</div>
+          <div class="vender-card" style="display:flex;flex-direction:column;gap:14px">
+            <div class="field"><label>Senha actual</label><input type="password" id="pw-cur"/></div>
+            <div class="field"><label>Nova senha</label><input type="password" id="pw-new"/></div>
+            <div class="field"><label>Confirmar</label><input type="password" id="pw-conf"/></div>
+            <button class="btn btn-primary btn-full" id="btn-change-pw">
+              <i data-lucide="lock"></i> Alterar Senha
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div id="bottom-nav">
+    <button class="nav-item active" data-page="vender">
+      <i data-lucide="shopping-cart"></i><span>Vender</span>
+    </button>
+    <button class="nav-item" data-page="produtos">
+      <i data-lucide="package"></i><span>Produtos</span>
+    </button>
+    <button class="nav-item" data-page="fiados">
+      <i data-lucide="credit-card"></i><span>Fiados</span>
+    </button>
+    <button class="nav-item" data-page="historico">
+      <i data-lucide="clock"></i><span>Histórico</span>
+    </button>
+    <button class="nav-item" data-page="perfil">
+      <i data-lucide="user"></i><span>Perfil</span>
+    </button>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="overlay">
+  <div class="modal" id="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-title"></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- MODO CAIXA RÁPIDA -->
+<div id="quick-mode" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#f4f4f5;z-index:250;flex-direction:column;">
+
+  <!-- Header -->
+  <div style="background:#5b21b6;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+    <div>
+      <div style="color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px">
+        <i data-lucide="zap" style="width:18px;height:18px"></i> Caixa Rápida
+      </div>
+      <div style="color:#ddd6fe;font-size:12px;margin-top:2px">
+        Carrinho: <span id="qm-count" style="font-weight:700">0</span> produto(s)
+      </div>
+    </div>
+    <button id="btn-qm-close" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);border-radius:8px;color:#fff;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+      ✕ Fechar
+    </button>
+  </div>
+
+  <!-- Pesquisa -->
+  <div style="padding:10px 12px;background:#fff;border-bottom:1px solid #e4e4e7;flex-shrink:0;display:flex;gap:8px">
+    <div style="flex:1;display:flex;align-items:center;background:#f4f4f5;border-radius:10px;padding:0 12px;gap:8px;border:1.5px solid #e4e4e7">
+      <i data-lucide="search" style="width:16px;height:16px;color:#71717a;flex-shrink:0"></i>
+      <input id="qm-search" placeholder="Pesquisar produto ou scan..." autocomplete="off"
+             style="flex:1;background:none;border:none;padding:11px 0;font-size:15px;font-family:inherit;outline:none;color:#18181b"/>
+    </div>
+    <button id="btn-qm-scan" style="background:#ede9fe;border:1.5px solid #ddd6fe;border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <i data-lucide="scan-line" style="width:20px;height:20px;color:#5b21b6"></i>
+    </button>
+  </div>
+
+  <!-- Resultados -->
+  <div id="qm-results" style="display:none;background:#fff;border-bottom:1px solid #e4e4e7;max-height:160px;overflow-y:auto;flex-shrink:0"></div>
+
+  <!-- Carrinho -->
+  <div id="qm-cart" style="flex:1;overflow-y:auto;background:#f4f4f5"></div>
+
+  <!-- Pagamento -->
+  <div style="background:#fff;padding:12px 16px;border-top:1px solid #e4e4e7;flex-shrink:0">
+    <div style="font-size:11px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Pagamento</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button class="qm-pay-btn active" data-method="dinheiro" style="flex:1;padding:9px 4px;border:2px solid #5b21b6;border-radius:8px;background:#ede9fe;color:#5b21b6;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Dinheiro</button>
+      <button class="qm-pay-btn" data-method="transferencia" style="flex:1;padding:9px 4px;border:2px solid #e4e4e7;border-radius:8px;background:#fff;color:#71717a;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Transfer.</button>
+      <button class="qm-pay-btn" data-method="multicaixa" style="flex:1;padding:9px 4px;border:2px solid #e4e4e7;border-radius:8px;background:#fff;color:#71717a;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Multicaixa</button>
+      <button class="qm-pay-btn" data-method="fiado" style="flex:1;padding:9px 4px;border:2px solid #e4e4e7;border-radius:8px;background:#fff;color:#71717a;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Fiado</button>
+    </div>
+    <div id="qm-fiado-wrap" style="display:none;margin-bottom:10px">
+      <input id="qm-fiado-client" placeholder="Nome do cliente *"
+             style="width:100%;background:#f4f4f5;border:1.5px solid #e4e4e7;border-radius:10px;padding:11px 14px;font-size:14px;font-family:inherit;outline:none;color:#18181b"/>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:15px;font-weight:700;color:#18181b">Total</span>
+      <span id="qm-total" style="font-size:24px;font-weight:700;color:#16a34a">0,00 Kz</span>
+    </div>
+    <button id="btn-qm-finalizar" style="width:100%;padding:15px;background:#5b21b6;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(91,33,182,.3)">
+      <i data-lucide="check" style="width:20px;height:20px"></i>
+      Finalizar venda
+    </button>
+  </div>
+
+</div>
+
+<!-- CÂMARA --><!-- CÂMARA --><!-- CÂMARA -->
+<div id="camera-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:300;flex-direction:column">
+  <div style="padding:16px;display:flex;justify-content:space-between;align-items:center">
+    <span style="color:#fff;font-size:16px;font-weight:700">Ler código</span>
+    <button id="btn-close-camera" style="color:#fff;background:rgba(255,255,255,.2);border:none;
+            border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">Fechar</button>
+  </div>
+  <video id="camera-video" style="flex:1;width:100%;object-fit:cover" playsinline></video>
+  <div style="padding:16px;text-align:center;color:rgba(255,255,255,.6);font-size:13px">
+    Aponte para o código de barras ou QR do produto
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<!-- MODAL VERIFICAÇÃO -->
+<div id="verify-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+     background:rgba(0,0,0,.5);z-index:300;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:340px">
+    <div style="font-size:16px;font-weight:700;margin-bottom:16px;text-align:center">Verificar Recibo</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button onclick="window._verifyByCam()" style="padding:14px;border:2px solid #5b21b6;border-radius:10px;background:#ede9fe;color:#5b21b6;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+        <i data-lucide="scan-line" style="width:18px;height:18px"></i> Usar câmara
+      </button>
+      <button onclick="window._verifyByCode()" style="padding:14px;border:2px solid #e4e4e7;border-radius:10px;background:#f4f4f5;color:#18181b;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+        <i data-lucide="keyboard" style="width:18px;height:18px"></i> Digitar código
+      </button>
+      <div id="verify-code-input" style="display:none;flex-direction:column;gap:8px">
+        <input id="manual-code" placeholder="Ex: K3F9X2" maxlength="10"
+               style="width:100%;padding:12px;border:2px solid #5b21b6;border-radius:10px;
+                      font-size:18px;font-weight:700;text-align:center;font-family:inherit;
+                      outline:none;letter-spacing:4px;text-transform:uppercase;box-sizing:border-box"/>
+        <button onclick="window._verifyManualCode()" style="padding:12px;background:#5b21b6;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+          Verificar
+        </button>
+      </div>
+      <button onclick="document.getElementById('verify-overlay').style.display='none'" 
+              style="padding:10px;border:none;background:none;color:#71717a;font-size:14px;cursor:pointer;font-family:inherit">
+        Cancelar
+      </button>
+    </div>
+  </div>
+</div>
+<script src="/assets/qrcode.min.js"></script>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

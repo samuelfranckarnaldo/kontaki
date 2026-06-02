@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"/><title>Reset DB</title></head>
+<body>
+<h2>Reset Kontaki DB</h2>
+<button onclick="reset()" style="padding:20px;font-size:18px;background:red;color:white;border:none;border-radius:10px;cursor:pointer">
+  Apagar base de dados e reiniciar
+</button>
+<p id="msg"></p>
+<script>
+function reset() {
+  const req = indexedDB.deleteDatabase('kontaki_db');
+  req.onsuccess = () => {
+    document.getElementById('msg').textContent = 'Feito! A redirecionar...';
+    setTimeout(() => window.location.href = '/', 1500);
+  };
+  req.onerror = () => {
+    document.getElementById('msg').textContent = 'Erro: ' + req.error;
+  };
+}
+</script>
+</body>
+</html>
