@@ -43,7 +43,7 @@ async function renderList() {
 
   const q = (val("fiados-search")||"").toLowerCase();
   const filtered = all.filter(f => {
-    const ms = (f.clientName || "").toLowerCase().includes(q);
+    const ms = f.(clientName&&clientName.toLowerCase)().includes(q);
     const mf = fiadoFilter==="all" || f.status===fiadoFilter;
     return ms && mf;
   });
