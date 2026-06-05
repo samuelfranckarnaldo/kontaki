@@ -1,4 +1,5 @@
-import { loadDashboard }   from "./dashboard.js";
+import { loadDashboard }      from "./dashboard.js";
+import { loadConfiguracoes }  from "./configuracoes.js";
 import { loadSeguranca }   from "./seguranca.js";
 import { loadTurno } from "./turno.js";
 import { loadFornecedores } from "./fornecedores.js";
@@ -23,6 +24,7 @@ function renderMenu() {
   const items = [
     ...(user.role === "admin" ? [
       { label: "Fornecedores",     sub: "Compras e fornecedores",   icon: "truck",         color: "#fef3c7", iconColor: "#d97706", page: "fornecedores"},
+      { label: "Configurações",   sub: "Loja, backup e logs",       icon: "settings",      color: "#f4f4f5", iconColor: "#71717a", page: "configuracoes"},
       { label: "Segurança",          sub: "Chave HMAC e auditoria",   icon: "shield",        color: "#fee2e2", iconColor: "#dc2626", page: "seguranca"   },
       { label: "Dashboard",          sub: "Resumo do negócio",        icon: "bar-chart-2",   color: "#dcfce7", iconColor: "#16a34a", page: "dashboard"  },
       { label: "Gestão de Stock",   sub: "Produtos e inventário",   icon: "package",       color: "#ede9fe", iconColor: "#5b21b6", page: "stock"      },
@@ -77,6 +79,7 @@ window._perfilNav = async (page) => {
   if (page === "incidentes") await loadIncidentes();
   if (page === "equipa")     await loadEquipa();
   if (page === "loja")       await loadLoja();
+  if (page === "configuracoes") await loadConfiguracoesPage();
   if (page === "seguranca")    await loadSegurancaPage();
   if (page === "turno")        await loadTurnoPage();
   if (page === "fornecedores") await loadFornecedoresPage();
@@ -84,7 +87,7 @@ window._perfilNav = async (page) => {
 };
 
 function showSubpage(name) {
-  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca"];
+  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes"];
   subpages.forEach(s => {
     const node = el("subpage-" + s);
     if (node) node.style.display = "none";
@@ -361,4 +364,11 @@ async function loadSegurancaPage() {
   if (btn) btn.onclick = () => showSubpage(null);
   window._showSubpage = showSubpage;
   await loadSeguranca();
+}
+
+async function loadConfiguracoesPage() {
+  const btn = document.getElementById("btn-back-configuracoes");
+  if (btn) btn.onclick = () => showSubpage(null);
+  window._showSubpage = showSubpage;
+  await loadConfiguracoes();
 }
