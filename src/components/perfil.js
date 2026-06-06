@@ -7,7 +7,7 @@ import { db }                    from "../db.js";
 import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
-import { getUser, logout }       from "../auth.js";
+import { getUser, logout, changePasswordAuth, createUser } from "../auth.js";
 
 export async function initPerfil() {
   const user = getUser();
@@ -288,16 +288,19 @@ function openUserAdd() {
 }
 
 window._saveUser = async () => {
-  const name = el("uf-name").value.trim();
+  const name     = el("uf-name").value.trim();
   const username = el("uf-user").value.trim();
   const password = el("uf-pass").value;
+  const role     = el("uf-role").value;
   if (!name || !username || !password) { toast("Preencha todos os campos.", "error"); return; }
-  const users = await db.getAll("users");
-  if (users.find(u => u.username === username)) { toast("Username já existe.", "error"); return; }
-  await db.add("users", { name, username, password, role: el("uf-role").value, active: true, createdAt: new Date().toISOString() });
-  toast("Funcionário adicionado.", "success");
-  closeModal();
-  loadEquipa();
+  try {
+    await createUser(name, username, password, role);
+    toast("Funcionário adicionado.", "success");
+    closeModal();
+    loadEquipa();
+  } catch(err) {
+    toast(err.message, "error");
+  }
 };
 
 window._toggleUser = async (id) => {
@@ -323,11 +326,13 @@ async function changePassword() {
   const cur = val("pw-cur"), nw = val("pw-new"), conf = val("pw-conf");
   if (!cur || !nw) { toast("Preencha todos os campos.", "error"); return; }
   if (nw !== conf)  { toast("As senhas não coincidem.", "error"); return; }
-  const u = await db.get("users", getUser().id);
-  if (u.password !== cur) { toast("Senha actual incorreta.", "error"); return; }
-  await db.put("users", { ...u, password: nw });
-  toast("Senha alterada.", "success");
-  el("pw-cur").value = ""; el("pw-new").value = ""; el("pw-conf").value = "";
+  try {
+    await changePasswordAuth(cur, nw);
+    toast("Senha alterada com sucesso.", "success");
+    el("pw-cur").value = ""; el("pw-new").value = ""; el("pw-conf").value = "";
+  } catch(err) {
+    toast(err.message, "error");
+  }
 }
 
 window._closeModal = closeModal;
