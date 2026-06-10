@@ -34,6 +34,9 @@ export function initAuth() {
     var p = pass.value;
     if (!u || !p) { showErr("Preenche todos os campos."); return; }
 
+    // Valida role seleccionada
+    var selectedRole = window._selectedRole || null;
+
     var users = await db.getAll("users");
     var user  = null;
 
@@ -41,6 +44,8 @@ export function initAuth() {
       var candidate = users[i];
       if (candidate.username !== u) continue;
       if (candidate.active === false) continue;
+      // Se role foi seleccionada, verifica
+      if (selectedRole && candidate.role !== selectedRole) continue;
 
       // Suporta senha em texto simples (migração) e hash SHA-256
       var valid = false;
@@ -272,12 +277,42 @@ export function logout() {
   if (!confirm("Tens a certeza que queres terminar a sessão?")) return;
   currentUser    = null;
   currentSession = null;
-  var app   = document.getElementById("app");
-  var login = document.getElementById("login-page");
-  if (app)   app.style.display   = "none";
-  if (login) login.style.display = "flex";
-  document.getElementById("inp-user").value = "";
-  document.getElementById("inp-pass").value = "";
+
+  var app    = document.getElementById("app");
+  var login  = document.getElementById("login-page");
+  var screen = document.getElementById("logout-screen");
+
+  if (app) app.style.display = "none";
+
+  // Mostra ecrã de logout animado
+  if (screen) {
+    screen.style.display = "flex";
+    var lucide = window.lucide;
+    if (lucide) lucide.createIcons();
+    var bar = document.getElementById("logout-progress");
+    if (bar) setTimeout(function() { bar.style.width = "100%"; }, 100);
+    setTimeout(function() {
+      screen.style.display = "none";
+      if (login) {
+        login.style.display = "flex";
+        // Volta ao step de role
+        var stepRole  = document.getElementById("login-step-role");
+        var stepCreds = document.getElementById("login-step-creds");
+        if (stepRole)  stepRole.style.display  = "flex";
+        if (stepCreds) stepCreds.style.display = "none";
+        var inpUser = document.getElementById("inp-user");
+        var inpPass = document.getElementById("inp-pass");
+        if (inpUser) inpUser.value = "";
+        if (inpPass) inpPass.value = "";
+      }
+    }, 1800);
+  } else {
+    if (login) login.style.display = "flex";
+    var inpUser = document.getElementById("inp-user");
+    var inpPass = document.getElementById("inp-pass");
+    if (inpUser) inpUser.value = "";
+    if (inpPass) inpPass.value = "";
+  }
 }
 
 // ── ALTERAR SENHA (autenticado) ───────────────────────────────────────────────

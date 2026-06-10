@@ -17,12 +17,55 @@ export async function initPerfil() {
 
   renderMenu();
   setupSubpageButtons();
+  renderPwaButton();
+  renderVersionFooter();
+}
+
+function renderPwaButton() {
+  var wrap = el("perfil-menu");
+  if (!wrap) return;
+  var existing = document.getElementById("pwa-install-wrap");
+  if (existing) existing.remove();
+  var div = document.createElement("div");
+  div.id = "pwa-install-wrap";
+  div.style.cssText = "padding:0 0 12px";
+  div.innerHTML =
+    '<button class="btn-install-pwa" onclick="window._installPWA()" ' +
+    'style="display:none;width:100%;padding:14px;background:linear-gradient(135deg,#5b21b6,#7c3aed);' +
+    'color:#fff;border:none;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;' +
+    'font-family:inherit;align-items:center;justify-content:center;gap:10px;margin-bottom:8px">' +
+    '<i data-lucide="download" style="width:18px;height:18px"></i>' +
+    'Instalar Kontaki no dispositivo</button>';
+  wrap.parentNode.insertBefore(div, wrap);
+  refreshIcons(div);
+}
+
+function renderVersionFooter() {
+  var existing = document.getElementById("perfil-version-footer");
+  if (existing) existing.remove();
+  var pg = el("pg-perfil");
+  if (!pg) return;
+  var div = document.createElement("div");
+  div.id = "perfil-version-footer";
+  div.style.cssText = "padding:16px;text-align:center;border-top:1px solid #f4f4f5;margin-top:8px";
+  div.innerHTML =
+    '<div style="font-size:12px;color:#a1a1aa;line-height:1.8">' +
+    'Kontaki v1.0.0-beta<br/>' +
+    'Introxeer Technology · Angola<br/>' +
+    '<button onclick="window._showTermos()" style="background:none;border:none;color:#5b21b6;' +
+    'font-size:11px;cursor:pointer;font-family:inherit;text-decoration:underline">Termos</button>' +
+    ' · ' +
+    '<button onclick="window._showPrivacidade()" style="background:none;border:none;color:#5b21b6;' +
+    'font-size:11px;cursor:pointer;font-family:inherit;text-decoration:underline">Privacidade</button>' +
+    '</div>';
+  pg.appendChild(div);
 }
 
 function renderMenu() {
   const user  = getUser();
   const items = [
     ...(user.role === "admin" ? [
+      { label: "Fecho de Turno", sub: "Fechar turno e gerar .ktk", icon: "clock", color: "#ede9fe", iconColor: "#5b21b6", page: "turno" },
       { label: "Fornecedores",     sub: "Compras e fornecedores",   icon: "truck",         color: "#fef3c7", iconColor: "#d97706", page: "fornecedores"},
       { label: "Configurações",   sub: "Loja, backup e logs",       icon: "settings",      color: "#f4f4f5", iconColor: "#71717a", page: "configuracoes"},
       { label: "Segurança",          sub: "Chave HMAC e auditoria",   icon: "shield",        color: "#fee2e2", iconColor: "#dc2626", page: "seguranca"   },
@@ -103,25 +146,116 @@ function showSubpage(name) {
 }
 
 async function loadStock() {
-  const products = await db.getAll("products");
-  const q = ((el("stock-search") ? el("stock-search").value : "") || "").toLowerCase();
-  const list = products.filter(p => p.active && p.name.toLowerCase().includes(q));
+  var invMode = false;
+  var counts  = {};
 
-  el("stock-list").innerHTML = list.map(p => `
-    <div style="display:flex;justify-content:space-between;align-items:center;
-                padding:14px 16px;border-bottom:1px solid #f4f4f5">
-      <div>
-        <div style="font-size:14px;font-weight:600">${p.name}</div>
-        <div style="font-size:12px;color:#71717a">${p.category} · ${p.price.toLocaleString("pt-AO")} Kz</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:15px;font-weight:700;color:${p.stock <= 5 ? "#d97706" : "#16a34a"}">${p.stock}</span>
-        <button class="btn btn-ghost btn-sm" onclick="window._openAdjust(${p.id})">Ajustar</button>
-      </div>
-    </div>`).join("");
+  async function render() {
+    const products = await db.getAll("products");
+    const q = ((el("stock-search") && el("stock-search").value) || "").toLowerCase();
+    const list = products.filter(function(p) {
+      return p.active && p.name.toLowerCase().includes(q);
+    });
 
-  el("stock-search").oninput = loadStock;
-  refreshIcons(el("subpage-stock"));
+    var invBtn = el("btn-inv-toggle");
+    if (invBtn) {
+      invBtn.textContent = invMode ? "Terminar Inventário" : "Modo Inventário";
+      invBtn.style.background = invMode ? "#fee2e2" : "#ede9fe";
+      invBtn.style.color      = invMode ? "#dc2626" : "#5b21b6";
+      invBtn.style.border     = "none";
+      invBtn.style.borderRadius = "10px";
+      invBtn.style.padding    = "10px 16px";
+      invBtn.style.fontWeight = "700";
+      invBtn.style.cursor     = "pointer";
+      invBtn.style.width      = "100%";
+      invBtn.style.marginBottom = "10px";
+      invBtn.style.fontFamily = "inherit";
+    }
+
+    el("stock-list").innerHTML = list.map(function(p) {
+      var stockColor = p.stock <= p.minStock ? "#d97706" : "#16a34a";
+      var invField = invMode
+        ? '<input type="number" placeholder="Contagem" min="0" value="' + (counts[p.id] !== undefined ? counts[p.id] : "") + '" ' +
+          'style="width:80px;padding:6px 8px;border:1.5px solid #ddd6fe;border-radius:8px;text-align:center;font-size:14px;font-weight:700" ' +
+          'onchange="window._invCount(' + p.id + ',this.value)"/>'
+        : '<button class="btn btn-ghost btn-sm" onclick="window._openAdjust(' + p.id + ')">Ajustar</button>';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #f4f4f5">' +
+        '<div>' +
+        '<div style="font-size:14px;font-weight:600">' + p.name + '</div>' +
+        '<div style="font-size:12px;color:#71717a">' + p.category + ' · ' + p.price.toLocaleString("pt-AO") + ' Kz</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+        '<span style="font-size:15px;font-weight:700;color:' + stockColor + '">' + p.stock + '</span>' +
+        invField +
+        '</div></div>';
+    }).join("");
+
+    if (invMode) {
+      var saveBtn = document.getElementById("inv-save-btn");
+      if (!saveBtn) {
+        saveBtn = document.createElement("button");
+        saveBtn.id = "inv-save-btn";
+        saveBtn.style.cssText = "width:100%;padding:14px;background:#5b21b6;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:10px";
+        saveBtn.textContent = "Gerar incidentes com contagem";
+        saveBtn.onclick = window._finalizarInventario;
+        el("stock-list").appendChild(saveBtn);
+      }
+    } else {
+      var old = document.getElementById("inv-save-btn");
+      if (old) old.remove();
+    }
+
+    var search = el("stock-search");
+    if (search) search.oninput = render;
+    refreshIcons(el("subpage-stock"));
+  }
+
+  window._invCount = function(id, val) {
+    counts[id] = parseInt(val) || 0;
+  };
+
+  window._finalizarInventario = async function() {
+    const products = await db.getAll("products");
+    var incidentes = 0;
+    for (var i = 0; i < products.length; i++) {
+      var p = products[i];
+      if (!p.active) continue;
+      if (counts[p.id] === undefined) continue;
+      var found    = counts[p.id];
+      var expected = p.stock;
+      var diff     = found - expected;
+      if (diff !== 0) {
+        await db.add("incidents", {
+          productId:   p.id,
+          productName: p.name,
+          expected:    expected,
+          found:       found,
+          diff:        diff,
+          sessionId:   getUser().sessionId || null,
+          responsibleSessionId: null,
+          foundBy:     getUser().id,
+          status:      "open",
+          note:        "Inventário físico",
+          createdAt:   new Date().toISOString(),
+        });
+        incidentes++;
+      }
+    }
+    toast(incidentes + " incidente(s) gerado(s).", incidentes > 0 ? "error" : "success");
+    counts = {};
+    invMode = false;
+    await render();
+  };
+
+  var invBtn = el("btn-inv-toggle");
+  if (invBtn) {
+    invBtn.onclick = function() {
+      invMode = !invMode;
+      counts = {};
+      render();
+    };
+  }
+
+  await render();
 }
 
 function openProductAdd() {

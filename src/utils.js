@@ -25,7 +25,11 @@ export const refreshIcons = (node = document) => {
 };
 
 // QR Code gerado offline via Canvas - implementação minimalista
-export function generateQR(text, container, size = 120) {
+export function generateQR(text, container, size) {
+  size = size || 120;
+  if (!container) return;
+  // QRCode.js max ~512 chars no modo M — garante limite
+  if (text && text.length > 200) text = text.slice(0, 200);
   if (!container) return;
   container.innerHTML = "";
 

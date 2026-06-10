@@ -1,0 +1,38 @@
+{
+  "name": "Kontaki",
+  "short_name": "Kontaki",
+  "description": "Gestão de negócios offline-first para pequenas lojas",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#5b21b6",
+  "lang": "pt",
+  "icons": [
+    {
+      "src": "/assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Vender",
+      "url": "/?page=vender",
+      "description": "Abrir modo de venda"
+    },
+    {
+      "name": "Produtos",
+      "url": "/?page=produtos",
+      "description": "Gerir produtos"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 const DB_NAME    = "kontaki_db";
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 let _db = null;
 
 function openDB() {

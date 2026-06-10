@@ -1,7 +1,8 @@
 import { db } from "../db.js";
 import { fmt, today, refreshIcons } from "../utils.js";
 
-export async function loadDashboard() {
+export async function loadDashboard(filterUserId) {
+  filterUserId = filterUserId || null;
   const elD = document.getElementById("dash-content");
   if (!elD) return;
   elD.innerHTML = `<div style="padding:20px;text-align:center;color:#a1a1aa;font-size:13px">A carregar...</div>`;

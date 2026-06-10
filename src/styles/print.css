@@ -1,0 +1,148 @@
+/* ── ESTILOS DE IMPRESSÃO KONTAKI ─────────────────────────────── */
+
+@media print {
+  /* Esconde tudo excepto o recibo */
+  body > *:not(#print-root) { display: none !important; }
+  #print-root { display: block !important; }
+
+  body { margin: 0; padding: 0; background: #fff; }
+}
+
+/* Formatos de papel */
+.recibo-58mm {
+  width: 58mm;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #000;
+}
+
+.recibo-80mm {
+  width: 80mm;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #000;
+}
+
+.recibo-a4 {
+  width: 210mm;
+  min-height: 297mm;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #000;
+  padding: 20mm;
+  box-sizing: border-box;
+}
+
+.recibo-a5 {
+  width: 148mm;
+  min-height: 210mm;
+  font-family: Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #000;
+  padding: 15mm;
+  box-sizing: border-box;
+}
+
+/* Elementos comuns */
+.recibo-header { text-align: center; margin-bottom: 12px; }
+.recibo-header h1 { font-size: 1.3em; font-weight: 700; margin: 0 0 4px; }
+.recibo-header p  { font-size: 0.85em; margin: 2px 0; color: #444; }
+
+.recibo-divider       { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+.recibo-divider-solid { border: none; border-top: 2px solid #000; margin: 8px 0; }
+
+.recibo-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 3px 0;
+}
+.recibo-row.total {
+  font-weight: 700;
+  font-size: 1.1em;
+  margin-top: 6px;
+}
+
+.recibo-footer {
+  text-align: center;
+  font-size: 0.8em;
+  color: #555;
+  margin-top: 12px;
+  line-height: 1.6;
+}
+
+.recibo-qr {
+  text-align: center;
+  margin: 10px 0;
+}
+
+.recibo-aviso {
+  font-size: 0.75em;
+  color: #777;
+  text-align: center;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* A4 — estilo factura profissional */
+.recibo-a4 .recibo-header h1 { font-size: 1.6em; }
+.recibo-a4 .factura-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin: 16px 0;
+}
+.recibo-a4 .factura-info-box {
+  background: #f8f8f8;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 12px;
+}
+.recibo-a4 .factura-info-box h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #777;
+  margin: 0 0 6px;
+}
+.recibo-a4 table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+.recibo-a4 table th {
+  background: #f0f0f0;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.recibo-a4 table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #eee;
+}
+.recibo-a4 .totais-box {
+  max-width: 280px;
+  margin-left: auto;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.recibo-a4 .totais-box .row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+}
+.recibo-a4 .totais-box .row.total {
+  background: #5b21b6;
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  border: none;
+}

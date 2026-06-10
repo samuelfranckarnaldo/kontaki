@@ -35,7 +35,7 @@ export var router = {
     refreshIcons(el("bottom-nav"));
     refreshIcons(el("topbar"));
     initQuickMode();
-    setTimeout(function() { self.go("vender"); }, 0);
+    setTimeout(function() { self.go("vender"); }, 50);
   },
 
   go: function(pageId) {

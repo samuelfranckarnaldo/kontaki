@@ -12,6 +12,10 @@ const MIME = {
   ".json": "application/json",
   ".png":  "image/png",
   ".svg":  "image/svg+xml",
+  ".woff2":"font/woff2",
+  ".woff": "font/woff",
+  ".ico":  "image/x-icon",
+  ".webp": "image/webp",
 };
 
 const server = http.createServer((req, res) => {
@@ -25,10 +29,16 @@ const server = http.createServer((req, res) => {
       res.end("Not found");
       return;
     }
-    res.writeHead(200, {
+    var headers = {
       "Content-Type": contentType,
       "Cache-Control": "no-cache",
-    });
+    };
+    // Service Worker precisa deste header para controlar toda a app
+    if (req.url === "/sw.js") {
+      headers["Service-Worker-Allowed"] = "/";
+      headers["Cache-Control"] = "no-store";
+    }
+    res.writeHead(200, headers);
     res.end(data);
   });
 });

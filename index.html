@@ -2,12 +2,20 @@
 <html lang="pt">
 <head>
   <meta charset="UTF-8"/>
+  <meta name="theme-color" content="#5b21b6"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="Kontaki"/>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Kontaki</title>
   <link rel="stylesheet" href="/src/styles/base.css"/>
   <link rel="stylesheet" href="/src/styles/layout.css"/>
   <link rel="stylesheet" href="/src/styles/components.css"/>
   <link rel="stylesheet" href="/src/styles/pages.css"/>
+  <link rel="stylesheet" href="/src/styles/print.css"/>
   <script src="/assets/lucide.min.js"></script>
 </head>
 <body>
@@ -20,37 +28,107 @@
       <h1>Kontaki</h1>
       <p>Gestão de negócios offline-first</p>
     </div>
-    <div class="login-card">
-      <div class="field">
-        <label>Utilizador</label>
-        <div class="input-icon-wrap">
-          <i data-lucide="user" class="input-icon"></i>
-          <input id="inp-user" placeholder="O seu utilizador" autocomplete="username"/>
+
+    <!-- STEP 1: Escolha de função -->
+    <div id="login-step-role" style="display:flex;flex-direction:column;gap:10px;width:100%">
+      <div style="font-size:12px;font-weight:700;color:#71717a;text-align:center;
+                  text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">
+        Como queres entrar?
+      </div>
+      <button onclick="window._selectRole('admin')"
+              style="padding:16px;background:#ede9fe;border:2px solid #ddd6fe;
+                     border-radius:14px;cursor:pointer;font-family:inherit;
+                     text-align:left;display:flex;align-items:center;gap:14px">
+        <div style="width:44px;height:44px;background:#5b21b6;border-radius:12px;
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i data-lucide="shield-check" style="width:22px;height:22px;color:#fff"></i>
         </div>
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#18181b">Administrador</div>
+          <div style="font-size:12px;color:#7c3aed;margin-top:2px">Acesso total · Stock · Equipa · Relatórios</div>
+        </div>
+      </button>
+      <button onclick="window._selectRole('caixa')"
+              style="padding:16px;background:#f0fdf4;border:2px solid #bbf7d0;
+                     border-radius:14px;cursor:pointer;font-family:inherit;
+                     text-align:left;display:flex;align-items:center;gap:14px">
+        <div style="width:44px;height:44px;background:#16a34a;border-radius:12px;
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i data-lucide="shopping-cart" style="width:22px;height:22px;color:#fff"></i>
+        </div>
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#18181b">Operador de Caixa</div>
+          <div style="font-size:12px;color:#16a34a;margin-top:2px">Vendas · Fiados · Histórico</div>
+        </div>
+      </button>
+      <div style="margin-top:8px;font-size:11px;color:#a1a1aa;text-align:center;line-height:1.7">
+        Ao entrar aceitas os
+        <button onclick="window._showTermos()" style="background:none;border:none;color:#5b21b6;
+                font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;
+                text-decoration:underline;padding:0">Termos e Condições</button>
+        e a
+        <button onclick="window._showPrivacidade()" style="background:none;border:none;color:#5b21b6;
+                font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;
+                text-decoration:underline;padding:0">Política de Privacidade</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: Credenciais -->
+    <div id="login-step-creds" style="display:none;flex-direction:column;gap:0;width:100%">
+      <div id="login-role-badge" style="display:flex;align-items:center;gap:10px;
+           padding:12px 14px;border-radius:12px;margin-bottom:14px"></div>
+      <div class="field">
+        <label>UTILIZADOR</label>
+        <input id="inp-user" type="text" placeholder="Username" autocomplete="username"/>
       </div>
       <div class="field">
-        <label>Senha</label>
-        <div class="input-icon-wrap pw-wrap">
-          <i data-lucide="lock" class="input-icon"></i>
-          <input id="inp-pass" type="password" placeholder="A sua senha" autocomplete="current-password"/>
-          <button class="pw-toggle" id="pw-toggle">
-            <i data-lucide="eye" id="pw-eye"></i>
+        <label>SENHA</label>
+        <div class="pw-wrap">
+          <input id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password"/>
+          <button id="pw-toggle" class="pw-eye-btn" type="button">
+            <i id="pw-eye" data-lucide="eye"></i>
           </button>
         </div>
       </div>
-      <div id="login-err" class="err-box">
+      <div id="login-err" style="display:none" class="login-err">
         <i data-lucide="alert-circle"></i>
         <span id="login-err-msg"></span>
       </div>
-      <button class="btn btn-primary btn-full btn-lg" id="btn-login">Entrar</button>
+      <button id="btn-login" class="btn btn-primary btn-full" style="margin-top:8px">Entrar</button>
+      <button onclick="window._backToRole()"
+              style="width:100%;padding:10px;background:none;border:none;color:#71717a;
+                     font-size:13px;cursor:pointer;font-family:inherit;margin-top:4px">
+        ← Voltar
+      </button>
+      <button id="btn-forgot-pw"
+              style="background:none;border:none;color:#5b21b6;font-size:13px;
+                     font-weight:600;cursor:pointer;font-family:inherit;padding:8px">
+        Esqueci a senha
+      </button>
     </div>
-    <button id="btn-forgot-pw" style="background:none;border:none;color:#5b21b6;
-            font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;
-            margin-top:8px;padding:8px">
-      Esqueci a senha
-    </button>
+
     <p class="login-hint">admin / admin123 &nbsp;•&nbsp; caixa1 / caixa123</p>
   </div>
+</div>
+
+<!-- Ecrã de logout animado -->
+<div id="logout-screen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+     background:linear-gradient(135deg,#5b21b6,#7c3aed);z-index:9000;
+     flex-direction:column;align-items:center;justify-content:center;padding:40px;text-align:center">
+  <div style="width:80px;height:80px;background:rgba(255,255,255,.15);border-radius:50%;
+              display:flex;align-items:center;justify-content:center;margin-bottom:24px">
+    <i data-lucide="log-out" style="width:36px;height:36px;color:#fff"></i>
+  </div>
+  <div style="font-size:26px;font-weight:700;color:#fff;margin-bottom:8px">Até logo!</div>
+  <div style="font-size:14px;color:#ddd6fe;margin-bottom:32px;line-height:1.6">
+    A tua sessão foi terminada com segurança.<br/>Os dados estão guardados localmente.
+  </div>
+  <div style="width:200px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;overflow:hidden">
+    <div id="logout-progress" style="height:100%;background:#fff;border-radius:2px;
+         width:0%;transition:width 1.8s ease"></div>
+  </div>
+  <div style="font-size:12px;color:#c4b5fd;margin-top:12px">A voltar ao login...</div>
+</div>
 </div>
 
 <!-- APP -->
@@ -235,7 +313,8 @@
             <i data-lucide="search"></i>
           </button>
         </div>
-        <div id="historico-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px"></div>
+        <div style="background:#f4f4f5;border-radius:10px;padding:4px;display:flex;gap:2px;margin-top:4px" id="historico-tabs"></div>
+        <div id="historico-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px"></div>
         <div id="historico-chart" class="vender-card" style="display:none;margin-top:0"></div>
         <button id="btn-export-csv" class="btn btn-ghost btn-full btn-sm" style="display:none;margin-top:0"><i data-lucide="download"></i> Exportar CSV</button>
         <div class="list-card" style="margin-top:0" id="historico-list"></div>
@@ -515,5 +594,59 @@
 </div>
 <script src="/assets/qrcode.min.js"></script>
 <script type="module" src="/src/main.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js').then(function(reg) {
+          console.log('[SW] Registado:', reg.scope);
+
+          // Detecta update disponível
+          reg.addEventListener('updatefound', function() {
+            var newWorker = reg.installing;
+            newWorker.addEventListener('statechange', function() {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Notifica utilizador de update
+                var div = document.createElement('div');
+                div.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;' +
+                  'background:#5b21b6;color:#fff;padding:12px 16px;border-radius:12px;' +
+                  'font-size:13px;font-family:inherit;display:flex;justify-content:space-between;' +
+                  'align-items:center;z-index:9999;box-shadow:0 4px 16px rgba(91,33,182,.4)';
+                div.innerHTML = '<span>Nova versão disponível!</span>' +
+                  '<button onclick="window.location.reload()" style="background:rgba(255,255,255,.2);' +
+                  'border:none;color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;' +
+                  'font-family:inherit;font-weight:700">Actualizar</button>';
+                document.body.appendChild(div);
+              }
+            });
+          });
+        }).catch(function(err) {
+          console.warn('[SW] Erro:', err);
+        });
+      });
+    }
+
+    // Banner de instalação PWA
+    var deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      deferredPrompt = e;
+
+      // Mostra botão de instalação no perfil
+      var installBtns = document.querySelectorAll('.btn-install-pwa');
+      installBtns.forEach(function(btn) { btn.style.display = 'flex'; });
+    });
+
+    window._installPWA = function() {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(result) {
+        if (result.outcome === 'accepted') {
+          var btns = document.querySelectorAll('.btn-install-pwa');
+          btns.forEach(function(btn) { btn.style.display = 'none'; });
+        }
+        deferredPrompt = null;
+      });
+    };
+  </script>
 </body>
 </html>

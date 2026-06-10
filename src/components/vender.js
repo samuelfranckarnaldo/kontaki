@@ -120,10 +120,10 @@ async function verifyCode(code) {
   let hash = code;
   let sid  = null;
 
-  if (code.startsWith("KONTAKI|")) {
+  if (code.startsWith("KONTAKI|") || code.startsWith("K|")) {
     const parts = code.split("|");
-    sid  = parseInt((parts[1]||"").replace("VENDA#",""));
-    hash = parts[4] || "";
+    if (code.startsWith("K|")) { sid=parseInt(parts[1]||0); hash=parts[2]||""; }
+    else { sid=parseInt((parts[1]||"").replace("VENDA#","")); hash=parts[4]||""; }
   } else if (code.length <= 10) {
     // Código curto — procura por hash
     hash = code.toUpperCase();
@@ -148,7 +148,7 @@ async function verifyCode(code) {
     refreshIcons(el("modal-box")); return;
   }
 
-  const isValid = sale.hash === hash || code.startsWith("KONTAKI|");
+  const isValid = sale.hash === hash || code.startsWith("KONTAKI|") || code.startsWith("K|");
   openModal("Verificação de Recibo",
     `<div style="text-align:center;padding:16px 0">
       <div style="width:60px;height:60px;background:${isValid?"#dcfce7":"#fee2e2"};border-radius:50%;
@@ -469,7 +469,7 @@ window._confirmarVenda = async () => {
 function showReceipt({ sid, items, sub, da, total, clientName, clientPhone, store, payMethod, saleDate, hash }) {
   const dateStr   = fmtDate(saleDate);
   const storeName = store.name || "Kontaki";
-  const qrData    = `KONTAKI|VENDA#${sid}|${fmt(total)}|${dateStr}|${hash}`;
+  const qrData = "K|" + sid + "|" + hash;
 
   openModal(`Recibo #${sid}`,
     `<div id="recibo-content" style="font-family:monospace;max-width:300px;margin:0 auto;font-size:13px;line-height:1.6">
