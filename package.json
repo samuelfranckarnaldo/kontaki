@@ -1,0 +1,16 @@
+{
+  "name": "kontaki",
+  "version": "1.0.0",
+  "description": "Sistema de gestão de vendas e inventário",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "node --test",
+    "dev": "node --watch src/index.js"
+  },
+  "keywords": ["vendas", "inventory", "gestão"],
+  "author": "samuelfranckarnaldo",
+  "license": "ISC",
+  "dependencies": {}
+}
