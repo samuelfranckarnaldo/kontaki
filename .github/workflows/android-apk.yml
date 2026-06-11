@@ -29,8 +29,11 @@ jobs:
       - name: Install Capacitor
         run: npm install @capacitor/core @capacitor/cli @capacitor/android
 
+      - name: Create www directory
+        run: mkdir -p www && echo "Kontaki App" > www/index.html
+
       - name: Init Capacitor
-        run: npx cap init kontaki com.kontaki.app --web-dir=.
+        run: npx cap init kontaki com.kontaki.app --web-dir=www
 
       - name: Add Android
         run: npx cap add android || true
