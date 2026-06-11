@@ -32,8 +32,8 @@ android {
         jvmTarget = '17'
     }
 
-    packagingOptions {
-        exclude 'kotlin/collections/jdk8/CollectionsJDK8Kt.class'
+    lint {
+        checkDuplicateClasses = false
     }
 }
 
@@ -42,9 +42,8 @@ dependencies {
     implementation project(':capacitor-cordova-android-plugins')
     
     // Forçar versão do Kotlin em todas as dependências
-    constraints {
-        implementation('org.jetbrains.kotlin:kotlin-stdlib:1.8.22')
-        implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22')
+    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.8.22') {
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
     }
     
     implementation 'androidx.appcompat:appcompat:1.6.1'
@@ -55,7 +54,6 @@ configurations.all {
     resolutionStrategy {
         // Forçar todas as versões do Kotlin para 1.8.22
         force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
         force 'org.jetbrains.kotlin:kotlin-reflect:1.8.22'
     }
 }
