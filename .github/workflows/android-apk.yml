@@ -30,13 +30,16 @@ jobs:
         run: npm install @capacitor/core @capacitor/cli @capacitor/android
 
       - name: Create www directory
-        run: mkdir -p www && echo "Kontaki App" > www/index.html
+        run: mkdir -p www && echo "<html><body>Kontaki App</body></html>" > www/index.html
+
+      - name: Clean old Capacitor config
+        run: rm -rf capacitor.config.json android/ || true
 
       - name: Init Capacitor
         run: npx cap init kontaki com.kontaki.app --web-dir=www
 
       - name: Add Android
-        run: npx cap add android || true
+        run: npx cap add android
 
       - name: Sync
         run: npx cap sync android
