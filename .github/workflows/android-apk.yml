@@ -17,6 +17,12 @@ jobs:
         with:
           node-version: 20
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
       - name: Install dependencies
         run: npm install
 
@@ -24,13 +30,13 @@ jobs:
         run: npm install @capacitor/core @capacitor/cli @capacitor/android
 
       - name: Init Capacitor
-        run: npx cap init kontaki com.kontaki.app
+        run: npx cap init kontaki com.kontaki.app --web-dir=.
 
       - name: Add Android
-        run: npx cap add android
+        run: npx cap add android || true
 
-      - name: Copy web assets
-        run: npx cap copy android
+      - name: Sync
+        run: npx cap sync android
 
       - name: Build APK
         run: |
