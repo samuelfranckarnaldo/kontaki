@@ -31,8 +31,8 @@ android {
     kotlinOptions {
         jvmTarget = '17'
     }
-
-    lint {
+    
+    bundleConfig {
         checkDuplicateClasses = false
     }
 }
@@ -41,7 +41,7 @@ dependencies {
     implementation project(':capacitor-android')
     implementation project(':capacitor-cordova-android-plugins')
     
-    // Forçar versão do Kotlin em todas as dependências
+    // Excluir kotlin-stdlib-jdk8 de todas as dependências do Capacitor
     implementation('org.jetbrains.kotlin:kotlin-stdlib:1.8.22') {
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
     }
@@ -52,8 +52,11 @@ dependencies {
 
 configurations.all {
     resolutionStrategy {
-        // Forçar todas as versões do Kotlin para 1.8.22
+        // Forçar Kotlin 1.8.22 e remover jdk8
         force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
         force 'org.jetbrains.kotlin:kotlin-reflect:1.8.22'
+        
+        // Excluir completamente kotlin-stdlib-jdk8
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
     }
 }
