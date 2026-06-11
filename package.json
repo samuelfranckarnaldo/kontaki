@@ -2,15 +2,21 @@
   "name": "kontaki",
   "version": "1.0.0",
   "description": "Sistema de gestão de vendas e inventário",
-  "type": "module",
-  "main": "index.js",
+  "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "build": "node scripts/build.js",
-    "test": "node --test",
-    "dev": "node --watch src/index.js"
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "build:apk": "eas build --platform android --local"
   },
-  "keywords": ["vendas", "inventory", "gestão"],
-  "author": "samuelfranckarnaldo",
-  "license": "ISC",
-  "dependencies": {}
+  "dependencies": {
+    "expo": "^50.0.0",
+    "react": "^18.2.0",
+    "react-native": "^0.73.0",
+    "react-native-web": "^0.19.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.0"
+  }
 }
