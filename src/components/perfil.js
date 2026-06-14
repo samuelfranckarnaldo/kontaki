@@ -65,18 +65,25 @@ function renderMenu() {
   const user  = getUser();
   const items = [
     ...(user.role === "admin" ? [
-      { label: "Fecho de Turno", sub: "Fechar turno e gerar .ktk", icon: "clock", color: "#ede9fe", iconColor: "#5b21b6", page: "turno" },
-      { label: "Fornecedores",     sub: "Compras e fornecedores",   icon: "truck",         color: "#fef3c7", iconColor: "#d97706", page: "fornecedores"},
-      { label: "Configurações",   sub: "Loja, backup e logs",       icon: "settings",      color: "#f4f4f5", iconColor: "#71717a", page: "configuracoes"},
-      { label: "Segurança",          sub: "Chave HMAC e auditoria",   icon: "shield",        color: "#fee2e2", iconColor: "#dc2626", page: "seguranca"   },
-      { label: "Dashboard",          sub: "Resumo do negócio",        icon: "bar-chart-2",   color: "#dcfce7", iconColor: "#16a34a", page: "dashboard"  },
-      { label: "Gestão de Stock",   sub: "Produtos e inventário",   icon: "package",       color: "#ede9fe", iconColor: "#5b21b6", page: "stock"      },
-      { label: "Incidentes",        sub: "Divergências de stock",   icon: "alert-triangle", color: "#fef3c7", iconColor: "#d97706", page: "incidentes" },
-      { label: "Equipa",            sub: "Funcionários e acessos",  icon: "users",          color: "#dbeafe", iconColor: "#2563eb", page: "equipa"     },
-      { label: "Dados da Loja",     sub: "Nome, endereço, contacto",icon: "store",          color: "#dcfce7", iconColor: "#16a34a", page: "loja"       },
+      { label: "Fecho de Turno",    sub: "Fechar turno e gerar .ktk",    icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno"         },
+      { label: "Dashboard",         sub: "Resumo do negócio",             icon: "bar-chart-2",    color: "#dcfce7", iconColor: "#16a34a", page: "dashboard"     },
+      { label: "Contabilidade",     sub: "Receitas, despesas e lucros",   icon: "trending-up",    color: "#f0fdf4", iconColor: "#16a34a", page: "contabilidade" },
+      { label: "Gestão de Stock",   sub: "Produtos e inventário",         icon: "package",        color: "#ede9fe", iconColor: "#5b21b6", page: "stock"         },
+      { label: "Incidentes",        sub: "Divergências de stock",         icon: "alert-triangle", color: "#fef3c7", iconColor: "#d97706", page: "incidentes"    },
+      { label: "Fornecedores",      sub: "Compras e fornecedores",        icon: "truck",          color: "#fef3c7", iconColor: "#d97706", page: "fornecedores"  },
+      { label: "Equipa",            sub: "Funcionários e acessos",        icon: "users",          color: "#dbeafe", iconColor: "#2563eb", page: "equipa"        },
+      { label: "Dados da Loja",     sub: "Nome, endereço, contacto",      icon: "store",          color: "#dcfce7", iconColor: "#16a34a", page: "loja"          },
+      { label: "Segurança",         sub: "Chave HMAC e auditoria",        icon: "shield",         color: "#fee2e2", iconColor: "#dc2626", page: "seguranca"     },
+      { label: "Configurações",     sub: "Loja, backup e logs",           icon: "settings",       color: "#f4f4f5", iconColor: "#71717a", page: "configuracoes" },
     ] : []),
-    { label: "Alterar Senha",       sub: "Mudar senha de acesso",   icon: "lock",           color: "#f4f4f5", iconColor: "#71717a", page: "senha"      },
-    { label: "Terminar Sessão",     sub: "",                        icon: "log-out",        color: "#fee2e2", iconColor: "#dc2626", page: "logout"     },
+    { label: "Contabilidade",  sub: "Receitas, despesas e lucros",  icon: "trending-up", color: "#dcfce7", iconColor: "#16a34a", page: "contabilidade" },
+    { label: "Assinatura",     sub: "Licenca e plano activo",       icon: "award",       color: "#ede9fe", iconColor: "#5b21b6", page: "assinatura"    },
+    { label: "Contactos",      sub: "Suporte Introxeer Technology", icon: "headphones",  color: "#dbeafe", iconColor: "#2563eb", page: "contactos"     },
+    { label: "Fecho de Turno",   sub: "Fechar turno e gerar .ktk",  icon: "clock",  color: "#ede9fe", iconColor: "#5b21b6", page: "turno"    },
+    { label: "Alterar Senha",    sub: "Mudar senha de acesso",        icon: "lock",       color: "#f4f4f5", iconColor: "#71717a", page: "senha"     },
+    { label: "Assinatura",       sub: "Licença e plano activo",       icon: "award",      color: "#ede9fe", iconColor: "#5b21b6", page: "assinatura" },
+    { label: "Contactos",        sub: "Suporte Introxeer Technology", icon: "headphones", color: "#dbeafe", iconColor: "#2563eb", page: "contactos"  },
+    { label: "Terminar Sessão",  sub: "",                             icon: "log-out",    color: "#fee2e2", iconColor: "#dc2626", page: "logout"     },
   ];
 
   el("perfil-menu").innerHTML = `
