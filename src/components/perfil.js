@@ -122,7 +122,10 @@ window._perfilNav = async (page) => {
   if (page === "incidentes") await loadIncidentes();
   if (page === "equipa")     await loadEquipa();
   if (page === "loja")       await loadLoja();
-  if (page === "configuracoes") await loadConfiguracoesPage();
+  if (page === "configuracoes")  await loadConfiguracoesPage();
+  if (page === "contabilidade")  await loadContabilidadePage();
+  if (page === "assinatura")     await loadAssinaturaPage();
+  if (page === "contactos")      await loadContactosPage();
   if (page === "seguranca")    await loadSegurancaPage();
   if (page === "turno")        await loadTurnoPage();
   if (page === "fornecedores") await loadFornecedoresPage();
@@ -130,7 +133,7 @@ window._perfilNav = async (page) => {
 };
 
 function showSubpage(name) {
-  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes"];
+  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","assinatura","contactos"];
   subpages.forEach(s => {
     const node = el("subpage-" + s);
     if (node) node.style.display = "none";
@@ -324,15 +327,21 @@ window._openAdjust = async (id) => {
 };
 
 window._applyAdjust = async (id) => {
-  const p  = await db.get("products", id);
-  const ns = Number(el("adj-stock").value);
-  await db.put("products", { ...p, stock: ns, physicalStock: ns });
-  await db.add("adjustments", {
-    productId: id, productName: p.name,
-    fromStock: p.stock, toStock: ns,
-    reason: el("adj-reason").value,
-    userId: getUser().id, date: new Date().toISOString(),
-  });
+  const p      = await db.get("products", id);
+  const ns     = Number(el("adj-stock").value);
+  const reason = el("adj-reason") ? el("adj-reason").value : "Ajuste manual";
+  const diff   = ns - (p.stock||0);
+  await db.put("products", { ...p, stock: ns, physicalStock: ns, updatedAt: new Date().toISOString() });
+  if (diff !== 0) {
+    await db.add("stockMovements", {
+      productId: id, productName: p.name,
+      type: "adjustment", location: "shop",
+      qty: diff, qtyBefore: p.stock||0, qtyAfter: ns,
+      reference: "adjust", note: reason||"Ajuste manual",
+      userId: getUser().id, sessionId: getUser().sessionId||null,
+      imported: false, createdAt: new Date().toISOString(),
+    });
+  }
   toast("Stock ajustado.", "success");
   closeModal();
   loadStock();
@@ -350,9 +359,9 @@ async function loadIncidentes() {
             <div>
               <div style="font-weight:700;font-size:14px;margin-bottom:4px">${i.productName}</div>
               <div style="font-size:12px;color:#71717a">
-                Esperado: <strong>${i.expectedStock}</strong> ·
-                Contagem: <strong>${i.countedStock}</strong> ·
-                Diferença: <strong style="color:${i.difference < 0 ? "#dc2626" : "#16a34a"}">${i.difference > 0 ? "+" : ""}${i.difference}</strong>
+                Esperado: <strong>${i.expected||0}</strong> ·
+                Encontrado: <strong>${i.found||0}</strong> ·
+                Diferença: <strong style="color:${(i.diff||0) < 0 ? "#dc2626" : "#16a34a"}">${(i.diff||0) > 0 ? "+" : ""}${i.diff||0}</strong>
               </div>
             </div>
             ${i.status === "open" && getUser().role === "admin"
@@ -511,3 +520,282 @@ async function loadConfiguracoesPage() {
   window._showSubpage = showSubpage;
   await loadConfiguracoes();
 }
+
+
+async function loadContabilidadePage() {
+  var btn = document.getElementById("btn-back-contabilidade");
+  if (btn) btn.onclick = function(){ showSubpage(null); };
+  window._showSubpage = showSubpage;
+  await loadContabilidade();
+}
+
+async function loadAssinaturaPage() {
+  var btn = document.getElementById("btn-back-assinatura");
+  if (btn) btn.onclick = function(){ showSubpage(null); };
+  window._showSubpage = showSubpage;
+  await loadAssinatura();
+}
+
+async function loadContactosPage() {
+  var btn = document.getElementById("btn-back-contactos");
+  if (btn) btn.onclick = function(){ showSubpage(null); };
+  window._showSubpage = showSubpage;
+  await loadContactos();
+}
+
+async function loadContabilidade() {
+  var wrap = document.getElementById("contabilidade-content");
+  if (!wrap) return;
+
+  var sales    = await db.getAll("sales");
+  var purchases= await db.getAll("purchases");
+  var products = await db.getAll("products");
+  var fiados   = await db.getAll("fiado");
+
+  var now   = new Date();
+  var mes   = now.toISOString().slice(0,7);
+  var hoje  = now.toISOString().slice(0,10);
+  var ano   = now.getFullYear().toString();
+
+  // Receitas
+  var vendasMes  = sales.filter(function(s){ return (s.date||"").startsWith(mes); });
+  var vendasAno  = sales.filter(function(s){ return (s.date||"").startsWith(ano); });
+  var vendasHoje = sales.filter(function(s){ return (s.date||"").startsWith(hoje); });
+
+  var receitaMes  = vendasMes.reduce(function(a,s){ return a+(s.total||0); },0);
+  var receitaAno  = vendasAno.reduce(function(a,s){ return a+(s.total||0); },0);
+  var receitaHoje = vendasHoje.reduce(function(a,s){ return a+(s.total||0); },0);
+
+  // Custo das vendas (COGS)
+  var prodMap = {};
+  products.forEach(function(p){ prodMap[p.id]=p; });
+
+  var cogsMes = vendasMes.reduce(function(a,s){
+    return a + (s.items||[]).reduce(function(b,i){
+      var p = prodMap[i.id];
+      return b + (p ? (p.costPrice||0)*i.qty : 0);
+    },0);
+  },0);
+
+  var cogsAno = vendasAno.reduce(function(a,s){
+    return a + (s.items||[]).reduce(function(b,i){
+      var p = prodMap[i.id];
+      return b + (p ? (p.costPrice||0)*i.qty : 0);
+    },0);
+  },0);
+
+  // Lucro bruto
+  var lucroMes = receitaMes - cogsMes;
+  var lucroAno = receitaAno - cogsAno;
+  var margemMes = receitaMes > 0 ? ((lucroMes/receitaMes)*100).toFixed(1) : "0.0";
+
+  // Compras a fornecedores
+  var comprasMes = purchases.filter(function(p){ return (p.date||"").startsWith(mes); })
+    .reduce(function(a,p){ return a+(p.total||0); },0);
+
+  // Fiados em aberto
+  var fiadoAberto = fiados.filter(function(f){ return f.status==="open"; })
+    .reduce(function(a,f){ return a+(f.amount||0); },0);
+  var fiadoRecebido = fiados.filter(function(f){ return f.status==="paid"; })
+    .reduce(function(a,f){ return a+(f.amount||0); },0);
+
+  // Top produtos por receita
+  var prodReceita = {};
+  vendasMes.forEach(function(s){
+    (s.items||[]).forEach(function(i){
+      prodReceita[i.id] = (prodReceita[i.id]||{name:i.name,total:0,qty:0});
+      prodReceita[i.id].total += i.price*i.qty;
+      prodReceita[i.id].qty   += i.qty;
+    });
+  });
+  var topProd = Object.values(prodReceita).sort(function(a,b){ return b.total-a.total; }).slice(0,5);
+
+  // Vendas por método de pagamento
+  var porMetodo = {};
+  vendasMes.forEach(function(s){
+    porMetodo[s.payMethod] = (porMetodo[s.payMethod]||0) + s.total;
+  });
+
+  wrap.innerHTML =
+    // KPIs principais
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Resumo do Mês</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">' +
+    kpi("Receita mensal", fmt(receitaMes), "#16a34a", "trending-up") +
+    kpi("Lucro bruto", fmt(lucroMes), lucroMes>=0?"#16a34a":"#dc2626", "dollar-sign") +
+    kpi("Margem bruta", margemMes+"%", lucroMes>=0?"#5b21b6":"#dc2626", "percent") +
+    kpi("COGS do mês", fmt(cogsMes), "#d97706", "package") +
+    kpi("Compras", fmt(comprasMes), "#dc2626", "shopping-bag") +
+    kpi("Fiado aberto", fmt(fiadoAberto), "#d97706", "credit-card") +
+    '</div>' +
+
+    // Receita hoje vs mês vs ano
+    '<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid #f4f4f5">' +
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Receitas por período</div>' +
+    row("Hoje", fmt(receitaHoje), vendasHoje.length+" vendas") +
+    row("Este mês", fmt(receitaMes), vendasMes.length+" vendas") +
+    row("Este ano", fmt(receitaAno), vendasAno.length+" vendas") +
+    row("Fiado recebido", fmt(fiadoRecebido), fiados.filter(function(f){return f.status==="paid";}).length+" pagos") +
+    '</div>' +
+
+    // Top produtos
+    (topProd.length ?
+    '<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid #f4f4f5">' +
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Top Produtos (mês)</div>' +
+    topProd.map(function(p,i){
+      var pct = receitaMes>0?Math.round((p.total/receitaMes)*100):0;
+      return '<div style="margin-bottom:10px">' +
+        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">' +
+        '<span style="font-weight:600">'+(i+1)+'. '+p.name+'</span>' +
+        '<span style="font-weight:700;color:#16a34a">'+fmt(p.total)+'</span>' +
+        '</div>' +
+        '<div style="height:6px;background:#f4f4f5;border-radius:3px;overflow:hidden">' +
+        '<div style="height:100%;width:'+pct+'%;background:#5b21b6;border-radius:3px"></div>' +
+        '</div>' +
+        '<div style="font-size:11px;color:#a1a1aa;margin-top:2px">'+p.qty+' unidades · '+pct+'% da receita</div>' +
+        '</div>';
+    }).join("") +
+    '</div>' : "") +
+
+    // Por método de pagamento
+    '<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid #f4f4f5">' +
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Por método de pagamento</div>' +
+    Object.entries(porMetodo).map(function(e){
+      var pct = receitaMes>0?Math.round((e[1]/receitaMes)*100):0;
+      var colors = {dinheiro:"#16a34a",transferencia:"#2563eb",multicaixa:"#d97706",fiado:"#dc2626"};
+      var color  = colors[e[0]]||"#71717a";
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f4f4f5">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+        '<div style="width:10px;height:10px;border-radius:50%;background:'+color+'"></div>' +
+        '<span style="font-size:13px;font-weight:600;text-transform:capitalize">'+e[0]+'</span>' +
+        '</div>' +
+        '<div style="text-align:right">' +
+        '<div style="font-size:13px;font-weight:700;color:'+color+'">'+fmt(e[1])+'</div>' +
+        '<div style="font-size:11px;color:#a1a1aa">'+pct+'%</div>' +
+        '</div></div>';
+    }).join("") +
+    '</div>';
+
+  refreshIcons(wrap);
+}
+
+function kpi(label, value, color, icon) {
+  return '<div class="stat-card" style="border-left:3px solid '+color+'">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+    '<div class="stat-label" style="color:'+color+';font-size:11px">'+label+'</div>' +
+    '<i data-lucide="'+icon+'" style="width:14px;height:14px;color:'+color+';opacity:.6"></i>' +
+    '</div>' +
+    '<div class="stat-val" style="color:'+color+';font-size:15px;margin-top:4px">'+value+'</div>' +
+    '</div>';
+}
+
+function row(label, value, sub) {
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f4f4f5">' +
+    '<div><div style="font-size:13px;font-weight:600">'+label+'</div>' +
+    (sub?'<div style="font-size:11px;color:#a1a1aa">'+sub+'</div>':'')+
+    '</div>' +
+    '<div style="font-size:14px;font-weight:700">'+value+'</div>' +
+    '</div>';
+}
+
+function fmt(v) {
+  return (v||0).toLocaleString("pt-AO") + " Kz";
+}
+
+async function loadAssinatura() {
+  var wrap = document.getElementById("assinatura-content");
+  if (!wrap) return;
+
+  var sk = await db.get("settings","storeKey");
+  var hasKey = !!(sk&&sk.value);
+
+  wrap.innerHTML =
+    '<div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);border-radius:16px;padding:20px;color:#fff;text-align:center;margin-bottom:16px">' +
+    '<i data-lucide="award" style="width:40px;height:40px;color:#ddd6fe;margin-bottom:12px"></i>' +
+    '<div style="font-size:18px;font-weight:700;margin-bottom:4px">Kontaki Beta</div>' +
+    '<div style="font-size:13px;color:#ddd6fe;margin-bottom:12px">Versão 1.0.0-beta · Introxeer Technology</div>' +
+    '<div style="background:rgba(255,255,255,.15);border-radius:10px;padding:10px;font-size:12px;color:#ddd6fe">' +
+    'Plano Beta gratuito · Sem limite de vendas · Dados locais seguros' +
+    '</div></div>' +
+
+    '<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #f4f4f5">' +
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Estado da licença</div>' +
+    statusRow("Versão", "1.0.0-beta", "#5b21b6") +
+    statusRow("Plano", "Beta Gratuito", "#16a34a") +
+    statusRow("Chave HMAC", hasKey?"Configurada":"Não configurada", hasKey?"#16a34a":"#dc2626") +
+    statusRow("Dados", "Armazenamento local (offline)", "#5b21b6") +
+    statusRow("Validade", "Acesso durante período Beta", "#d97706") +
+    '</div>' +
+
+    '<div style="background:#fef3c7;border:1.5px solid #fde68a;border-radius:12px;padding:14px;margin-bottom:12px">' +
+    '<div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:6px">⚠ Versão Beta</div>' +
+    '<div style="font-size:12px;color:#92400e;line-height:1.6">' +
+    'Esta é uma versão de teste. Exporta backups regularmente para não perder dados. ' +
+    'A versão final terá sincronização cloud e suporte completo.' +
+    '</div></div>' +
+
+    '<div style="background:#fff;border-radius:12px;padding:14px;border:1px solid #f4f4f5;margin-bottom:12px">' +
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Código de activação</div>' +
+    '<div style="font-size:13px;color:#71717a;margin-bottom:10px;line-height:1.5">Recebeste um código de activação da Introxeer Technology? Insere aqui:</div>' +
+    '<div class="field" style="margin-bottom:10px"><input id="activation-code" placeholder="Ex: KTKI-XXXX-XXXX-XXXX" style="text-align:center;font-size:16px;font-weight:700;letter-spacing:2px;text-transform:uppercase"/></div>' +
+    '<button onclick="window._activarLicenca()" style="width:100%;padding:13px;background:#5b21b6;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Activar licença</button>' +
+    '</div>';
+
+  refreshIcons(wrap);
+}
+
+function statusRow(label, value, color) {
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f4f4f5">' +
+    '<span style="font-size:13px;color:#71717a">'+label+'</span>' +
+    '<span style="font-size:13px;font-weight:700;color:'+color+'">'+value+'</span>' +
+    '</div>';
+}
+
+window._activarLicenca = function() {
+  var code = document.getElementById("activation-code");
+  if (!code||!code.value.trim()) { toast("Insere o código de activação.","error"); return; }
+  toast("Código enviado para validação. Aguarda resposta da Introxeer Technology.","info");
+};
+
+async function loadContactos() {
+  var wrap = document.getElementById("contactos-content");
+  if (!wrap) return;
+
+  wrap.innerHTML =
+    '<div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);border-radius:16px;padding:20px;color:#fff;text-align:center;margin-bottom:16px">' +
+    '<i data-lucide="headphones" style="width:40px;height:40px;color:#ddd6fe;margin-bottom:10px"></i>' +
+    '<div style="font-size:18px;font-weight:700">Suporte Kontaki</div>' +
+    '<div style="font-size:13px;color:#ddd6fe;margin-top:4px">Introxeer Technology · Angola</div>' +
+    '</div>' +
+
+    contactCard("WhatsApp", "Suporte técnico rápido", "message-circle", "#25D366", "https://wa.me/244900000000") +
+    contactCard("Email", "info@introxeer.co.ao", "mail", "#5b21b6", "mailto:info@introxeer.co.ao") +
+    contactCard("GitHub", "github.com/samuelfranckarnaldo/kontaki", "github", "#18181b", "https://github.com/samuelfranckarnaldo/kontaki") +
+
+    '<div style="background:#fff;border-radius:12px;padding:14px;border:1px solid #f4f4f5;margin-top:12px">' +
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Reportar problema</div>' +
+    '<div class="field" style="margin-bottom:10px"><label>Descrição do problema</label><textarea id="report-msg" rows="4" style="width:100%;padding:10px;border:1.5px solid #e4e4e7;border-radius:8px;font-family:inherit;font-size:13px;resize:none" placeholder="Descreve o problema que encontraste..."></textarea></div>' +
+    '<button onclick="window._reportarProblema()" style="width:100%;padding:13px;background:#5b21b6;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Enviar relatório</button>' +
+    '</div>';
+
+  refreshIcons(wrap);
+}
+
+function contactCard(title, sub, icon, color, href) {
+  return '<a href="'+href+'" target="_blank" style="display:flex;align-items:center;gap:14px;padding:14px;background:#fff;border-radius:12px;border:1px solid #f4f4f5;margin-bottom:8px;text-decoration:none">' +
+    '<div style="width:44px;height:44px;background:'+color+';border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+    '<i data-lucide="'+icon+'" style="width:20px;height:20px;color:#fff"></i></div>' +
+    '<div><div style="font-size:14px;font-weight:700;color:#18181b">'+title+'</div>' +
+    '<div style="font-size:12px;color:#71717a;margin-top:2px">'+sub+'</div></div>' +
+    '<i data-lucide="chevron-right" style="width:16px;height:16px;color:#a1a1aa;margin-left:auto"></i>' +
+    '</a>';
+}
+
+window._reportarProblema = function() {
+  var msg = document.getElementById("report-msg");
+  if (!msg||!msg.value.trim()) { toast("Descreve o problema primeiro.","error"); return; }
+  var text = "Kontaki Bug Report:\n\n"+msg.value.trim();
+  var wa = "https://wa.me/244900000000?text="+encodeURIComponent(text);
+  window.open(wa,"_blank");
+};
+
+

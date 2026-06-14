@@ -111,7 +111,7 @@
   padding-left: 44px;
 }
 
-.pw-wrap input { padding-right: 48px; }
+
 
 .pw-toggle {
   position: absolute;
@@ -323,3 +323,33 @@
 }
 
 .produto-menu-btn:active { background: #f4f4f5; }
+
+.pw-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.pw-wrap input[type="password"],
+.pw-wrap input[type="text"] {
+  width: 100%;
+  padding-right: 48px !important;
+  box-sizing: border-box;
+}
+.pw-eye-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #71717a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  z-index: 2;
+}

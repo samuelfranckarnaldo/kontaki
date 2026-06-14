@@ -391,6 +391,54 @@
         </div>
       </div>
 
+      <div id="subpage-contabilidade" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-contabilidade">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Contabilidade</div>
+          <div id="contabilidade-content"></div>
+        </div>
+      </div>
+
+      <div id="subpage-assinatura" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-assinatura">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Assinatura</div>
+          <div id="assinatura-content"></div>
+        </div>
+      </div>
+
+      <div id="subpage-contactos" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-contactos">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Contactos</div>
+          <div id="contactos-content"></div>
+        </div>
+      </div>
+
+      <div id="subpage-contabilidade" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-contabilidade">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Contabilidade</div>
+          <div id="contabilidade-content"></div>
+        </div>
+      </div>
+
+      <div id="subpage-assinatura" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-assinatura">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Assinatura</div>
+          <div id="assinatura-content"></div>
+        </div>
+      </div>
+
+      <div id="subpage-contactos" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-contactos">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Contactos</div>
+          <div id="contactos-content"></div>
+        </div>
+      </div>
+
       <div id="subpage-configuracoes" style="display:none">
         <div class="page-inner">
           <button class="btn btn-ghost btn-sm" id="btn-back-configuracoes">← Voltar</button>
@@ -593,6 +641,93 @@
   </div>
 </div>
 <script src="/assets/qrcode.min.js"></script>
+<script>
+var _selectedRole = null;
+
+window._selectRole = function(role) {
+  _selectedRole = role;
+  window._selectedRole = role;
+  var stepRole  = document.getElementById("login-step-role");
+  var stepCreds = document.getElementById("login-step-creds");
+  var badge     = document.getElementById("login-role-badge");
+  var loginBtn  = document.getElementById("btn-login");
+  if (stepRole)  stepRole.style.display  = "none";
+  if (stepCreds) { stepCreds.style.display = "flex"; stepCreds.style.flexDirection = "column"; }
+  if (badge) {
+    var isAdmin = role === "admin";
+    var bg      = isAdmin ? "#ede9fe" : "#f0fdf4";
+    var border  = isAdmin ? "#ddd6fe" : "#bbf7d0";
+    var iconBg  = isAdmin ? "#5b21b6" : "#16a34a";
+    var name    = isAdmin ? "Administrador" : "Operador de Caixa";
+    var subtext = isAdmin ? "Acesso total ao sistema" : "Vendas e operações de caixa";
+    var subcolor= isAdmin ? "#7c3aed" : "#16a34a";
+    badge.style.cssText = "display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;margin-bottom:14px;background:" + bg + ";border:1.5px solid " + border;
+    badge.innerHTML =
+      "<div style='width:36px;height:36px;background:" + iconBg + ";border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0'>" +
+      "<svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/></svg></div>" +
+      "<div><div style='font-size:14px;font-weight:700;color:#18181b'>" + name + "</div>" +
+      "<div style='font-size:11px;color:" + subcolor + "'>" + subtext + "</div></div>";
+  }
+  if (loginBtn) loginBtn.style.background = role === "admin" ? "#5b21b6" : "#16a34a";
+  var inpUser = document.getElementById("inp-user");
+  if (inpUser) setTimeout(function(){ inpUser.focus(); }, 100);
+};
+
+window._backToRole = function() {
+  _selectedRole = null;
+  window._selectedRole = null;
+  var stepRole  = document.getElementById("login-step-role");
+  var stepCreds = document.getElementById("login-step-creds");
+  if (stepRole)  stepRole.style.display  = "flex";
+  if (stepCreds) stepCreds.style.display = "none";
+};
+
+window._closeOverlay = function(el) {
+  if (el && el.parentNode) el.parentNode.remove();
+};
+
+window._showTermos = function() {
+  var d = document.createElement("div");
+  d.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end";
+  d.innerHTML =
+    "<div style='background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:24px'>" +
+    "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px'>" +
+    "<div style='font-size:17px;font-weight:700'>Termos e Condições</div>" +
+    "<button onclick='window._closeOverlay(this)' style='background:#f4f4f5;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px'>x</button></div>" +
+    "<div style='font-size:13px;color:#444;line-height:1.9'>" +
+    "<b>1. Aceitação</b><br/>Ao usar o Kontaki aceitas estes termos.<br/><br/>" +
+    "<b>2. Serviço</b><br/>App de gestão offline para micro-empresas em Angola.<br/><br/>" +
+    "<b>3. Licença</b><br/>Licença limitada e intransferível. Proibido copiar sem autorização.<br/><br/>" +
+    "<b>4. Dados</b><br/>Dados armazenados apenas no dispositivo. A Introxeer Technology não acede aos teus dados.<br/><br/>" +
+    "<b>5. Documentos Fiscais</b><br/>Recibos são documentos internos. Sem validade fiscal perante a AGT.<br/><br/>" +
+    "<b>6. Ficheiros KTK</b><br/>Protegidos por HMAC-SHA256. Adulteração pode constituir crime.<br/><br/>" +
+    "<b>7. Responsabilidade</b><br/>Faz backups regulares. Sem garantia de dados durante Beta.<br/><br/>" +
+    "<b>8. Lei Aplicável</b><br/>Legislação de Angola. Tribunal: Luanda.<br/><br/>" +
+    "<b>9. Contacto</b><br/>info@introxeer.co.ao" +
+    "</div>" +
+    "<button onclick='window._closeOverlay(this)' style='width:100%;padding:14px;background:#5b21b6;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:16px'>Li e aceito</button>" +
+    "</div>";
+  document.body.appendChild(d);
+};
+
+window._showPrivacidade = function() {
+  var d = document.createElement("div");
+  d.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end";
+  d.innerHTML =
+    "<div style='background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:80vh;overflow-y:auto;padding:24px'>" +
+    "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px'>" +
+    "<div style='font-size:17px;font-weight:700'>Política de Privacidade</div>" +
+    "<button onclick='window._closeOverlay(this)' style='background:#f4f4f5;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px'>x</button></div>" +
+    "<div style='font-size:13px;color:#444;line-height:1.9'>" +
+    "<b>Dados Locais</b><br/>Todos os dados ficam no dispositivo via IndexedDB.<br/><br/>" +
+    "<b>Segurança</b><br/>Senhas com SHA-256. Ficheiros KTK com HMAC-SHA256.<br/><br/>" +
+    "<b>Backup</b><br/>Exporta backups regularmente em Perfil > Configurações." +
+    "</div>" +
+    "<button onclick='window._closeOverlay(this)' style='width:100%;padding:14px;background:#5b21b6;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:16px'>Fechar</button>" +
+    "</div>";
+  document.body.appendChild(d);
+};
+</script>
 <script type="module" src="/src/main.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

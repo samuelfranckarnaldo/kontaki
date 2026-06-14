@@ -7,6 +7,7 @@ let currentSession = null;
 
 export function getUser()    { return currentUser; }
 export function getSession() { return currentSession; }
+export function _setSession(s) { currentSession = s; if (currentUser) currentUser.sessionId = s ? s.id : null; }
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
 export function initAuth() {
