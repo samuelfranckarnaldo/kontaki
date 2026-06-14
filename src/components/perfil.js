@@ -8,6 +8,7 @@ import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { getUser, logout, changePasswordAuth, createUser } from "../auth.js";
+import { gerarRelatorioPDF } from "../extras.js";
 
 export async function initPerfil() {
   const user = getUser();
@@ -681,6 +682,13 @@ async function loadContabilidade() {
         '</div></div>';
     }).join("") +
     '</div>';
+
+  // Botão exportar PDF
+  var pdfBtn = document.createElement("button");
+  pdfBtn.style.cssText = "width:100%;padding:14px;background:#dc2626;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px";
+  pdfBtn.innerHTML = '<i data-lucide="file-text" style="width:16px;height:16px"></i> Exportar Relatório PDF';
+  pdfBtn.onclick = gerarRelatorioPDF;
+  wrap.appendChild(pdfBtn);
 
   refreshIcons(wrap);
 }

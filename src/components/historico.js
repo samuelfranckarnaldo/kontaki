@@ -3,6 +3,7 @@ import { fmt, fmtDate, today, el, val, setVal, refreshIcons } from "../utils.js"
 import { openModal, closeModal }        from "../modal.js";
 import { getUser }                      from "../auth.js";
 import { printRecibo }                  from "../print.js";
+import { openDevolucao, gerarRelatorioPDF } from "../extras.js";
 
 let activeTab = "geral";
 
@@ -345,6 +346,7 @@ window._openSaleDetail = async function(id) {
     }).join("") +
     '</div>' +
     '<div class="form-actions">' +
+    '<button onclick="window._abrirDevolucao(' + s.id + ')" style="width:100%;padding:12px;background:#fef3c7;border:1.5px solid #fde68a;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#92400e;margin-bottom:8px">↩ Devolução</button>' +
     '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>' +
     '<button class="btn btn-primary btn-full" onclick="window._printSale(' + s.id + ',\'58mm\')">' +
     '<i data-lucide="printer"></i> Imprimir talão</button>' +
@@ -389,3 +391,8 @@ function downloadCSV(csv, filename) {
 }
 
 window._closeModal = closeModal;
+
+window._abrirDevolucao = async function(id) {
+  closeModal();
+  setTimeout(function(){ openDevolucao(id); }, 100);
+};

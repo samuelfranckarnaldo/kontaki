@@ -6,6 +6,7 @@ import { initFiados }                      from "./components/fiados.js";
 import { initHistorico }                   from "./components/historico.js";
 import { initPerfil }                      from "./components/perfil.js";
 import { initCamera }                      from "./components/camera.js";
+import { initDarkMode, checkStockAlerts }  from "./components/extras.js";
 
 var PAGES = {
   vender:    { init: initVender    },
@@ -34,6 +35,8 @@ export var router = {
 
     refreshIcons(el("bottom-nav"));
     refreshIcons(el("topbar"));
+    initDarkMode();
+    checkStockAlerts();
     initQuickMode();
     setTimeout(function() { self.go("vender"); }, 50);
   },
