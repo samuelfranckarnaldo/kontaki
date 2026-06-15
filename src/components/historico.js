@@ -62,7 +62,7 @@ async function loadGeral(from, to) {
     return d >= from && d <= to;
   }).reverse();
 
-  const total    = filtered.reduce(function(a,s) { return a+(s.total||0); }, 0);
+  const total    = filtered.reduce(function(a,s) { return a+((s.total||0)-(s.totalDevolvido||0)); }, 0);
   const byM      = {};
   filtered.forEach(function(s) { byM[s.payMethod] = (byM[s.payMethod]||0) + s.total; });
 

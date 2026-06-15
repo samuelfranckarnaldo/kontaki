@@ -16,8 +16,8 @@ export async function loadDashboard(filterUserId) {
   const thisMonth  = td.slice(0, 7);
   const todaySales = sales.filter(s => (s.date || "").startsWith(td));
   const monthSales = sales.filter(s => (s.date || "").startsWith(thisMonth));
-  const totalToday = todaySales.reduce((a,s) => a+(s.total||0), 0);
-  const totalMonth = monthSales.reduce((a,s) => a+(s.total||0), 0);
+  const totalToday = todaySales.reduce((a,s) => a+((s.total||0)-(s.totalDevolvido||0)), 0);
+  const totalMonth = monthSales.reduce((a,s) => a+((s.total||0)-(s.totalDevolvido||0)), 0);
 
   const activeProds = products.filter(p => p.active);
   const zeroStock   = activeProds.filter(p => (p.stock||0) === 0);

@@ -250,7 +250,7 @@ export const sessionService = {
     const sales=await db.getAll("sales");
     const shopMap=await getAllStocks("shop");
     const sessionSales=sales.filter(s=>s.sessionId===sessionId);
-    const totalVendas=sessionSales.reduce((a,s)=>a+(s.total||0),0);
+    const totalVendas=sessionSales.reduce((a,s)=>a+((s.total||0)-(s.totalDevolvido||0)),0);
     const stockEsperado={};
     for(const p of products) {
       const vendido=sessionSales.reduce((a,s)=>a+(s.items||[]).filter(i=>i.id===p.id).reduce((b,i)=>b+i.qty,0),0);

@@ -570,9 +570,9 @@ async function loadContabilidade() {
   var vendasAno  = sales.filter(function(s){ return (s.date||"").startsWith(ano); });
   var vendasHoje = sales.filter(function(s){ return (s.date||"").startsWith(hoje); });
 
-  var receitaMes  = vendasMes.reduce(function(a,s){ return a+(s.total||0); },0);
-  var receitaAno  = vendasAno.reduce(function(a,s){ return a+(s.total||0); },0);
-  var receitaHoje = vendasHoje.reduce(function(a,s){ return a+(s.total||0); },0);
+  var receitaMes  = vendasMes.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  var receitaAno  = vendasAno.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  var receitaHoje = vendasHoje.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
 
   // Custo das vendas (COGS)
   var prodMap = {};
