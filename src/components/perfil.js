@@ -8,7 +8,7 @@ import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { getUser, logout, changePasswordAuth, createUser } from "../auth.js";
-import { gerarRelatorioPDF } from "../extras.js";
+import { gerarRelatorioPDF } from "./extras.js";
 
 export async function initPerfil() {
   const user = getUser();

@@ -3,7 +3,7 @@ import { fmt, fmtDate, today, el, val, setVal, refreshIcons } from "../utils.js"
 import { openModal, closeModal }        from "../modal.js";
 import { getUser }                      from "../auth.js";
 import { printRecibo }                  from "../print.js";
-import { openDevolucao, gerarRelatorioPDF } from "../extras.js";
+import { openDevolucao, gerarRelatorioPDF } from "./extras.js";
 
 let activeTab = "geral";
 
@@ -139,14 +139,19 @@ async function loadGeral(from, to) {
   }
 
   el("historico-list").innerHTML = filtered.map(function(s) {
+    var devBadge = s.temDevolucao
+      ? '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#d97706;margin-left:6px">↩ Dev.</span>'
+      : "";
+    var totalLiq = s.total - (s.totalDevolvido||0);
     return '<div class="historico-item" onclick="window._openSaleDetail(' + s.id + ')">' +
       '<div>' +
-      '<div class="historico-id">Venda #' + s.id + '</div>' +
+      '<div class="historico-id">Venda #' + s.id + devBadge + '</div>' +
       '<div class="historico-meta">' + fmtDate(s.date) + ' · ' + (s.items ? s.items.length : 0) + ' item(s) · ' + s.payMethod +
       (s.clientName ? ' · ' + s.clientName : '') + '</div>' +
       '</div>' +
       '<div style="text-align:right;flex-shrink:0">' +
-      '<div class="historico-total">' + fmt(s.total) + '</div>' +
+      '<div class="historico-total"' + (s.temDevolucao?' style="text-decoration:line-through;color:#a1a1aa;font-size:13px"':'') + '>' + fmt(s.total) + '</div>' +
+      (s.temDevolucao ? '<div style="font-size:13px;font-weight:700;color:#d97706">' + fmt(totalLiq) + '</div>' : '') +
       (s.discount > 0 ? '<div style="font-size:11px;color:#dc2626">-' + fmt(s.discount) + ' desc.</div>' : '') +
       '</div></div>';
   }).join("");
@@ -336,6 +341,13 @@ window._openSaleDetail = async function(id) {
     }).join("") +
     '</div>' +
     '<div style="font-size:11px;color:#a1a1aa;text-align:center;margin-bottom:14px">Código: ' + (s.hash||"N/A") + '</div>' +
+    (s.temDevolucao ? '<div style="background:#fef3c7;border-radius:10px;padding:12px;margin-bottom:14px">' +
+      '<div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:6px">↩ Devoluções registadas</div>' +
+      (s.devolucoes||[]).map(function(d){
+        return '<div style="font-size:12px;color:#71717a;margin-bottom:4px">' + fmtDate(d.date) + ' · ' + d.itens.join(", ") + ' · <strong style="color:#d97706">-' + fmt(d.total) + '</strong></div>';
+      }).join("") +
+      '<div style="font-size:13px;font-weight:700;color:#d97706;margin-top:6px;padding-top:6px;border-top:1px solid #fde68a">Líquido: ' + fmt(s.total-(s.totalDevolvido||0)) + '</div>' +
+      '</div>' : '') +
     '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Imprimir</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">' +
     ['58mm','80mm','a5','a4'].map(function(f) {

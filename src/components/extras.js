@@ -99,52 +99,76 @@ window._confirmarDevolucao = async function() {
 
   var user  = getUser();
   var items = sale.items || [];
-  var total = 0;
+  var totalDevolvido = 0;
   var devolvidos = [];
 
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
-    var qty  = parseInt(document.getElementById("dev-" + item.id).value) || 0;
-    if (qty <= 0 || qty > item.qty) continue;
+    var inp  = document.getElementById("dev-" + item.id);
+    var qty  = inp ? (parseInt(inp.value) || 0) : 0;
+    if (qty <= 0) continue;
+    if (qty > item.qty) {
+      toast("Não podes devolver mais do que foi vendido: " + item.name, "error");
+      return;
+    }
 
-    // Repõe stock
-    await addStockMovement({
+    // Verifica stock actual do produto
+    var product = await db.get("products", item.id);
+    var stockActual = product ? (product.stock || 0) : 0;
+
+    // Cria StockMovement de devolução — adiciona qty ao stock
+    await db.add("stockMovements", {
       productId:   item.id,
       productName: item.name,
       type:        "return",
       location:    "shop",
-      qty:         qty,
+      qty:         qty,           // positivo — repõe stock
+      qtyBefore:   stockActual,
+      qtyAfter:    stockActual + qty,
       reference:   "return#" + sale.id,
       note:        "Devolução da venda #" + sale.id,
+      userId:      user.id,
+      sessionId:   user.sessionId || null,
+      imported:    false,
+      createdAt:   new Date().toISOString(),
     });
 
-    total += item.price * qty;
-    devolvidos.push(item.name + " ×" + qty);
+    // Actualiza cache do produto
+    if (product) {
+      await db.put("products", {
+        ...product,
+        stock: stockActual + qty,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    totalDevolvido += item.price * qty;
+    devolvidos.push(item.name + " x" + qty);
   }
 
   if (!devolvidos.length) {
     toast("Nenhuma quantidade para devolver.", "error"); return;
   }
 
-  // Regista devolução
-  await db.add("stockMovements", {
-    productId:   0,
-    productName: "Devolução venda #" + sale.id,
-    type:        "return_summary",
-    location:    "shop",
-    qty:         0,
-    qtyBefore:   0,
-    qtyAfter:    0,
-    reference:   "return#" + sale.id,
-    note:        devolvidos.join(", ") + " — total: " + fmt(total),
-    userId:      user.id,
-    sessionId:   user.sessionId || null,
-    imported:    false,
-    createdAt:   new Date().toISOString(),
+  // Marca a venda com devolução
+  var saleAtual = await db.get("sales", sale.id);
+  var devolucoes = saleAtual.devolucoes || [];
+  devolucoes.push({
+    itens:     devolvidos,
+    total:     totalDevolvido,
+    date:      new Date().toISOString(),
+    userId:    user.id,
+    userName:  user.name,
+  });
+  await db.put("sales", {
+    ...saleAtual,
+    devolucoes:    devolucoes,
+    temDevolucao:  true,
+    totalDevolvido:(saleAtual.totalDevolvido||0) + totalDevolvido,
   });
 
   closeModal();
-  toast("Devolução registada. Stock reposto. Total: " + fmt(total), "success");
+  toast("Devolução registada: " + devolvidos.join(", ") + " — " + fmt(totalDevolvido) + " reembolsados.", "success");
   window._saleParaDevolucao = null;
 };
 
@@ -277,6 +301,3 @@ function kpiBox(label, value, color) {
     '</div>';
 }
 
-function fmt(v) {
-  return (v||0).toLocaleString("pt-AO") + " Kz";
-}
