@@ -1,4 +1,5 @@
 import { seed }      from "./db.js";
+import { checkSetup } from "./setup.js";
 import { initAuth }  from "./auth.js";
 import { initModal } from "./modal.js";
 import { logger }    from "./logger.js";
@@ -6,7 +7,8 @@ import { logger }    from "./logger.js";
 async function main() {
   await seed();
   initModal();
-  initAuth();
+  var isSetup = await checkSetup();
+  if (!isSetup) initAuth();
   if (window.lucide) window.lucide.createIcons();
 }
 

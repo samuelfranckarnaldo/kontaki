@@ -27,88 +27,59 @@
     <div class="login-logo">
       <div class="login-logo-mark"><i data-lucide="zap"></i></div>
       <h1>Kontaki</h1>
-      <p>Gestão de negócios offline-first</p>
+      <p id="login-store-name">Gestão de negócios offline-first</p>
     </div>
 
-    <!-- STEP 1: Escolha de função -->
-    <div id="login-step-role" style="display:flex;flex-direction:column;gap:10px;width:100%">
-      <div style="font-size:12px;font-weight:700;color:#71717a;text-align:center;
-                  text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">
-        Como queres entrar?
-      </div>
-      <button onclick="window._selectRole('admin')"
-              style="padding:16px;background:#ede9fe;border:2px solid #ddd6fe;
-                     border-radius:14px;cursor:pointer;font-family:inherit;
-                     text-align:left;display:flex;align-items:center;gap:14px">
-        <div style="width:44px;height:44px;background:#5b21b6;border-radius:12px;
-                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <i data-lucide="shield-check" style="width:22px;height:22px;color:#fff"></i>
-        </div>
-        <div>
-          <div style="font-size:16px;font-weight:700;color:#18181b">Administrador</div>
-          <div style="font-size:12px;color:#7c3aed;margin-top:2px">Acesso total · Stock · Equipa · Relatórios</div>
-        </div>
-      </button>
-      <button onclick="window._selectRole('caixa')"
-              style="padding:16px;background:#f0fdf4;border:2px solid #bbf7d0;
-                     border-radius:14px;cursor:pointer;font-family:inherit;
-                     text-align:left;display:flex;align-items:center;gap:14px">
-        <div style="width:44px;height:44px;background:#16a34a;border-radius:12px;
-                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <i data-lucide="shopping-cart" style="width:22px;height:22px;color:#fff"></i>
-        </div>
-        <div>
-          <div style="font-size:16px;font-weight:700;color:#18181b">Operador de Caixa</div>
-          <div style="font-size:12px;color:#16a34a;margin-top:2px">Vendas · Fiados · Histórico</div>
-        </div>
-      </button>
-      <div style="margin-top:8px;font-size:11px;color:#a1a1aa;text-align:center;line-height:1.7">
+    <!-- STEP 1: Selecciona utilizador -->
+    <div id="login-step-role" style="display:flex;flex-direction:column;width:100%">
+      <div style="font-size:12px;font-weight:700;color:#71717a;text-align:center;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Quem és tu?</div>
+      <div id="login-users-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
+      <div style="font-size:11px;color:#a1a1aa;text-align:center;line-height:1.7">
         Ao entrar aceitas os
-        <button onclick="window._showTermos()" style="background:none;border:none;color:#5b21b6;
-                font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;
-                text-decoration:underline;padding:0">Termos e Condições</button>
+        <button onclick="window._showTermos()" style="background:none;border:none;color:#5b21b6;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;text-decoration:underline;padding:0">Termos</button>
         e a
-        <button onclick="window._showPrivacidade()" style="background:none;border:none;color:#5b21b6;
-                font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;
-                text-decoration:underline;padding:0">Política de Privacidade</button>
+        <button onclick="window._showPrivacidade()" style="background:none;border:none;color:#5b21b6;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;text-decoration:underline;padding:0">Privacidade</button>
       </div>
     </div>
 
-    <!-- STEP 2: Credenciais -->
-    <div id="login-step-creds" style="display:none;flex-direction:column;gap:0;width:100%">
-      <div id="login-role-badge" style="display:flex;align-items:center;gap:10px;
-           padding:12px 14px;border-radius:12px;margin-bottom:14px"></div>
-      <div class="field">
-        <label>UTILIZADOR</label>
-        <input id="inp-user" type="text" placeholder="Username" autocomplete="username"/>
+    <!-- STEP 2: PIN -->
+    <div id="login-step-pin" style="display:none;flex-direction:column;width:100%">
+      <div id="login-pin-user" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;margin-bottom:16px"></div>
+
+      <div style="font-size:12px;font-weight:700;color:#71717a;text-align:center;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Introduz o teu PIN</div>
+
+      <div id="pin-dots" style="display:flex;gap:10px;justify-content:center;margin-bottom:20px">
+        <div id="pdot-0" class="pin-dot"></div>
+        <div id="pdot-1" class="pin-dot"></div>
+        <div id="pdot-2" class="pin-dot"></div>
+        <div id="pdot-3" class="pin-dot"></div>
+        <div id="pdot-4" class="pin-dot"></div>
+        <div id="pdot-5" class="pin-dot"></div>
       </div>
-      <div class="field">
-        <label>SENHA</label>
-        <div class="pw-wrap">
-          <input id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password"/>
-          <button id="pw-toggle" class="pw-eye-btn" type="button">
-            <i id="pw-eye" data-lucide="eye"></i>
-          </button>
-        </div>
+
+      <div id="login-err" style="display:none;background:#fee2e2;border-radius:8px;padding:10px;text-align:center;font-size:13px;color:#dc2626;margin-bottom:12px">
+        <span id="login-err-msg">PIN incorrecto</span>
       </div>
-      <div id="login-err" style="display:none" class="login-err">
-        <i data-lucide="alert-circle"></i>
-        <span id="login-err-msg"></span>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:280px;margin:0 auto 16px">
+        <button onclick="window._pinKey('1')" class="pin-btn">1</button>
+        <button onclick="window._pinKey('2')" class="pin-btn">2</button>
+        <button onclick="window._pinKey('3')" class="pin-btn">3</button>
+        <button onclick="window._pinKey('4')" class="pin-btn">4</button>
+        <button onclick="window._pinKey('5')" class="pin-btn">5</button>
+        <button onclick="window._pinKey('6')" class="pin-btn">6</button>
+        <button onclick="window._pinKey('7')" class="pin-btn">7</button>
+        <button onclick="window._pinKey('8')" class="pin-btn">8</button>
+        <button onclick="window._pinKey('9')" class="pin-btn">9</button>
+        <button onclick="window._backToRole()" class="pin-btn" style="font-size:13px;color:#71717a">←</button>
+        <button onclick="window._pinKey('0')" class="pin-btn">0</button>
+        <button onclick="window._pinKey('⌫')" class="pin-btn" style="color:#dc2626">⌫</button>
       </div>
-      <button id="btn-login" class="btn btn-primary btn-full" style="margin-top:8px">Entrar</button>
-      <button onclick="window._backToRole()"
-              style="width:100%;padding:10px;background:none;border:none;color:#71717a;
-                     font-size:13px;cursor:pointer;font-family:inherit;margin-top:4px">
-        ← Voltar
-      </button>
-      <button id="btn-forgot-pw"
-              style="background:none;border:none;color:#5b21b6;font-size:13px;
-                     font-weight:600;cursor:pointer;font-family:inherit;padding:8px">
-        Esqueci a senha
+
+      <button id="btn-forgot-pw" style="background:none;border:none;color:#5b21b6;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px;text-align:center">
+        Esqueci o PIN
       </button>
     </div>
-
-    <p class="login-hint">admin / admin123 &nbsp;•&nbsp; caixa1 / caixa123</p>
   </div>
 </div>
 
