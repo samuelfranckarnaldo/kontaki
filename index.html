@@ -7,17 +7,17 @@
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
   <meta name="apple-mobile-web-app-title" content="Kontaki"/>
-  <link rel="manifest" href="/manifest.json"/>
-  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png"/>
+  <link rel="manifest" href="./manifest.json"/>
+  <link rel="apple-touch-icon" href="./assets/icons/icon-192.png"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Kontaki</title>
-  <link rel="stylesheet" href="/src/styles/base.css"/>
-  <link rel="stylesheet" href="/src/styles/layout.css"/>
-  <link rel="stylesheet" href="/src/styles/components.css"/>
-  <link rel="stylesheet" href="/src/styles/pages.css"/>
-  <link rel="stylesheet" href="/src/styles/print.css"/>
-  <link rel="stylesheet" href="/src/styles/dark.css"/>
-  <script src="/assets/lucide.min.js"></script>
+  <link rel="stylesheet" href="./src/styles/base.css"/>
+  <link rel="stylesheet" href="./src/styles/layout.css"/>
+  <link rel="stylesheet" href="./src/styles/components.css"/>
+  <link rel="stylesheet" href="./src/styles/pages.css"/>
+  <link rel="stylesheet" href="./src/styles/print.css"/>
+  <link rel="stylesheet" href="./src/styles/dark.css"/>
+  <script src="./assets/lucide.min.js"></script>
 </head>
 <body>
 
@@ -642,7 +642,7 @@
     </div>
   </div>
 </div>
-<script src="/assets/qrcode.min.js"></script>
+<script src="./assets/qrcode.min.js"></script>
 <script>
 var _selectedRole = null;
 
@@ -730,11 +730,11 @@ window._showPrivacidade = function() {
   document.body.appendChild(d);
 };
 </script>
-<script type="module" src="/src/main.js"></script>
+<script type="module" src="./src/main.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/sw.js').then(function(reg) {
+        navigator.serviceWorker.register('./sw.js').then(function(reg) {
           console.log('[SW] Registado:', reg.scope);
 
           // Detecta update disponível
