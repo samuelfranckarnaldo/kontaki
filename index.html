@@ -655,8 +655,10 @@ window._backToRole = function() {
   if (stepCreds) stepCreds.style.display = "none";
 };
 
-window._closeOverlay = function(el) {
-  if (el && el.parentNode) el.parentNode.remove();
+window._closeOverlay = function(btn) {
+  var overlay = btn;
+  while(overlay && !overlay.style.cssText.includes('fixed')) overlay = overlay.parentNode;
+  if (overlay) overlay.remove();
 };
 
 window._showTermos = function() {

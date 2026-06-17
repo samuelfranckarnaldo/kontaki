@@ -202,19 +202,53 @@ window._deactivateProd = async (id) => {
 };
 
 window._openTransfer = async (id) => {
-  const p = await db.get("products",id);
-  closeModal();
-  openModal("Armazem para Loja",
-    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">` +
-    `<div style="background:#ede9fe;border-radius:10px;padding:12px;text-align:center"><div style="font-size:11px;color:#7c3aed;font-weight:700;margin-bottom:4px">ARMAZEM</div><div style="font-size:22px;font-weight:700;color:#5b21b6">${p.warehouseStock||0}</div><div style="font-size:11px;color:#7c3aed">${p.unit}</div></div>` +
-    `<div style="background:#dcfce7;border-radius:10px;padding:12px;text-align:center"><div style="font-size:11px;color:#16a34a;font-weight:700;margin-bottom:4px">LOJA</div><div style="font-size:22px;font-weight:700;color:#16a34a">${p.stock||0}</div><div style="font-size:11px;color:#16a34a">${p.unit}</div></div>` +
-    `</div>` +
-    `<div class="field" style="margin-bottom:16px"><label>Quantidade a transferir (max: ${p.warehouseStock||0})</label><input type="number" id="tr-qty" placeholder="0" min="1"/></div>` +
-    `<div class="form-actions">` +
-    `<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>` +
-    `<button class="btn btn-primary btn-full" onclick="window._applyTransfer(${id})"><i data-lucide="arrow-right-left"></i> Transferir</button>` +
-    `</div>`);
+  const p = await db.get("products", id);
+  if (!p) return;
+  const shopStock = p.stock || 0;
+  const whStock   = p.warehouseStock || 0;
+  openModal("Transferir Stock — " + p.name,
+    "<div style='margin-bottom:14px'>" +
+    "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px'>" +
+    "<div class='stat-card' style='border-left:3px solid #5b21b6;text-align:center'>" +
+    "<div style='font-size:11px;color:#5b21b6;font-weight:700'>LOJA</div>" +
+    "<div style='font-size:20px;font-weight:700;color:#5b21b6'>" + shopStock + "</div>" +
+    "<div style='font-size:11px;color:#71717a'>" + p.unit + "</div></div>" +
+    "<div class='stat-card' style='border-left:3px solid #d97706;text-align:center'>" +
+    "<div style='font-size:11px;color:#d97706;font-weight:700'>ARMAZÉM</div>" +
+    "<div style='font-size:20px;font-weight:700;color:#d97706'>" + whStock + "</div>" +
+    "<div style='font-size:11px;color:#71717a'>" + p.unit + "</div></div>" +
+    "</div>" +
+    "<div class='field' style='margin-bottom:12px'>" +
+    "<label>Direcção da transferência</label>" +
+    "<select id='tr-dir' style='width:100%;padding:10px;border:1.5px solid #e4e4e7;border-radius:8px;font-family:inherit;font-size:14px'>" +
+    "<option value='wh-to-shop'>Armazém → Loja</option>" +
+    "<option value='shop-to-wh'>Loja → Armazém</option>" +
+    "</select></div>" +
+    "<div class='field'><label>Quantidade</label>" +
+    "<input type='number' id='tr-qty' min='1' value='1' style='width:100%;padding:10px;border:1.5px solid #e4e4e7;border-radius:8px;font-family:inherit;font-size:14px;box-sizing:border-box'/>" +
+    "</div></div>" +
+    "<div class='form-actions'>" +
+    "<button class='btn btn-ghost btn-full' onclick='window._closeModal()'>Cancelar</button>" +
+    "<button class='btn btn-primary btn-full' onclick='window._applyTransfer(" + id + ")'>Transferir</button>" +
+    "</div>");
   refreshIcons(el("modal-box"));
+};
+
+window._applyTransfer = async (id) => {
+  const qty = parseInt(el("tr-qty").value) || 0;
+  const dir = el("tr-dir").value;
+  if (qty <= 0) { toast("Quantidade inválida.", "error"); return; }
+  const from = dir === "wh-to-shop" ? "warehouse" : "shop";
+  const to   = dir === "wh-to-shop" ? "shop"      : "warehouse";
+  try {
+    const { productService } = await import("../services.js");
+    await productService.transfer(id, qty, from, to);
+    toast("Transferência realizada com sucesso.", "success");
+    closeModal();
+    await initProdutos();
+  } catch(err) {
+    toast("Erro: " + err.message, "error");
+  }
 };
 
 window._applyTransfer = async (id) => {

@@ -76,7 +76,9 @@ function renderMenu() {
       { label: "Dados da Loja",     sub: "Nome, endereço, contacto",      icon: "store",          color: "#dcfce7", iconColor: "#16a34a", page: "loja"          },
       { label: "Segurança",         sub: "Chave HMAC e auditoria",        icon: "shield",         color: "#fee2e2", iconColor: "#dc2626", page: "seguranca"     },
       { label: "Configurações",     sub: "Loja, backup e logs",           icon: "settings",       color: "#f4f4f5", iconColor: "#71717a", page: "configuracoes" },
-    ] : []),
+    ] : [
+      { label: "Fecho de Turno",    sub: "Fechar turno e gerar .ktk",    icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno"         },
+    ]),
     { label: "Contabilidade",  sub: "Receitas, despesas e lucros",  icon: "trending-up", color: "#dcfce7", iconColor: "#16a34a", page: "contabilidade" },
     { label: "Assinatura",     sub: "Licenca e plano activo",       icon: "award",       color: "#ede9fe", iconColor: "#5b21b6", page: "assinatura"    },
     { label: "Contactos",      sub: "Suporte Introxeer Technology", icon: "headphones",  color: "#dbeafe", iconColor: "#2563eb", page: "contactos"     },
@@ -463,9 +465,18 @@ window._toggleUser = async (id) => {
 
 async function loadLoja() {
   const s = (await db.get("settings", "store")) || {};
-  el("ss-name").value  = s.name    || "";
-  el("ss-addr").value  = s.address || "";
-  el("ss-phone").value = s.phone   || "";
+  var fields = {
+    "ss-name":     s.name     || "",
+    "ss-addr":     s.address  || "",
+    "ss-phone":    s.phone    || "",
+    "ss-province": s.province || "",
+    "ss-nif":      s.nif      || "",
+    "ss-email":    s.email    || "",
+  };
+  Object.entries(fields).forEach(function([id, val]) {
+    var el2 = document.getElementById(id);
+    if (el2) el2.value = val;
+  });
 }
 
 async function saveStoreSettings() {
