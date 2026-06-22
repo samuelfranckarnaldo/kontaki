@@ -38,9 +38,11 @@ function buildTalao(sale, store, format) {
     );
   }).join("");
 
+  const logoHtml = (store && store.logo) ? '<img src="'+store.logo+'" style="width:50px;height:50px;object-fit:contain;margin:0 auto 6px;display:block"/>' : '';
   return (
     '<div class="recibo-' + format + '">' +
     '<div class="recibo-header">' +
+    logoHtml +
     '<h1>' + storeName + '</h1>' +
     ((store && store.address) ? '<p>' + store.address + '</p>' : '') +
     ((store && store.phone)   ? '<p>' + store.phone + '</p>'   : '') +

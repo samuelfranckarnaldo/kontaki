@@ -1,5 +1,7 @@
 import { loadDashboard }      from "./dashboard.js";
 import { loadConfiguracoes }  from "./configuracoes.js";
+import { loadClientes }       from "./clientes.js";
+import { loadDespesas }       from "./despesas.js";
 import { loadSeguranca }   from "./seguranca.js";
 import { loadTurno } from "./turno.js";
 import { loadFornecedores } from "./fornecedores.js";
@@ -63,48 +65,51 @@ function renderVersionFooter() {
 }
 
 function renderMenu() {
-  const user  = getUser();
-  const items = [
-    ...(user.role === "admin" ? [
-      { label: "Fecho de Turno",    sub: "Fechar turno e gerar .ktk",    icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno"         },
-      { label: "Dashboard",         sub: "Resumo do negócio",             icon: "bar-chart-2",    color: "#dcfce7", iconColor: "#16a34a", page: "dashboard"     },
-      { label: "Contabilidade",     sub: "Receitas, despesas e lucros",   icon: "trending-up",    color: "#f0fdf4", iconColor: "#16a34a", page: "contabilidade" },
-      { label: "Gestão de Stock",   sub: "Produtos e inventário",         icon: "package",        color: "#ede9fe", iconColor: "#5b21b6", page: "stock"         },
-      { label: "Incidentes",        sub: "Divergências de stock",         icon: "alert-triangle", color: "#fef3c7", iconColor: "#d97706", page: "incidentes"    },
-      { label: "Fornecedores",      sub: "Compras e fornecedores",        icon: "truck",          color: "#fef3c7", iconColor: "#d97706", page: "fornecedores"  },
-      { label: "Equipa",            sub: "Funcionários e acessos",        icon: "users",          color: "#dbeafe", iconColor: "#2563eb", page: "equipa"        },
-      { label: "Dados da Loja",     sub: "Nome, endereço, contacto",      icon: "store",          color: "#dcfce7", iconColor: "#16a34a", page: "loja"          },
-      { label: "Segurança",         sub: "Chave HMAC e auditoria",        icon: "shield",         color: "#fee2e2", iconColor: "#dc2626", page: "seguranca"     },
-      { label: "Configurações",     sub: "Loja, backup e logs",           icon: "settings",       color: "#f4f4f5", iconColor: "#71717a", page: "configuracoes" },
-    ] : [
-      { label: "Fecho de Turno",    sub: "Fechar turno e gerar .ktk",    icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno"         },
-    ]),
-    { label: "Contabilidade",  sub: "Receitas, despesas e lucros",  icon: "trending-up", color: "#dcfce7", iconColor: "#16a34a", page: "contabilidade" },
-    { label: "Assinatura",     sub: "Licenca e plano activo",       icon: "award",       color: "#ede9fe", iconColor: "#5b21b6", page: "assinatura"    },
-    { label: "Contactos",      sub: "Suporte Introxeer Technology", icon: "headphones",  color: "#dbeafe", iconColor: "#2563eb", page: "contactos"     },
-    { label: "Fecho de Turno",   sub: "Fechar turno e gerar .ktk",  icon: "clock",  color: "#ede9fe", iconColor: "#5b21b6", page: "turno"    },
-    { label: "Alterar Senha",    sub: "Mudar senha de acesso",        icon: "lock",       color: "#f4f4f5", iconColor: "#71717a", page: "senha"     },
-    { label: "Assinatura",       sub: "Licença e plano activo",       icon: "award",      color: "#ede9fe", iconColor: "#5b21b6", page: "assinatura" },
-    { label: "Contactos",        sub: "Suporte Introxeer Technology", icon: "headphones", color: "#dbeafe", iconColor: "#2563eb", page: "contactos"  },
-    { label: "Terminar Sessão",  sub: "",                             icon: "log-out",    color: "#fee2e2", iconColor: "#dc2626", page: "logout"     },
+  const user = getUser();
+
+  const adminItems = [
+    { label: "Meu Turno",         sub: "Abrir, fechar e gerar .ktk",    icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno"         },
+    { label: "Dashboard",         sub: "Receitas, lucros e despesas",    icon: "bar-chart-2",    color: "#dcfce7", iconColor: "#16a34a", page: "contabilidade" },
+    { label: "Gestão de Stock",   sub: "Produtos e inventário",          icon: "package",        color: "#ede9fe", iconColor: "#5b21b6", page: "stock"         },
+    { label: "Clientes",          sub: "Fichas e histórico",             icon: "users",          color: "#dbeafe", iconColor: "#2563eb", page: "clientes"      },
+    { label: "Fornecedores",      sub: "Compras e fornecedores",         icon: "truck",          color: "#fef3c7", iconColor: "#d97706", page: "fornecedores"  },
+    { label: "Despesas",          sub: "Renda, salários e outros custos",icon: "receipt",        color: "#fee2e2", iconColor: "#dc2626", page: "despesas"      },
+    { label: "Incidentes",        sub: "Divergências de stock",          icon: "alert-triangle", color: "#fef3c7", iconColor: "#d97706", page: "incidentes"    },
+    { label: "Equipa",            sub: "Funcionários e acessos",         icon: "users-2",        color: "#dbeafe", iconColor: "#2563eb", page: "equipa"        },
+    { label: "Dados da Loja",     sub: "Nome, logo, endereço e IVA",     icon: "store",          color: "#dcfce7", iconColor: "#16a34a", page: "loja"          },
+    { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "#fee2e2", iconColor: "#dc2626", page: "seguranca"     },
+    { label: "Configurações",     sub: "Backup, logs e dados",           icon: "settings",       color: "#f4f4f5", iconColor: "#71717a", page: "configuracoes" },
   ];
 
-  el("perfil-menu").innerHTML = `
-    <div class="perfil-menu-wrap">
-      ${items.map(item => `
-        <button class="perfil-menu-item" onclick="window._perfilNav('${item.page}')">
-          <div class="perfil-menu-item-left">
-            <div class="perfil-menu-icon" style="background:${item.color}">
-              <i data-lucide="${item.icon}" style="color:${item.iconColor}"></i>
-            </div>
-            <div>
-              <div style="font-size:15px;font-weight:600">${item.label}</div>
-              ${item.sub ? `<div style="font-size:12px;color:#71717a;margin-top:2px">${item.sub}</div>` : ""}
-            </div>
-          </div>
-          <span class="perfil-menu-chevron">›</span>
-        </button>`).join("")}
-    </div>`;
+  const caixaItems = [
+    { label: "Meu Turno",         sub: "Abrir, fechar e gerar .ktk",    icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno"         },
+    { label: "Clientes",          sub: "Fichas e histórico",             icon: "users",          color: "#dbeafe", iconColor: "#2563eb", page: "clientes"      },
+  ];
+
+  const commonItems = [
+    { label: "Assinatura",        sub: "Licença e plano activo",         icon: "award",          color: "#ede9fe", iconColor: "#5b21b6", page: "assinatura"    },
+    { label: "Alterar PIN",       sub: "Mudar PIN de acesso",            icon: "lock",           color: "#f4f4f5", iconColor: "#71717a", page: "senha"         },
+    { label: "Contactos",         sub: "Suporte Introxeer Technology",   icon: "headphones",     color: "#dbeafe", iconColor: "#2563eb", page: "contactos"     },
+    { label: "Terminar Sessão",   sub: "",                               icon: "log-out",        color: "#fee2e2", iconColor: "#dc2626", page: "logout"        },
+  ];
+
+  const items = [...(user.role === "admin" ? adminItems : caixaItems), ...commonItems];
+
+  el("perfil-menu").innerHTML =
+    '<div class="perfil-menu-wrap">' +
+    items.map(function(item) {
+      return '<button class="perfil-menu-item" onclick="window._perfilNav(\'' + item.page + '\')">' +
+        '<div class="perfil-menu-item-left">' +
+        '<div class="perfil-menu-icon" style="background:' + item.color + '">' +
+        '<i data-lucide="' + item.icon + '" style="color:' + item.iconColor + '"></i>' +
+        '</div><div>' +
+        '<div style="font-size:15px;font-weight:600">' + item.label + '</div>' +
+        (item.sub ? '<div style="font-size:12px;color:#71717a;margin-top:2px">' + item.sub + '</div>' : '') +
+        '</div></div>' +
+        '<span class="perfil-menu-chevron">›</span>' +
+        '</button>';
+    }).join("") +
+    '</div>';
 
   refreshIcons(el("perfil-menu"));
 }
@@ -118,17 +123,20 @@ function setupSubpageButtons() {
   const pwBtn   = el("btn-change-pw");
   const lojaBtn = el("btn-save-loja");
   const userBtn = el("btn-user-add");
-  const prodBtn = el("btn-prod-add");
   if (pwBtn)   pwBtn.onclick   = changePassword;
   if (lojaBtn) lojaBtn.onclick = saveStoreSettings;
   if (userBtn) userBtn.onclick = openUserAdd;
-  if (prodBtn) prodBtn.onclick = openProductAdd;
 }
 
 window._perfilNav = async (page) => {
   if (page === "logout") { logout(); return; }
   showSubpage(page);
-  if (page === "stock")      await loadStock();
+  if (page === "stock") {
+    showSubpage(null);
+    var prodNav = document.querySelector('.nav-item[data-page="produtos"]');
+    if (prodNav) prodNav.click();
+    return;
+  }
   if (page === "incidentes") await loadIncidentes();
   if (page === "equipa")     await loadEquipa();
   if (page === "loja")       await loadLoja();
@@ -139,11 +147,11 @@ window._perfilNav = async (page) => {
   if (page === "seguranca")    await loadSegurancaPage();
   if (page === "turno")        await loadTurnoPage();
   if (page === "fornecedores") await loadFornecedoresPage();
-  if (page === "dashboard")  await loadDashboardPage();
+
 };
 
 function showSubpage(name) {
-  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","assinatura","contactos"];
+  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","clientes","despesas","assinatura","contactos"];
   subpages.forEach(s => {
     const node = el("subpage-" + s);
     if (node) node.style.display = "none";
@@ -158,207 +166,40 @@ function showSubpage(name) {
   }
 }
 
-async function loadStock() {
-  var invMode = false;
-  var counts  = {};
+// loadStock removido — Gestao de Stock agora usa a aba Produtos directamente
 
-  async function render() {
-    const products = await db.getAll("products");
-    const q = ((el("stock-search") && el("stock-search").value) || "").toLowerCase();
-    const list = products.filter(function(p) {
-      return p.active && p.name.toLowerCase().includes(q);
-    });
+// openProductAdd removido
 
-    var invBtn = el("btn-inv-toggle");
-    if (invBtn) {
-      invBtn.textContent = invMode ? "Terminar Inventário" : "Modo Inventário";
-      invBtn.style.background = invMode ? "#fee2e2" : "#ede9fe";
-      invBtn.style.color      = invMode ? "#dc2626" : "#5b21b6";
-      invBtn.style.border     = "none";
-      invBtn.style.borderRadius = "10px";
-      invBtn.style.padding    = "10px 16px";
-      invBtn.style.fontWeight = "700";
-      invBtn.style.cursor     = "pointer";
-      invBtn.style.width      = "100%";
-      invBtn.style.marginBottom = "10px";
-      invBtn.style.fontFamily = "inherit";
-    }
+// window._saveProd removido — usa produtos.js
 
-    el("stock-list").innerHTML = list.map(function(p) {
-      var stockColor = p.stock <= p.minStock ? "#d97706" : "#16a34a";
-      var invField = invMode
-        ? '<input type="number" placeholder="Contagem" min="0" value="' + (counts[p.id] !== undefined ? counts[p.id] : "") + '" ' +
-          'style="width:80px;padding:6px 8px;border:1.5px solid #ddd6fe;border-radius:8px;text-align:center;font-size:14px;font-weight:700" ' +
-          'onchange="window._invCount(' + p.id + ',this.value)"/>'
-        : '<button class="btn btn-ghost btn-sm" onclick="window._openAdjust(' + p.id + ')">Ajustar</button>';
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #f4f4f5">' +
-        '<div>' +
-        '<div style="font-size:14px;font-weight:600">' + p.name + '</div>' +
-        '<div style="font-size:12px;color:#71717a">' + p.category + ' · ' + p.price.toLocaleString("pt-AO") + ' Kz</div>' +
-        '</div>' +
-        '<div style="display:flex;align-items:center;gap:10px">' +
-        '<span style="font-size:15px;font-weight:700;color:' + stockColor + '">' + p.stock + '</span>' +
-        invField +
-        '</div></div>';
-    }).join("");
+// window._openAdjust removido — usa produtos.js
 
-    if (invMode) {
-      var saveBtn = document.getElementById("inv-save-btn");
-      if (!saveBtn) {
-        saveBtn = document.createElement("button");
-        saveBtn.id = "inv-save-btn";
-        saveBtn.style.cssText = "width:100%;padding:14px;background:#5b21b6;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:10px";
-        saveBtn.textContent = "Gerar incidentes com contagem";
-        saveBtn.onclick = window._finalizarInventario;
-        el("stock-list").appendChild(saveBtn);
-      }
-    } else {
-      var old = document.getElementById("inv-save-btn");
-      if (old) old.remove();
-    }
-
-    var search = el("stock-search");
-    if (search) search.oninput = render;
-    refreshIcons(el("subpage-stock"));
-  }
-
-  window._invCount = function(id, val) {
-    counts[id] = parseInt(val) || 0;
-  };
-
-  window._finalizarInventario = async function() {
-    const products = await db.getAll("products");
-    var incidentes = 0;
-    for (var i = 0; i < products.length; i++) {
-      var p = products[i];
-      if (!p.active) continue;
-      if (counts[p.id] === undefined) continue;
-      var found    = counts[p.id];
-      var expected = p.stock;
-      var diff     = found - expected;
-      if (diff !== 0) {
-        await db.add("incidents", {
-          productId:   p.id,
-          productName: p.name,
-          expected:    expected,
-          found:       found,
-          diff:        diff,
-          sessionId:   getUser().sessionId || null,
-          responsibleSessionId: null,
-          foundBy:     getUser().id,
-          status:      "open",
-          note:        "Inventário físico",
-          createdAt:   new Date().toISOString(),
-        });
-        incidentes++;
-      }
-    }
-    toast(incidentes + " incidente(s) gerado(s).", incidentes > 0 ? "error" : "success");
-    counts = {};
-    invMode = false;
-    await render();
-  };
-
-  var invBtn = el("btn-inv-toggle");
-  if (invBtn) {
-    invBtn.onclick = function() {
-      invMode = !invMode;
-      counts = {};
-      render();
-    };
-  }
-
-  await render();
-}
-
-function openProductAdd() {
-  const cats = ["Alimentação","Bebidas","Higiene","Limpeza","Outro"];
-  openModal("Novo Produto", `
-    <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="field"><label>Nome *</label><input id="pf-name"/></div>
-      <div class="field-row">
-        <div class="field"><label>Preço (Kz) *</label><input type="number" id="pf-price"/></div>
-        <div class="field"><label>Stock</label><input type="number" id="pf-stock" value="0"/></div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>Categoria</label>
-          <select id="pf-cat">${cats.map(c => `<option>${c}</option>`).join("")}</select>
-        </div>
-        <div class="field"><label>Unidade</label><input id="pf-unit" value="unid"/></div>
-      </div>
-      <div class="field"><label>Código de Barras (GTIN)</label><input id="pf-bar"/></div>
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
-      <button class="btn btn-primary btn-full" onclick="window._saveProd(0)">
-        <i data-lucide="save"></i> Guardar
-      </button>
-    </div>`);
-  refreshIcons(el("modal-box"));
-}
-
-window._saveProd = async (id) => {
-  const name  = el("pf-name").value.trim();
-  const price = Number(el("pf-price").value);
-  if (!name || !price) { toast("Nome e preço são obrigatórios.", "error"); return; }
-  const data = {
-    name, barcode: el("pf-bar").value, price,
-    stock: Number(el("pf-stock").value || 0),
-    physicalStock: Number(el("pf-stock").value || 0),
-    category: el("pf-cat").value,
-    unit: el("pf-unit").value, active: true,
-  };
-  if (id) { const p = await db.get("products", id); await db.put("products", { ...p, ...data }); }
-  else await db.add("products", { ...data, createdAt: new Date().toISOString() });
-  toast(id ? "Produto actualizado." : "Produto adicionado.", "success");
-  closeModal();
-  loadStock();
-};
-
-window._openAdjust = async (id) => {
-  const p = await db.get("products", id);
-  openModal(`Ajustar Stock · ${p.name}`, `
-    <div style="background:#f4f4f5;border-radius:10px;padding:14px;margin-bottom:16px;
-                display:flex;justify-content:space-between;align-items:center">
-      <span style="color:#71717a;font-size:13px">Stock actual</span>
-      <span style="font-weight:700;font-size:20px">${p.stock} ${p.unit}</span>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="field"><label>Novo Stock</label><input type="number" id="adj-stock" value="${p.stock}" min="0"/></div>
-      <div class="field"><label>Razão</label><input id="adj-reason" placeholder="Ex: Rutura, dano..."/></div>
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
-      <button class="btn btn-primary btn-full" onclick="window._applyAdjust(${id})">
-        <i data-lucide="check"></i> Aplicar
-      </button>
-    </div>`);
-  refreshIcons(el("modal-box"));
-};
-
-window._applyAdjust = async (id) => {
-  const p      = await db.get("products", id);
-  const ns     = Number(el("adj-stock").value);
-  const reason = el("adj-reason") ? el("adj-reason").value : "Ajuste manual";
-  const diff   = ns - (p.stock||0);
-  await db.put("products", { ...p, stock: ns, physicalStock: ns, updatedAt: new Date().toISOString() });
-  if (diff !== 0) {
-    await db.add("stockMovements", {
-      productId: id, productName: p.name,
-      type: "adjustment", location: "shop",
-      qty: diff, qtyBefore: p.stock||0, qtyAfter: ns,
-      reference: "adjust", note: reason||"Ajuste manual",
-      userId: getUser().id, sessionId: getUser().sessionId||null,
-      imported: false, createdAt: new Date().toISOString(),
-    });
-  }
-  toast("Stock ajustado.", "success");
-  closeModal();
-  loadStock();
-};
+// window._applyAdjust removido daqui — definido apenas em produtos.js agora
 
 async function loadIncidentes() {
-  const list = (await db.getAll("incidents")).reverse();
+  const allList = (await db.getAll("incidents")).reverse();
+  const resolvedCount = allList.filter(function(i){ return i.status==="resolved"; }).length;
+  const list = allList;
+
+  var clearBtn = document.getElementById("btn-clear-resolved-inc");
+  if (!clearBtn) {
+    var wrap = document.getElementById("subpage-incidentes");
+    var header = wrap ? wrap.querySelector(".page-inner") : null;
+    if (header) {
+      clearBtn = document.createElement("button");
+      clearBtn.id = "btn-clear-resolved-inc";
+      clearBtn.style.cssText = "width:100%;padding:11px;background:#f4f4f5;color:#71717a;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px";
+      clearBtn.onclick = window._clearResolvedIncidents;
+      var listEl = document.getElementById("inc-list");
+      if (listEl) header.insertBefore(clearBtn, listEl);
+    }
+  }
+  if (clearBtn) {
+    clearBtn.innerHTML = '<i data-lucide="trash-2" style="width:14px;height:14px"></i> Limpar ' + resolvedCount + ' incidente(s) resolvido(s)';
+    clearBtn.style.display = resolvedCount > 0 ? "flex" : "none";
+    refreshIcons(clearBtn);
+  }
+
   el("inc-list").innerHTML = !list.length
     ? `<div class="empty-state"><div class="empty-state-title">Sem incidentes</div></div>`
     : list.map(i => `
@@ -383,6 +224,15 @@ async function loadIncidentes() {
         </div>`).join("");
   refreshIcons(el("inc-list"));
 }
+
+window._clearResolvedIncidents = async function() {
+  if (!confirm("Eliminar todos os incidentes resolvidos? O stock já foi corrigido, isto so limpa a lista.")) return;
+  const all = await db.getAll("incidents");
+  const resolved = all.filter(function(i){ return i.status==="resolved"; });
+  for (var i=0;i<resolved.length;i++) await db.delete("incidents", resolved[i].id);
+  toast(resolved.length + " incidente(s) removido(s).", "success");
+  await loadIncidentes();
+};
 
 window._resolveInc = async (id) => {
   const i = await db.get("incidents", id);
@@ -472,11 +322,13 @@ async function loadLoja() {
     "ss-province": s.province || "",
     "ss-nif":      s.nif      || "",
     "ss-email":    s.email    || "",
+    "ss-iva":      s.iva !== undefined ? String(s.iva) : "",
   };
   Object.entries(fields).forEach(function([id, val]) {
     var el2 = document.getElementById(id);
     if (el2) el2.value = val;
   });
+  if (s.logo) renderLogoPreview(s.logo);
 }
 
 async function saveStoreSettings() {
@@ -570,6 +422,7 @@ async function loadContabilidade() {
   var purchases= await db.getAll("purchases");
   var products = await db.getAll("products");
   var fiados   = await db.getAll("fiado");
+  var archive  = await db.getAll("accountingArchive");
 
   var now   = new Date();
   var mes   = now.toISOString().slice(0,7);
@@ -581,9 +434,11 @@ async function loadContabilidade() {
   var vendasAno  = sales.filter(function(s){ return (s.date||"").startsWith(ano); });
   var vendasHoje = sales.filter(function(s){ return (s.date||"").startsWith(hoje); });
 
-  var receitaMes  = vendasMes.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
-  var receitaAno  = vendasAno.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
-  var receitaHoje = vendasHoje.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  // Receita = só vendas pagas (exclui fiados em aberto)
+  var receitaMes  = vendasMes.filter(function(s){ return s.payMethod!=="fiado"||s.fiadoPago; }).reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  var receitaAno  = vendasAno.filter(function(s){ return s.payMethod!=="fiado"||s.fiadoPago; }).reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  var receitaHoje = vendasHoje.filter(function(s){ return s.payMethod!=="fiado"||s.fiadoPago; }).reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  var receitaFiadoMes = vendasMes.filter(function(s){ return s.payMethod==="fiado"&&!s.fiadoPago; }).reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
 
   // Custo das vendas (COGS)
   var prodMap = {};
@@ -611,6 +466,11 @@ async function loadContabilidade() {
   // Compras a fornecedores
   var comprasMes = purchases.filter(function(p){ return (p.date||"").startsWith(mes); })
     .reduce(function(a,p){ return a+(p.total||0); },0);
+
+  var allExpenses = await db.getAll("expenses");
+  var despesasMes = allExpenses.filter(function(e){ return (e.date||"").startsWith(mes); })
+    .reduce(function(a,e){ return a+(e.amount||0); },0);
+  var lucroLiquido = lucroMes - despesasMes;
 
   // Fiados em aberto
   var fiadoAberto = fiados.filter(function(f){ return f.status==="open"; })
@@ -644,7 +504,10 @@ async function loadContabilidade() {
     kpi("Margem bruta", margemMes+"%", lucroMes>=0?"#5b21b6":"#dc2626", "percent") +
     kpi("COGS do mês", fmt(cogsMes), "#d97706", "package") +
     kpi("Compras", fmt(comprasMes), "#dc2626", "shopping-bag") +
+    kpi("Despesas gerais", fmt(despesasMes), "#dc2626", "receipt") +
+    kpi("Lucro Líquido", fmt(lucroLiquido), lucroLiquido>=0?"#16a34a":"#dc2626", "wallet") +
     kpi("Fiado aberto", fmt(fiadoAberto), "#d97706", "credit-card") +
+    kpi("Fiado pendente (mês)", fmt(receitaFiadoMes||0), "#d97706", "clock") +
     '</div>' +
 
     // Receita hoje vs mês vs ano
@@ -693,6 +556,21 @@ async function loadContabilidade() {
         '</div></div>';
     }).join("") +
     '</div>';
+
+  // Relatorio por funcionario
+  var users = await db.getAll("users");
+  var funcSection = document.createElement("div");
+  funcSection.style.cssText = "margin-bottom:14px";
+  funcSection.innerHTML =
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Relatório por funcionário</div>' +
+    '<div class="vender-card" style="display:flex;flex-direction:column;gap:10px">' +
+    '<select id="func-select" style="width:100%;padding:10px;border:1.5px solid #e4e4e7;border-radius:8px;font-family:inherit;font-size:14px">' +
+    users.map(function(u){ return '<option value="'+u.id+'">'+u.name+'</option>'; }).join("") +
+    '</select>' +
+    '<button onclick="window._gerarRelatorioFuncionario()" style="width:100%;padding:12px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px"><i data-lucide="user-check" style="width:15px;height:15px"></i> Gerar relatório do funcionário</button>' +
+    '</div>';
+  wrap.appendChild(funcSection);
+  refreshIcons(funcSection);
 
   // Botão exportar PDF
   var pdfBtn = document.createElement("button");
@@ -825,3 +703,110 @@ window._reportarProblema = function() {
 };
 
 
+
+window._gerarRelatorioFuncionario = async function() {
+  var sel = document.getElementById("func-select");
+  if (!sel) return;
+  var userId = Number(sel.value);
+  var user = await db.get("users", userId);
+  var sales = await db.getAll("sales");
+  var mySales = sales.filter(function(s){ return s.userId === userId; });
+
+  var now = new Date();
+  var mes = now.toISOString().slice(0,7);
+  var mySalesMes = mySales.filter(function(s){ return (s.date||"").startsWith(mes); });
+  var totalMes = mySalesMes.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  var totalGeral = mySales.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+
+  var store = (await db.get("settings","store")) || {};
+
+  var html = "<!DOCTYPE html><html lang='pt'><head><meta charset='UTF-8'/><title>Relatório " + user.name + "</title>" +
+    "<style>body{font-family:Arial,sans-serif;padding:20mm;font-size:13px}h1{font-size:20px}" +
+    "table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#5b21b6;color:#fff;padding:8px;text-align:left;font-size:11px}" +
+    "td{padding:7px;border-bottom:1px solid #eee;font-size:12px}</style></head><body>" +
+    "<h1>" + (store.name||"Kontaki") + "</h1>" +
+    "<div style='color:#71717a;margin-bottom:16px'>Relatório de Funcionário · " + new Date().toLocaleDateString("pt-AO") + "</div>" +
+    "<div style='background:#f8f8f8;border-radius:8px;padding:16px;margin-bottom:20px'>" +
+    "<div style='font-size:18px;font-weight:700'>" + user.name + "</div>" +
+    "<div style='color:#71717a'>" + (user.role==="admin"?"Administrador":"Operador de Caixa") + "</div>" +
+    "<div style='margin-top:10px;display:flex;gap:20px'>" +
+    "<div><div style='font-size:11px;color:#71717a'>Vendas este mês</div><div style='font-size:16px;font-weight:700;color:#16a34a'>" + totalMes.toLocaleString("pt-AO") + " Kz</div></div>" +
+    "<div><div style='font-size:11px;color:#71717a'>Vendas total</div><div style='font-size:16px;font-weight:700;color:#5b21b6'>" + totalGeral.toLocaleString("pt-AO") + " Kz</div></div>" +
+    "<div><div style='font-size:11px;color:#71717a'>Nº transacções</div><div style='font-size:16px;font-weight:700'>" + mySales.length + "</div></div>" +
+    "</div></div>" +
+    "<table><thead><tr><th>Data</th><th>Total</th><th>Pagamento</th></tr></thead><tbody>" +
+    mySales.slice(-50).reverse().map(function(s){
+      return "<tr><td>" + new Date(s.date).toLocaleString("pt-AO") + "</td><td>" + (s.total||0).toLocaleString("pt-AO") + " Kz</td><td>" + s.payMethod + "</td></tr>";
+    }).join("") +
+    "</tbody></table>" +
+    "<div style='margin-top:30px;text-align:center;font-size:11px;color:#a1a1aa'>Kontaki · Introxeer Technology</div>" +
+    "</body></html>";
+
+  var win = window.open("","_blank","width=900,height=700");
+  win.document.write(html);
+  win.document.close();
+  setTimeout(function(){ win.print(); }, 400);
+};
+
+
+async function loadClientesPage() {
+  var btn = document.getElementById("btn-back-clientes");
+  if (btn) btn.onclick = function() { showSubpage(null); };
+  window._showSubpage = showSubpage;
+  await loadClientes();
+}
+
+async function loadDespesasPage() {
+  var btn = document.getElementById("btn-back-despesas");
+  if (btn) btn.onclick = function() { showSubpage(null); };
+  window._showSubpage = showSubpage;
+  await loadDespesas();
+}
+
+// ── LOGOTIPO DA LOJA ──────────────────────────────────────────────────────────
+window._uploadLogo = function(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var maxSize = 200;
+      var scale = Math.min(maxSize/img.width, maxSize/img.height, 1);
+      var canvas = document.createElement("canvas");
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      var ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      var dataUrl = canvas.toDataURL("image/png", 0.85);
+
+      db.get("settings","store").then(function(s){
+        s = s || {};
+        return db.put("settings", Object.assign({}, s, { key:"store", logo: dataUrl }));
+      }).then(function(){
+        toast("Logótipo guardado.","success");
+        renderLogoPreview(dataUrl);
+      });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = "";
+};
+
+function renderLogoPreview(dataUrl) {
+  var prev = document.getElementById("logo-preview");
+  if (!prev) return;
+  if (dataUrl) {
+    prev.innerHTML = '<div style="display:flex;align-items:center;gap:10px;background:#f4f4f5;border-radius:10px;padding:8px"><img src="' + dataUrl + '" style="width:48px;height:48px;object-fit:contain;border-radius:8px;background:#fff"/><button onclick="window._removeLogo()" style="background:none;border:none;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Remover</button></div>';
+  } else {
+    prev.innerHTML = "";
+  }
+}
+
+window._removeLogo = async function() {
+  var s = (await db.get("settings","store")) || {};
+  await db.put("settings", Object.assign({}, s, { logo: null }));
+  renderLogoPreview(null);
+  toast("Logótipo removido.","success");
+};

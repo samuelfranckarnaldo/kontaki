@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { addStockMovement, getStock } from "../services.js";
 import { fmt, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
@@ -21,9 +22,10 @@ export function openProductForm(p = {}) {
     `<div style="display:flex;flex-direction:column;gap:14px">` +
     `<div class="field"><label>Nome *</label><input id="pf-name" value="${p.name||""}" placeholder="Ex: Arroz 1kg"/></div>` +
     `<div class="field-row">` +
-    `<div class="field"><label>Preco (Kz) *</label><input type="number" id="pf-price" value="${p.price||""}" placeholder="0"/></div>` +
-    `<div class="field"><label>Unidade</label><input id="pf-unit" value="${p.unit||"unid"}" placeholder="unid"/></div>` +
+    `<div class="field"><label>Preco Venda (Kz) *</label><input type="number" id="pf-price" value="${p.price||""}" placeholder="0"/></div>` +
+    `<div class="field"><label>Preco Custo (Kz)</label><input type="number" id="pf-cost" value="${p.costPrice||""}" placeholder="Opcional"/></div>` +
     `</div>` +
+    `<div class="field"><label>Unidade</label><input id="pf-unit" value="${p.unit||"unid"}" placeholder="unid"/></div>` +
     `<div style="background:#ede9fe;border-radius:12px;padding:14px">` +
     `<div style="font-size:12px;font-weight:700;color:#5b21b6;margin-bottom:10px">STOCK</div>` +
     `<div class="field-row">` +
@@ -34,7 +36,8 @@ export function openProductForm(p = {}) {
     `</div>` +
     `<div class="field-row">` +
     `<div class="field"><label>Categoria</label><select id="pf-cat">${cats.map(c=>`<option ${p.category===c?"selected":""}>${c}</option>`).join("")}</select></div>` +
-    `<div class="field"><label>Codigo Barras</label><input id="pf-bar" value="${p.barcode||""}" placeholder="GTIN..."/></div>` +
+    `<div class="field"><label>Codigo Barras (unidade)</label><input id="pf-bar" value="${p.barcode||""}" placeholder="GTIN da unidade"/></div>` +
+    `<div class="field"><label>Codigo Embalagem Mae (opcional)</label><input id="pf-bar-mae" value="${p.masterBarcode||""}" placeholder="GTIN da caixa/fardo"/></div>` +
     `</div></div>` +
     `<div class="form-actions">` +
     `<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>` +
@@ -236,13 +239,15 @@ window._openTransfer = async (id) => {
 
 window._applyTransfer = async (id) => {
   const qty = parseInt(el("tr-qty").value) || 0;
-  const dir = el("tr-dir").value;
+  const dir = el("tr-dir") ? el("tr-dir").value : "wh-to-shop";
   if (qty <= 0) { toast("Quantidade inválida.", "error"); return; }
   const from = dir === "wh-to-shop" ? "warehouse" : "shop";
   const to   = dir === "wh-to-shop" ? "shop"      : "warehouse";
   try {
-    const { productService } = await import("../services.js");
-    await productService.transfer(id, qty, from, to);
+    const curFrom = await getStock(id, from);
+    if (qty > curFrom) { toast("Stock insuficiente em " + (from==="shop"?"loja":"armazém") + ": apenas " + curFrom + " disponíveis.", "error"); return; }
+    await addStockMovement({ productId:id, productName:"", type:"transfer_out", location:from, qty:-qty, reference:"transfer", note:from+" → "+to, sessionId:null });
+    await addStockMovement({ productId:id, productName:"", type:"transfer_in",  location:to,   qty:+qty, reference:"transfer", note:from+" → "+to, sessionId:null });
     toast("Transferência realizada com sucesso.", "success");
     closeModal();
     await initProdutos();
@@ -251,18 +256,7 @@ window._applyTransfer = async (id) => {
   }
 };
 
-window._applyTransfer = async (id) => {
-  const p   = await db.get("products",id);
-  const qty = Number(el("tr-qty").value);
-  if (!qty||qty<=0) { toast("Quantidade invalida.","error"); return; }
-  if (qty>(p.warehouseStock||0)) { toast("Superior ao armazem.","error"); return; }
-  await db.put("products",{...p,stock:(p.stock||0)+qty,warehouseStock:(p.warehouseStock||0)-qty});
-  await db.add("transfers",{productId:id,productName:p.name,qty,userId:getUser().id,date:new Date().toISOString()});
-  toast(qty+" "+p.unit+" transferidos para a loja.","success");
-  closeModal();
-  products = await db.getAll("products");
-  renderStats(); renderList();
-};
+
 
 window._openAdjustProd = async (id) => {
   const p = await db.get("products",id);
@@ -286,8 +280,20 @@ window._applyAdjust = async (id) => {
   const ns = Number(el("adj-stock").value);
   const nw = Number(el("adj-warehouse").value);
   if (isNaN(ns)||ns<0||isNaN(nw)||nw<0) { toast("Valores invalidos.","error"); return; }
-  await db.put("products",{...p,stock:ns,physicalStock:ns,warehouseStock:nw});
-  await db.add("adjustments",{productId:id,productName:p.name,fromStock:p.stock,toStock:ns,reason:el("adj-reason").value||"Ajuste manual",userId:getUser().id,date:new Date().toISOString()});
+  const reason = (el("adj-reason") ? el("adj-reason").value : "")||"Ajuste manual";
+
+  const curShop = await getStock(id, "shop");
+  const curWh   = await getStock(id, "warehouse");
+  const diffShop = ns - curShop;
+  const diffWh   = nw - curWh;
+
+  if (diffShop !== 0) {
+    await addStockMovement({ productId:id, productName:p.name, type:"adjustment", location:"shop", qty:diffShop, reference:"adjust", note:reason, sessionId:null });
+  }
+  if (diffWh !== 0) {
+    await addStockMovement({ productId:id, productName:p.name, type:"adjustment", location:"warehouse", qty:diffWh, reference:"adjust", note:reason, sessionId:null });
+  }
+
   toast("Stock ajustado.","success");
   closeModal();
   products = await db.getAll("products");
@@ -297,20 +303,48 @@ window._applyAdjust = async (id) => {
 window._saveProduto = async (id) => {
   const name  = (el("pf-name") ? el("pf-name").value.trim() : "");
   const price = Number((el("pf-price") ? el("pf-price").value : ""));
+  const cost  = Number((el("pf-cost") ? el("pf-cost").value : "")||0);
   if (!name)  { toast("O nome e obrigatorio.","error"); return; }
   if (!price) { toast("O preco e obrigatorio.","error"); return; }
-  const data = {
-    name, barcode:(el("pf-bar") ? el("pf-bar").value.trim() : "")||"", price,
-    stock:Number((el("pf-stock") ? el("pf-stock").value : "")||0),
-    warehouseStock:Number((el("pf-warehouse") ? el("pf-warehouse").value : "")||0),
+
+  const baseData = {
+    name, barcode:(el("pf-bar") ? el("pf-bar").value.trim() : "")||"",
+    masterBarcode:(el("pf-bar-mae") ? el("pf-bar-mae").value.trim() : "")||"",
+    price,
+    costPrice: cost,
     minStock:Number((el("pf-minstock") ? el("pf-minstock").value : "")||5),
-    physicalStock:Number((el("pf-stock") ? el("pf-stock").value : "")||0),
     category:(el("pf-cat") ? el("pf-cat").value : "")||"Alimentacao",
     unit:(el("pf-unit") ? el("pf-unit").value : "")||"unid",
     active:true,
   };
-  if (id) { const ex=await db.get("products",id); await db.put("products",{...ex,...data}); toast("Produto actualizado.","success"); }
-  else { await db.add("products",{...data,createdAt:new Date().toISOString()}); toast("Produto adicionado!","success"); }
+
+  if (id) {
+    // EDITAR — nunca mexe no stock aqui, so dados do produto
+    const ex = await db.get("products", id);
+    await db.put("products", { ...ex, ...baseData });
+    toast("Produto actualizado.","success");
+  } else {
+    // Verifica limite do plano antes de criar
+    const allProducts = await db.getAll("products");
+    const activeCount = allProducts.filter(function(p){ return p.active; }).length;
+    const store2 = (await db.get("settings","store")) || {};
+    const planLimit = store2.planLimit || 99999;
+    if (activeCount >= planLimit) {
+      toast("Limite de " + planLimit + " produtos atingido para o teu plano. Contacta o suporte para upgrade.", "error");
+      return;
+    }
+    // CRIAR — stock inicial gera StockMovement real
+    const initialShop = Number((el("pf-stock") ? el("pf-stock").value : "")||0);
+    const initialWh    = Number((el("pf-warehouse") ? el("pf-warehouse").value : "")||0);
+    const newId = await db.add("products", { ...baseData, stock:0, warehouseStock:0, createdAt:new Date().toISOString() });
+    if (initialShop > 0) {
+      await addStockMovement({ productId:newId, productName:name, type:"purchase", location:"shop", qty:initialShop, reference:"create", note:"Stock inicial", sessionId:null });
+    }
+    if (initialWh > 0) {
+      await addStockMovement({ productId:newId, productName:name, type:"purchase", location:"warehouse", qty:initialWh, reference:"create", note:"Stock inicial armazem", sessionId:null });
+    }
+    toast("Produto adicionado!","success");
+  }
   closeModal();
   products = await db.getAll("products");
   renderStats(); renderList();

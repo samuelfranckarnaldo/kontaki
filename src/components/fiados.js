@@ -17,6 +17,15 @@ export async function initFiados() {
     });
   });
   window._openFiadoAdd = openFiadoAdd;
+  window._clearPaidFiados = async function() {
+    if (!confirm("Eliminar todos os fiados pagos? Esta acção não pode ser desfeita.")) return;
+    var all = await db.getAll("fiado");
+    var paid = all.filter(function(f){ return f.status==="paid"; });
+    for (var i=0;i<paid.length;i++) await db.delete("fiado", paid[i].id);
+    const { toast } = await import("../toast.js");
+    toast(paid.length + " fiado(s) pagos removidos.", "success");
+    await renderList();
+  };
   await renderList();
 }
 
@@ -24,6 +33,20 @@ async function renderList() {
   const all    = await db.getAll("fiado");
   const total  = all.filter(f => f.status==="open").reduce((a,f) => a+(f.amount||0), 0);
   const count  = all.filter(f => f.status==="open").length;
+
+  var all2 = await db.getAll("fiado");
+  var paidCount = all2.filter(function(f){ return f.status==="paid"; }).length;
+  var clearBar = document.getElementById("fiados-clear-bar");
+  if (!clearBar) {
+    clearBar = document.createElement("div");
+    clearBar.id = "fiados-clear-bar";
+    var totalBar = el("fiados-total-bar");
+    if (totalBar && totalBar.parentNode) totalBar.parentNode.insertBefore(clearBar, totalBar.nextSibling);
+  }
+  clearBar.innerHTML = paidCount > 0
+    ? '<button onclick="window._clearPaidFiados()" style="width:100%;padding:10px;background:#f4f4f5;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;color:#71717a;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px"><i data-lucide="trash-2" style="width:13px;height:13px"></i> Limpar ' + paidCount + ' fiado(s) pago(s)</button>'
+    : "";
+  if (clearBar) refreshIcons(clearBar);
 
   el("fiados-total-bar").innerHTML =
     `<div style="display:flex;justify-content:space-between;align-items:center;

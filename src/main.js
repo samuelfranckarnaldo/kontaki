@@ -39,6 +39,22 @@ function showErrorBoundary(message, file, line) {
   document.body.appendChild(div);
 }
 
+window._restoreBackupLogin = async function(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (!confirm("Restaurar backup vai substituir os dados actuais. Continuar?")) { input.value=""; return; }
+  try {
+    var text = await file.text();
+    var backupMod = await import("./backup.js");
+    var results = await backupMod.backupService.import(text);
+    var total = Object.values(results).reduce(function(a,b){ return a+b; }, 0);
+    alert("Backup restaurado: " + total + " registos. A app vai recarregar.");
+    window.location.reload();
+  } catch(err) {
+    alert("Erro ao restaurar: " + err.message);
+  }
+};
+
 main().catch(function(e) {
   try { logger.error("Erro fatal: " + e.message, e); } catch(x){}
   showErrorBoundary(e.message, null, null);

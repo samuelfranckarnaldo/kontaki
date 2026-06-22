@@ -28,10 +28,8 @@ export var router = {
       btn.addEventListener("click", function() { self.go(btn.dataset.page); });
     });
 
-    var qrBtn  = el("btn-topbar-qr");
-    var addBtn = el("btn-topbar-add");
-    if (qrBtn)  qrBtn.addEventListener("click",  function() { initCamera(window._onVerifyQR); });
-    if (addBtn) addBtn.addEventListener("click", function() { openProductForm(); });
+    var qrBtn = el("btn-topbar-qr");
+    if (qrBtn) qrBtn.addEventListener("click", function() { initCamera(window._onVerifyQR); });
 
     refreshIcons(el("bottom-nav"));
     refreshIcons(el("topbar"));
@@ -61,7 +59,7 @@ export var router = {
     var quickBtn = el("btn-topbar-quick");
 
     if (qrBtn)    qrBtn.style.display    = "none";
-    if (addBtn)   addBtn.style.display   = "none";
+    if (addBtn)   { addBtn.style.display = "none"; addBtn.onclick = null; }
     if (quickBtn) quickBtn.style.display = "none";
 
     if (pageId === "vender") {
@@ -69,7 +67,10 @@ export var router = {
       if (qrBtn)    qrBtn.style.display    = "flex";
     }
     if (pageId === "produtos") {
-      if (addBtn) addBtn.style.display = "flex";
+      if (addBtn) {
+        addBtn.style.display = "flex";
+        addBtn.onclick = function() { openProductForm(); };
+      }
     }
     if (pageId === "fiados") {
       if (addBtn) {

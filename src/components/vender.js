@@ -4,6 +4,9 @@ import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { getUser } from "../auth.js";
 import { initCamera } from "./camera.js";
+import { addStockMovement, getStock } from "../services.js";
+import { gerarReciboPDF, partilharReciboPDF } from "./recibo-pdf.js";
+import { printRecibo } from "../print.js";
 
 let products  = [];
 let cart      = [];
@@ -28,6 +31,7 @@ const PAY_DESC = {
 export async function initVender() {
   products = await db.getAll("products").then(p => p.filter(x => x.active));
   cart     = [];
+  _storeIvaCache = null;
 
   const btnScanner   = el("btn-scanner");
   const btnLimpar    = el("btn-limpar");
@@ -49,58 +53,65 @@ export async function initVender() {
   // Verificação QR — abre modal de escolha
   window._onVerifyQR = onVerifyQR;
   window._verifyByCam  = () => {
-    document.getElementById("verify-overlay").style.display = "none";
+    var ov = document.getElementById("verify-overlay");
+    if (ov) ov.style.display = "none";
     initCamera(onVerifyQR);
   };
   window._verifyByCode = () => {
-    const wrap = document.getElementById("verify-code-input");
+    var wrap = document.getElementById("verify-code-input");
+    if (!wrap) return;
     wrap.style.display = wrap.style.display === "flex" ? "none" : "flex";
     if (wrap.style.display === "flex") {
-      setTimeout(() => (document.getElementById("manual-code") && document.getElementById("manual-code").focus()), 100);
+      setTimeout(() => { var m = document.getElementById("manual-code"); if (m) m.focus(); }, 100);
     }
   };
   window._verifyManualCode = async () => {
-    const code = (document.getElementById("manual-code") ? document.getElementById("manual-code").value.trim() : "").toUpperCase();
+    var codeEl = document.getElementById("manual-code");
+    var code = codeEl ? codeEl.value.trim().toUpperCase() : "";
     if (!code) { toast("Insere o código.", "error"); return; }
-    document.getElementById("verify-overlay").style.display = "none";
+    var ov = document.getElementById("verify-overlay");
+    if (ov) ov.style.display = "none";
     await verifyCode(code);
   };
 
-  // Botão topbar QR — abre modal de escolha
   const qrBtn = document.getElementById("btn-topbar-qr");
   if (qrBtn) {
     qrBtn.onclick = () => {
-      const overlay = document.getElementById("verify-overlay");
-      overlay.style.display = "flex";
-      document.getElementById("verify-code-input").style.display = "none";
-      document.getElementById("manual-code").value = "";
-      refreshIcons(overlay);
+      initCamera(function(code) {
+        verifyCode(code);
+      });
     };
   }
 
-  el("prod-search").oninput = () => {
-    const q = el("prod-search").value.trim().toLowerCase();
-    if (!q) { el("search-results").style.display = "none"; return; }
-    const f = products.filter(p => p.name.toLowerCase().includes(q) || (p.barcode||"").includes(q));
-    renderSearchResults(f);
-  };
-
-  el("prod-search").onkeydown = (e) => {
-    if (e.key !== "Enter") return;
-    const q = el("prod-search").value.trim().toLowerCase();
-    const f = products.filter(p => p.name.toLowerCase().includes(q) || (p.barcode||"").includes(q));
-    if (f.length === 1) addToCart(f[0]);
-  };
+  const search = el("prod-search");
+  if (search) {
+    search.oninput = () => {
+      const q = search.value.trim().toLowerCase();
+      var results = el("search-results");
+      if (!q) { if (results) results.style.display = "none"; return; }
+      const f = products.filter(p => p.name.toLowerCase().includes(q) || (p.barcode||"").includes(q));
+      renderSearchResults(f);
+    };
+    search.onkeydown = (e) => {
+      if (e.key !== "Enter") return;
+      const q = search.value.trim().toLowerCase();
+      const f = products.filter(p => p.name.toLowerCase().includes(q) || (p.barcode||"").includes(q));
+      if (f.length === 1) addToCart(f[0]);
+    };
+  }
 
   document.querySelectorAll(".pay-method-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       payMethod = btn.dataset.method;
       document.querySelectorAll(".pay-method-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
-      el("pay-method-desc").textContent = PAY_DESC[payMethod];
-      el("fiado-client-wrap").style.display  = payMethod === "fiado"    ? "block" : "none";
-      el("troco-wrap").style.display         = payMethod === "dinheiro" ? "block" : "none";
-      if (payMethod !== "dinheiro") el("troco-bar").style.display = "none";
+      var desc = el("pay-method-desc");
+      if (desc) desc.textContent = PAY_DESC[payMethod];
+      var fiadoWrap = el("fiado-client-wrap");
+      if (fiadoWrap) fiadoWrap.style.display = payMethod === "fiado" ? "block" : "none";
+      var trocoWrap = el("troco-wrap");
+      if (trocoWrap) trocoWrap.style.display = payMethod === "dinheiro" ? "block" : "none";
+      if (payMethod !== "dinheiro") { var tb = el("troco-bar"); if (tb) tb.style.display = "none"; }
     });
   });
 
@@ -111,28 +122,27 @@ export async function initVender() {
 }
 
 // ── VERIFICAÇÃO ───────────────────────────────────────────────────────────────
-function onVerifyQR(code) {
-  verifyCode(code);
-}
+function onVerifyQR(code) { verifyCode(code); }
 
 async function verifyCode(code) {
-  // Suporta QR completo ou só o hash
   let hash = code;
   let sid  = null;
 
   if (code.startsWith("KONTAKI|") || code.startsWith("K|")) {
     const parts = code.split("|");
-    if (code.startsWith("K|")) { sid=parseInt(parts[1]||0); hash=parts[2]||""; }
-    else { sid=parseInt((parts[1]||"").replace("VENDA#","")); hash=parts[4]||""; }
+    if (code.startsWith("K|")) {
+      sid  = parseInt(parts[1] || "0");
+      hash = parts[2] || "";
+    } else {
+      sid  = parseInt((parts[1]||"").replace("VENDA#",""));
+      hash = parts[4] || "";
+    }
   } else if (code.length <= 10) {
-    // Código curto — procura por hash
     hash = code.toUpperCase();
   }
 
   const sales = await db.getAll("sales");
-  const sale  = sid
-    ? sales.find(s => s.id === sid)
-    : sales.find(s => s.hash === hash);
+  const sale  = sid ? sales.find(s => s.id === sid) : sales.find(s => s.hash === hash);
 
   if (!sale) {
     openModal("Recibo Inválido",
@@ -156,7 +166,7 @@ async function verifyCode(code) {
         <i data-lucide="${isValid?"check-circle":"x-circle"}" style="width:28px;height:28px;color:${isValid?"#16a34a":"#dc2626"}"></i>
       </div>
       <div style="font-size:16px;font-weight:700;color:${isValid?"#16a34a":"#dc2626"};margin-bottom:6px">
-        ${isValid?"✓ Recibo Válido":"✗ Recibo Inválido"}
+        ${isValid ? "Recibo Válido" : "Recibo Inválido"}
       </div>
     </div>
     ${isValid ? `
@@ -174,7 +184,7 @@ async function verifyCode(code) {
 
 // ── CÂMARA ────────────────────────────────────────────────────────────────────
 function onBarcode(code) {
-  const p = products.find(x => x.barcode === code);
+  const p = products.find(x => x.barcode === code || (x.masterBarcode && x.masterBarcode === code));
   if (p) { addToCart(p); if (navigator.vibrate) navigator.vibrate(60); }
   else toast("Produto não encontrado: " + code, "error");
 }
@@ -215,13 +225,14 @@ async function renderRecentProducts() {
 
 function renderSearchResults(f) {
   const wrap = el("search-results");
+  if (!wrap) return;
   if (!f.length) { wrap.style.display = "none"; return; }
   wrap.style.display = "block";
   wrap.innerHTML = f.slice(0, 6).map(p =>
     `<div class="search-result-item" onclick="window._addProd(${p.id})">
       <div>
         <div style="font-size:14px;font-weight:600">${p.name}</div>
-        <div style="font-size:11px;color:#71717a">${p.category} · ${p.stock} ${p.unit} em stock</div>
+        <div style="font-size:11px;color:#71717a">${p.category||""} · ${p.stock} ${p.unit||"unid"} em stock</div>
       </div>
       <div style="font-size:14px;font-weight:700;color:#5b21b6">${fmt(p.price)}</div>
     </div>`
@@ -243,8 +254,10 @@ function addToCart(p) {
   } else {
     cart.push({ id:p.id, name:p.name, price:p.price, stock:p.stock, unit:p.unit, qty:1 });
   }
-  el("search-results").style.display = "none";
-  el("prod-search").value = "";
+  var results = el("search-results");
+  if (results) results.style.display = "none";
+  var search = el("prod-search");
+  if (search) search.value = "";
   if (navigator.vibrate) navigator.vibrate(40);
   renderCart();
   renderSummary();
@@ -292,7 +305,8 @@ window._limparCart = limpar;
 
 let undoTimer = null;
 function showUndo(name) {
-  (document.getElementById("undo-toast") && document.getElementById("undo-toast").remove());
+  var old = document.getElementById("undo-toast");
+  if (old) old.remove();
   if (undoTimer) clearTimeout(undoTimer);
   const div = document.createElement("div");
   div.id = "undo-toast";
@@ -308,7 +322,8 @@ window._undoRemove = () => {
   if (ex) ex.qty += lastRemoved.qty;
   else cart.push({ ...lastRemoved });
   lastRemoved = null;
-  (document.getElementById("undo-toast") && document.getElementById("undo-toast").remove());
+  var old = document.getElementById("undo-toast");
+  if (old) old.remove();
   if (undoTimer) clearTimeout(undoTimer);
   renderCart(); renderSummary();
   toast("Item restaurado.", "success");
@@ -316,9 +331,13 @@ window._undoRemove = () => {
 
 function renderCart() {
   const count = cart.reduce((a, i) => a + i.qty, 0);
-  el("cart-count").textContent = count;
+  var countEl = el("cart-count");
+  if (countEl) countEl.textContent = count;
+  var itemsEl = el("cart-items");
+  if (!itemsEl) return;
+
   if (!cart.length) {
-    el("cart-items").innerHTML = `<div style="padding:20px;text-align:center;color:#a1a1aa;font-size:13px">Nenhum produto adicionado</div>`;
+    itemsEl.innerHTML = `<div style="padding:20px;text-align:center;color:#a1a1aa;font-size:13px">Nenhum produto adicionado</div>`;
     return;
   }
   let html = "";
@@ -341,25 +360,66 @@ function renderCart() {
       `<button onclick="window._removeItem(${item.id})" style="background:none;border:none;color:#dc2626;font-size:10px;cursor:pointer;font-family:inherit;margin-top:2px">remover</button>` +
       `</div></div>`;
   });
-  el("cart-items").innerHTML = html;
-  refreshIcons(el("cart-items"));
+  itemsEl.innerHTML = html;
+  refreshIcons(itemsEl);
 }
 
 function itemTotal(item) { return item.price * item.qty; }
 
-function calcTotal() {
-  const itemsTotal = cart.reduce((a, i) => a + itemTotal(i), 0);
-  const disc = Number((el("disc-input") ? el("disc-input").value : "") || 0);
-  const da   = discType === "pct" ? itemsTotal * (disc/100) : Math.min(disc, itemsTotal);
-  return { sub: cart.reduce((a,i)=>a+i.price*i.qty,0), da, total: itemsTotal - da };
+// ── CÁLCULO COM IVA OPCIONAL DA LOJA ──────────────────────────────────────────
+let _storeIvaCache = null;
+async function getStoreIva() {
+  const store = (await db.get("settings","store")) || {};
+  _storeIvaCache = Number(store.iva) || 0;
+  return _storeIvaCache;
 }
 
-function renderSummary() {
-  const { da, total } = calcTotal();
-  el("total-val").textContent = fmt(total);
+function calcTotal() {
+  const subtotal = cart.reduce((a, i) => a + i.price * i.qty, 0);
+  const disc = Number((el("disc-input") ? el("disc-input").value : "") || 0);
+  let da = discType === "pct" ? subtotal * (disc/100) : disc;
+  if (da > subtotal) da = subtotal;
+  const base = subtotal - da;
+  const ivaPct = _storeIvaCache || 0;
+  const valorIva = ivaPct > 0 ? base * (ivaPct/100) : 0;
+  const total = base + valorIva;
+  return { sub: subtotal, da, ivaPct, valorIva, total };
+}
+
+async function renderSummary() {
+  await getStoreIva();
+  const { da, total, ivaPct, valorIva } = calcTotal();
+  var totalEl = el("total-val");
+  if (totalEl) totalEl.textContent = fmt(total);
+
   const discRow = el("disc-amt-row");
-  if (da > 0) { discRow.style.display = "flex"; el("disc-amt-val").textContent = "− " + fmt(da); }
-  else discRow.style.display = "none";
+  if (discRow) {
+    if (da > 0) { discRow.style.display = "flex"; var dv = el("disc-amt-val"); if (dv) dv.textContent = "− " + fmt(da); }
+    else discRow.style.display = "none";
+  }
+
+  // Linha de IVA dinâmica
+  var ivaRow = el("iva-amt-row");
+  if (!ivaRow) {
+    var totalRow = totalEl ? totalEl.closest("div") : null;
+    if (totalRow && totalRow.parentNode) {
+      ivaRow = document.createElement("div");
+      ivaRow.id = "iva-amt-row";
+      ivaRow.style.cssText = "display:none;justify-content:space-between;font-size:13px;color:#d97706;padding:2px 0";
+      ivaRow.innerHTML = '<span>IVA <span id="iva-pct-label"></span>%</span><span id="iva-amt-val"></span>';
+      totalRow.parentNode.insertBefore(ivaRow, totalRow);
+    }
+  }
+  if (ivaRow) {
+    if (ivaPct > 0 && valorIva > 0) {
+      ivaRow.style.display = "flex";
+      var pl = document.getElementById("iva-pct-label"); if (pl) pl.textContent = ivaPct;
+      var iv = document.getElementById("iva-amt-val"); if (iv) iv.textContent = "+ " + fmt(valorIva);
+    } else {
+      ivaRow.style.display = "none";
+    }
+  }
+
   window._calcTroco();
 }
 
@@ -379,175 +439,347 @@ window._calcTroco = () => {
 
 function toggleDiscType() {
   discType = discType === "pct" ? "kz" : "pct";
-  el("btn-disc-type").textContent = discType === "pct" ? "%" : "Kz";
+  var btn = el("btn-disc-type");
+  if (btn) btn.textContent = discType === "pct" ? "%" : "Kz";
   setVal("disc-input", "");
   renderSummary();
 }
 
 function limpar() {
   cart = []; lastRemoved = null;
-  (document.getElementById("undo-toast") && document.getElementById("undo-toast").remove());
+  var old = document.getElementById("undo-toast");
+  if (old) old.remove();
   setVal("disc-input", ""); setVal("valor-recebido", "");
   payMethod = "dinheiro"; discType = "pct";
-  el("btn-disc-type").textContent = "%";
+  var btn = el("btn-disc-type");
+  if (btn) btn.textContent = "%";
   document.querySelectorAll(".pay-method-btn").forEach(b => b.classList.remove("active"));
-  var _dinBtn2 = document.querySelector('.pay-method-btn[data-method="dinheiro"]'); if (_dinBtn2) _dinBtn2.classList.add("active");
-  el("pay-method-desc").textContent = PAY_DESC["dinheiro"];
-  el("fiado-client-wrap").style.display = "none";
-  el("troco-wrap").style.display        = "block";
-  el("troco-bar").style.display         = "none";
+  var dinBtn = document.querySelector('.pay-method-btn[data-method="dinheiro"]');
+  if (dinBtn) dinBtn.classList.add("active");
+  var desc = el("pay-method-desc");
+  if (desc) desc.textContent = PAY_DESC["dinheiro"];
+  var fc = el("fiado-client-wrap"); if (fc) fc.style.display = "none";
+  var tw = el("troco-wrap"); if (tw) tw.style.display = "block";
+  var tb = el("troco-bar"); if (tb) tb.style.display = "none";
   renderCart(); renderSummary();
 }
 
 // ── CHECKOUT ──────────────────────────────────────────────────────────────────
-function openCheckout() {
+async function openCheckout() {
   if (!cart.length) { toast("Carrinho vazio.", "error"); return; }
-  const { da, total } = calcTotal();
-  window._checkoutDa    = da;
-  window._checkoutTotal = total;
+  await getStoreIva();
+  const existingClients = await db.getAll("clients");
+  const { sub, da, ivaPct, valorIva, total } = calcTotal();
+  window._checkoutSub     = sub;
+  window._checkoutDa      = da;
+  window._checkoutTotal   = total;
+  window._checkoutIvaPct  = ivaPct;
+  window._checkoutIvaVal  = valorIva;
+
   openModal("Finalizar Venda",
     `<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px">
-      <div class="field"><label>Nome do cliente (opcional)</label><input id="ck-name" placeholder="Ex: João Silva"/></div>
+      <div class="field"><label>Nome do cliente (opcional)</label><input id="ck-name" list="ck-clients-list" placeholder="Ex: João Silva"/><datalist id="ck-clients-list"></datalist></div>
       <div class="field"><label>Telefone (opcional)</label><input id="ck-phone" placeholder="Ex: 923 000 000" type="tel"/></div>
     </div>
     <div style="background:#f4f4f5;border-radius:12px;padding:12px;margin-bottom:12px">
       <div style="font-size:10px;color:#a1a1aa;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Resumo</div>
       ${cart.map(i=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:#71717a">${i.name} ×${i.qty}</span><span style="font-weight:600">${fmt(itemTotal(i))}</span></div>`).join("")}
-      ${da>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-top:1px solid #e4e4e7;margin-top:6px;padding-top:6px"><span style="color:#71717a">Desconto</span><span style="color:#dc2626;font-weight:600">− ${fmt(da)}</span></div>`:""}
-      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;border-top:1px solid #e4e4e7;margin-top:6px;padding-top:8px"><span>Total</span><span style="color:#16a34a">${fmt(total)}</span></div>
+      ${da>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:#16a34a"><span>Desconto</span><span>− ${fmt(da)}</span></div>`:""}
+      ${ivaPct>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:#d97706"><span>IVA ${ivaPct}%</span><span>+ ${fmt(valorIva)}</span></div>`:""}
+      <div id="ck-summary-iva" style="display:${ivaPct>0?'flex':'none'};justify-content:space-between;font-size:13px;padding:3px 0;color:#d97706"><span>IVA ${ivaPct}%</span><span>+ ${fmt(valorIva)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;padding-top:8px;margin-top:6px;border-top:1.5px solid #e4e4e7">
+        <span>Total</span><span id="ck-summary-total" style="color:#5b21b6">${fmt(total)}</span>
+      </div>
     </div>
-    <div style="background:#ede9fe;border-radius:10px;padding:10px 12px;font-size:13px;color:#7c3aed;margin-bottom:16px"><strong>Pagamento:</strong> ${payMethod}</div>
+
+    <div style="display:flex;align-items:center;gap:10px;background:#fef3c7;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+      <i data-lucide="percent" style="width:16px;height:16px;color:#92400e;flex-shrink:0"></i>
+      <div style="flex:1;font-size:13px;color:#92400e;font-weight:600">IVA</div>
+      <input type="number" id="ck-iva-pct" min="0" max="100" step="0.1" value="${ivaPct||0}"
+        placeholder="0" oninput="window._ckRecalcTotal()"
+        style="width:70px;padding:6px 8px;border:1.5px solid #fde68a;border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit;background:#fff"/>
+      <span style="font-size:13px;color:#92400e;font-weight:600">%</span>
+    </div>
+    <div style="font-size:11px;color:#a1a1aa;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Método de pagamento</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <button class="pay-method-btn-ck active" data-method="dinheiro" onclick="window._ckSetPay(this,'dinheiro')" style="padding:12px;border-radius:10px;border:1.5px solid #5b21b6;background:#ede9fe;color:#5b21b6;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i data-lucide="banknote" style="width:15px;height:15px"></i> Dinheiro</button>
+      <button class="pay-method-btn-ck" data-method="transferencia" onclick="window._ckSetPay(this,'transferencia')" style="padding:12px;border-radius:10px;border:1.5px solid #e4e4e7;background:#fff;color:#71717a;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i data-lucide="arrow-left-right" style="width:15px;height:15px"></i> Transferência</button>
+      <button class="pay-method-btn-ck" data-method="multicaixa" onclick="window._ckSetPay(this,'multicaixa')" style="padding:12px;border-radius:10px;border:1.5px solid #e4e4e7;background:#fff;color:#71717a;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i data-lucide="credit-card" style="width:15px;height:15px"></i> Multicaixa</button>
+      <button class="pay-method-btn-ck" data-method="fiado" onclick="window._ckSetPay(this,'fiado')" style="padding:12px;border-radius:10px;border:1.5px solid #e4e4e7;background:#fff;color:#71717a;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i data-lucide="hand-coins" style="width:15px;height:15px"></i> Fiado</button>
+    </div>
+    <div id="ck-pay-desc" style="font-size:12px;color:#71717a;margin-bottom:12px">${PAY_DESC.dinheiro}</div>
+
+    <div id="ck-troco-wrap" style="margin-bottom:12px">
+      <div class="field"><label>Valor recebido (opcional)</label><input id="ck-recebido" type="number" placeholder="Ex: 5000" oninput="window._ckCalcTroco()"/></div>
+      <div id="ck-troco-bar" style="display:none;margin-top:8px;background:#dcfce7;border-radius:10px;padding:10px;display:flex;justify-content:space-between">
+        <span style="font-size:13px;color:#15803d;font-weight:600">Troco</span>
+        <span id="ck-troco-val" style="font-size:14px;font-weight:700;color:#15803d"></span>
+      </div>
+    </div>
+
     <div class="form-actions">
       <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
-      <button class="btn btn-primary btn-full" onclick="window._confirmarVenda()"><i data-lucide="check"></i> Confirmar</button>
+      <button class="btn btn-primary btn-full" onclick="window._confirmarVenda()">
+        <i data-lucide="check"></i> Confirmar venda
+      </button>
     </div>`);
   refreshIcons(el("modal-box"));
+
+  var datalist = document.getElementById("ck-clients-list");
+  if (datalist) datalist.innerHTML = existingClients.map(c => `<option value="${c.name}">`).join("");
+
+  window._ckPayMethod = "dinheiro";
+
+  window._ckRecalcTotal = function() {
+    var ivaPctNew = Number(document.getElementById("ck-iva-pct").value) || 0;
+    window._checkoutIvaPct = ivaPctNew;
+    var sub  = window._checkoutSub || 0;
+    var da   = window._checkoutDa  || 0;
+    var base = sub - da;
+    var ivaVal = base * ivaPctNew / 100;
+    var total  = base + ivaVal;
+    window._checkoutIvaVal = ivaVal;
+    window._checkoutTotal  = total;
+    var summaryTotal = document.getElementById("ck-summary-total");
+    if (summaryTotal) summaryTotal.textContent = fmt(total);
+    var summaryIva = document.getElementById("ck-summary-iva");
+    if (summaryIva) {
+      summaryIva.style.display = ivaPctNew > 0 ? "flex" : "none";
+      summaryIva.querySelector("span:last-child").textContent = "+ " + fmt(ivaVal);
+      summaryIva.querySelector("span:first-child").textContent = "IVA " + ivaPctNew + "%";
+    }
+  };
+  window._ckSetPay = function(btn, method) {
+    window._ckPayMethod = method;
+    document.querySelectorAll(".pay-method-btn-ck").forEach(b => {
+      b.classList.remove("active");
+      b.style.border = "1.5px solid #e4e4e7";
+      b.style.background = "#fff";
+      b.style.color = "#71717a";
+    });
+    btn.classList.add("active");
+    btn.style.border = "1.5px solid #5b21b6";
+    btn.style.background = "#ede9fe";
+    btn.style.color = "#5b21b6";
+    var desc = document.getElementById("ck-pay-desc");
+    if (desc) desc.textContent = PAY_DESC[method];
+    var trocoWrap = document.getElementById("ck-troco-wrap");
+    if (trocoWrap) trocoWrap.style.display = method === "dinheiro" ? "block" : "none";
+  };
+
+  window._ckCalcTroco = function() {
+    var recebido = Number(document.getElementById("ck-recebido").value || 0);
+    var bar = document.getElementById("ck-troco-bar");
+    if (!bar) return;
+    if (recebido > 0 && recebido >= window._checkoutTotal) {
+      bar.style.display = "flex";
+      var tv = document.getElementById("ck-troco-val");
+      if (tv) tv.textContent = fmt(recebido - window._checkoutTotal);
+    } else {
+      bar.style.display = "none";
+    }
+  };
 }
 
 window._confirmarVenda = async () => {
-  const da    = window._checkoutDa    || 0;
-  const total = window._checkoutTotal || 0;
-  const clientName  = (el("ck-name") ? el("ck-name").value.trim() : "")  || "";
-  const clientPhone = (el("ck-phone") ? el("ck-phone").value.trim() : "")  || "";
-  const fc          = val("fiado-client");
-  if (payMethod === "fiado" && !fc.trim() && !clientName) {
-    toast("Insira o nome do cliente para fiado.", "error"); return;
+  const clientName  = el("ck-name")  ? el("ck-name").value.trim()  : "";
+  const clientPhone = el("ck-phone") ? el("ck-phone").value.trim() : "";
+  const method       = window._ckPayMethod || "dinheiro";
+
+  if (method === "fiado" && !clientName) {
+    toast("Insere o nome do cliente para venda a fiado.", "error"); return;
   }
+
   try {
     const store    = (await db.get("settings","store")) || {};
+    let   clientId = null;
+    if (clientName) {
+      const allClients = await db.getAll("clients");
+      const match = allClients.find(c => c.name.toLowerCase() === clientName.toLowerCase());
+      if (match) {
+        clientId = match.id;
+        if (clientPhone && !match.phone) await db.put("clients", { ...match, phone:clientPhone });
+      } else {
+        clientId = await db.add("clients", { name:clientName, phone:clientPhone||"", address:"", notes:"", createdAt:new Date().toISOString() });
+      }
+    }
+    const da       = window._checkoutDa     || 0;
+    const ivaEl    = document.getElementById("ck-iva-pct");
+    const ivaPct   = ivaEl ? (Number(ivaEl.value)||0) : (window._checkoutIvaPct||0);
+    const sub2     = window._checkoutSub || 0;
+    const ivaVal   = (sub2 - da) * ivaPct / 100;
+    const total    = (sub2 - da) + ivaVal;
+    const subtotal = cart.reduce((a,i)=>a+i.price*i.qty,0);
     const saleDate = new Date().toISOString();
-    const sub      = cart.reduce((a,i) => a+i.price*i.qty, 0);
-    const sid      = await db.add("sales", {
-      items: cart.map(i=>({id:i.id,name:i.name,price:i.price,qty:i.qty,itemDisc:0})),
-      subtotal:sub, discount:da, total, payMethod, date:saleDate,
-      userId:getUser().id, sessionId:getUser().sessionId,
-      clientName, clientPhone,
-      fiadoClient: payMethod==="fiado"?(fc||clientName):null,
+    const user     = getUser();
+
+    // Verifica stock antes de confirmar
+    for (const item of cart) {
+      const available = await getStock(item.id, "shop");
+      if (item.qty > available) {
+        toast(`Stock insuficiente: ${item.name} (disponível: ${available})`, "error");
+        return;
+      }
+    }
+
+    const recebidoEl = document.getElementById("ck-recebido");
+    const recebido   = method==="dinheiro" ? Number(recebidoEl ? recebidoEl.value : 0) || 0 : 0;
+    const troco      = recebido > total ? recebido - total : 0;
+
+    const sid = await db.add("sales", {
+      items: cart.map(i=>({id:i.id,name:i.name,price:i.price,qty:i.qty})),
+      subtotal, discount:da,
+      ivaPct, ivaValor:ivaVal,
+      total, payMethod:method, date:saleDate,
+      userId:user.id, sessionId:user.sessionId||null,
+      clientName, clientPhone, clientId,
+      fiadoClient: method==="fiado" ? clientName : null,
+      recebido, troco,
+      hash:null,
     });
+
     const finalHash = genHash(sid, saleDate);
     const rec       = await db.get("sales", sid);
     await db.put("sales", { ...rec, hash:finalHash });
+
+    // SaleItems
     for (const item of cart) {
-      const p = await db.get("products", item.id);
-      if (p) await db.put("products", { ...p, stock: p.stock - item.qty });
+      await db.add("saleItems", {
+        saleId:sid, productId:item.id, productName:item.name,
+        qty:item.qty, unitPrice:item.price, total:item.price*item.qty,
+        createdAt:saleDate,
+      });
     }
-    if (payMethod === "fiado") {
-      await db.add("fiado", { clientName:fc||clientName, amount:total, saleId:sid, date:saleDate, status:"open", userId:getUser().id, notes:"" });
+
+    // StockMovements — fonte de verdade
+    for (const item of cart) {
+      await addStockMovement({
+        productId:item.id, productName:item.name,
+        type:"sale", location:"shop", qty:-item.qty,
+        reference:`sale#${sid}`, note:`Venda #${sid}`,
+      });
     }
+
+    // Fiado
+    if (method === "fiado") {
+      await db.add("fiado", {
+        clientName, clientPhone, clientId, amount:total, amountPaid:0,
+        saleId:sid, sessionId:user.sessionId||null, userId:user.id,
+        date:saleDate, status:"open", note:"",
+      });
+    }
+
     const cartSnap = [...cart];
-    closeModal(); limpar();
+    closeModal();
+    limpar();
     products = await db.getAll("products").then(p => p.filter(x => x.active));
     renderRecentProducts();
-    showReceipt({ sid, items:cartSnap, sub, da, total, clientName, clientPhone, store, payMethod, saleDate, hash:finalHash });
+
+    showReceipt({ sid, items:cartSnap, sub:subtotal, da, ivaPct, ivaVal, total, clientName, clientPhone, store, payMethod:method, saleDate, hash:finalHash, recebido, troco });
+
   } catch (err) {
     toast("Erro: " + err.message, "error");
     console.error(err);
   }
 };
 
-// ── RECIBO COM QR OFFLINE ─────────────────────────────────────────────────────
-function showReceipt({ sid, items, sub, da, total, clientName, clientPhone, store, payMethod, saleDate, hash }) {
-  const dateStr   = fmtDate(saleDate);
-  const storeName = store.name || "Kontaki";
-  const qrData = "K|" + sid + "|" + hash;
+// ── RECIBO ────────────────────────────────────────────────────────────────────
+function showReceipt(d) {
+  window._lastSaleId = d.sid;
+  const storeName = (d.store&&d.store.name)||"Kontaki";
+  const storeAddr = (d.store&&d.store.address)||"";
+  const storePhone= (d.store&&d.store.phone)||"";
+  const storeLogo = (d.store&&d.store.logo)||"";
+  const nif       = (d.store&&d.store.nif)||"";
 
-  openModal(`Recibo #${sid}`,
-    `<div id="recibo-content" style="font-family:monospace;max-width:300px;margin:0 auto;font-size:13px;line-height:1.6">
-      <div style="text-align:center;border-bottom:2px dashed #ccc;padding-bottom:12px;margin-bottom:12px">
-        <div style="font-size:16px;font-weight:700">${storeName}</div>
-        ${store.address?`<div style="font-size:11px;color:#555">${store.address}</div>`:""}
-        ${store.phone?`<div style="font-size:11px;color:#555">${store.phone}</div>`:""}
-        <div style="font-size:11px;color:#777">Recibo Nº ${sid} · ${dateStr}</div>
+  openModal("",
+    `<div style="background:#fff;font-family:'DM Sans',Arial,sans-serif">
+
+      <!-- Cabeçalho verde sucesso -->
+      <div style="background:linear-gradient(135deg,#059669,#10b981);padding:20px 16px;text-align:center;margin:-20px -20px 0;border-radius:16px 16px 0 0">
+        <div style="width:52px;height:52px;background:rgba(255,255,255,.25);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px">
+          <i data-lucide="check" style="width:26px;height:26px;color:#fff;stroke-width:3"></i>
+        </div>
+        <div style="font-size:22px;font-weight:700;color:#fff;margin-bottom:2px">${fmt(d.total)}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.8)">Venda concluída</div>
       </div>
-      ${clientName||clientPhone?`<div style="border-bottom:1px dashed #ccc;padding-bottom:8px;margin-bottom:8px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#777;margin-bottom:3px">Cliente</div>${clientName?`<div>${clientName}</div>`:""}${clientPhone?`<div style="color:#555">${clientPhone}</div>`:""}</div>`:""}
-      <div style="border-bottom:1px dashed #ccc;padding-bottom:8px;margin-bottom:8px">
-        ${items.map(i=>`<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span>${i.name} ×${i.qty}</span><span style="font-weight:700">${fmt(i.price*i.qty)}</span></div>`).join("")}
+
+      <!-- Corpo do recibo — estilo talão -->
+      <div style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin:16px 0 14px">
+
+        <!-- Info da loja -->
+        <div style="padding:14px 16px;text-align:center;background:#f9fafb;border-bottom:1px dashed #d1d5db">
+          ${storeLogo?`<img src="${storeLogo}" style="width:36px;height:36px;object-fit:contain;margin:0 auto 6px;display:block;border-radius:6px"/>`:``}
+          <div style="font-size:14px;font-weight:700;color:#111827">${storeName}</div>
+          ${storeAddr?`<div style="font-size:11px;color:#6b7280;margin-top:1px">${storeAddr}</div>`:""}
+          ${storePhone?`<div style="font-size:11px;color:#6b7280">${storePhone}</div>`:""}
+          ${nif?`<div style="font-size:11px;color:#6b7280">NIF: ${nif}</div>`:""}
+          <div style="font-size:10px;color:#9ca3af;margin-top:6px">Nº ${String(d.sid).padStart(6,"0")} · ${fmtDate(d.saleDate)}</div>
+        </div>
+
+        ${d.clientName?`<div style="padding:10px 16px;border-bottom:1px dashed #d1d5db;display:flex;align-items:center;gap:8px"><i data-lucide="user" style="width:13px;height:13px;color:#6b7280;flex-shrink:0"></i><span style="font-size:13px;font-weight:600;color:#111827">${d.clientName}</span></div>`:""}
+
+        <!-- Itens -->
+        <div style="padding:12px 16px;border-bottom:1px dashed #d1d5db">
+          ${d.items.map(i=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0">
+            <div>
+              <span style="font-size:13px;color:#374151">${i.name}</span>
+              <span style="font-size:11px;color:#9ca3af;margin-left:6px">×${i.qty}</span>
+            </div>
+            <span style="font-size:13px;font-weight:600;color:#111827">${fmt(i.price*i.qty)}</span>
+          </div>`).join("")}
+        </div>
+
+        <!-- Totais -->
+        <div style="padding:12px 16px;border-bottom:1px dashed #d1d5db;background:#f9fafb">
+          ${d.da>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span style="color:#6b7280">Desconto</span><span style="color:#059669;font-weight:600">− ${fmt(d.da)}</span></div>`:""}
+          ${d.ivaPct>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span style="color:#6b7280">IVA ${d.ivaPct}%</span><span style="color:#d97706;font-weight:600">+ ${fmt(d.ivaVal)}</span></div>`:""}
+          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;margin-top:4px;border-top:1.5px solid #e5e7eb">
+            <span style="font-size:15px;font-weight:700;color:#111827">TOTAL</span>
+            <span style="font-size:18px;font-weight:700;color:#5b21b6">${fmt(d.total)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px">
+            <span style="color:#6b7280;text-transform:capitalize">${d.payMethod}</span>
+            ${d.recebido>0?`<span style="color:#6b7280">Recebido: ${fmt(d.recebido)} · Troco: <strong style="color:#059669">${fmt(d.troco)}</strong></span>`:""}
+          </div>
+        </div>
+
+        <!-- QR + Código -->
+        <div style="padding:14px 16px;text-align:center">
+          <div id="receipt-qr" style="display:flex;justify-content:center;margin-bottom:8px"></div>
+          <div style="font-size:14px;font-weight:700;color:#5b21b6;letter-spacing:4px">${d.hash}</div>
+          <div style="font-size:9px;color:#9ca3af;margin-top:3px">Scan para verificar autenticidade</div>
+        </div>
+
+        <!-- Rodapé -->
+        <div style="padding:8px 16px;text-align:center;background:#f9fafb;border-top:1px dashed #d1d5db">
+          <div style="font-size:8px;color:#9ca3af;line-height:1.6">Documento de gestão interna · Sem validade fiscal perante a AGT<br/>Powered by Kontaki · Introxeer Technology</div>
+        </div>
       </div>
-      <div style="border-bottom:2px dashed #ccc;padding-bottom:8px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between"><span style="color:#555">Subtotal</span><span>${fmt(sub)}</span></div>
-        ${da>0?`<div style="display:flex;justify-content:space-between"><span style="color:#555">Desconto</span><span style="color:#c00">− ${fmt(da)}</span></div>`:""}
-        <div style="display:flex;justify-content:space-between;font-weight:700;font-size:15px;margin-top:4px"><span>TOTAL</span><span>${fmt(total)}</span></div>
-        <div style="font-size:11px;color:#555;margin-top:3px">Pagamento: ${payMethod}</div>
+
+      <!-- Botões de acção -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button onclick="window._partilharReciboPDF(${d.sid})" style="padding:13px;background:#25D366;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+          <i data-lucide="share-2" style="width:16px;height:16px"></i> Partilhar
+        </button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button onclick="window._gerarReciboPDF(${d.sid})" style="padding:12px;background:#ede9fe;color:#5b21b6;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+            <i data-lucide="printer" style="width:15px;height:15px"></i> PDF
+          </button>
+          <button onclick="window._closeModal()" style="padding:12px;background:#f4f4f5;color:#6b7280;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+            Fechar
+          </button>
+        </div>
       </div>
-      <div style="text-align:center;margin-bottom:10px">
-        <div id="qr-container" style="display:flex;justify-content:center;margin-bottom:6px"></div>
-        <div style="font-size:11px;color:#555">Código: <strong style="letter-spacing:2px">${hash}</strong></div>
-        <div style="font-size:10px;color:#888">Scan para verificar autenticidade</div>
-      </div>
-      <div style="border-top:1px dashed #ccc;padding-top:8px;text-align:center;font-size:10px;color:#888">
-        <div>Documento de gestão interna.</div>
-        <div>Sem validade fiscal perante a AGT.</div>
-        <div style="margin-top:4px;font-weight:700;color:#5b21b6">Powered by Kontaki · Introxeer Technology</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button class="btn btn-ghost btn-full" onclick="window._printReceipt()"><i data-lucide="printer"></i> Imprimir</button>
-      <button class="btn btn-primary btn-full" onclick="window._shareReceipt(${sid},${total},'${hash}','${storeName.replace(/'/g,"\\'")}')"><i data-lucide="share-2"></i> Partilhar</button>
-    </div>
-    <button class="btn btn-ghost btn-full" onclick="window._closeModal()" style="margin-top:8px">Fechar</button>`);
+    </div>`);
 
   refreshIcons(el("modal-box"));
-
-  // Gera QR offline
-  setTimeout(() => {
-    const container = document.getElementById("qr-container");
-    if (container) generateQR(qrData, container, 110);
-  }, 100);
+  var qrContainer = document.getElementById("receipt-qr");
+  if (qrContainer) generateQR("K|" + d.sid + "|" + d.hash, qrContainer, 120);
 }
 
-window._printReceipt = () => {
-  const content = (document.getElementById("recibo-content") ? document.getElementById("recibo-content").innerHTML : "");
-  if (!content) return;
-  const win = window.open("","_blank");
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Recibo</title>
-    <style>body{font-family:monospace;max-width:300px;margin:20px auto;font-size:13px}@media print{body{margin:0}}</style>
-    </head><body>${content}<script>window.onload=()=>{window.print();window.close();}<\/script></body></html>`);
-  win.document.close();
-};
-
-window._shareReceipt = async (sid, total, hash, storeName) => {
-  const sale    = await db.get("sales", sid);
-  const line    = "━━━━━━━━━━━━━━━━━━━━━";
-  const dateStr = fmtDate(sale.date);
-  const items   = (sale.items||[]).map(i => {
-    const name = i.name.length > 16 ? i.name.slice(0,14)+".." : i.name.padEnd(16);
-    return `${name} ×${i.qty}  ${fmt(i.price*i.qty)}`;
-  }).join("\n");
-  const text =
-    `${line}\n    ${storeName.toUpperCase()}\n${line}\n` +
-    `Recibo #${sid}\n${dateStr}\n` +
-    `──────────────────────\n${items}\n──────────────────────\n` +
-    (sale.discount>0?`Desconto:    − ${fmt(sale.discount)}\n`:"") +
-    `TOTAL:       ${fmt(sale.total)}\nPagamento:   ${sale.payMethod}\n` +
-    `──────────────────────\nCódigo: ${hash}\n${line}\n` +
-    `Powered by Kontaki\nIntroxeer Technology\n${line}`;
-
-  if (navigator.share) {
-    try { await navigator.share({ title:`Recibo #${sid}`, text }); } catch {}
-  } else {
-    await navigator.clipboard.writeText(text);
-    toast("Recibo copiado para a área de transferência.", "info");
-  }
-};
+window._gerarReciboPDF     = gerarReciboPDF;
+window._partilharReciboPDF = partilharReciboPDF;
 
 window._closeModal = closeModal;

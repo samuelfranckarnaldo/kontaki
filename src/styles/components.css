@@ -401,3 +401,34 @@
   25%     { transform:translateX(-6px); }
   75%     { transform:translateX(6px); }
 }
+
+.pin-btn-g {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #f4f4f5;
+  border: none;
+  font-size: 24px;
+  font-weight: 400;
+  cursor: pointer;
+  font-family: inherit;
+  color: #18181b;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  transition: all .1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.pin-btn-g:active {
+  background: #e4e4e7;
+  transform: scale(.93);
+}
+[data-theme="dark"] .pin-btn-g {
+  background: #2e2e2e;
+  color: #f4f4f5;
+}
+[data-theme="dark"] .pin-btn-g:active {
+  background: #3f3f3f;
+}

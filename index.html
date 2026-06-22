@@ -61,19 +61,19 @@
         <span id="login-err-msg">PIN incorrecto</span>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:280px;margin:0 auto 16px">
-        <button onclick="window._pinKey('1')" class="pin-btn">1</button>
-        <button onclick="window._pinKey('2')" class="pin-btn">2</button>
-        <button onclick="window._pinKey('3')" class="pin-btn">3</button>
-        <button onclick="window._pinKey('4')" class="pin-btn">4</button>
-        <button onclick="window._pinKey('5')" class="pin-btn">5</button>
-        <button onclick="window._pinKey('6')" class="pin-btn">6</button>
-        <button onclick="window._pinKey('7')" class="pin-btn">7</button>
-        <button onclick="window._pinKey('8')" class="pin-btn">8</button>
-        <button onclick="window._pinKey('9')" class="pin-btn">9</button>
-        <button onclick="window._backToRole()" class="pin-btn" style="font-size:13px;color:#71717a">←</button>
-        <button onclick="window._pinKey('0')" class="pin-btn">0</button>
-        <button onclick="window._pinKey('⌫')" class="pin-btn" style="color:#dc2626">⌫</button>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:260px;margin:0 auto 16px">
+        <button onclick="window._pinKey('1')" class="pin-btn-g">1</button>
+        <button onclick="window._pinKey('2')" class="pin-btn-g">2</button>
+        <button onclick="window._pinKey('3')" class="pin-btn-g">3</button>
+        <button onclick="window._pinKey('4')" class="pin-btn-g">4</button>
+        <button onclick="window._pinKey('5')" class="pin-btn-g">5</button>
+        <button onclick="window._pinKey('6')" class="pin-btn-g">6</button>
+        <button onclick="window._pinKey('7')" class="pin-btn-g">7</button>
+        <button onclick="window._pinKey('8')" class="pin-btn-g">8</button>
+        <button onclick="window._pinKey('9')" class="pin-btn-g">9</button>
+        <button onclick="window._backToRole()" class="pin-btn-g" style="background:transparent;box-shadow:none;font-size:13px;color:#71717a">←</button>
+        <button onclick="window._pinKey('0')" class="pin-btn-g">0</button>
+        <button onclick="window._pinKey('⌫')" class="pin-btn-g" style="background:transparent;box-shadow:none;color:#dc2626;font-size:22px">⌫</button>
       </div>
 
       <button id="btn-forgot-pw" style="background:none;border:none;color:#5b21b6;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px;text-align:center">
@@ -364,6 +364,22 @@
         </div>
       </div>
 
+      <div id="subpage-clientes" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-clientes">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Clientes</div>
+          <div id="clientes-content"></div>
+        </div>
+      </div>
+
+      <div id="subpage-despesas" style="display:none">
+        <div class="page-inner">
+          <button class="btn btn-ghost btn-sm" id="btn-back-despesas">← Voltar</button>
+          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Despesas</div>
+          <div id="despesas-content"></div>
+        </div>
+      </div>
+
       <div id="subpage-contabilidade" style="display:none">
         <div class="page-inner">
           <button class="btn btn-ghost btn-sm" id="btn-back-contabilidade">← Voltar</button>
@@ -614,6 +630,7 @@
   </div>
 </div>
 <script src="./assets/qrcode.min.js"></script>
+<script src="./assets/jspdf.min.js"></script>
 <script>
 var _selectedRole = null;
 

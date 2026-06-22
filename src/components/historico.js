@@ -1,4 +1,5 @@
 import { db }                           from "../db.js";
+import { gerarReciboPDF, partilharReciboPDF } from "./recibo-pdf.js";
 import { fmt, fmtDate, today, el, val, setVal, refreshIcons } from "../utils.js";
 import { openModal, closeModal }        from "../modal.js";
 import { getUser }                      from "../auth.js";
@@ -6,6 +7,15 @@ import { printRecibo }                  from "../print.js";
 import { openDevolucao, gerarRelatorioPDF } from "./extras.js";
 
 let activeTab = "geral";
+
+function toLocalDateStr(isoString) {
+  if (!isoString) return "";
+  var d = new Date(isoString);
+  var y = d.getFullYear();
+  var m = String(d.getMonth()+1).padStart(2,"0");
+  var day = String(d.getDate()).padStart(2,"0");
+  return y + "-" + m + "-" + day;
+}
 
 export async function initHistorico() {
   setVal("hist-from", today());
@@ -58,7 +68,7 @@ async function loadGeral(from, to) {
   const incidents = await db.getAll("incidents");
 
   const filtered = sales.filter(function(s) {
-    const d = (s.date || "").split("T")[0];
+    const d = toLocalDateStr(s.date);
     return d >= from && d <= to;
   }).reverse();
 
@@ -166,7 +176,7 @@ async function loadStock(from, to) {
 
   const movements = await db.getAll("stockMovements");
   const filtered  = movements.filter(function(m) {
-    const d = (m.createdAt || "").split("T")[0];
+    const d = toLocalDateStr(m.createdAt);
     return d >= from && d <= to;
   });
 
@@ -358,7 +368,11 @@ window._openSaleDetail = async function(id) {
     }).join("") +
     '</div>' +
     '<div class="form-actions">' +
-    '<button onclick="window._abrirDevolucao(' + s.id + ')" style="width:100%;padding:12px;background:#fef3c7;border:1.5px solid #fde68a;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#92400e;margin-bottom:8px">↩ Devolução</button>' +
+    '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">' +
+      '<button onclick="window._gerarReciboPDF(' + s.id + ')" style="padding:12px;background:#ede9fe;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#5b21b6;display:flex;align-items:center;justify-content:center;gap:8px"><i data-lucide="file-text" style="width:15px;height:15px"></i> Gerar PDF</button>' +
+      '<button onclick="window._partilharReciboPDF(' + s.id + ')" style="padding:12px;background:#f0fdf4;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#16a34a;display:flex;align-items:center;justify-content:center;gap:8px"><i data-lucide="share-2" style="width:15px;height:15px"></i> Partilhar WhatsApp</button>' +
+      '<button onclick="window._abrirDevolucao(' + s.id + ')" style="padding:12px;background:#fef3c7;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#92400e;display:flex;align-items:center;justify-content:center;gap:8px"><i data-lucide="rotate-ccw" style="width:15px;height:15px"></i> Registar Devolução</button>' +
+      '</div>' +
     '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>' +
     '<button class="btn btn-primary btn-full" onclick="window._printSale(' + s.id + ',\'58mm\')">' +
     '<i data-lucide="printer"></i> Imprimir talão</button>' +
@@ -408,3 +422,6 @@ window._abrirDevolucao = async function(id) {
   closeModal();
   setTimeout(function(){ openDevolucao(id); }, 100);
 };
+
+window._gerarReciboPDF    = gerarReciboPDF;
+window._partilharReciboPDF = partilharReciboPDF;

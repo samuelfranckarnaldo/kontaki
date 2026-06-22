@@ -61,6 +61,18 @@ async function renderConfiguracoes() {
       : "") +
     '</div>';
 
+  // Limpeza de histórico
+  wrap.innerHTML +=
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;margin-top:8px">Limpar histórico de vendas</div>' +
+    '<div class="vender-card" style="margin-bottom:14px">' +
+    '<div style="font-size:13px;color:#71717a;margin-bottom:10px;line-height:1.5">Exporta e remove vendas de um período. O ficheiro JSON fica guardado antes de apagar.</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+    '<div class="field"><label>De</label><input type="date" id="clear-from"/></div>' +
+    '<div class="field"><label>Até</label><input type="date" id="clear-to"/></div>' +
+    '</div>' +
+    '<button onclick="window._limparHistorico()" style="width:100%;padding:13px;background:#dc2626;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Exportar e limpar período</button>' +
+    '</div>';
+
   refreshIcons(wrap);
 }
 
@@ -126,3 +138,70 @@ window._clearLogs = async () => {
 };
 
 window._closeModal = closeModal;
+
+window._limparHistorico = async function() {
+  var from = document.getElementById("clear-from").value;
+  var to   = document.getElementById("clear-to").value;
+  if (!from || !to) { toast("Selecciona o período.", "error"); return; }
+
+  var sales    = await db.getAll("sales");
+  var saleItems= await db.getAll("saleItems");
+  var movements= await db.getAll("stockMovements");
+
+  var toDelete = sales.filter(function(s){ return s.date && s.date.slice(0,10)>=from && s.date.slice(0,10)<=to; });
+  var toDeleteIds = toDelete.map(function(s){ return s.id; });
+  var toDeleteItems = saleItems.filter(function(i){ return toDeleteIds.includes(i.saleId); });
+  var toDeleteMoves = movements.filter(function(m){
+    return m.type==="sale" && m.reference && toDeleteIds.some(function(id){ return m.reference==="sale#"+id; });
+  });
+
+  if (!toDelete.length) { toast("Nenhuma venda no período seleccionado.", "info"); return; }
+
+  // ARQUIVA totais antes de apagar — protege a contabilidade para sempre
+  const products = await db.getAll("products");
+  const prodMap = {};
+  products.forEach(function(p){ prodMap[p.id] = p; });
+
+  const receitaPeriodo = toDelete.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  const cogsPeriodo = toDelete.reduce(function(a,s){
+    return a + (s.items||[]).reduce(function(b,i){
+      var p = prodMap[i.id];
+      return b + (p ? (p.costPrice||0)*i.qty : 0);
+    },0);
+  },0);
+
+  const periodKey = from + "_a_" + to;
+  const existing = await db.get("accountingArchive", periodKey).catch(function(){ return null; });
+
+  await db.put("accountingArchive", {
+    period: periodKey,
+    from, to,
+    nVendas: (existing?existing.nVendas:0) + toDelete.length,
+    receita: (existing?existing.receita:0) + receitaPeriodo,
+    cogs:    (existing?existing.cogs:0) + cogsPeriodo,
+    lucro:   (existing?existing.lucro:0) + (receitaPeriodo - cogsPeriodo),
+    archivedAt: new Date().toISOString(),
+  });
+
+  // Exporta antes de apagar
+  var data = {
+    exportedAt: new Date().toISOString(),
+    periodo: from + " a " + to,
+    vendas: toDelete,
+    items: toDeleteItems,
+    movimentos: toDeleteMoves,
+  };
+  var blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement("a");
+  a.href=url; a.download="historico_"+from+"_"+to+".json"; a.click();
+  URL.revokeObjectURL(url);
+
+  // Apaga
+  for (var i=0;i<toDelete.length;i++) await db.delete("sales", toDelete[i].id);
+  for (var i=0;i<toDeleteItems.length;i++) await db.delete("saleItems", toDeleteItems[i].id);
+  for (var i=0;i<toDeleteMoves.length;i++) await db.delete("stockMovements", toDeleteMoves[i].id);
+
+  toast(toDelete.length + " vendas exportadas e removidas.", "success");
+  await renderConfiguracoes();
+};

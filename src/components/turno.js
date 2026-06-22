@@ -371,6 +371,7 @@ function showKtkViewer(ktk, hashResult) {
 
   // Guarda ktk em variável global para confirmar
   window._ktkPendente = ktk;
+  window._ktkContagemManual = {};
 
   openModal("Turno — " + ktk.funcionario,
     '<div style="max-height:65vh;overflow-y:auto">' +
@@ -391,9 +392,34 @@ function showKtkViewer(ktk, hashResult) {
     '<div class="stat-card" style="border-left:3px solid #d97706"><div class="stat-label" style="color:#d97706">Fiado aberto</div><div class="stat-val" style="color:#d97706;font-size:13px">' + fmt(fiadoAberto) + '</div></div>' +
     '<div class="stat-card" style="border-left:3px solid #5b21b6"><div class="stat-label" style="color:#5b21b6">Fiados pagos</div><div class="stat-val" style="color:#5b21b6">' + fiados.filter(function(f){return f.status==="paid";}).length + '</div></div>' +
     '</div>' +
+    (fiadoAberto > 0 ? '<div style="background:#fef3c7;border:2px solid #fde68a;border-radius:12px;padding:14px;margin-bottom:14px">' +
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+    '<i data-lucide="alert-circle" style="width:16px;height:16px;color:#92400e"></i>' +
+    '<div style="font-size:12px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.4px">⚠ Fiados em aberto neste turno</div>' +
+    '</div>' +
+    fiados.filter(function(f){ return f.status==="open"; }).map(function(f){
+      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #fde68a;font-size:13px">' +
+        '<span style="font-weight:600;color:#92400e">' + f.clientName + '</span>' +
+        '<span style="font-weight:700;color:#dc2626">' + fmt(f.amount) + '</span></div>';
+    }).join("") +
+    '<div style="font-size:12px;font-weight:700;color:#92400e;margin-top:6px">Total em aberto: ' + fmt(fiadoAberto) + '</div>' +
+    '</div>' : "") +
     stockHtml + incHtml + fiadoHtml +
     '</div>' +
 
+    '<div style="margin-bottom:14px">' +
+    '<div style="font-size:12px;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Contagem física (opcional)</div>' +
+    '<div style="font-size:12px;color:#71717a;margin-bottom:10px;line-height:1.5">Insere a quantidade encontrada fisicamente para gerar incidentes automaticamente.</div>' +
+    Object.values(ktk.stock_esperado||{}).map(function(r){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f4f4f5">' +
+        '<div style="flex:1"><div style="font-size:13px;font-weight:600">' + r.productName + '</div>' +
+        '<div style="font-size:11px;color:#71717a">Esperado: ' + r.expected + ' ' + r.unit + '</div></div>' +
+        '<input type="number" min="0" placeholder="—" ' +
+        'onchange="window._ktkContagemManual[' + r.productId + ']=parseInt(this.value)" ' +
+        'style="width:70px;padding:7px;border:1.5px solid #ddd6fe;border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
+        '</div>';
+    }).join("") +
+    '</div>' +
     '<div style="display:flex;gap:8px;margin-top:14px;border-top:1px solid #f4f4f5;padding-top:14px">' +
     '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>' +
     '<button class="btn btn-primary btn-full" onclick="window._confirmarImportKtk()" style="background:#16a34a">' +
@@ -408,8 +434,38 @@ window._confirmarImportKtk = async function() {
   if (!ktk) { toast("Nenhum KTK pendente.","error"); return; }
   try {
     var result = await ktkService.import(ktk);
+
+    // Aplica contagem manual — gera incidentes adicionais
+    var contagem = window._ktkContagemManual || {};
+    var user = getUser();
+    var extraInc = 0;
+    for (var pid in contagem) {
+      var found    = contagem[pid];
+      var stockExp = ktk.stock_esperado && ktk.stock_esperado[pid];
+      var expected = stockExp ? stockExp.expected : 0;
+      var diff     = found - expected;
+      if (!isNaN(found) && diff !== 0) {
+        await db.add("incidents", {
+          productId:   Number(pid),
+          productName: stockExp ? stockExp.productName : "Produto " + pid,
+          expected:    expected,
+          found:       found,
+          diff:        diff,
+          sessionId:   result.sessionId,
+          responsibleSessionId: null,
+          foundBy:     user.id,
+          status:      "open",
+          note:        "Contagem manual na importação KTK",
+          createdAt:   new Date().toISOString(),
+        });
+        extraInc++;
+      }
+    }
+
     window._ktkPendente = null;
-    toast("Turno importado. "+result.incidentCount+" incidente(s) registado(s).","success");
+    window._ktkContagemManual = {};
+    var totalInc = result.incidentCount + extraInc;
+    toast("Turno importado. " + totalInc + " incidente(s) registado(s).","success");
     closeModal();
     await renderTurno();
   } catch(err) {

@@ -18,10 +18,11 @@ export async function loadFornecedores() {
 }
 
 async function renderFornecedores() {
-  const [suppliers, purchases] = await Promise.all([
+  const [allSuppliers, purchases] = await Promise.all([
     db.getAll("suppliers"),
     db.getAll("purchases"),
   ]);
+  const suppliers = allSuppliers.filter(function(s){ return s.active !== false; });
 
   const totalCompras = purchases.reduce((a,p) => a+(p.total||0), 0);
   const mesAtual     = new Date().toISOString().slice(0,7);
@@ -85,8 +86,9 @@ async function renderFornecedores() {
                 ${(p.items||[]).map(i => i.productName+"×"+i.qty).join(", ")}
               </div>
             </div>
-            <div style="text-align:right;flex-shrink:0">
+            <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
               <div style="font-size:14px;font-weight:700;color:#dc2626">${fmt(p.total)}</div>
+              <button onclick="window._editCompra(${p.id})" style="background:none;border:none;color:#5b21b6;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Editar</button>
             </div>
           </div>
         </div>`;
@@ -123,6 +125,7 @@ window._openSupplierDetail = async (id) => {
     </div>
     <div class="form-actions">
       <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>
+      <button class="btn btn-danger btn-full" onclick="window._deleteSupplier(${id})"><i data-lucide="trash-2"></i> Eliminar fornecedor</button>
       <button class="btn btn-outline btn-full" onclick="window._editSupplier(${id})">
         <i data-lucide="edit-3"></i> Editar
       </button>
@@ -241,3 +244,94 @@ window._saveCompra = async () => {
 };
 
 window._closeModal = closeModal;
+
+window._deleteSupplier = async (id) => {
+  const purchases = await db.getAll("purchases");
+  const hasPurchases = purchases.some(function(p){ return p.supplierId === id; });
+
+  if (hasPurchases) {
+    if (!confirm("Este fornecedor tem compras registadas e nao pode ser eliminado (preserva auditoria). Queres desactiva-lo? Deixa de aparecer na lista mas o historico fica guardado.")) return;
+    await window._deactivateSupplier(id);
+    return;
+  }
+
+  if (!confirm("Eliminar este fornecedor? Esta accao nao pode ser desfeita.")) return;
+  await db.delete("suppliers", id);
+  toast("Fornecedor eliminado.", "success");
+  closeModal();
+  renderFornecedores();
+};
+
+window._deactivateSupplier = async (id) => {
+  const s = await db.get("suppliers", id);
+  if (!s) return;
+  await db.put("suppliers", { ...s, active: false, deactivatedAt: new Date().toISOString() });
+  toast("Fornecedor desactivado.", "success");
+  closeModal();
+  renderFornecedores();
+};
+
+window._editCompra = async (purchaseId) => {
+  const p = await db.get("purchases", purchaseId);
+  if (!p) return;
+  const item = (p.items||[])[0] || {};
+  closeModal();
+  openModal("Editar Compra",
+    `<div style="background:#f4f4f5;border-radius:10px;padding:12px;margin-bottom:14px">
+      <div style="font-size:12px;color:#71717a">Produto</div>
+      <div style="font-size:14px;font-weight:700">${item.productName||"?"}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="field-row">
+        <div class="field"><label>Quantidade</label><input type="number" id="ec-qty" value="${item.qty||0}" min="1"/></div>
+        <div class="field"><label>Custo Unitário (Kz)</label><input type="number" id="ec-cost" value="${item.unitCost||0}" min="0"/></div>
+      </div>
+      <div class="field"><label>Notas</label><input id="ec-notes" value="${p.notes||""}"/></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
+      <button class="btn btn-primary btn-full" onclick="window._saveEditCompra(${purchaseId})">
+        <i data-lucide="save"></i> Guardar alterações
+      </button>
+    </div>`);
+  refreshIcons(el("modal-box"));
+};
+
+window._saveEditCompra = async (purchaseId) => {
+  const p = await db.get("purchases", purchaseId);
+  if (!p) return;
+  const item = (p.items||[])[0] || {};
+  const newQty  = Number(el("ec-qty").value);
+  const newCost = Number(el("ec-cost").value);
+  const newNotes = el("ec-notes").value;
+
+  if (!newQty || newQty <= 0) { toast("Quantidade inválida.", "error"); return; }
+
+  const diffQty = newQty - (item.qty||0);
+  const product = await db.get("products", item.productId);
+
+  if (product && diffQty !== 0) {
+    const { addStockMovement } = await import("../services.js");
+    await addStockMovement({
+      productId: item.productId, productName: item.productName,
+      type: "adjustment", location: p.dest||"shop",
+      qty: diffQty, reference: "purchase-edit#"+purchaseId,
+      note: "Correcção de compra editada", sessionId: null,
+    });
+  }
+  if (product && newCost !== item.unitCost) {
+    await db.put("products", { ...product, costPrice: newCost });
+  }
+
+  await db.put("purchases", {
+    ...p,
+    items: [{ ...item, qty:newQty, unitCost:newCost }],
+    total: newQty * newCost,
+    notes: newNotes,
+    editedAt: new Date().toISOString(),
+  });
+
+  toast("Compra actualizada.", "success");
+  closeModal();
+  renderFornecedores();
+};
