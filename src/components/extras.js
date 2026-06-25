@@ -29,6 +29,16 @@ window._toggleDarkMode = function() {
 };
 
 // ── ALERTAS DE STOCK MÍNIMO ───────────────────────────────────────────────────
+export async function checkBadges() {
+  // Badge fiados
+  try {
+    var fiados = await db.getAll("fiado");
+    var aberto = fiados.filter(function(f){ return f.status==="open"; }).length;
+    var fb = document.getElementById("fiados-badge");
+    if (fb) { fb.textContent = aberto; fb.style.display = aberto > 0 ? "flex" : "none"; }
+  } catch(e) {}
+}
+
 export async function checkStockAlerts() {
   var products = await db.getAll("products");
   var low = products.filter(function(p) {

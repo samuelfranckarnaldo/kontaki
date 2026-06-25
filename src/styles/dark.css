@@ -1,47 +1,18 @@
-/* ── MODO ESCURO ─────────────────────────────────────────────── */
-[data-theme="dark"] {
-  --bg:        #0f0f0f;
-  --bg2:       #1a1a1a;
-  --bg3:       #242424;
-  --border:    #2e2e2e;
-  --text:      #f4f4f5;
-  --text2:     #a1a1aa;
-  --text3:     #71717a;
-  --primary:   #7c3aed;
-  --primary-bg:#1e1040;
-  --success:   #16a34a;
-  --danger:    #dc2626;
-  --warning:   #d97706;
-}
-
-[data-theme="dark"] body                { background: var(--bg);  color: var(--text); }
-[data-theme="dark"] .page               { background: var(--bg);  }
-[data-theme="dark"] .vender-card        { background: var(--bg2); border-color: var(--border); }
-[data-theme="dark"] .list-card          { background: var(--bg2); border-color: var(--border); }
-[data-theme="dark"] .stat-card          { background: var(--bg2); border-color: var(--border); }
-[data-theme="dark"] .bottom-nav         { background: var(--bg2); border-color: var(--border); }
-[data-theme="dark"] .topbar             { background: var(--bg2); border-color: var(--border); }
-[data-theme="dark"] .modal-overlay      { background: rgba(0,0,0,.8); }
-[data-theme="dark"] .modal-box          { background: var(--bg2); }
-[data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea {
-  background: var(--bg3); color: var(--text); border-color: var(--border);
-}
-[data-theme="dark"] .btn-ghost          { background: var(--bg3); color: var(--text); border-color: var(--border); }
-[data-theme="dark"] .login-box          { background: var(--bg2); }
-[data-theme="dark"] .login-page         { background: var(--bg);  }
-[data-theme="dark"] .perfil-menu-item   { background: var(--bg2); border-color: var(--border); }
-[data-theme="dark"] .historico-item     { background: var(--bg2); border-color: var(--border); }
-[data-theme="dark"] .search-result-item { background: var(--bg2); border-color: var(--border); }
-[data-theme="dark"] #search-results     { background: var(--bg2); border-color: var(--border); }
-[data-theme="dark"] #cart-items         { background: var(--bg2); }
-[data-theme="dark"] .nav-item           { color: var(--text3); }
-[data-theme="dark"] .nav-item.active    { color: var(--primary); }
-[data-theme="dark"] h1,h2,h3            { color: var(--text); }
-[data-theme="dark"] .topbar-title       { color: var(--text); }
+/* Dark mode — variáveis já definidas em components.css */
+/* Este ficheiro existe para retrocompatibilidade */
 [data-theme="dark"] [style*="background:#fff"]    { background: var(--bg2) !important; }
-[data-theme="dark"] [style*="background:#f4f4f5"] { background: var(--bg3) !important; }
-[data-theme="dark"] [style*="background:#ffffff"] { background: var(--bg2) !important; }
-[data-theme="dark"] [style*="color:#18181b"]      { color: var(--text)  !important; }
+[data-theme="dark"] [style*="background:#f4f4f5"] { background: var(--border2) !important; }
+[data-theme="dark"] [style*="color:#18181b"]      { color: var(--text) !important; }
 [data-theme="dark"] [style*="color:#71717a"]      { color: var(--text3) !important; }
+[data-theme="dark"] [style*="color:#a1a1aa"]      { color: var(--text4) !important; }
 [data-theme="dark"] [style*="border-bottom:1px solid #f4f4f5"] { border-color: var(--border) !important; }
 [data-theme="dark"] [style*="border:1px solid #f4f4f5"]        { border-color: var(--border) !important; }
+[data-theme="dark"] [style*="border:1.5px solid #e4e4e7"]      { border-color: var(--border) !important; }
+[data-theme="dark"] [style*="background:#fafafa"] { background: var(--border2) !important; }
+[data-theme="dark"] [style*="background:#f9fafb"] { background: var(--border2) !important; }
+[data-theme="dark"] [style*="background:#f0fdf4"] { background: rgba(22,163,74,.15) !important; }
+[data-theme="dark"] [style*="background:#dcfce7"] { background: rgba(22,163,74,.2) !important; }
+[data-theme="dark"] [style*="background:#fee2e2"] { background: rgba(220,38,38,.2) !important; }
+[data-theme="dark"] [style*="background:#fef3c7"] { background: rgba(217,119,6,.2) !important; }
+[data-theme="dark"] [style*="background:#ede9fe"] { background: rgba(91,33,182,.25) !important; }
+[data-theme="dark"] [style*="background:#dbeafe"] { background: rgba(37,99,235,.2) !important; }

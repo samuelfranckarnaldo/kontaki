@@ -106,16 +106,16 @@
 <!-- APP -->
 <div id="app" style="display:none">
 
-  <div id="topbar">
-    <span id="topbar-title">Kontaki</span>
+  <div id="topbar" class="topbar">
+    <span id="topbar-title" class="topbar-title">Kontaki</span>
     <div style="display:flex;gap:4px">
-      <button class="topbar-side-btn" id="btn-topbar-quick" style="display:none" title="Modo Caixa Rápida">
+      <button class="topbar-btn" id="btn-topbar-quick" style="display:none" title="Modo Caixa Rápida">
         <i data-lucide="zap"></i>
       </button>
-      <button class="topbar-side-btn" id="btn-topbar-qr" style="display:none">
+      <button class="topbar-btn" id="btn-topbar-qr" style="display:none">
         <i data-lucide="scan-qr-code"></i>
       </button>
-      <button class="topbar-side-btn" id="btn-topbar-add" style="display:none">
+      <button class="topbar-btn" id="btn-topbar-add" style="display:none">
         <i data-lucide="plus"></i>
       </button>
     </div>
@@ -138,7 +138,7 @@
             </div>
           </button>
           <div class="or-divider"><span>ou</span></div>
-          <div class="search-bar">
+          <div class="search-wrap">
             <i data-lucide="search" class="search-icon"></i>
             <input id="prod-search" placeholder="Pesquisar produto por nome ou código"/>
           </div>
@@ -242,7 +242,7 @@
     <!-- PRODUTOS -->
     <div class="page" id="pg-produtos">
       <div class="page-inner">
-        <div class="search-bar">
+        <div class="search-wrap">
           <i data-lucide="search" class="search-icon"></i>
           <input id="produtos-search" placeholder="Pesquisar produto por nome ou código"/>
         </div>
@@ -255,7 +255,7 @@
     <!-- FIADOS -->
     <div class="page" id="pg-fiados">
       <div class="page-inner">
-        <div class="search-bar">
+        <div class="search-wrap">
           <i data-lucide="search" class="search-icon"></i>
           <input id="fiados-search" placeholder="Pesquisar cliente..."/>
         </div>
@@ -312,7 +312,7 @@
               <i data-lucide="plus"></i> Produto
             </button>
           </div>
-          <div class="search-bar">
+          <div class="search-wrap">
             <i data-lucide="search" class="search-icon"></i>
             <input id="stock-search" placeholder="Pesquisar..."/>
           </div>
@@ -404,29 +404,11 @@
         </div>
       </div>
 
-      <div id="subpage-contabilidade" style="display:none">
-        <div class="page-inner">
-          <button class="btn btn-ghost btn-sm" id="btn-back-contabilidade">← Voltar</button>
-          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Contabilidade</div>
-          <div id="contabilidade-content"></div>
-        </div>
-      </div>
+      
 
-      <div id="subpage-assinatura" style="display:none">
-        <div class="page-inner">
-          <button class="btn btn-ghost btn-sm" id="btn-back-assinatura">← Voltar</button>
-          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Assinatura</div>
-          <div id="assinatura-content"></div>
-        </div>
-      </div>
+      
 
-      <div id="subpage-contactos" style="display:none">
-        <div class="page-inner">
-          <button class="btn btn-ghost btn-sm" id="btn-back-contactos">← Voltar</button>
-          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Contactos</div>
-          <div id="contactos-content"></div>
-        </div>
-      </div>
+      
 
       <div id="subpage-configuracoes" style="display:none">
         <div class="page-inner">
@@ -497,7 +479,7 @@
   </div>
 
   <!-- BOTTOM NAV -->
-  <div id="bottom-nav">
+  <div id="bottom-nav" class="bottom-nav">
     <button class="nav-item active" data-page="vender">
       <i data-lucide="shopping-cart"></i><span>Vender</span>
     </button>
@@ -517,10 +499,9 @@
 </div>
 
 <!-- MODAL -->
-<div id="overlay">
-  <div class="modal" id="modal-box">
-    <div class="modal-handle"></div>
-    <div class="modal-title" id="modal-title"></div>
+<div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:8000;align-items:flex-end;justify-content:center">
+  <div id="modal-box" style="background:var(--bg2);border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto">
+    <div id="modal-title" style="font-size:17px;font-weight:700;margin-bottom:16px"></div>
     <div id="modal-body"></div>
   </div>
 </div>
@@ -599,6 +580,15 @@
   </div>
 </div>
 
+<div id="modal-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:8000;align-items:center;justify-content:center;padding:20px">
+  <div id="modal-box" style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div id="modal-title" style="font-size:17px;font-weight:700"></div>
+      <button onclick="if(window._closeModal)window._closeModal()" style="background:#f4f4f5;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px">×</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
 <div id="toasts"></div>
 
 <!-- MODAL VERIFICAÇÃO -->

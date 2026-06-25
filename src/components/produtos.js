@@ -134,7 +134,7 @@ function renderList() {
     const bg  = qty===0 ? "#fff5f5" : qty<=min ? "#fffbeb" : "#fff";
     const tag = qty===0 ? "Esgotado" : qty<=min ? "Stock baixo" : "";
     html +=
-      `<div class="produto-item" style="background:${bg};border-left:3px solid ${qty<=min?sc:"transparent"}">` +
+      `<div class="produto-item ${qty===0?"produto-item-zero":qty<=min?"produto-item-low":"produto-item-ok"}">` +
       `<div style="flex:1;min-width:0">` +
       `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">` +
       `<div class="produto-name">${p.name}</div>` +
@@ -142,16 +142,16 @@ function renderList() {
       `</div>` +
       `<div class="produto-meta">${p.barcode?p.barcode+" · ":""}${p.category}</div>` +
       `<div style="display:flex;gap:10px;margin-top:3px;font-size:11px">` +
-      `<span style="color:#16a34a;font-weight:600">Loja: ${qty} ${p.unit}</span>` +
-      `<span style="color:#5b21b6;font-weight:600">Arm: ${arm} ${p.unit}</span>` +
-      `<span style="color:#2563eb;font-weight:600">Total: ${qty+arm} ${p.unit}</span>` +
+      `<span class="produto-stock-ok">Loja: ${qty} ${p.unit}</span>` +
+      `<span class="produto-stock-arm">Arm: ${arm} ${p.unit}</span>` +
+      `<span class="produto-stock-total">Total: ${qty+arm} ${p.unit}</span>` +
       `</div></div>` +
-      `<div class="produto-right" style="margin-right:6px">` +
+      `<div class="produto-right">` +
       `<div class="produto-label">Preco venda</div>` +
       `<div style="font-size:14px;font-weight:700;color:#18181b">${fmt(p.price)}</div>` +
       `</div>` +
       `<button class="produto-menu-btn" onclick="window._openProdMenu(${p.id})">` +
-      `<i data-lucide="more-vertical" style="width:17px;height:17px;color:#a1a1aa"></i>` +
+      `<i data-lucide="more-vertical"></i>` +
       `</button></div>`;
   }
   el("produtos-list").innerHTML += html;

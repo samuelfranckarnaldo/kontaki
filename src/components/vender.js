@@ -391,6 +391,14 @@ async function renderSummary() {
   const { da, total, ivaPct, valorIva } = calcTotal();
   var totalEl = el("total-val");
   if (totalEl) totalEl.textContent = fmt(total);
+  var finBtn = el("btn-finalizar");
+  if (finBtn) {
+    var cartCount = cart.reduce(function(a,i){return a+i.qty;},0);
+    finBtn.innerHTML = cartCount > 0
+      ? '<i data-lucide="check" style="width:16px;height:16px"></i> Finalizar · ' + fmt(total)
+      : '<i data-lucide="check" style="width:16px;height:16px"></i> Finalizar';
+    if (window.lucide) window.lucide.createIcons({el:finBtn});
+  }
 
   const discRow = el("disc-amt-row");
   if (discRow) {

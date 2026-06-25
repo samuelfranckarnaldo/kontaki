@@ -6,7 +6,8 @@ import { initFiados }                      from "./components/fiados.js";
 import { initHistorico }                   from "./components/historico.js";
 import { initPerfil }                      from "./components/perfil.js";
 import { initCamera }                      from "./components/camera.js";
-import { initDarkMode, checkStockAlerts }  from "./components/extras.js";
+import { initDarkMode, checkStockAlerts, checkBadges } from "./components/extras.js";
+import { loadDashboard }                    from "./components/dashboard.js";
 
 var PAGES = {
   vender:    { init: initVender    },
@@ -35,8 +36,9 @@ export var router = {
     refreshIcons(el("topbar"));
     initDarkMode();
     checkStockAlerts();
+    checkBadges();
     initQuickMode();
-    setTimeout(function() { self.go("vender"); }, 50);
+    setTimeout(function() { self.go("vender"); loadDashboard(); }, 50);
   },
 
   go: function(pageId) {
@@ -80,6 +82,7 @@ export var router = {
     }
 
     PAGES[pageId].init();
+    checkBadges();
     var pgEl = el("pg-" + pageId);
     if (pgEl) refreshIcons(pgEl);
   },

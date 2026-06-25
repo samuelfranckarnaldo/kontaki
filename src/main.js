@@ -59,3 +59,25 @@ main().catch(function(e) {
   try { logger.error("Erro fatal: " + e.message, e); } catch(x){}
   showErrorBoundary(e.message, null, null);
 });
+
+async function checkBackupReminder() {
+  try {
+    var last = localStorage.getItem("kontaki-last-backup");
+    var now  = Date.now();
+    if (!last || now - Number(last) > 7 * 24 * 60 * 60 * 1000) {
+      setTimeout(function() {
+        var banner = document.createElement("div");
+        banner.style.cssText = "position:fixed;bottom:80px;left:16px;right:16px;background:#1e3a5f;color:#fff;border-radius:12px;padding:14px;z-index:9000;display:flex;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,.2);font-family:inherit";
+        banner.innerHTML =
+          "<i data-lucide='cloud-upload' style='width:20px;height:20px;flex-shrink:0'></i>" +
+          "<div style='flex:1'><div style='font-size:13px;font-weight:700'>Lembrete de backup</div><div style='font-size:11px;color:rgba(255,255,255,.7);margin-top:2px'>Há mais de 7 dias sem backup. Os teus dados são importantes.</div></div>" +
+          "<button onclick='this.parentNode.remove()' style='background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:18px;padding:0'>×</button>";
+        document.body.appendChild(banner);
+        if (window.lucide) window.lucide.createIcons({el:banner});
+        setTimeout(function(){ if(banner.parentNode) banner.remove(); }, 12000);
+      }, 3000);
+    }
+  } catch(e) {}
+}
+
+checkBackupReminder();
