@@ -30,12 +30,44 @@ window._toggleDarkMode = function() {
 
 // ── ALERTAS DE STOCK MÍNIMO ───────────────────────────────────────────────────
 export async function checkBadges() {
-  // Badge fiados
   try {
     var fiados = await db.getAll("fiado");
     var aberto = fiados.filter(function(f){ return f.status==="open"; }).length;
+    var total = fiados.length;
     var fb = document.getElementById("fiados-badge");
-    if (fb) { fb.textContent = aberto; fb.style.display = aberto > 0 ? "flex" : "none"; }
+    if (fb) {
+      if (aberto > 0) {
+        fb.textContent = aberto;
+        fb.style.display = "flex";
+        fb.style.background = "#ef4444";
+        fb.style.animation = "pulse 1.5s infinite";
+      } else if (total > 0) {
+        fb.textContent = "";
+        fb.style.display = "flex";
+        fb.style.background = "#16a34a";
+        fb.style.animation = "none";
+        fb.style.minWidth = "8px";
+        fb.style.width = "8px";
+        fb.style.height = "8px";
+        fb.style.borderRadius = "50%";
+      } else {
+        fb.style.display = "none";
+      }
+    }
+    
+    var produtos = await db.getAll("products");
+    var low = produtos.filter(function(p){ return p.active && p.stock <= (p.minStock || 5); }).length;
+    var pb = document.getElementById("produtos-badge");
+    if (pb) {
+      if (low > 0) {
+        pb.textContent = low;
+        pb.style.display = "flex";
+        pb.style.background = "#d97706";
+        pb.style.animation = "none";
+      } else {
+        pb.style.display = "none";
+      }
+    }
   } catch(e) {}
 }
 

@@ -10,6 +10,7 @@ import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { getUser, logout, changePasswordAuth, createUser } from "../auth.js";
+import { getLicense, PLANS, activateLicense } from "../license.js";
 import { gerarRelatorioPDF } from "./extras.js";
 
 export async function initPerfil() {
@@ -82,8 +83,7 @@ function renderMenu() {
   ];
 
   const caixaItems = [
-    { label: "Meu Turno",         sub: "Abrir, fechar e gerar .ktk",    icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno"         },
-    { label: "Clientes",          sub: "Fichas e histórico",             icon: "users",          color: "#dbeafe", iconColor: "#2563eb", page: "clientes"      },
+        { label: "Clientes",          sub: "Fichas e histórico",             icon: "users",          color: "#dbeafe", iconColor: "#2563eb", page: "clientes"      },
   ];
 
   const commonItems = [
