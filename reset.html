@@ -1,23 +1,58 @@
 <!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8"/><title>Reset DB</title></head>
-<body>
-<h2>Reset Kontaki DB</h2>
-<button onclick="reset()" style="padding:20px;font-size:18px;background:red;color:white;border:none;border-radius:10px;cursor:pointer">
-  Apagar base de dados e reiniciar
+<head>
+  <meta charset="UTF-8"/>
+  <title>Reset Kontaki</title>
+</head>
+<body style="font-family: sans-serif; padding: 20px">
+
+<h2>Reset completo do Kontaki</h2>
+
+<button onclick="resetAll()" style="padding:20px;font-size:18px;background:red;color:white;border:none;border-radius:10px;cursor:pointer">
+  Apagar TUDO e reiniciar app
 </button>
+
 <p id="msg"></p>
+
 <script>
-function reset() {
-  const req = indexedDB.deleteDatabase('kontaki_db');
-  req.onsuccess = () => {
-    document.getElementById('msg').textContent = 'Feito! A redirecionar...';
-    setTimeout(() => window.location.href = '/', 1500);
-  };
-  req.onerror = () => {
-    document.getElementById('msg').textContent = 'Erro: ' + req.error;
-  };
+async function resetAll() {
+  const msg = document.getElementById("msg");
+  msg.textContent = "A limpar dados...";
+
+  try {
+    // 1. IndexedDB
+    indexedDB.deleteDatabase("kontaki_db");
+
+    // 2. LocalStorage + SessionStorage
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // 3. Cache Storage (Service Worker cache)
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+
+    // 4. Service Workers
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const reg of regs) {
+        await reg.unregister();
+      }
+    }
+
+    msg.textContent = "Reset concluído. A reiniciar...";
+
+    setTimeout(() => {
+      location.href = "/";
+      location.reload(true);
+    }, 1200);
+
+  } catch (e) {
+    msg.textContent = "Erro: " + e.message;
+  }
 }
 </script>
+
 </body>
 </html>

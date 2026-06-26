@@ -1,246 +1,28 @@
 /* ── VENDER ─────────────────────────────────────────────────────────────────── */
 #pg-vender { background: var(--bg); }
+#pg-vender .page-inner { padding-bottom: 90px; }
 
-.vender-search-wrap {
-  position: sticky; top: 0; z-index: 20;
-  background: var(--bg2); padding: 10px 16px;
-  border-bottom: 1px solid var(--border2);
-}
-.vender-search-inner { position: relative; }
-.vender-search-inner input {
-  padding-left: 38px; padding-right: 12px;
-  background: var(--border2); border-color: transparent;
-  border-radius: 10px;
-}
-.vender-search-inner input:focus {
-  border-color: var(--primary); background: var(--bg2);
-}
-.vender-search-icon {
-  position: absolute; left: 11px; top: 50%;
-  transform: translateY(-50%); pointer-events: none;
-  color: var(--text4);
-}
-.vender-search-icon i { width: 15px; height: 15px; }
+/* ── PRODUTOS ───────────────────────────────────────────────────────────────── */
+#pg-produtos .page-inner { padding-bottom: 80px; }
 
-/* Carrinho header */
-.cart-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px 6px;
-}
-.cart-count-badge {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 20px; height: 20px; background: var(--primary);
-  color: #fff; border-radius: 10px; font-size: 11px; font-weight: 700; padding: 0 5px;
-  transition: transform .15s ease;
-}
+/* ── FIADOS ─────────────────────────────────────────────────────────────────── */
+#pg-fiados #fiados-total-bar { padding: 12px 16px; font-size: 13px; color: var(--text3); }
 
-/* Cart vazio */
-.cart-empty {
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; padding: 32px 20px; gap: 8px; color: var(--text4);
-}
-.cart-empty i { width: 36px; height: 36px; }
-
-/* Resumo */
-.vender-summary {
-  border-top: 1px solid var(--border2);
-  padding: 10px 16px; background: var(--bg2);
-}
-.summary-row {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 13px; padding: 2px 0; color: var(--text3);
-}
-.summary-row.total {
-  font-size: 17px; font-weight: 700; color: var(--text);
-  padding-top: 8px; margin-top: 6px; border-top: 1.5px solid var(--border2);
-}
-
-/* Desconto */
-.disc-row { display: flex; align-items: center; gap: 8px; }
-.disc-input { flex: 1; }
-.disc-type-btn {
-  width: 44px; height: 44px; flex-shrink: 0;
-  background: var(--primary-light); border: 1.5px solid var(--primary);
-  border-radius: var(--radius-sm); color: var(--primary);
-  font-size: 13px; font-weight: 700; cursor: pointer;
-  font-family: var(--font); display: flex; align-items: center; justify-content: center;
-}
-
-/* Botão finalizar */
-#btn-finalizar {
-  width: 100%; padding: 14px; margin: 10px 0 0;
-  background: var(--primary); color: #fff; border: none;
-  border-radius: var(--radius); font-size: 15px; font-weight: 700;
-  cursor: pointer; font-family: var(--font);
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  box-shadow: 0 4px 16px rgba(91,33,182,.3);
-  transition: all var(--transition);
-}
-#btn-finalizar:active { transform: scale(.98); box-shadow: none; }
-#btn-finalizar:disabled { background: var(--text4); box-shadow: none; }
-
-/* ── PRODUTOS ────────────────────────────────────────────────────────────────── */
-.produto-card {
-  background: var(--bg2); border-radius: var(--radius);
-  padding: 13px 14px; border-bottom: 1px solid var(--border2);
-  display: flex; align-items: center; gap: 12px;
-  cursor: pointer; transition: background var(--transition);
-}
-.produto-card:active { background: var(--border2); }
-.produto-avatar {
-  width: 44px; height: 44px; border-radius: var(--radius-sm);
-  background: var(--primary-light); display: flex;
-  align-items: center; justify-content: center; flex-shrink: 0;
-  font-size: 18px; font-weight: 700; color: var(--primary);
-}
-.produto-stock-badge {
-  display: inline-flex; align-items: center;
-  padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 700;
-}
-.produto-stock-ok      { background: var(--success-light); color: var(--success); }
-.produto-stock-low     { background: var(--warning-light); color: var(--warning); }
-.produto-stock-zero    { background: var(--danger-light);  color: var(--danger); }
-
-/* ── FIADOS ──────────────────────────────────────────────────────────────────── */
-#fiados-total-bar { padding: 12px 16px; }
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* ── HISTÓRICO ───────────────────────────────────────────────────────────────── */
-.historico-filters {
-  display: flex; gap: 8px; padding: 10px 16px;
-  background: var(--bg2); border-bottom: 1px solid var(--border2);
-  overflow-x: auto;
-}
-.historico-filters::-webkit-scrollbar { display: none; }
+/* ── HISTÓRICO ──────────────────────────────────────────────────────────────── */
 .historico-date-row {
   display: grid; grid-template-columns: 1fr 1fr auto;
   gap: 8px; padding: 10px 16px;
   background: var(--bg2); border-bottom: 1px solid var(--border2);
 }
-.historico-summary {
-  padding: 10px 16px; background: var(--bg2);
-  border-bottom: 1px solid var(--border2);
-  display: flex; justify-content: space-between; align-items: center;
-}
 
-/* ── PERFIL ──────────────────────────────────────────────────────────────────── */
+/* ── PERFIL ─────────────────────────────────────────────────────────────────── */
 #pg-perfil { background: var(--bg); }
-#perfil-header { margin-bottom: 0; }
-#perfil-menu   { padding: 12px 16px; }
+#perfil-menu { padding: 12px 16px; }
 
-/* ── PRINT ───────────────────────────────────────────────────────────────────── */
+/* ── PRINT ──────────────────────────────────────────────────────────────────── */
 @media print {
   .bottom-nav, .topbar, #btn-finalizar { display: none !important; }
   .page { position: static !important; display: block !important; }
+  body > *:not(#print-root) { display: none !important; }
+  #print-root { display: block !important; }
 }
-
-
-/* ── PRODUTOS (classes reais do JS) ─────────────────────────────────────────── */
-
-
-
-
-
-
-
-
-
-/* ── PRODUTOS ────────────────────────────────────────────────────────────────── */
-
-
-.produto-name {
-  font-size: 14px; font-weight: 700; color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.produto-meta { font-size: 11px; color: var(--text3); margin-top: 3px; }
-.produto-right { text-align: right; flex-shrink: 0; margin-left: auto; }
-.produto-label { font-size: 9px; color: var(--text4); text-transform: uppercase; letter-spacing: .3px; }
-.produto-price { font-size: 16px; font-weight: 700; color: var(--primary); }
-
-/* Badge de stock */
-.produto-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 8px; border-radius: 20px; font-size: 10px; font-weight: 700;
-}
-.produto-badge-ok    { background: #dcfce7; color: #15803d; }
-.produto-badge-low   { background: #fef3c7; color: #92400e; }
-.produto-badge-zero  { background: #fee2e2; color: #dc2626; }
-
-/* Stats grid */
-.produtos-stats {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-  margin-bottom: 14px;
-}
-
-
-/* Botão de ações do produto (3 pontos) */
-.produto-actions-btn {
-  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
-  background: none; border: none; cursor: pointer; color: var(--text3);
-  border-radius: 50%; transition: background .15s ease;
-  flex-shrink: 0;
-}
-.produto-actions-btn:active { background: var(--border2); }
-.produto-actions-btn i, .produto-actions-btn svg { width: 18px; height: 18px; }
-
-
-
-
-
-
-
-
-/* ── PRODUTOS ────────────────────────────────────────────────────────────────── */
-.produto-item { display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 12px; margin-bottom: 8px; border: 1px solid var(--border2); cursor: pointer; background: var(--bg2); }
-.produto-item-ok  { background: var(--bg2); }
-.produto-item-low { background: #fffbeb; }
-.produto-item-zero { background: #fff5f5; }
-.produto-name { font-size: 14px; font-weight: 700; color: var(--text); }
-.produto-meta { font-size: 11px; color: var(--text3); }
-.produto-right { text-align: right; flex-shrink: 0; }
-.produto-label { font-size: 9px; color: var(--text4); text-transform: uppercase; }
-.produto-price { font-size: 16px; font-weight: 700; color: var(--primary); }
-
-.produto-stock-ok { color: #16a34a; font-weight: 600; font-size: 11px; background: none !important; }
-.produto-stock-arm { color: #5b21b6; font-weight: 600; font-size: 11px; }
-.produto-stock-total { color: #2563eb; font-weight: 600; font-size: 11px; }
-
-/* Botão 3 pontos */
-.produto-menu-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; border-radius: 50%; flex-shrink: 0; }
-.produto-menu-btn:active { background: var(--border2); }
-.produto-menu-btn i, .produto-menu-btn svg { width: 18px; height: 18px; color: var(--text3); }
-
-#pg-produtos .page-inner { padding-bottom: 80px; }
-
-
-/* ── FIADOS ─────────────────────────────────────────────────────────────────── */
-.fiado-cliente {
-  background: var(--bg2); border-radius: 14px; margin-bottom: 10px;
-  border: 1px solid var(--border2); box-shadow: var(--shadow-sm); overflow: hidden;
-}
-.fiado-cliente-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; cursor: pointer; transition: background .15s ease;
-}
-.fiado-cliente-header:active { background: var(--border2); }
-.fiado-cliente-name { font-size: 14px; font-weight: 700; color: var(--text); }
-.fiado-cliente-total { font-size: 16px; font-weight: 700; color: var(--primary); }
-
-.fiado-entry {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px; border-top: 1px solid var(--border2);
-  background: var(--bg); font-size: 13px;
-}
-.fiado-entry-amt { font-size: 14px; font-weight: 700; }
-.fiado-entry-info { font-size: 11px; color: var(--text3); margin-top: 2px; }

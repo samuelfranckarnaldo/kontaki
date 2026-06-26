@@ -27,28 +27,28 @@
     <div class="login-logo">
       <div class="login-logo-mark"><i data-lucide="zap"></i></div>
       <h1>Kontaki</h1>
-      <p id="login-store-name">Gestão de negócios offline-first</p>
+      <p id="login-store-name"> </p>
     </div>
 
     <!-- STEP 1: Selecciona utilizador -->
-    <div id="login-step-role" style="display:flex;flex-direction:column;width:100%">
-      <div style="font-size:12px;font-weight:700;color:#71717a;text-align:center;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Quem és tu?</div>
-      <div id="login-users-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
-      <div style="font-size:11px;color:#a1a1aa;text-align:center;line-height:1.7">
+    <div id="login-step-role">
+      <div class="login-step-label">Selecciona o teu perfil</div>
+      <div id="login-users-list" class="login-users-list"></div>
+      <div class="login-terms">
         Ao entrar aceitas os
-        <button onclick="window._showTermos()" style="background:none;border:none;color:#5b21b6;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;text-decoration:underline;padding:0">Termos</button>
+        <button onclick="window._showTermos()">Termos</button>
         e a
-        <button onclick="window._showPrivacidade()" style="background:none;border:none;color:#5b21b6;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;text-decoration:underline;padding:0">Privacidade</button>
+        <button onclick="window._showPrivacidade()">Privacidade</button>
       </div>
     </div>
 
     <!-- STEP 2: PIN -->
-    <div id="login-step-pin" style="display:none;flex-direction:column;width:100%">
+    <div id="login-step-pin">
       <div id="login-pin-user" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;margin-bottom:16px"></div>
 
-      <div style="font-size:12px;font-weight:700;color:#71717a;text-align:center;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Introduz o teu PIN</div>
+      <div class="login-step-label">Introduz o teu PIN</div>
 
-      <div id="pin-dots" style="display:flex;gap:10px;justify-content:center;margin-bottom:20px">
+      <div id="pin-dots" class="pin-dots">
         <div id="pdot-0" class="pin-dot"></div>
         <div id="pdot-1" class="pin-dot"></div>
         <div id="pdot-2" class="pin-dot"></div>
@@ -57,11 +57,11 @@
         <div id="pdot-5" class="pin-dot"></div>
       </div>
 
-      <div id="login-err" style="display:none;background:#fee2e2;border-radius:8px;padding:10px;text-align:center;font-size:13px;color:#dc2626;margin-bottom:12px">
+      <div id="login-err" class="login-err">
         <span id="login-err-msg">PIN incorrecto</span>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:260px;margin:0 auto 16px">
+      <div class="pin-keypad">
         <button onclick="window._pinKey('1')" class="pin-btn-g">1</button>
         <button onclick="window._pinKey('2')" class="pin-btn-g">2</button>
         <button onclick="window._pinKey('3')" class="pin-btn-g">3</button>
@@ -71,17 +71,22 @@
         <button onclick="window._pinKey('7')" class="pin-btn-g">7</button>
         <button onclick="window._pinKey('8')" class="pin-btn-g">8</button>
         <button onclick="window._pinKey('9')" class="pin-btn-g">9</button>
-        <button onclick="window._backToRole()" class="pin-btn-g" style="background:transparent;box-shadow:none;font-size:13px;color:#71717a">←</button>
+        <button onclick="window._backToRole()" class="pin-btn-g pin-btn-back"><i data-lucide="arrow-left"></i></button>
         <button onclick="window._pinKey('0')" class="pin-btn-g">0</button>
-        <button onclick="window._pinKey('⌫')" class="pin-btn-g" style="background:transparent;box-shadow:none;color:#dc2626;font-size:22px">⌫</button>
+        <button onclick="window._pinKey('⌫')" class="pin-btn-g pin-btn-del"><i data-lucide="delete"></i></button>
       </div>
 
-      <button id="btn-forgot-pw" style="background:none;border:none;color:#5b21b6;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px;text-align:center">
-        Esqueci o PIN
-      </button>
+      <button id="btn-forgot-pw" class="login-forgot-btn">Esqueci o PIN</button>
     </div>
   </div>
 </div>
+
+<script>
+// Inicializa ícones no login assim que o DOM carrega
+document.addEventListener("DOMContentLoaded", function() {
+  if (window.lucide) window.lucide.createIcons();
+});
+</script>
 
 <!-- Ecrã de logout animado -->
 <div id="logout-screen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;
@@ -501,9 +506,9 @@
 </div>
 
 <!-- MODAL -->
-<div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:8000;align-items:flex-end;justify-content:center">
-  <div id="modal-box" style="background:var(--bg2);border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto">
-    <div id="modal-title" style="font-size:17px;font-weight:700;margin-bottom:16px"></div>
+<div id="modal-overlay">
+  <div id="modal-box">
+    <div id="modal-title"></div>
     <div id="modal-body"></div>
   </div>
 </div>
@@ -582,15 +587,7 @@
   </div>
 </div>
 
-<div id="modal-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:8000;align-items:center;justify-content:center;padding:20px">
-  <div id="modal-box" style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div id="modal-title" style="font-size:17px;font-weight:700"></div>
-      <button onclick="if(window._closeModal)window._closeModal()" style="background:#f4f4f5;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px">×</button>
-    </div>
-    <div id="modal-body"></div>
-  </div>
-</div>
+
 <div id="toasts"></div>
 
 <!-- MODAL VERIFICAÇÃO -->
@@ -624,55 +621,29 @@
 <script src="./assets/qrcode.min.js"></script>
 <script src="./assets/jspdf.min.js"></script>
 <script>
-var _selectedRole = null;
-
-window._selectRole = function(role) {
-  _selectedRole = role;
-  window._selectedRole = role;
-  var stepRole  = document.getElementById("login-step-role");
-  var stepCreds = document.getElementById("login-step-creds");
-  var badge     = document.getElementById("login-role-badge");
-  var loginBtn  = document.getElementById("btn-login");
-  if (stepRole)  stepRole.style.display  = "none";
-  if (stepCreds) { stepCreds.style.display = "flex"; stepCreds.style.flexDirection = "column"; }
-  if (badge) {
-    var isAdmin = role === "admin";
-    var bg      = isAdmin ? "#ede9fe" : "#f0fdf4";
-    var border  = isAdmin ? "#ddd6fe" : "#bbf7d0";
-    var iconBg  = isAdmin ? "#5b21b6" : "#16a34a";
-    var name    = isAdmin ? "Administrador" : "Operador de Caixa";
-    var subtext = isAdmin ? "Acesso total ao sistema" : "Vendas e operações de caixa";
-    var subcolor= isAdmin ? "#7c3aed" : "#16a34a";
-    badge.style.cssText = "display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;margin-bottom:14px;background:" + bg + ";border:1.5px solid " + border;
-    badge.innerHTML =
-      "<div style='width:36px;height:36px;background:" + iconBg + ";border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0'>" +
-      "<svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/></svg></div>" +
-      "<div><div style='font-size:14px;font-weight:700;color:#18181b'>" + name + "</div>" +
-      "<div style='font-size:11px;color:" + subcolor + "'>" + subtext + "</div></div>";
-  }
-  if (loginBtn) loginBtn.style.background = role === "admin" ? "#5b21b6" : "#16a34a";
-  var inpUser = document.getElementById("inp-user");
-  if (inpUser) setTimeout(function(){ inpUser.focus(); }, 100);
-};
-
-window._backToRole = function() {
-  _selectedRole = null;
-  window._selectedRole = null;
-  var stepRole  = document.getElementById("login-step-role");
-  var stepCreds = document.getElementById("login-step-creds");
-  if (stepRole)  stepRole.style.display  = "flex";
-  if (stepCreds) stepCreds.style.display = "none";
-};
-
 window._closeOverlay = function(btn) {
-  var overlay = btn;
-  while(overlay && !overlay.style.cssText.includes('fixed')) overlay = overlay.parentNode;
-  if (overlay) overlay.remove();
+  var el = btn;
+  while (el && el !== document.body) {
+    if (el.style && el.style.position === 'fixed') { el.remove(); return; }
+    el = el.parentNode;
+  }
+  // fallback — remove o pai directo do botão até 5 níveis
+  el = btn;
+  for (var i = 0; i < 5; i++) { el = el.parentNode; }
+  if (el) el.remove();
 };
 
 window._showTermos = function() {
   var d = document.createElement("div");
-  d.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end";
+  d.style.position = 'fixed';
+  d.style.top = '0';
+  d.style.left = '0';
+  d.style.right = '0';
+  d.style.bottom = '0';
+  d.style.background = 'rgba(0,0,0,.6)';
+  d.style.zIndex = '9999';
+  d.style.display = 'flex';
+  d.style.alignItems = 'flex-end';
   d.innerHTML =
     "<div style='background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:24px'>" +
     "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px'>" +
@@ -696,7 +667,15 @@ window._showTermos = function() {
 
 window._showPrivacidade = function() {
   var d = document.createElement("div");
-  d.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end";
+  d.style.position = 'fixed';
+  d.style.top = '0';
+  d.style.left = '0';
+  d.style.right = '0';
+  d.style.bottom = '0';
+  d.style.background = 'rgba(0,0,0,.6)';
+  d.style.zIndex = '9999';
+  d.style.display = 'flex';
+  d.style.alignItems = 'flex-end';
   d.innerHTML =
     "<div style='background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:80vh;overflow-y:auto;padding:24px'>" +
     "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px'>" +

@@ -9,112 +9,156 @@ export async function checkSetup() {
   return true;
 }
 
-function field(id, label, type, placeholder) {
-  return '<div class="field">' +
-    '<label style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.4px">' + label + '</label>' +
-    '<input id="' + id + '" type="' + type + '" placeholder="' + placeholder + '" ' +
-    'style="width:100%;padding:12px;border:1.5px solid #e4e4e7;border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-top:4px"/>' +
-    '</div>';
+function inp(id, type, placeholder, required) {
+  var req = required ? '<span style="color:#dc2626"> *</span>' : '<span style="color:#9ca3af;font-weight:400"> (opcional)</span>';
+  return (
+    '<div>' +
+    '<label style="display:block;font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">' + id.replace('setup-','').replace('store-','').replace('admin-','Admin ').replace(/-/g,' ') + req + '</label>' +
+    '<input id="' + id + '" type="' + type + '" placeholder="' + placeholder + '" autocomplete="off" ' +
+    'style="width:100%;padding:13px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:15px;font-family:inherit;box-sizing:border-box;background:#fff;color:#111827;outline:none;" />' +
+    '</div>'
+  );
 }
 
 function showSetup() {
   var overlay = document.createElement("div");
   overlay.id  = "setup-overlay";
-  overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;z-index:9999;overflow-y:auto;display:flex;flex-direction:column";
+  overlay.style.cssText = "position:fixed;inset:0;background:#f8f7ff;z-index:9999;overflow-y:auto;display:flex;flex-direction:column;font-family:inherit";
 
-  var pinKeys = [1,2,3,4,5,6,7,8,9,'','0','del'];
+  overlay.innerHTML = [
+    // HEADER
+    '<div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);padding:48px 24px 32px;text-align:center;color:#fff;position:relative;flex-shrink:0">',
+      '<label style="position:absolute;top:16px;right:16px;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);border-radius:10px;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:700;color:#fff">',
+        '<i data-lucide="upload-cloud" style="width:14px;height:14px"></i> Restaurar',
+        '<input type="file" accept=".json" style="display:none" onchange="window._restoreBackupLogin(this)"/>',
+      '</label>',
+      '<div style="width:80px;height:80px;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.25);border-radius:24px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px">',
+        '<i data-lucide="zap" style="width:40px;height:40px;color:#fff"></i>',
+      '</div>',
+      '<div style="font-size:26px;font-weight:800;margin-bottom:8px;letter-spacing:-.3px">Bem-vindo ao Kontaki</div>',
+      '<div style="font-size:14px;color:#ddd6fe;line-height:1.5">Configura a tua loja em 2 minutos</div>',
+    '</div>',
 
-  overlay.innerHTML =
-    '<div style="position:relative;background:linear-gradient(135deg,#5b21b6,#7c3aed);padding:40px 24px 30px;text-align:center;color:#fff">' +
-    '<label style="position:absolute;top:16px;right:16px;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.2);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:700;color:#fff">' +
-    '<i data-lucide="upload" style="width:14px;height:14px"></i> Restaurar backup' +
-    '<input type="file" accept=".json" style="display:none" onchange="window._restoreBackupLogin(this)"/>' +
-    '</label>' +
-    '<div style="width:72px;height:72px;background:rgba(255,255,255,.2);border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">' +
-    '<i data-lucide="zap" style="width:36px;height:36px;color:#fff"></i></div>' +
-    '<div style="font-size:24px;font-weight:700;margin-bottom:6px">Bem-vindo ao Kontaki</div>' +
-    '<div style="font-size:14px;color:#ddd6fe">Vamos configurar a tua loja em 2 minutos</div>' +
-    '</div>' +
+    // PROGRESS
+    '<div style="background:#ede9fe;height:4px;flex-shrink:0">',
+      '<div id="setup-progress" style="height:4px;background:#5b21b6;width:50%;transition:width .4s ease"></div>',
+    '</div>',
 
-    '<div style="padding:24px;flex:1">' +
+    // BODY
+    '<div style="padding:24px 20px;flex:1;max-width:480px;margin:0 auto;width:100%;box-sizing:border-box">',
 
-    // ── PASSO 1: Dados da loja ──
-    '<div id="setup-step-1">' +
-    '<div style="font-size:11px;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Passo 1 de 2</div>' +
-    '<div style="font-size:18px;font-weight:700;margin-bottom:4px">Dados da loja</div>' +
-    '<div style="font-size:13px;color:#71717a;margin-bottom:20px">Podes alterar depois em Perfil</div>' +
-    '<div style="display:flex;flex-direction:column;gap:14px">' +
-    field("setup-store-name",    "Nome da loja *",    "text",  "Ex: Mercearia do Zé") +
-    field("setup-store-phone",   "Telefone *",        "tel",   "Ex: 923 000 000") +
-    field("setup-store-address", "Endereço",          "text",  "Ex: Bairro Popular, Luanda") +
-    field("setup-store-province","Província",         "text",  "Ex: Luanda") +
-    field("setup-store-nif",     "NIF (opcional)",    "text",  "Número de identificação fiscal") +
-    field("setup-store-email",   "Email (opcional)",  "email", "Ex: loja@email.com") +
-    '<div style="background:#fef3c7;border-radius:10px;padding:12px">' +
-    '<label style="font-size:12px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.4px">IVA % (opcional)</label>' +
-    '<input id="setup-store-iva" type="number" min="0" step="0.1" placeholder="Deixa vazio se não aplicas IVA" style="width:100%;padding:12px;border:1.5px solid #fde68a;border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-top:4px;background:#fff"/>' +
-    '<div style="font-size:11px;color:#92400e;margin-top:4px">Podes alterar a qualquer momento em Perfil</div>' +
-    '</div>' +
-    '</div>' +
-    '<button onclick="window._setupStep2()" style="width:100%;padding:14px;background:#5b21b6;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:20px">Continuar →</button>' +
-    '</div>' +
+      // PASSO 1
+      '<div id="setup-step-1">',
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">',
+          '<div style="width:32px;height:32px;background:#5b21b6;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0">1</div>',
+          '<div>',
+            '<div style="font-size:18px;font-weight:700;color:#111827">Dados da loja</div>',
+            '<div style="font-size:12px;color:#6b7280">Passo 1 de 2 · Podes alterar depois</div>',
+          '</div>',
+        '</div>',
 
-    // ── PASSO 2: PIN do admin ──
-    '<div id="setup-step-2" style="display:none">' +
-    '<div style="font-size:11px;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Passo 2 de 2</div>' +
-    '<div style="font-size:18px;font-weight:700;margin-bottom:4px">Criar PIN de administrador</div>' +
-    '<div style="font-size:13px;color:#71717a;margin-bottom:16px">6 dígitos para entrar na tua conta</div>' +
+        '<div style="display:flex;flex-direction:column;gap:14px">',
+          inp('setup-store-name',    'text',  'Ex: Mercearia Central',  true),
+          inp('setup-admin-name',    'text',  'Ex: João Silva',          true),
+          inp('setup-store-phone',   'tel',   'Ex: 923 000 000',         true),
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">',
+            inp('setup-store-address',  'text',  'Bairro, Rua...',    false),
+            inp('setup-store-province', 'text',  'Ex: Luanda',        false),
+          '</div>',
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">',
+            inp('setup-store-nif',   'text',  'Ex: 5417382LA041',  false),
+            inp('setup-store-email', 'email', 'loja@email.com',     false),
+          '</div>',
+        '</div>',
 
-    '<div id="setup-admin-preview" style="background:#f4f4f5;border-radius:10px;padding:12px;margin-bottom:20px;font-size:14px;font-weight:600;text-align:center;color:#18181b"></div>' +
+        '<button onclick="window._setupStep2()" style="width:100%;padding:15px;background:#5b21b6;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:24px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(91,33,182,.3)">',
+          'Continuar <i data-lucide="arrow-right" style="width:18px;height:18px"></i>',
+        '</button>',
+      '</div>',
 
-    '<div id="setup-pin-label" style="font-size:13px;font-weight:700;color:#5b21b6;text-align:center;margin-bottom:12px">Introduz o PIN</div>' +
-    '<div id="setup-pin-dots" style="display:flex;gap:12px;justify-content:center;margin-bottom:24px"></div>' +
+      // PASSO 2
+      '<div id="setup-step-2" style="display:none">',
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">',
+          '<div style="width:32px;height:32px;background:#5b21b6;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0">2</div>',
+          '<div>',
+            '<div style="font-size:18px;font-weight:700;color:#111827">PIN de administrador</div>',
+            '<div style="font-size:12px;color:#6b7280">Passo 2 de 2 · 6 dígitos para entrar</div>',
+          '</div>',
+        '</div>',
 
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:260px;margin:0 auto 20px">' +
-    pinKeys.map(function(n) {
-      if (n === '') return '<div></div>';
-      var icon = n === 'del' ? '&#‌x232B;' : n;
-      return '<button onclick="window._setupPinKey(\'' + n + '\')" style="width:72px;height:72px;border-radius:50%;background:' + (n==='del'?'transparent':'#f4f4f5') + ';border:none;font-size:24px;font-weight:400;cursor:pointer;font-family:inherit;color:' + (n==='del'?'#dc2626':'#18181b') + ';margin:0 auto;display:flex;align-items:center;justify-content:center;box-shadow:' + (n==='del'?'none':'0 1px 3px rgba(0,0,0,.1)') + '">' + (n==='del'?'⌫':n) + '</button>';
-    }).join('') +
-    '</div>' +
+        '<div id="setup-admin-preview" style="display:flex;align-items:center;gap:12px;background:#fff;border:1.5px solid #ede9fe;border-radius:14px;padding:14px;margin-bottom:24px">',
+          '<div id="setup-preview-avatar" style="width:48px;height:48px;background:#5b21b6;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0">A</div>',
+          '<div>',
+            '<div id="setup-preview-name" style="font-size:16px;font-weight:700;color:#111827"></div>',
+            '<div style="font-size:12px;color:#5b21b6;margin-top:2px;font-weight:600">Administrador</div>',
+          '</div>',
+        '</div>',
 
-    '<div style="display:flex;gap:10px">' +
-    '<button onclick="window._setupBack()" style="flex:1;padding:13px;background:#f4f4f5;color:#71717a;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">← Voltar</button>' +
-    '<button id="setup-btn-finalizar" onclick="window._setupFinalizar()" style="flex:2;padding:13px;background:#16a34a;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:none">Começar ✓</button>' +
-    '</div>' +
-    '</div>' +
+        '<div id="setup-pin-label" style="font-size:13px;font-weight:600;color:#6b7280;text-align:center;margin-bottom:16px">Cria um PIN de 6 dígitos</div>',
+        '<div id="setup-pin-dots" style="display:flex;gap:10px;justify-content:center;margin-bottom:28px"></div>',
 
-    '</div>';
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:264px;margin:0 auto 24px">',
+          [1,2,3,4,5,6,7,8,9,'back','0','del'].map(function(n) {
+            if (n === 'back') return '<button onclick="window._setupBack()" style="width:72px;height:72px;border-radius:50%;background:transparent;border:none;cursor:pointer;color:#9ca3af;margin:0 auto;display:flex;align-items:center;justify-content:center"><i data-lucide="arrow-left" style="width:22px;height:22px"></i></button>';
+            if (n === 'del')  return '<button onclick="window._setupPinKey(\'del\')" style="width:72px;height:72px;border-radius:50%;background:transparent;border:none;cursor:pointer;color:#ef4444;margin:0 auto;display:flex;align-items:center;justify-content:center"><i data-lucide="delete" style="width:22px;height:22px"></i></button>';
+            return '<button onclick="window._setupPinKey(\'' + n + '\')" style="width:72px;height:72px;border-radius:50%;background:#fff;border:1.5px solid #e5e7eb;font-size:24px;font-weight:400;cursor:pointer;font-family:inherit;color:#111827;margin:0 auto;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.08)">' + n + '</button>';
+          }).join(''),
+        '</div>',
+
+        '<button id="setup-btn-finalizar" onclick="window._setupFinalizar()" style="display:none;width:100%;padding:15px;background:#16a34a;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(22,163,74,.3)">',
+          '<i data-lucide="check" style="width:18px;height:18px"></i> Começar a usar o Kontaki',
+        '</button>',
+      '</div>',
+
+    '</div>',
+
+    // FOOTER
+    '<div style="text-align:center;padding:16px;font-size:11px;color:#9ca3af;flex-shrink:0">',
+      'Desenvolvido por <span style="color:#5b21b6;font-weight:700">Introxeer Technology</span>',
+    '</div>',
+
+  ].join('');
 
   document.body.appendChild(overlay);
   refreshIcons(overlay);
 
-  // ── Estado do PIN ──
+  // Adiciona focus highlight nos inputs
+  overlay.querySelectorAll('input').forEach(function(el) {
+    el.addEventListener('focus', function() { this.style.borderColor = '#5b21b6'; this.style.boxShadow = '0 0 0 3px rgba(91,33,182,.1)'; });
+    el.addEventListener('blur',  function() { this.style.borderColor = '#e5e7eb'; this.style.boxShadow = 'none'; });
+  });
+
   var _pin = "";
   var _pinConfirm = "";
-  var _step = "enter"; // "enter" | "confirm"
+  var _step = "enter";
 
   function renderDots() {
     var dotsEl = document.getElementById("setup-pin-dots");
     if (!dotsEl) return;
-    var src = _step === "confirm" ? _pinConfirm : _pin;
+    var src   = _step === "confirm" ? _pinConfirm : _pin;
+    var color = _step === "confirm" ? "#16a34a" : "#5b21b6";
     dotsEl.innerHTML = [0,1,2,3,4,5].map(function(i) {
       var filled = i < src.length;
-      var color  = _step === "confirm" ? "#16a34a" : "#5b21b6";
-      return '<div style="width:44px;height:44px;border-radius:50%;border:2.5px solid ' + (filled?color:"#e4e4e7") + ';background:' + (filled?color:"#f4f4f5") + ';display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;transition:all .1s">' + (filled?"●":"") + '</div>';
+      return '<div style="width:46px;height:46px;border-radius:50%;border:2px solid ' +
+        (filled ? color : '#e5e7eb') + ';background:' + (filled ? color : '#f9fafb') +
+        ';display:flex;align-items:center;justify-content:center;transition:all .15s;' +
+        (filled ? 'box-shadow:0 4px 12px rgba(91,33,182,.25);transform:scale(1.08)' : '') +
+        '"></div>';
     }).join("");
   }
 
   renderDots();
 
   window._setupPinKey = function(key) {
-    var src = _step === "confirm" ? _pinConfirm : _pin;
-    if (key === 'del') {
+    if (key === "del") {
       if (_step === "confirm") _pinConfirm = _pinConfirm.slice(0,-1);
       else _pin = _pin.slice(0,-1);
-    } else if (src.length < 6) {
-      if (_step === "confirm") _pinConfirm += key;
-      else _pin += key;
+    } else {
+      var src = _step === "confirm" ? _pinConfirm : _pin;
+      if (src.length < 6) {
+        if (_step === "confirm") _pinConfirm += key;
+        else _pin += key;
+      }
     }
     renderDots();
 
@@ -122,38 +166,40 @@ function showSetup() {
       setTimeout(function() {
         _step = "confirm";
         var lbl = document.getElementById("setup-pin-label");
-        if (lbl) lbl.textContent = "Confirma o PIN";
+        if (lbl) { lbl.textContent = "Confirma o PIN"; lbl.style.color = "#16a34a"; }
         renderDots();
-      }, 200);
+      }, 250);
     }
 
-    if (_step === "confirm" && _pinConfirm.length === 6) {
-      var btn = document.getElementById("setup-btn-finalizar");
-      if (btn) btn.style.display = "flex";
-    } else {
-      var btn2 = document.getElementById("setup-btn-finalizar");
-      if (btn2) btn2.style.display = "none";
-    }
+    var btn = document.getElementById("setup-btn-finalizar");
+    if (btn) btn.style.display = (_step === "confirm" && _pinConfirm.length === 6) ? "flex" : "none";
   };
 
   window._setupStep2 = function() {
-    var name  = document.getElementById("setup-store-name");
-    var phone = document.getElementById("setup-store-phone");
-    if (!name || !name.value.trim())  { alert("Insere o nome da loja."); return; }
-    if (!phone || !phone.value.trim()) { alert("Insere o telefone da loja."); return; }
+    var storeName  = (document.getElementById("setup-store-name")  || {}).value || "";
+    var adminName  = (document.getElementById("setup-admin-name")  || {}).value || "";
+    var storePhone = (document.getElementById("setup-store-phone") || {}).value || "";
+    if (!storeName.trim())  { alert("Insere o nome da loja."); return; }
+    if (!adminName.trim())  { alert("Insere o nome do administrador."); return; }
+    if (!storePhone.trim()) { alert("Insere o telefone."); return; }
     document.getElementById("setup-step-1").style.display = "none";
     document.getElementById("setup-step-2").style.display = "block";
-    var preview = document.getElementById("setup-admin-preview");
-    if (preview) preview.textContent = name.value.trim() + " · " + phone.value.trim();
+    document.getElementById("setup-progress").style.width = "100%";
+    var n = document.getElementById("setup-preview-name");
+    var a = document.getElementById("setup-preview-avatar");
+    if (n) n.textContent = adminName.trim();
+    if (a) a.textContent = adminName.trim().charAt(0).toUpperCase();
     _pin = ""; _pinConfirm = ""; _step = "enter";
     var lbl = document.getElementById("setup-pin-label");
-    if (lbl) lbl.textContent = "Introduz o PIN";
+    if (lbl) { lbl.textContent = "Cria um PIN de 6 dígitos"; lbl.style.color = "#6b7280"; }
     renderDots();
+    refreshIcons(overlay);
   };
 
   window._setupBack = function() {
     document.getElementById("setup-step-2").style.display = "none";
     document.getElementById("setup-step-1").style.display = "block";
+    document.getElementById("setup-progress").style.width = "50%";
   };
 
   window._setupFinalizar = async function() {
@@ -162,40 +208,37 @@ function showSetup() {
       alert("Os PINs não coincidem. Tenta novamente.");
       _pin = ""; _pinConfirm = ""; _step = "enter";
       var lbl = document.getElementById("setup-pin-label");
-      if (lbl) lbl.textContent = "Introduz o PIN";
+      if (lbl) { lbl.textContent = "Cria um PIN de 6 dígitos"; lbl.style.color = "#6b7280"; }
       var btn = document.getElementById("setup-btn-finalizar");
       if (btn) btn.style.display = "none";
       renderDots(); return;
     }
 
-    var storeName    = document.getElementById("setup-store-name").value.trim();
-    var storePhone   = document.getElementById("setup-store-phone").value.trim();
-    var storeAddr    = document.getElementById("setup-store-address").value.trim();
-    var storeProv    = document.getElementById("setup-store-province").value.trim();
-    var storeNif     = document.getElementById("setup-store-nif").value.trim();
-    var storeEmail   = document.getElementById("setup-store-email").value.trim();
-    var storeIva     = Number(document.getElementById("setup-store-iva").value) || 0;
+    var storeName  = document.getElementById("setup-store-name").value.trim();
+    var adminName  = document.getElementById("setup-admin-name").value.trim();
+    var storePhone = document.getElementById("setup-store-phone").value.trim();
+    var storeAddr  = (document.getElementById("setup-store-address")  || {}).value || "";
+    var storeProv  = (document.getElementById("setup-store-province") || {}).value || "";
+    var storeNif   = (document.getElementById("setup-store-nif")      || {}).value || "";
+    var storeEmail = (document.getElementById("setup-store-email")    || {}).value || "";
 
     await db.put("settings", {
       key: "store",
-      name: storeName, phone: storePhone, address: storeAddr,
-      province: storeProv, nif: storeNif, email: storeEmail,
-      iva: storeIva, currency: "Kz",
+      name: storeName, phone: storePhone,
+      address: storeAddr.trim(), province: storeProv.trim(),
+      nif: storeNif.trim(), email: storeEmail.trim(),
+      iva: 0, currency: "Kz",
       createdAt: new Date().toISOString(),
     });
 
-    var pinHash = await hashPassword(_pin);
-    var username = storeName.toLowerCase().replace(/\s+/g, ".");
+    var pinHash  = await hashPassword(_pin);
+    var username = adminName.toLowerCase().replace(/\s+/g, ".");
     await db.add("users", {
-      name:         storeName,
-      phone:        storePhone,
-      username:     username,
-      passwordHash: pinHash,
-      password:     null,
-      role:         "admin",
-      active:       true,
-      avatar:       storeName.charAt(0).toUpperCase(),
-      createdAt:    new Date().toISOString(),
+      name: adminName, phone: storePhone, username: username,
+      passwordHash: pinHash, password: null,
+      role: "admin", active: true,
+      avatar: adminName.charAt(0).toUpperCase(),
+      createdAt: new Date().toISOString(),
     });
 
     document.getElementById("setup-overlay").remove();

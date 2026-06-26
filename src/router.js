@@ -87,3 +87,6 @@ export var router = {
     if (pgEl) refreshIcons(pgEl);
   },
 };
+
+window.router = router;
+window.router = router;

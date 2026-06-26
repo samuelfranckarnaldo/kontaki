@@ -1,18 +1,1 @@
-/* Dark mode — variáveis já definidas em components.css */
-/* Este ficheiro existe para retrocompatibilidade */
-[data-theme="dark"] [style*="background:#fff"]    { background: var(--bg2) !important; }
-[data-theme="dark"] [style*="background:#f4f4f5"] { background: var(--border2) !important; }
-[data-theme="dark"] [style*="color:#18181b"]      { color: var(--text) !important; }
-[data-theme="dark"] [style*="color:#71717a"]      { color: var(--text3) !important; }
-[data-theme="dark"] [style*="color:#a1a1aa"]      { color: var(--text4) !important; }
-[data-theme="dark"] [style*="border-bottom:1px solid #f4f4f5"] { border-color: var(--border) !important; }
-[data-theme="dark"] [style*="border:1px solid #f4f4f5"]        { border-color: var(--border) !important; }
-[data-theme="dark"] [style*="border:1.5px solid #e4e4e7"]      { border-color: var(--border) !important; }
-[data-theme="dark"] [style*="background:#fafafa"] { background: var(--border2) !important; }
-[data-theme="dark"] [style*="background:#f9fafb"] { background: var(--border2) !important; }
-[data-theme="dark"] [style*="background:#f0fdf4"] { background: rgba(22,163,74,.15) !important; }
-[data-theme="dark"] [style*="background:#dcfce7"] { background: rgba(22,163,74,.2) !important; }
-[data-theme="dark"] [style*="background:#fee2e2"] { background: rgba(220,38,38,.2) !important; }
-[data-theme="dark"] [style*="background:#fef3c7"] { background: rgba(217,119,6,.2) !important; }
-[data-theme="dark"] [style*="background:#ede9fe"] { background: rgba(91,33,182,.25) !important; }
-[data-theme="dark"] [style*="background:#dbeafe"] { background: rgba(37,99,235,.2) !important; }
+/* Dark mode via components.css — este ficheiro mantido por compatibilidade */
