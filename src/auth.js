@@ -21,6 +21,7 @@ export function initAuth() {
   }
 
   _renderLoginUsers();
+  _initPinKeypad();
 
   if (window.lucide) window.lucide.createIcons();
 

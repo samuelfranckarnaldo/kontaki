@@ -26,3 +26,15 @@
   body > *:not(#print-root) { display: none !important; }
   #print-root { display: block !important; }
 }
+
+/* ── VENDER — layout flex vertical ─────────────────────────────────────────── */
+#pg-vender {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#pg-vender .vender-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 12px;
+}

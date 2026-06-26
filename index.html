@@ -130,118 +130,64 @@ document.addEventListener("DOMContentLoaded", function() {
 
     <!-- VENDER -->
     <div class="page" id="pg-vender">
-      <div class="page-inner">
 
-        <!-- Adicionar produto -->
-        <div class="vender-card">
-          <div class="vender-card-title">Adicionar produto</div>
-          <button class="scanner-btn" id="btn-scanner">
-            <i data-lucide="scan-line" class="scanner-icon"></i>
-            <div>
-              <div class="scanner-btn-title">Ler código (GTIN-13 / QR)</div>
-              <div class="scanner-btn-sub">Aponte a câmara para o produto</div>
-            </div>
-          </button>
-          <div class="or-divider"><span>ou</span></div>
-          <div class="search-wrap">
-            <i data-lucide="search" class="search-icon"></i>
-            <input id="prod-search" placeholder="Pesquisar produto por nome ou código"/>
-          </div>
+      <!-- Barra de pesquisa fixa no topo -->
+      <div class="vender-search-bar">
+        <button class="vender-scan-btn" id="btn-scanner">
+          <i data-lucide="scan-line"></i>
+        </button>
+        <div class="vender-search-wrap">
+          <i data-lucide="search" class="search-icon"></i>
+          <input id="prod-search" placeholder="Pesquisar produto..."/>
           <div id="search-results"></div>
         </div>
+      </div>
+
+      <!-- Conteúdo com scroll -->
+      <div class="vender-scroll">
 
         <!-- Recentes -->
-        <div class="vender-card" id="recent-products" style="display:none"></div>
+        <div id="recent-products" style="display:none"></div>
 
         <!-- Carrinho -->
-        <div class="vender-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-            <div class="vender-card-title" style="margin-bottom:0">
-              Carrinho <span id="cart-count" style="background:#5b21b6;color:#fff;border-radius:20px;padding:1px 7px;font-size:11px;margin-left:4px">0</span>
+        <div class="vender-cart-wrap">
+          <div class="vender-cart-header">
+            <div class="vender-cart-title">
+              <span>Carrinho</span>
+              <span id="cart-count" class="cart-badge">0</span>
             </div>
-            <button onclick="window._limparCart()" style="background:none;border:none;font-size:12px;color:#dc2626;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">
-              <i data-lucide="trash-2" style="width:13px;height:13px"></i> Limpar
+            <button onclick="window._limparCart()" class="vender-clear-btn" id="btn-limpar">
+              Limpar
             </button>
           </div>
-          <div id="cart-items"></div>
-        </div>
-
-        <!-- Método pagamento -->
-        <div class="vender-card">
-          <div class="vender-card-title">Método de pagamento</div>
-          <div class="pay-methods">
-            <button class="pay-method-btn active" data-method="dinheiro">
-              <i data-lucide="banknote"></i>Dinheiro
-            </button>
-            <button class="pay-method-btn" data-method="transferencia">
-              <i data-lucide="landmark"></i>Transferência
-            </button>
-            <button class="pay-method-btn" data-method="multicaixa">
-              <i data-lucide="credit-card"></i>Multicaixa
-            </button>
-            <button class="pay-method-btn" data-method="fiado">
-              <i data-lucide="user-check"></i>Fiado
-            </button>
-          </div>
-          <div class="pay-method-desc" id="pay-method-desc">
-            <i data-lucide="info"></i> Pagamento em dinheiro no ato da venda.
-          </div>
-          <div id="fiado-client-wrap" style="display:none;margin-top:12px">
-            <div class="field">
-              <label>Nome do cliente (fiado)</label>
-              <div class="input-icon-wrap">
-                <i data-lucide="user" class="input-icon"></i>
-                <input id="fiado-client" placeholder="Nome completo do cliente"/>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Desconto -->
-        <div class="vender-card">
-          <div class="discount-row">
-            <span class="discount-label">Desconto (opcional)</span>
-            <div class="discount-input-wrap">
-              <input class="discount-input" type="number" id="disc-input" value="" placeholder="0" min="0"/>
-              <button class="discount-type-btn active" id="btn-disc-type">%</button>
-            </div>
-          </div>
-          <div id="disc-amt-row" style="display:none;justify-content:space-between;
-               align-items:center;margin-top:8px;font-size:13px">
-            <span style="color:#71717a">Desconto aplicado</span>
-            <span style="color:#dc2626;font-weight:600" id="disc-amt-val"></span>
-          </div>
-        </div>
-
-        <!-- Troco -->
-        <div class="vender-card" id="troco-wrap">
-          <div class="field">
-            <label>Valor recebido (Kz)</label>
-            <input type="number" id="valor-recebido" placeholder="0" oninput="window._calcTroco()"/>
-          </div>
-          <div class="troco-bar" id="troco-bar" style="display:none;margin-top:10px">
-            <span class="troco-label">Troco</span>
-            <span class="troco-value" id="troco-val">0,00 Kz</span>
-          </div>
-        </div>
-
-        <!-- Total -->
-        <div class="total-bar">
-          <span class="total-bar-label">Total a pagar</span>
-          <span class="total-bar-value" id="total-val">0,00 Kz</span>
-        </div>
-
-        <!-- Acções -->
-        <div class="vender-actions">
-          <button class="btn btn-ghost btn-lg" id="btn-limpar">
-            <i data-lucide="trash-2"></i> Limpar
-          </button>
-          <button class="btn btn-primary btn-lg" id="btn-finalizar">
-            <i data-lucide="check"></i> Finalizar venda
-          </button>
+          <div id="cart-items" class="cart-items-list"></div>
         </div>
 
       </div>
+
+      <!-- Barra inferior fixa: total + finalizar -->
+      <div class="vender-bottom-bar">
+        <div class="vender-total-info">
+          <span class="vender-total-label">Total</span>
+          <span class="vender-total-value" id="total-val">0,00 Kz</span>
+        </div>
+        <button class="vender-finalizar-btn" id="btn-finalizar">
+          Finalizar
+          <i data-lucide="arrow-right"></i>
+        </button>
+      </div>
+
+      <!-- inputs ocultos mantidos para compatibilidade com vender.js -->
+      <input type="hidden" id="disc-input" value="0"/>
+      <input type="hidden" id="btn-disc-type" value="pct"/>
+      <input type="hidden" id="valor-recebido" value="0"/>
+      <div id="disc-amt-row" style="display:none"><span id="disc-amt-val"></span></div>
+      <div id="troco-wrap" style="display:none">
+        <div id="troco-bar" style="display:none"><span id="troco-val"></span></div>
+      </div>
+      <div id="pay-method-desc" style="display:none"></div>
+      <div id="fiado-client-wrap" style="display:none"><input id="fiado-client"/></div>
+
     </div>
 
     <!-- PRODUTOS -->

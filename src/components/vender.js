@@ -39,7 +39,7 @@ export async function initVender() {
   const discInput    = el("disc-input");
   const discType2    = el("btn-disc-type");
 
-  if (!btnScanner || !btnLimpar || !btnFinalizar || !discInput || !discType2) {
+  if (!btnScanner || !btnFinalizar) {
     console.warn("[Vender] DOM incompleto — abortando init");
     return;
   }
@@ -47,8 +47,7 @@ export async function initVender() {
   btnScanner.onclick   = () => initCamera(onBarcode);
   btnLimpar.onclick    = limpar;
   btnFinalizar.onclick = openCheckout;
-  discInput.oninput    = renderSummary;
-  discType2.onclick    = toggleDiscType;
+
 
   // Verificação QR — abre modal de escolha
   window._onVerifyQR = onVerifyQR;
@@ -100,20 +99,7 @@ export async function initVender() {
     };
   }
 
-  document.querySelectorAll(".pay-method-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      payMethod = btn.dataset.method;
-      document.querySelectorAll(".pay-method-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      var desc = el("pay-method-desc");
-      if (desc) desc.textContent = PAY_DESC[payMethod];
-      var fiadoWrap = el("fiado-client-wrap");
-      if (fiadoWrap) fiadoWrap.style.display = payMethod === "fiado" ? "block" : "none";
-      var trocoWrap = el("troco-wrap");
-      if (trocoWrap) trocoWrap.style.display = payMethod === "dinheiro" ? "block" : "none";
-      if (payMethod !== "dinheiro") { var tb = el("troco-bar"); if (tb) tb.style.display = "none"; }
-    });
-  });
+  // pay method seleccionado no modal de checkout
 
   renderRecentProducts();
   renderCart();
@@ -210,15 +196,13 @@ async function renderRecentProducts() {
   if (!wrap || !recProd.length) { if (wrap) wrap.style.display = "none"; return; }
   wrap.style.display = "block";
   wrap.innerHTML =
-    `<div class="vender-card-title">Vendidos recentemente</div>` +
-    `<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">` +
+    `<div class="recentes-label">Recentes</div>` +
+    `<div class="recentes-scroll">` +
     recProd.map(p =>
-      `<button onclick="window._addProd(${p.id})"
-               style="flex-shrink:0;background:#f4f4f5;border:1.5px solid #e4e4e7;border-radius:10px;
-                      padding:10px 14px;cursor:pointer;font-family:inherit;text-align:left;min-width:110px">
-        <div style="font-size:12px;font-weight:700;color:#18181b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px">${p.name}</div>
-        <div style="font-size:13px;font-weight:700;color:#5b21b6;margin-top:4px">${fmt(p.price)}</div>
-        <div style="font-size:10px;color:${p.stock<=5?"#d97706":"#71717a"};margin-top:2px">${p.stock} em stock</div>
+      `<button onclick="window._addProd(${p.id})" class="recente-chip">
+        <div class="recente-chip-name">${p.name}</div>
+        <div class="recente-chip-price">${fmt(p.price)}</div>
+        <div class="recente-chip-stock" style="color:${p.stock<=5?"var(--warning)":"var(--text4)"}">${p.stock} em stock</div>
       </button>`
     ).join("") + `</div>`;
 }
@@ -337,7 +321,11 @@ function renderCart() {
   if (!itemsEl) return;
 
   if (!cart.length) {
-    itemsEl.innerHTML = `<div style="padding:20px;text-align:center;color:#a1a1aa;font-size:13px">Nenhum produto adicionado</div>`;
+    itemsEl.innerHTML = `<div class="cart-empty-state">
+      <i data-lucide="shopping-cart"></i>
+      <span>Nenhum produto adicionado</span>
+    </div>`;
+    refreshIcons(itemsEl);
     return;
   }
   let html = "";
@@ -345,19 +333,19 @@ function renderCart() {
     const isLow = item.qty >= item.stock * 0.8 && item.stock > 0;
     const total = item.price * item.qty;
     html +=
-      `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #f4f4f5;background:${isLow?"#fffbeb":"#fff"};border-left:3px solid ${isLow?"#d97706":"transparent"}">` +
+      `<div class="cart-item-row${isLow?" low":""}">` +
       `<div style="flex:1;min-width:0">` +
-      `<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>` +
-      `<div style="font-size:11px;color:#71717a;margin-top:2px">${fmt(item.price)} / un${isLow?" · <span style='color:#d97706;font-weight:700'>Stock baixo</span>":""}</div>` +
+      `<div class="cart-item-name">${item.name}</div>` +
+      `<div class="cart-item-sub">${fmt(item.price)} / un${isLow?" · <span style='color:var(--warning);font-weight:700'>Stock baixo</span>":""}</div>` +
       `</div>` +
-      `<div style="display:flex;align-items:center;border:1.5px solid #e4e4e7;border-radius:8px;overflow:hidden;flex-shrink:0">` +
-      `<button onclick="window._changeQty(${item.id},-1)" style="width:32px;height:32px;background:#f4f4f5;border:none;color:#5b21b6;cursor:pointer;display:flex;align-items:center;justify-content:center"><i data-lucide="minus" style="width:13px;height:13px"></i></button>` +
-      `<input type="number" value="${item.qty}" min="0" max="${item.stock}" onchange="window._setQty(${item.id},this.value)" style="width:40px;text-align:center;font-size:14px;font-weight:700;border:none;border-left:1px solid #e4e4e7;border-right:1px solid #e4e4e7;padding:6px 0;background:#fff;font-family:inherit;color:#18181b"/>` +
-      `<button onclick="window._changeQty(${item.id},1)" style="width:32px;height:32px;background:#f4f4f5;border:none;color:#5b21b6;cursor:pointer;display:flex;align-items:center;justify-content:center"><i data-lucide="plus" style="width:13px;height:13px"></i></button>` +
+      `<div class="qty-ctrl">` +
+      `<button onclick="window._changeQty(${item.id},-1)" class="qty-ctrl-btn"><i data-lucide="minus"></i></button>` +
+      `<input type="number" value="${item.qty}" min="0" max="${item.stock}" onchange="window._setQty(${item.id},this.value)" class="qty-ctrl-input"/>` +
+      `<button onclick="window._changeQty(${item.id},1)" class="qty-ctrl-btn"><i data-lucide="plus"></i></button>` +
       `</div>` +
-      `<div style="min-width:65px;text-align:right;flex-shrink:0">` +
-      `<div style="font-size:13px;font-weight:700;color:#5b21b6">${fmt(total)}</div>` +
-      `<button onclick="window._removeItem(${item.id})" style="background:none;border:none;color:#dc2626;font-size:10px;cursor:pointer;font-family:inherit;margin-top:2px">remover</button>` +
+      `<div style="flex-shrink:0;text-align:right">` +
+      `<div class="cart-item-total">${fmt(total)}</div>` +
+      `<button onclick="window._removeItem(${item.id})" class="cart-item-remove">remover</button>` +
       `</div></div>`;
   });
   itemsEl.innerHTML = html;
@@ -394,11 +382,10 @@ async function renderSummary() {
   var finBtn = el("btn-finalizar");
   if (finBtn) {
     var cartCount = cart.reduce(function(a,i){return a+i.qty;},0);
-    finBtn.innerHTML = cartCount > 0
-      ? '<i data-lucide="check" style="width:16px;height:16px"></i> Finalizar · ' + fmt(total)
-      : '<i data-lucide="check" style="width:16px;height:16px"></i> Finalizar';
-    if (window.lucide) window.lucide.createIcons({el:finBtn});
+    finBtn.disabled = cartCount === 0;
   }
+  var totalEl2 = el("total-val");
+  if (totalEl2) totalEl2.textContent = fmt(total);
 
   const discRow = el("disc-amt-row");
   if (discRow) {
@@ -457,18 +444,7 @@ function limpar() {
   cart = []; lastRemoved = null;
   var old = document.getElementById("undo-toast");
   if (old) old.remove();
-  setVal("disc-input", ""); setVal("valor-recebido", "");
   payMethod = "dinheiro"; discType = "pct";
-  var btn = el("btn-disc-type");
-  if (btn) btn.textContent = "%";
-  document.querySelectorAll(".pay-method-btn").forEach(b => b.classList.remove("active"));
-  var dinBtn = document.querySelector('.pay-method-btn[data-method="dinheiro"]');
-  if (dinBtn) dinBtn.classList.add("active");
-  var desc = el("pay-method-desc");
-  if (desc) desc.textContent = PAY_DESC["dinheiro"];
-  var fc = el("fiado-client-wrap"); if (fc) fc.style.display = "none";
-  var tw = el("troco-wrap"); if (tw) tw.style.display = "block";
-  var tb = el("troco-bar"); if (tb) tb.style.display = "none";
   renderCart(); renderSummary();
 }
 
@@ -484,95 +460,205 @@ async function openCheckout() {
   window._checkoutIvaPct  = ivaPct;
   window._checkoutIvaVal  = valorIva;
 
-  openModal("Finalizar Venda",
-    `<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px">
-      <div class="field"><label>Nome do cliente (opcional)</label><input id="ck-name" list="ck-clients-list" placeholder="Ex: João Silva"/><datalist id="ck-clients-list"></datalist></div>
-      <div class="field"><label>Telefone (opcional)</label><input id="ck-phone" placeholder="Ex: 923 000 000" type="tel"/></div>
-    </div>
-    <div style="background:#f4f4f5;border-radius:12px;padding:12px;margin-bottom:12px">
-      <div style="font-size:10px;color:#a1a1aa;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Resumo</div>
-      ${cart.map(i=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:#71717a">${i.name} ×${i.qty}</span><span style="font-weight:600">${fmt(itemTotal(i))}</span></div>`).join("")}
-      ${da>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:#16a34a"><span>Desconto</span><span>− ${fmt(da)}</span></div>`:""}
-      ${ivaPct>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:#d97706"><span>IVA ${ivaPct}%</span><span>+ ${fmt(valorIva)}</span></div>`:""}
-      <div id="ck-summary-iva" style="display:${ivaPct>0?'flex':'none'};justify-content:space-between;font-size:13px;padding:3px 0;color:#d97706"><span>IVA ${ivaPct}%</span><span>+ ${fmt(valorIva)}</span></div>
-      <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;padding-top:8px;margin-top:6px;border-top:1.5px solid #e4e4e7">
-        <span>Total</span><span id="ck-summary-total" style="color:#5b21b6">${fmt(total)}</span>
-      </div>
+  openModal("",
+    `<div class="ck-header">
+      <div class="ck-header-total">${fmt(total)}</div>
+      <div class="ck-header-label">${cart.length} ${cart.length===1?"produto":"produtos"} · Total a pagar</div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:10px;background:#fef3c7;border-radius:10px;padding:10px 12px;margin-bottom:12px">
-      <i data-lucide="percent" style="width:16px;height:16px;color:#92400e;flex-shrink:0"></i>
-      <div style="flex:1;font-size:13px;color:#92400e;font-weight:600">IVA</div>
-      <input type="number" id="ck-iva-pct" min="0" max="100" step="0.1" value="${ivaPct||0}"
-        placeholder="0" oninput="window._ckRecalcTotal()"
-        style="width:70px;padding:6px 8px;border:1.5px solid #fde68a;border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit;background:#fff"/>
-      <span style="font-size:13px;color:#92400e;font-weight:600">%</span>
-    </div>
-    <div style="font-size:11px;color:#a1a1aa;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Método de pagamento</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-      <button class="pay-method-btn-ck active" data-method="dinheiro" onclick="window._ckSetPay(this,'dinheiro')" style="padding:12px;border-radius:10px;border:1.5px solid #5b21b6;background:#ede9fe;color:#5b21b6;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i data-lucide="banknote" style="width:15px;height:15px"></i> Dinheiro</button>
-      <button class="pay-method-btn-ck" data-method="transferencia" onclick="window._ckSetPay(this,'transferencia')" style="padding:12px;border-radius:10px;border:1.5px solid #e4e4e7;background:#fff;color:#71717a;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i data-lucide="arrow-left-right" style="width:15px;height:15px"></i> Transferência</button>
-      <button class="pay-method-btn-ck" data-method="multicaixa" onclick="window._ckSetPay(this,'multicaixa')" style="padding:12px;border-radius:10px;border:1.5px solid #e4e4e7;background:#fff;color:#71717a;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i data-lucide="credit-card" style="width:15px;height:15px"></i> Multicaixa</button>
-      <button class="pay-method-btn-ck" data-method="fiado" onclick="window._ckSetPay(this,'fiado')" style="padding:12px;border-radius:10px;border:1.5px solid #e4e4e7;background:#fff;color:#71717a;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i data-lucide="hand-coins" style="width:15px;height:15px"></i> Fiado</button>
-    </div>
-    <div id="ck-pay-desc" style="font-size:12px;color:#71717a;margin-bottom:12px">${PAY_DESC.dinheiro}</div>
-
-    <div id="ck-troco-wrap" style="margin-bottom:12px">
-      <div class="field"><label>Valor recebido (opcional)</label><input id="ck-recebido" type="number" placeholder="Ex: 5000" oninput="window._ckCalcTroco()"/></div>
-      <div id="ck-troco-bar" style="display:none;margin-top:8px;background:#dcfce7;border-radius:10px;padding:10px;display:flex;justify-content:space-between">
-        <span style="font-size:13px;color:#15803d;font-weight:600">Troco</span>
-        <span id="ck-troco-val" style="font-size:14px;font-weight:700;color:#15803d"></span>
-      </div>
-    </div>
-
-    <div class="form-actions">
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
-      <button class="btn btn-primary btn-full" onclick="window._confirmarVenda()">
-        <i data-lucide="check"></i> Confirmar venda
+    <div class="ck-section-label">Método de pagamento</div>
+    <div class="ck-pay-grid">
+      <button class="ck-pay-btn active" data-method="dinheiro" onclick="window._ckSetPay(this,'dinheiro')">
+        <i data-lucide="banknote"></i> Dinheiro
       </button>
-    </div>`);
+      <button class="ck-pay-btn" data-method="transferencia" onclick="window._ckSetPay(this,'transferencia')">
+        <i data-lucide="arrow-left-right"></i> Transferência
+      </button>
+      <button class="ck-pay-btn" data-method="multicaixa" onclick="window._ckSetPay(this,'multicaixa')">
+        <i data-lucide="credit-card"></i> Multicaixa
+      </button>
+      <button class="ck-pay-btn" data-method="fiado" onclick="window._ckSetPay(this,'fiado')">
+        <i data-lucide="hand-coins"></i> Fiado
+      </button>
+    </div>
+
+    <div id="ck-troco-wrap" class="ck-troco-wrap">
+      <div class="ck-input-row">
+        <i data-lucide="banknote" style="width:16px;height:16px;color:var(--text3);flex-shrink:0"></i>
+        <input id="ck-recebido" type="number" placeholder="Valor recebido" oninput="window._ckCalcTroco()"
+          style="flex:1;border:none;outline:none;font-size:15px;font-family:inherit;background:transparent;color:var(--text)"/>
+        <span style="font-size:13px;color:var(--text3);font-weight:600">Kz</span>
+      </div>
+      <div id="ck-troco-bar" style="display:none" class="ck-troco-bar">
+        <span>Troco</span>
+        <span id="ck-troco-val" class="ck-troco-val"></span>
+      </div>
+    </div>
+
+    <div id="ck-fiado-wrap" style="display:none" class="ck-fiado-wrap">
+      <div class="ck-client-search-wrap">
+        <div class="ck-input-row" style="border-color:var(--warning);background:#fffbeb;margin-bottom:0">
+          <i data-lucide="user" style="width:16px;height:16px;color:var(--warning);flex-shrink:0"></i>
+          <input id="ck-name" placeholder="Nome do cliente *" autocomplete="off"
+            oninput="window._ckSearchFiadoClient(this.value)"
+            style="flex:1;border:none;outline:none;font-size:15px;font-family:inherit;background:transparent;color:var(--text)"/>
+          <button id="ck-fiado-client-clear" onclick="window._ckClearFiadoClient()" style="display:none;background:none;border:none;cursor:pointer;padding:0;color:var(--text4)">
+            <i data-lucide="x" style="width:16px;height:16px"></i>
+          </button>
+        </div>
+        <div id="ck-fiado-client-results" style="display:none" class="ck-client-results"></div>
+      </div>
+    </div>
+
+    <div class="ck-details" id="ck-client-section">
+      <div class="ck-details-summary" onclick="window._ckToggleClient()" style="cursor:pointer">
+        <i data-lucide="user" style="width:14px;height:14px"></i>
+        <span id="ck-client-summary-label">Cliente (opcional)</span>
+        <i data-lucide="chevron-down" id="ck-client-chevron" style="width:14px;height:14px;margin-left:auto;transition:transform .2s"></i>
+      </div>
+      <div id="ck-client-body" style="display:none" class="ck-details-body">
+        <div class="ck-client-search-wrap">
+          <div class="ck-input-row" style="margin-bottom:0">
+            <i data-lucide="user" style="width:16px;height:16px;color:var(--text3);flex-shrink:0"></i>
+            <input id="ck-name-opt" placeholder="Nome do cliente"
+              autocomplete="off"
+              oninput="window._ckSearchClient(this.value)"
+              style="flex:1;border:none;outline:none;font-size:15px;font-family:inherit;background:transparent;color:var(--text)"/>
+            <button id="ck-client-clear" onclick="window._ckClearClient()" style="display:none;background:none;border:none;cursor:pointer;padding:0;color:var(--text4)">
+              <i data-lucide="x" style="width:16px;height:16px"></i>
+            </button>
+          </div>
+          <div id="ck-client-results" style="display:none" class="ck-client-results"></div>
+        </div>
+      </div>
+    </div>
+
+    <details class="ck-details">
+      <summary class="ck-details-summary">
+        <i data-lucide="receipt" style="width:14px;height:14px"></i>
+        Resumo (${cart.length} ${cart.length===1?"item":"itens"})
+        <i data-lucide="chevron-down" style="width:14px;height:14px;margin-left:auto"></i>
+      </summary>
+      <div class="ck-details-body">
+        ${cart.map(i=>`
+        <div class="ck-item-row">
+          <span class="ck-item-name">${i.name} <span class="ck-item-qty">×${i.qty}</span></span>
+          <span class="ck-item-total">${fmt(itemTotal(i))}</span>
+        </div>`).join("")}
+        ${da>0?`<div class="ck-item-row" style="color:var(--success)"><span>Desconto</span><span>− ${fmt(da)}</span></div>`:""}
+        <div class="ck-item-row ck-item-total-row">
+          <span>Total</span>
+          <span id="ck-summary-total">${fmt(total)}</span>
+        </div>
+      </div>
+    </details>
+
+    <button class="ck-confirm-btn" onclick="window._confirmarVenda()">
+      <i data-lucide="check"></i>
+      Confirmar venda · ${fmt(total)}
+    </button>
+    <button class="ck-cancel-btn" onclick="window._closeModal()">Cancelar</button>
+    <div id="ck-summary-iva" style="display:none"></div>
+    <input type="hidden" id="ck-iva-pct" value="0"/>
+    <input type="hidden" id="ck-phone" value=""/>
+    `);
   refreshIcons(el("modal-box"));
 
-  var datalist = document.getElementById("ck-clients-list");
-  if (datalist) datalist.innerHTML = existingClients.map(c => `<option value="${c.name}">`).join("");
+  window._ckClients = existingClients;
+
+  window._ckToggleClient = function() {
+    var body = document.getElementById("ck-client-body");
+    var chevron = document.getElementById("ck-client-chevron");
+    if (!body) return;
+    var open = body.style.display === "none";
+    body.style.display = open ? "block" : "none";
+    if (chevron) chevron.style.transform = open ? "rotate(180deg)" : "";
+    if (open) setTimeout(function() { var inp = document.getElementById("ck-name-opt"); if (inp) inp.focus(); }, 100);
+  };
+
+  function renderClientResults(results, inputId, resultsId, clearId) {
+    var wrap = document.getElementById(resultsId);
+    if (!wrap) return;
+    if (!results.length) { wrap.style.display = "none"; return; }
+    wrap.style.display = "block";
+    wrap.innerHTML = "";
+    results.slice(0,5).forEach(function(c) {
+      var item = document.createElement("div");
+      item.className = "ck-client-result-item";
+      item.innerHTML =
+        '<div class="ck-client-result-name">' + c.name + '</div>' +
+        (c.phone ? '<div class="ck-client-result-sub">' + c.phone + '</div>' : '');
+      item.addEventListener("click", function() {
+        window._ckSelectClient(inputId, resultsId, clearId, c.name);
+      });
+      wrap.appendChild(item);
+    });
+  }
+
+  window._ckSelectClient = function(inputId, resultsId, clearId, name) {
+    var inp = document.getElementById(inputId);
+    var res = document.getElementById(resultsId);
+    var clr = document.getElementById(clearId);
+    if (inp) inp.value = name;
+    if (res) res.style.display = "none";
+    if (clr) clr.style.display = "flex";
+    var lbl = document.getElementById("ck-client-summary-label");
+    if (lbl && inputId === "ck-name-opt") lbl.textContent = name;
+  };
+
+  window._ckSearchClient = function(q) {
+    var clr = document.getElementById("ck-client-clear");
+    if (clr) clr.style.display = q ? "flex" : "none";
+    if (!q) { var r = document.getElementById("ck-client-results"); if (r) r.style.display = "none"; return; }
+    var filtered = (window._ckClients||[]).filter(function(c) {
+      return c.name.toLowerCase().includes(q.toLowerCase());
+    });
+    renderClientResults(filtered, "ck-name-opt", "ck-client-results", "ck-client-clear");
+  };
+
+  window._ckClearClient = function() {
+    var inp = document.getElementById("ck-name-opt");
+    var res = document.getElementById("ck-client-results");
+    var clr = document.getElementById("ck-client-clear");
+    var lbl = document.getElementById("ck-client-summary-label");
+    if (inp) inp.value = "";
+    if (res) res.style.display = "none";
+    if (clr) clr.style.display = "none";
+    if (lbl) lbl.textContent = "Cliente (opcional)";
+  };
+
+  window._ckSearchFiadoClient = function(q) {
+    var clr = document.getElementById("ck-fiado-client-clear");
+    if (clr) clr.style.display = q ? "flex" : "none";
+    if (!q) { var r = document.getElementById("ck-fiado-client-results"); if (r) r.style.display = "none"; return; }
+    var filtered = (window._ckClients||[]).filter(function(c) {
+      return c.name.toLowerCase().includes(q.toLowerCase());
+    });
+    renderClientResults(filtered, "ck-name", "ck-fiado-client-results", "ck-fiado-client-clear");
+  };
+
+  window._ckClearFiadoClient = function() {
+    var inp = document.getElementById("ck-name");
+    var res = document.getElementById("ck-fiado-client-results");
+    var clr = document.getElementById("ck-fiado-client-clear");
+    if (inp) inp.value = "";
+    if (res) res.style.display = "none";
+    if (clr) clr.style.display = "none";
+  };
 
   window._ckPayMethod = "dinheiro";
 
-  window._ckRecalcTotal = function() {
-    var ivaPctNew = Number(document.getElementById("ck-iva-pct").value) || 0;
-    window._checkoutIvaPct = ivaPctNew;
-    var sub  = window._checkoutSub || 0;
-    var da   = window._checkoutDa  || 0;
-    var base = sub - da;
-    var ivaVal = base * ivaPctNew / 100;
-    var total  = base + ivaVal;
-    window._checkoutIvaVal = ivaVal;
-    window._checkoutTotal  = total;
-    var summaryTotal = document.getElementById("ck-summary-total");
-    if (summaryTotal) summaryTotal.textContent = fmt(total);
-    var summaryIva = document.getElementById("ck-summary-iva");
-    if (summaryIva) {
-      summaryIva.style.display = ivaPctNew > 0 ? "flex" : "none";
-      summaryIva.querySelector("span:last-child").textContent = "+ " + fmt(ivaVal);
-      summaryIva.querySelector("span:first-child").textContent = "IVA " + ivaPctNew + "%";
-    }
-  };
+  window._ckRecalcTotal = function() {};
   window._ckSetPay = function(btn, method) {
     window._ckPayMethod = method;
-    document.querySelectorAll(".pay-method-btn-ck").forEach(b => {
-      b.classList.remove("active");
-      b.style.border = "1.5px solid #e4e4e7";
-      b.style.background = "#fff";
-      b.style.color = "#71717a";
-    });
+    document.querySelectorAll(".ck-pay-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
-    btn.style.border = "1.5px solid #5b21b6";
-    btn.style.background = "#ede9fe";
-    btn.style.color = "#5b21b6";
-    var desc = document.getElementById("ck-pay-desc");
-    if (desc) desc.textContent = PAY_DESC[method];
     var trocoWrap = document.getElementById("ck-troco-wrap");
     if (trocoWrap) trocoWrap.style.display = method === "dinheiro" ? "block" : "none";
+    var fiadoWrap = document.getElementById("ck-fiado-wrap");
+    if (fiadoWrap) fiadoWrap.style.display = method === "fiado" ? "block" : "none";
+    var troco = document.getElementById("ck-troco-bar");
+    if (troco && method !== "dinheiro") troco.style.display = "none";
   };
 
   window._ckCalcTroco = function() {
@@ -590,8 +676,12 @@ async function openCheckout() {
 }
 
 window._confirmarVenda = async () => {
-  const clientName  = el("ck-name")  ? el("ck-name").value.trim()  : "";
-  const clientPhone = el("ck-phone") ? el("ck-phone").value.trim() : "";
+  const fiadoWrap = document.getElementById("ck-fiado-wrap");
+  const isFiado = fiadoWrap && fiadoWrap.style.display !== "none";
+  const clientNameFiado = el("ck-name") ? el("ck-name").value.trim() : "";
+  const clientNameOpt   = el("ck-name-opt") ? el("ck-name-opt").value.trim() : "";
+  const clientName = isFiado ? clientNameFiado : clientNameOpt;
+  const clientPhone = "";
   const method       = window._ckPayMethod || "dinheiro";
 
   if (method === "fiado" && !clientName) {
@@ -708,8 +798,8 @@ function showReceipt(d) {
         <div style="width:52px;height:52px;background:rgba(255,255,255,.25);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px">
           <i data-lucide="check" style="width:26px;height:26px;color:#fff;stroke-width:3"></i>
         </div>
-        <div style="font-size:22px;font-weight:700;color:#fff;margin-bottom:2px">${fmt(d.total)}</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.8)">Venda concluída</div>
+        <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:2px;letter-spacing:-.5px">${fmt(d.total)}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.75)">${d.items.reduce(function(a,i){return a+i.qty;},0)} ${d.items.reduce(function(a,i){return a+i.qty;},0)===1?"item":"itens"} · Venda concluída</div>
       </div>
 
       <!-- Corpo do recibo — estilo talão -->
@@ -744,7 +834,7 @@ function showReceipt(d) {
           ${d.da>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span style="color:#6b7280">Desconto</span><span style="color:#059669;font-weight:600">− ${fmt(d.da)}</span></div>`:""}
           ${d.ivaPct>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span style="color:#6b7280">IVA ${d.ivaPct}%</span><span style="color:#d97706;font-weight:600">+ ${fmt(d.ivaVal)}</span></div>`:""}
           <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;margin-top:4px;border-top:1.5px solid #e5e7eb">
-            <span style="font-size:15px;font-weight:700;color:#111827">TOTAL</span>
+            <span style="font-size:14px;font-weight:700;color:#111827">Total</span>
             <span style="font-size:18px;font-weight:700;color:#5b21b6">${fmt(d.total)}</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px">
@@ -754,37 +844,39 @@ function showReceipt(d) {
         </div>
 
         <!-- QR + Código -->
-        <div style="padding:14px 16px;text-align:center">
-          <div id="receipt-qr" style="display:flex;justify-content:center;margin-bottom:8px"></div>
-          <div style="font-size:14px;font-weight:700;color:#5b21b6;letter-spacing:4px">${d.hash}</div>
-          <div style="font-size:9px;color:#9ca3af;margin-top:3px">Scan para verificar autenticidade</div>
+        <div style="padding:14px 16px;text-align:center;display:flex;align-items:center;gap:14px">
+          <div id="receipt-qr" style="flex-shrink:0"></div>
+          <div style="text-align:left">
+            <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Código de verificação</div>
+            <div style="font-size:18px;font-weight:800;color:#5b21b6;letter-spacing:2px">${d.hash}</div>
+            <div style="font-size:10px;color:#9ca3af;margin-top:4px;line-height:1.4">Scan para verificar<br/>autenticidade</div>
+          </div>
         </div>
 
         <!-- Rodapé -->
-        <div style="padding:8px 16px;text-align:center;background:#f9fafb;border-top:1px dashed #d1d5db">
-          <div style="font-size:8px;color:#9ca3af;line-height:1.6">Documento de gestão interna · Sem validade fiscal perante a AGT<br/>Powered by Kontaki · Introxeer Technology</div>
+        <div style="padding:10px 16px;text-align:center;background:#f9fafb;border-top:1px dashed #d1d5db">
+          <div style="font-size:10px;color:#9ca3af;line-height:1.8">Documento de gestão interna · Sem validade fiscal perante a AGT</div>
+          <div style="font-size:10px;color:#c4b5fd;font-weight:600;margin-top:2px">Powered by Kontaki · Introxeer Technology</div>
         </div>
       </div>
 
       <!-- Botões de acção -->
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <button onclick="window._partilharReciboPDF(${d.sid})" style="padding:13px;background:#25D366;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
-          <i data-lucide="share-2" style="width:16px;height:16px"></i> Partilhar
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px">
+        <button onclick="window._partilharReciboPDF(${d.sid})" style="padding:13px 8px;background:#25D366;color:#fff;border:none;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+          <i data-lucide="share-2" style="width:15px;height:15px"></i> Partilhar
         </button>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <button onclick="window._gerarReciboPDF(${d.sid})" style="padding:12px;background:#ede9fe;color:#5b21b6;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-            <i data-lucide="printer" style="width:15px;height:15px"></i> PDF
-          </button>
-          <button onclick="window._closeModal()" style="padding:12px;background:#f4f4f5;color:#6b7280;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-            Fechar
-          </button>
-        </div>
+        <button onclick="window._gerarReciboPDF(${d.sid})" style="padding:13px 8px;background:#ede9fe;color:#5b21b6;border:none;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+          <i data-lucide="printer" style="width:15px;height:15px"></i> PDF
+        </button>
+        <button onclick="window._closeModal()" style="padding:13px 8px;background:#f4f4f5;color:#6b7280;border:none;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+          Fechar
+        </button>
       </div>
     </div>`);
 
   refreshIcons(el("modal-box"));
   var qrContainer = document.getElementById("receipt-qr");
-  if (qrContainer) generateQR("K|" + d.sid + "|" + d.hash, qrContainer, 120);
+  if (qrContainer) generateQR("K|" + d.sid + "|" + d.hash, qrContainer, 72);
 }
 
 window._gerarReciboPDF     = gerarReciboPDF;
