@@ -157,17 +157,6 @@ window._openProdMenu = (id) => {
   const p = products.find(x => x.id === id);
   const user = getUser();
   if (!p) return;
-  const rows = [
-    ["Preco", fmt(p.price), ""],
-    ["Stock Loja", (p.stock||0)+" "+p.unit, p.stock<=0?"#dc2626":p.stock<=(p.minStock||5)?"#d97706":"#16a34a"],
-    ["Stock Armazem", (p.warehouseStock||0)+" "+p.unit, "#5b21b6"],
-    ["Total combinado", ((p.stock||0)+(p.warehouseStock||0))+" "+p.unit, "#2563eb"],
-    ["Stock Min.", (p.minStock||5)+" "+p.unit, "#71717a"],
-    ["Preco venda", fmt(p.price), ""],
-        ...(p.costPrice ? [["Preco custo", fmt(p.costPrice), "#71717a"], ["Margem", fmt(p.price-p.costPrice)+" ("+Math.round(((p.price-p.costPrice)/p.price)*100)+"%)", "#16a34a"]] : []),
-        ["Categoria", p.category, ""],
-    ...(p.barcode?[["GTIN",p.barcode,""]]:[] ),
-  ];
   const shopS = p.stock || 0;
   const whS   = p.warehouseStock || 0;
   const margin= p.costPrice ? Math.round(((p.price-p.costPrice)/p.price)*100) : null;
@@ -308,17 +297,43 @@ window._applyTransfer = async (id) => {
 window._openAdjustProd = async (id) => {
   const p = await db.get("products",id);
   closeModal();
-  openModal("Ajustar Stock",
-    `<div style="font-size:15px;font-weight:700;margin-bottom:14px">${p.name}</div>` +
-    `<div class="field-row" style="margin-bottom:14px">` +
-    `<div class="field"><label>Stock Loja</label><input type="number" id="adj-stock" value="${p.stock||0}" min="0"/></div>` +
-    `<div class="field"><label>Stock Armazem</label><input type="number" id="adj-warehouse" value="${p.warehouseStock||0}" min="0"/></div>` +
-    `</div>` +
-    `<div class="field" style="margin-bottom:16px"><label>Razao</label><input id="adj-reason" placeholder="Ex: Entrada de mercadoria..."/></div>` +
-    `<div class="form-actions">` +
-    `<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>` +
-    `<button class="btn btn-primary btn-full" onclick="window._applyAdjust(${id})"><i data-lucide="check"></i> Aplicar</button>` +
-    `</div>`);
+  const curShopAdj = p.stock || 0;
+  const curWhAdj   = p.warehouseStock || 0;
+  openModal("Ajustar Stock — " + p.name,
+    `<div class="adj-stock-grid">
+      <div class="adj-stock-card">
+        <div class="adj-stock-label">Loja actual</div>
+        <div class="adj-stock-cur" style="color:var(--primary)">${curShopAdj}</div>
+        <div class="adj-stock-unit">${p.unit||"un"}</div>
+      </div>
+      <div class="adj-stock-card">
+        <div class="adj-stock-label">Armazém actual</div>
+        <div class="adj-stock-cur" style="color:var(--info)">${curWhAdj}</div>
+        <div class="adj-stock-unit">${p.unit||"un"}</div>
+      </div>
+    </div>
+    <div class="adj-stock-fields">
+      <div class="field">
+        <label>Novo stock — Loja</label>
+        <input type="number" id="adj-stock" value="${curShopAdj}" min="0"
+          style="font-size:20px;font-weight:700;text-align:center;padding:14px"/>
+      </div>
+      <div class="field">
+        <label>Novo stock — Armazém</label>
+        <input type="number" id="adj-warehouse" value="${curWhAdj}" min="0"
+          style="font-size:20px;font-weight:700;text-align:center;padding:14px"/>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:16px">
+      <label>Razão do ajuste</label>
+      <input id="adj-reason" placeholder="Ex: Entrada de mercadoria, inventário..."/>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
+      <button class="btn btn-primary btn-full" onclick="window._applyAdjust(${id})">
+        <i data-lucide="check"></i> Aplicar
+      </button>
+    </div>`);
   refreshIcons(el("modal-box"));
 };
 

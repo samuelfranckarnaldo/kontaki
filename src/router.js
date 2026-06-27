@@ -19,7 +19,7 @@ var PAGES = {
 
 var TITLES = {
   vender: "Kontaki", produtos: "Produtos",
-  fiados: "Fiados",  historico: "Historico", perfil: "Perfil",
+  fiados: "Fiados",  historico: "Histórico", perfil: "Perfil",
 };
 
 export var router = {

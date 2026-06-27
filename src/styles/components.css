@@ -1185,3 +1185,186 @@
 .prod-modal-info-row span:last-child  { font-weight: 700; color: var(--text); }
 
 .prod-modal-actions { display: flex; flex-direction: column; gap: 8px; }
+
+/* ── AJUSTAR STOCK ──────────────────────────────────────────────────────────── */
+.adj-stock-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin-bottom: 16px;
+}
+.adj-stock-card {
+  background: var(--border2); border-radius: 12px;
+  padding: 14px; text-align: center;
+}
+.adj-stock-label { font-size: 10px; font-weight: 700; color: var(--text4); text-transform: uppercase; letter-spacing: .4px; }
+.adj-stock-cur   { font-size: 28px; font-weight: 800; line-height: 1.2; }
+.adj-stock-unit  { font-size: 11px; color: var(--text4); margin-top: 2px; }
+.adj-stock-fields{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+
+/* ── FIADOS — REDESIGN ──────────────────────────────────────────────────────── */
+.fiados-summary-card {
+  display: flex; align-items: center;
+  background: var(--bg2); border-radius: 14px;
+  padding: 14px 16px; box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border2); margin-bottom: 4px;
+}
+.fiados-summary-item  { flex: 1; }
+.fiados-summary-label { font-size: 11px; font-weight: 700; color: var(--text4); text-transform: uppercase; letter-spacing: .4px; }
+.fiados-summary-val   { font-size: 20px; font-weight: 800; margin-top: 2px; }
+.fiados-summary-divider { width: 1px; height: 36px; background: var(--border2); margin: 0 16px; }
+
+.fiados-archive-btn {
+  width: 100%; padding: 10px; background: var(--border2);
+  border: none; border-radius: 10px; font-size: 12px;
+  font-weight: 700; cursor: pointer; font-family: var(--font);
+  color: var(--text3); margin-top: 6px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: background .15s;
+}
+.fiados-archive-btn:active { background: var(--border); }
+
+/* Card cliente */
+.fiado-card {
+  background: var(--bg2); border-radius: 14px;
+  border: 1px solid var(--border2); margin-bottom: 10px;
+  overflow: hidden; box-shadow: var(--shadow-sm);
+  cursor: pointer; transition: box-shadow .15s;
+}
+.fiado-card:active { box-shadow: none; }
+
+.fiado-card-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+}
+.fiado-card-avatar {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: var(--primary-light); color: var(--primary);
+  font-size: 16px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.fiado-card-info  { flex: 1; min-width: 0; }
+.fiado-card-name  { font-size: 15px; font-weight: 700; color: var(--text); }
+.fiado-card-meta  { font-size: 11px; color: var(--text4); margin-top: 2px; }
+.fiado-card-right { text-align: right; flex-shrink: 0; }
+.fiado-card-total { font-size: 16px; font-weight: 800; color: var(--warning); }
+.fiado-badge-pago { font-size: 12px; font-weight: 700; color: var(--success); }
+
+/* Entrada */
+.fiado-entry-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; border-top: 1px solid var(--border2);
+  background: var(--bg);
+}
+.fiado-entry-left { flex: 1; }
+.fiado-entry-val  { font-size: 14px; font-weight: 700; }
+.fiado-entry-open { color: var(--warning); }
+.fiado-entry-paid { color: var(--text4); }
+.fiado-entry-check{ font-size: 10px; color: var(--success); margin-left: 4px; font-weight: 700; }
+.fiado-entry-date { font-size: 11px; color: var(--text4); margin-top: 2px; }
+.fiado-pay-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 8px 14px; background: var(--success); color: #fff;
+  border: none; border-radius: 10px; font-size: 12px; font-weight: 700;
+  cursor: pointer; font-family: var(--font); flex-shrink: 0;
+  transition: all .15s;
+}
+.fiado-pay-btn:active { transform: scale(.96); }
+.fiado-more {
+  font-size: 11px; color: var(--text4);
+  padding: 8px 16px; text-align: center;
+  border-top: 1px solid var(--border2); background: var(--bg);
+}
+
+/* Modal cliente */
+.fiado-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px; border-radius: 14px; margin-bottom: 16px;
+}
+.fiado-modal-open   { background: var(--warning-light); }
+.fiado-modal-saldo  { background: var(--success-light); }
+.fiado-modal-header-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--text3); }
+.fiado-modal-header-val   { font-size: 24px; font-weight: 800; color: var(--text); margin-top: 4px; }
+
+.fiado-modal-entries { margin-bottom: 16px; border: 1px solid var(--border2); border-radius: 12px; overflow: hidden; }
+.fiado-modal-entry {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 14px; border-bottom: 1px solid var(--border2); background: var(--bg2);
+}
+.fiado-modal-entry:last-child { border-bottom: none; }
+.fiado-modal-entry-val  { font-size: 14px; font-weight: 700; }
+.fiado-modal-entry-date { font-size: 11px; color: var(--text4); margin-top: 2px; }
+
+/* ── HISTÓRICO — REDESIGN ───────────────────────────────────────────────────── */
+
+/* Stats */
+.hist-stat-card {
+  background: var(--bg2); border-radius: var(--radius);
+  border: 1px solid var(--border2); padding: 12px;
+  box-shadow: var(--shadow-sm); text-align: center;
+}
+.hist-stat-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 6px;
+}
+.hist-stat-icon i, .hist-stat-icon svg { width: 15px; height: 15px; }
+.hist-stat-val   { font-size: 18px; font-weight: 800; line-height: 1; }
+.hist-stat-label { font-size: 11px; color: var(--text3); margin-top: 3px; font-weight: 600; }
+
+/* Gráfico */
+.hist-chart-label {
+  font-size: 12px; font-weight: 700; color: var(--text3);
+  margin-bottom: 12px; text-transform: uppercase; letter-spacing: .4px;
+}
+.hist-chart-bars {
+  display: flex; align-items: flex-end;
+  gap: 6px; height: 100px;
+}
+.hist-chart-col {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 4px;
+}
+.hist-chart-val {
+  font-size: 8px; color: var(--text4); text-align: center;
+  white-space: nowrap; overflow: hidden; max-width: 100%;
+}
+.hist-chart-bar {
+  width: 100%; border-radius: 4px 4px 0 0;
+  min-height: 8px; transition: height .3s ease;
+}
+.hist-chart-day {
+  font-size: 9px; color: var(--text4); white-space: nowrap;
+}
+
+/* Lista de vendas */
+.hist-sale-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 14px; border-bottom: 1px solid var(--border2);
+  background: var(--bg2); cursor: pointer; transition: background .15s;
+  gap: 10px;
+}
+.hist-sale-item:last-child { border-bottom: none; }
+.hist-sale-item:active { background: var(--border2); }
+
+.hist-sale-left { flex: 1; min-width: 0; }
+.hist-sale-id   {
+  font-size: 14px; font-weight: 700; color: var(--text);
+  display: flex; align-items: center; gap: 6px;
+}
+.hist-sale-id span { color: var(--primary); }
+.hist-dev-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 6px;
+  border-radius: 4px; background: var(--warning-light); color: var(--warning);
+}
+.hist-sale-meta {
+  font-size: 11px; color: var(--text3); margin-top: 3px;
+  display: flex; align-items: center; gap: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hist-sale-date { font-size: 10px; color: var(--text4); margin-top: 2px; }
+
+.hist-sale-right { text-align: right; flex-shrink: 0; }
+.hist-sale-total     { font-size: 15px; font-weight: 800; color: var(--success); }
+.hist-sale-total-old { font-size: 12px; font-weight: 600; color: var(--text4); text-decoration: line-through; }
+.hist-sale-total-new { font-size: 15px; font-weight: 800; color: var(--warning); }
+.hist-sale-disc      { font-size: 10px; color: var(--danger); margin-top: 2px; }

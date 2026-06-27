@@ -44,23 +44,21 @@ async function renderList() {
     if (totalBar && totalBar.parentNode) totalBar.parentNode.insertBefore(clearBar, totalBar.nextSibling);
   }
   clearBar.innerHTML = paidCount > 0
-    ? '<button onclick="window._clearPaidFiados()" style="width:100%;padding:10px;background:#f4f4f5;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;color:#71717a;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px"><i data-lucide="trash-2" style="width:13px;height:13px"></i> Limpar ' + paidCount + ' fiado(s) pago(s)</button>'
+    ? '<button onclick="window._clearPaidFiados()" class="fiados-archive-btn"><i data-lucide="archive" style="width:13px;height:13px"></i> Arquivar ' + paidCount + ' pago' + (paidCount>1?"s":"") + '</button>'
     : "";
   if (clearBar) refreshIcons(clearBar);
 
+  const uniqueClients = [...new Set(all.filter(f=>f.status==="open").map(f=>f.clientName))].length;
   el("fiados-total-bar").innerHTML =
-    `<div style="display:flex;justify-content:space-between;align-items:center;
-                 background:#fff;border-radius:12px;padding:12px 14px;
-                 box-shadow:0 1px 3px rgba(0,0,0,.06)">
-      <div>
-        <div style="font-size:11px;color:#71717a;font-weight:600;text-transform:uppercase;
-                    letter-spacing:.4px">Total em aberto</div>
-        <div style="font-size:18px;font-weight:700;color:#dc2626;margin-top:2px">${fmt(total)}</div>
+    `<div class="fiados-summary-card">
+      <div class="fiados-summary-item">
+        <div class="fiados-summary-label">Em aberto</div>
+        <div class="fiados-summary-val" style="color:var(--warning)">${fmt(total)}</div>
       </div>
-      <div style="text-align:right">
-        <div style="font-size:11px;color:#71717a;font-weight:600;text-transform:uppercase;
-                    letter-spacing:.4px">Clientes</div>
-        <div style="font-size:18px;font-weight:700;color:#5b21b6;margin-top:2px">${count}</div>
+      <div class="fiados-summary-divider"></div>
+      <div class="fiados-summary-item" style="text-align:right">
+        <div class="fiados-summary-label">Clientes</div>
+        <div class="fiados-summary-val" style="color:var(--primary)">${uniqueClients}</div>
       </div>
     </div>`;
 
@@ -91,44 +89,54 @@ async function renderList() {
     refreshIcons(el("fiados-list")); return;
   }
 
-  el("fiados-list").innerHTML = groups.map(g => `
-    <div class="fiado-cliente" onclick="window._openFiadoCliente('${encodeURIComponent(g.clientName)}')">
-      <div class="fiado-cliente-header">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:36px;height:36px;border-radius:50%;background:#ede9fe;
-                      color:#5b21b6;font-size:15px;font-weight:700;display:flex;
-                      align-items:center;justify-content:center;flex-shrink:0">
-            ${g.clientName.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <div class="fiado-cliente-name">${g.clientName}</div>
-            <div style="font-size:11px;color:#71717a">${g.entries.length} entradas</div>
-          </div>
-        </div>
-        <div style="text-align:right">
-          <div class="fiado-cliente-total">${g.total > 0 ? fmt(g.total) : ""}</div>
-          ${g.total===0 ? `<span style="font-size:12px;font-weight:700;color:#16a34a">✓ Saldado</span>` : ""}
-        </div>
-      </div>
-      ${g.entries.slice(0,2).map(e => `
-        <div class="fiado-entry">
-          <div>
-            <div class="fiado-entry-amt" style="color:${e.status==="open"?"#dc2626":"#71717a"}">
-              ${fmt(e.amount)}
-              ${e.status==="paid" ? `<span style="font-size:10px;color:#16a34a;margin-left:4px">✓ Pago</span>` : ""}
-            </div>
-            <div class="fiado-entry-info">${fmtDate(e.date)}${e.notes?" · "+e.notes:""}</div>
-          </div>
-          ${e.status==="open" ?
-            `<button class="btn btn-success btn-sm" onclick="event.stopPropagation();window._openPayModal(${e.id})">
-              <i data-lucide="check"></i> Pagar
-            </button>` : ""}
-        </div>`).join("")}
-      ${g.entries.length > 2 ?
-        `<div style="font-size:11px;color:#71717a;padding:6px 0;text-align:center">
-          +${g.entries.length-2} mais entradas
-        </div>` : ""}
-    </div>`).join("");
+  el("fiados-list").innerHTML = "";
+  groups.forEach(function(g) {
+    const lastEntry = g.entries.sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+    const openCount = g.entries.filter(e=>e.status==="open").length;
+    const isSaldado = g.total === 0;
+    const div = document.createElement("div");
+    div.className = "fiado-card";
+    div.onclick = function() { window._openFiadoCliente(encodeURIComponent(g.clientName)); };
+
+    div.innerHTML =
+      "<div class='fiado-card-header'>" +
+        "<div class='fiado-card-avatar'>" + g.clientName.charAt(0).toUpperCase() + "</div>" +
+        "<div class='fiado-card-info'>" +
+          "<div class='fiado-card-name'>" + g.clientName + "</div>" +
+          "<div class='fiado-card-meta'>" +
+            (openCount > 0 ? openCount + " em aberto" : "Saldado") +
+            " · " + fmtDate(lastEntry.date) +
+          "</div>" +
+        "</div>" +
+        "<div class='fiado-card-right'>" +
+          (isSaldado
+            ? "<span class='fiado-badge-pago'>✓ Saldado</span>"
+            : "<div class='fiado-card-total'>" + fmt(g.total) + "</div>"
+          ) +
+        "</div>" +
+      "</div>" +
+      // Entradas recentes
+      g.entries.slice(0,2).map(function(e) {
+        return "<div class='fiado-entry-row'>" +
+          "<div class='fiado-entry-left'>" +
+            "<div class='fiado-entry-val " + (e.status==="open"?"fiado-entry-open":"fiado-entry-paid") + "'>" +
+              fmt(e.amount) +
+              (e.status==="paid" ? " <span class='fiado-entry-check'>✓ Pago</span>" : "") +
+            "</div>" +
+            "<div class='fiado-entry-date'>" + fmtDate(e.date) + (e.notes?" · "+e.notes:"") + "</div>" +
+          "</div>" +
+          (e.status==="open"
+            ? "<button class='fiado-pay-btn' onclick='event.stopPropagation();window._openPayModal(" + e.id + ")'>" +
+              "<i data-lucide='check' style='width:13px;height:13px'></i> Pagar</button>"
+            : "") +
+        "</div>";
+      }).join("") +
+      (g.entries.length > 2
+        ? "<div class='fiado-more'>+ " + (g.entries.length-2) + " mais entradas</div>"
+        : "");
+
+    el("fiados-list").appendChild(div);
+  });
 
   refreshIcons(el("fiados-list"));
 }
@@ -139,38 +147,44 @@ window._openFiadoCliente = async (encodedName) => {
   const entries = all.filter(f => f.clientName === name).reverse();
   const total   = entries.filter(f => f.status==="open").reduce((a,f) => a+(f.amount||0), 0);
 
+  const encodedN = encodeURIComponent(name);
   openModal(name,
-    `<div style="background:${total>0?"#fee2e2":"#dcfce7"};border-radius:12px;padding:14px;
-                 margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+    // Header com total
+    `<div class="fiado-modal-header ${total>0?"fiado-modal-open":"fiado-modal-saldo"}">
       <div>
-        <div style="font-size:11px;color:${total>0?"#dc2626":"#16a34a"};font-weight:700;
-                    text-transform:uppercase;letter-spacing:.4px">Em dívida</div>
-        <div style="font-size:22px;font-weight:700;color:${total>0?"#dc2626":"#16a34a"}">${fmt(total)}</div>
+        <div class="fiado-modal-header-label">${total>0?"Em dívida":"Saldado"}</div>
+        <div class="fiado-modal-header-val">${fmt(total)}</div>
       </div>
-      ${total>0 ?
-        `<button class="btn btn-success btn-sm" onclick="window._pagarTudo('${encodeURIComponent(name)}')">
-          <i data-lucide="check-check"></i> Pagar tudo
-        </button>` :
-        `<span style="font-size:24px">✓</span>`}
-    </div>
-    <div style="margin-bottom:14px">
-      ${entries.map(e => `
-        <div style="display:flex;justify-content:space-between;align-items:center;
-                    padding:10px 0;border-bottom:1px solid #f4f4f5">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:${e.status==="open"?"#dc2626":"#71717a"}">
-              ${fmt(e.amount)}
-              ${e.status==="paid"?`<span style="font-size:10px;color:#16a34a;margin-left:4px">✓ Pago</span>`:""}
-            </div>
-            <div style="font-size:11px;color:#71717a">${fmtDate(e.date)}${e.notes?" · "+e.notes:""}</div>
+      ${total>0
+        ? `<button class="btn btn-success btn-sm" onclick="window._pagarTudo('${encodedN}')">
+             <i data-lucide="check-check"></i> Pagar tudo
+           </button>`
+        : `<div style="font-size:32px">✓</div>`}
+    </div>` +
+
+    // Lista de entradas
+    `<div class="fiado-modal-entries">` +
+    entries.map(e =>
+      `<div class="fiado-modal-entry">
+        <div>
+          <div class="fiado-modal-entry-val ${e.status==="open"?"fiado-entry-open":"fiado-entry-paid"}">
+            ${fmt(e.amount)}
+            ${e.status==="paid"?`<span class="fiado-entry-check">✓ Pago</span>`:""}
           </div>
-          ${e.status==="open" ?
-            `<button class="btn btn-ghost btn-sm" onclick="window._openPayModal(${e.id})">Pagar</button>` : ""}
-        </div>`).join("")}
-    </div>
-    <div class="form-actions">
+          <div class="fiado-modal-entry-date">${fmtDate(e.date)}${e.notes?" · "+e.notes:""}</div>
+        </div>
+        ${e.status==="open"
+          ? `<button class="btn btn-outline btn-sm" onclick="window._openPayModal(${e.id})">
+               <i data-lucide="check"></i> Pagar
+             </button>`
+          : ""}
+      </div>`
+    ).join("") +
+    `</div>` +
+
+    `<div class="form-actions">
       <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>
-      <button class="btn btn-outline btn-full" onclick="window._addFiadoCliente('${encodeURIComponent(name)}')">
+      <button class="btn btn-primary btn-full" onclick="window._addFiadoCliente('${encodedN}')">
         <i data-lucide="plus"></i> Novo fiado
       </button>
     </div>`);
