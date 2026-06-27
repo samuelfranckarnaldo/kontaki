@@ -5,7 +5,7 @@ import { openModal, closeModal } from "../modal.js";
 import { getUser } from "../auth.js";
 import { initCamera } from "./camera.js";
 import { addStockMovement, getStock } from "../services.js";
-import { gerarReciboPDF, partilharReciboPDF } from "./recibo-pdf.js";
+import { gerarReciboPDF, partilharReciboPDF, printReciboHTML } from "./recibo-pdf.js";
 import { printRecibo } from "../print.js";
 
 let products  = [];
@@ -518,7 +518,7 @@ async function openCheckout() {
       </div>
       <div id="ck-client-body" style="display:none" class="ck-details-body">
         <div class="ck-client-search-wrap">
-          <div class="ck-input-row" style="margin-bottom:0">
+          <div class="ck-input-row" style="margin-bottom:6px">
             <i data-lucide="user" style="width:16px;height:16px;color:var(--text3);flex-shrink:0"></i>
             <input id="ck-name-opt" placeholder="Nome do cliente"
               autocomplete="off"
@@ -529,6 +529,16 @@ async function openCheckout() {
             </button>
           </div>
           <div id="ck-client-results" style="display:none" class="ck-client-results"></div>
+        </div>
+        <div id="ck-client-phone-row" style="display:none;align-items:center;gap:8px;padding:8px 10px;background:var(--border2);border-radius:8px;margin-top:4px">
+          <i data-lucide="phone" style="width:13px;height:13px;color:var(--text3);flex-shrink:0"></i>
+          <span id="ck-client-phone-val" style="font-size:13px;color:var(--text3)"></span>
+        </div>
+        <div class="ck-input-row" style="margin-top:6px">
+          <i data-lucide="phone" style="width:16px;height:16px;color:var(--text3);flex-shrink:0"></i>
+          <input id="ck-phone-opt" type="tel" placeholder="Telefone (opcional)"
+            autocomplete="off"
+            style="flex:1;border:none;outline:none;font-size:15px;font-family:inherit;background:transparent;color:var(--text)"/>
         </div>
       </div>
     </div>
@@ -578,8 +588,16 @@ async function openCheckout() {
 
   function renderClientResults(results, inputId, resultsId, clearId) {
     var wrap = document.getElementById(resultsId);
+    var inp  = document.getElementById(inputId);
     if (!wrap) return;
     if (!results.length) { wrap.style.display = "none"; return; }
+    // Posicionar abaixo do input usando coordenadas absolutas
+    if (inp) {
+      var rect = inp.getBoundingClientRect();
+      wrap.style.top  = (rect.bottom + 6) + "px";
+      wrap.style.left = "20px";
+      wrap.style.right = "20px";
+    }
     wrap.style.display = "block";
     wrap.innerHTML = "";
     results.slice(0,5).forEach(function(c) {
@@ -602,6 +620,20 @@ async function openCheckout() {
     if (inp) inp.value = name;
     if (res) res.style.display = "none";
     if (clr) clr.style.display = "flex";
+    // Guardar telefone do cliente seleccionado
+    var client = (window._ckClients||[]).find(function(c) { return c.name === name; });
+    window._ckSelectedPhone = client ? (client.phone || "") : "";
+    // Mostrar telefone se existir
+    var phoneRow = document.getElementById("ck-client-phone-row");
+    if (phoneRow) {
+      if (window._ckSelectedPhone) {
+        phoneRow.style.display = "flex";
+        var phoneVal = document.getElementById("ck-client-phone-val");
+        if (phoneVal) phoneVal.textContent = window._ckSelectedPhone;
+      } else {
+        phoneRow.style.display = "none";
+      }
+    }
     var lbl = document.getElementById("ck-client-summary-label");
     if (lbl && inputId === "ck-name-opt") lbl.textContent = name;
   };
@@ -621,10 +653,15 @@ async function openCheckout() {
     var res = document.getElementById("ck-client-results");
     var clr = document.getElementById("ck-client-clear");
     var lbl = document.getElementById("ck-client-summary-label");
+    var phr = document.getElementById("ck-client-phone-row");
+    var pho = document.getElementById("ck-phone-opt");
     if (inp) inp.value = "";
     if (res) res.style.display = "none";
     if (clr) clr.style.display = "none";
     if (lbl) lbl.textContent = "Cliente (opcional)";
+    if (phr) phr.style.display = "none";
+    if (pho) pho.value = "";
+    window._ckSelectedPhone = null;
   };
 
   window._ckSearchFiadoClient = function(q) {
@@ -681,7 +718,13 @@ window._confirmarVenda = async () => {
   const clientNameFiado = el("ck-name") ? el("ck-name").value.trim() : "";
   const clientNameOpt   = el("ck-name-opt") ? el("ck-name-opt").value.trim() : "";
   const clientName = isFiado ? clientNameFiado : clientNameOpt;
-  const clientPhone = "";
+  var clientPhone = window._ckSelectedPhone || "";
+  // Se não veio da selecção, tentar campo manual
+  if (!clientPhone) {
+    var phoneOptEl = document.getElementById("ck-phone-opt");
+    if (phoneOptEl) clientPhone = phoneOptEl.value.trim();
+  }
+  window._ckSelectedPhone = null;
   const method       = window._ckPayMethod || "dinheiro";
 
   if (method === "fiado" && !clientName) {
@@ -881,5 +924,6 @@ function showReceipt(d) {
 
 window._gerarReciboPDF     = gerarReciboPDF;
 window._partilharReciboPDF = partilharReciboPDF;
+window._printRecibo        = printReciboHTML;
 
 window._closeModal = closeModal;

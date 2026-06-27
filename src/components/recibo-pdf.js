@@ -1,99 +1,225 @@
-import { db }        from "../db.js";
-import { fmt, fmtDate } from "../utils.js";
+import { db }           from "../db.js";
+import { fmt, fmtDate }  from "../utils.js";
 
+// ── PDF 80mm ─────────────────────────────────────────────────────────────────
 function buildPdfDoc(sale, store) {
   var jsPDFLib = window.jspdf ? window.jspdf.jsPDF : null;
-  if (!jsPDFLib) { alert("Biblioteca PDF não carregada. Recarrega a app."); return null; }
+  if (!jsPDFLib) { alert("Biblioteca PDF não carregada."); return null; }
 
-  var doc = new jsPDFLib({ unit: "mm", format: [80, 150] });
-  var y = 10;
-  var items = sale.items || [];
-  var total = (sale.total||0) - (sale.totalDevolvido||0);
+  var pageW  = 80;
+  var margin = 5;
+  var cW     = pageW - margin * 2;
+  var cX     = pageW / 2;
+  var items  = sale.items || [];
+  var total  = (sale.total || 0) - (sale.totalDevolvido || 0);
 
-  if (store.logo) {
-    try {
-      doc.addImage(store.logo, "PNG", 30, y, 20, 20);
-      y += 23;
-    } catch(e) {}
+  // Estimar altura da página
+  var estHeight = 60 + items.length * 6 + 60;
+  var doc = new jsPDFLib({ unit: "mm", format: [pageW, estHeight] });
+  var y = margin;
+
+  function line(dash) {
+    if (dash) doc.setLineDashPattern([1,1], 0);
+    else doc.setLineDashPattern([], 0);
+    doc.setDrawColor(180, 180, 180);
+    doc.line(margin, y, pageW - margin, y);
+    y += 4;
   }
 
-  doc.setFont("helvetica","bold");
-  doc.setFontSize(13);
-  doc.text((store.name||"Kontaki"), 40, y, { align:"center" }); y += 5;
+  function text(str, x, align, size, bold) {
+    doc.setFontSize(size || 8);
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setTextColor(bold ? 30 : 80, bold ? 30 : 80, bold ? 30 : 80);
+    doc.text(str, x, y, { align: align || "left" });
+    y += (size || 8) * 0.45;
+  }
 
-  doc.setFont("helvetica","normal");
-  doc.setFontSize(8);
-  if (store.address) { doc.text(store.address, 40, y, { align:"center" }); y += 4; }
-  if (store.phone)   { doc.text(store.phone, 40, y, { align:"center" }); y += 4; }
-  if (store.nif)      { doc.text("NIF: "+store.nif, 40, y, { align:"center" }); y += 4; }
+  function row(left, right, size, bold) {
+    doc.setFontSize(size || 8);
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setTextColor(bold ? 30 : 60, bold ? 30 : 60, bold ? 30 : 60);
+    doc.text(left,  margin, y);
+    doc.text(right, pageW - margin, y, { align: "right" });
+    y += (size || 8) * 0.45;
+  }
 
+  // ── CABEÇALHO ──
+  if (store.logo) {
+    try { doc.addImage(store.logo, "PNG", cX - 8, y, 16, 16); y += 18; }
+    catch(e) {}
+  }
+
+  text(store.name || "Kontaki", cX, "center", 12, true); y += 1;
+  if (store.address) { text(store.address, cX, "center", 7); }
+  if (store.phone)   { text(store.phone,   cX, "center", 7); }
+  if (store.nif)     { text("NIF: " + store.nif, cX, "center", 7); }
   y += 2;
-  doc.setLineDashPattern([1,1],0);
-  doc.line(5, y, 75, y); y += 5;
 
-  doc.setFontSize(8);
-  doc.text("Recibo Nº " + String(sale.id).padStart(6,"0"), 5, y); y += 4;
-  doc.text(fmtDate(sale.date), 5, y); y += 4;
-  if (sale.clientName) { doc.setFont("helvetica","bold"); doc.text("Cliente: "+sale.clientName,5,y); doc.setFont("helvetica","normal"); y += 4; }
+  line(true);
 
-  doc.line(5, y, 75, y); y += 5;
+  text("Recibo Nº " + String(sale.id).padStart(6, "0"), margin, "left", 7.5, true);
+  y -= 1;
+  text(fmtDate(sale.date), pageW - margin, "right", 7);
+  y += 1;
+  if (sale.clientName) {
+    text("Cliente: " + sale.clientName, margin, "left", 7.5, true);
+    if (sale.clientPhone) text("Tel: " + sale.clientPhone, margin, "left", 7);
+  }
+  y += 1;
 
-  doc.setFontSize(8);
-  items.forEach(function(i){
-    var label = i.name + " x" + i.qty;
-    var val   = fmt(i.price*i.qty);
-    doc.text(label, 5, y);
-    doc.text(val, 75, y, { align:"right" });
-    y += 4.5;
+  line(true);
+
+  // ── ITENS ──
+  items.forEach(function(i) {
+    var name = i.name.length > 28 ? i.name.slice(0, 25) + "..." : i.name;
+    text(name, margin, "left", 7.5, true);
+    y -= 1;
+    row(i.qty + " x " + fmt(i.price), fmt(i.price * i.qty), 7.5);
+    y += 1;
   });
 
-  doc.line(5, y, 75, y); y += 5;
+  line(true);
 
+  // ── TOTAIS ──
   if (sale.discount > 0) {
-    doc.text("Desconto", 5, y);
-    doc.text("- "+fmt(sale.discount), 75, y, { align:"right" });
-    y += 4.5;
+    row("Desconto", "- " + fmt(sale.discount), 8);
   }
   if (sale.ivaPct > 0) {
-    doc.text("IVA "+sale.ivaPct+"%", 5, y);
-    doc.text("+ "+fmt(sale.ivaValor||0), 75, y, { align:"right" });
-    y += 4.5;
+    row("IVA " + sale.ivaPct + "%", "+ " + fmt(sale.ivaValor || 0), 8);
   }
-  if (sale.totalDevolvido > 0) {
-    doc.text("Devoluções", 5, y);
-    doc.text("- "+fmt(sale.totalDevolvido), 75, y, { align:"right" });
-    y += 4.5;
-  }
+  y += 1;
+  doc.setFillColor(91, 33, 182);
+  doc.roundedRect(margin, y - 4, cW, 9, 1.5, 1.5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
+  doc.text("TOTAL", margin + 3, y + 1.5);
+  doc.text(fmt(total), pageW - margin - 3, y + 1.5, { align: "right" });
+  y += 9;
 
-  doc.setFont("helvetica","bold");
-  doc.setFontSize(11);
-  doc.text("TOTAL", 5, y);
-  doc.text(fmt(total), 75, y, { align:"right" });
-  y += 6;
-
-  doc.setFont("helvetica","normal");
-  doc.setFontSize(8);
-  doc.text("Pagamento: " + sale.payMethod, 5, y); y += 4;
-  if (sale.recebido > 0) { doc.text("Recebido: " + fmt(sale.recebido), 5, y); y += 4; }
-  if (sale.troco > 0)    { doc.text("Troco: " + fmt(sale.troco), 5, y); y += 4; }
+  doc.setTextColor(60, 60, 60);
+  y += 2;
+  text("Pagamento: " + (sale.payMethod || ""), margin, "left", 7.5);
+  if (sale.recebido > 0) row("Recebido", fmt(sale.recebido), 7.5);
+  if (sale.troco > 0)    row("Troco",    fmt(sale.troco),    7.5, true);
 
   y += 2;
-  doc.line(5, y, 75, y); y += 5;
+  line(true);
 
-  doc.setFont("helvetica","bold");
-  doc.setFontSize(9);
-  doc.text((sale.hash||"N/A"), 40, y, { align:"center" }); y += 6;
+  // ── CÓDIGO ──
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(91, 33, 182);
+  doc.text(sale.hash || "", cX, y, { align: "center" });
+  y += 5;
 
-  doc.setFont("helvetica","normal");
-  doc.setFontSize(6.5);
-  doc.text("Documento de gestão interna", 40, y, { align:"center" }); y += 3;
-  doc.text("Sem validade fiscal perante a AGT", 40, y, { align:"center" }); y += 4;
-  doc.setFont("helvetica","bold");
-  doc.text("Kontaki · Introxeer Technology", 40, y, { align:"center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6);
+  doc.setTextColor(150, 150, 150);
+  doc.text("Documento de gestao interna · Sem validade fiscal AGT", cX, y, { align: "center" }); y += 3;
+  doc.text("Powered by Kontaki · Introxeer Technology", cX, y, { align: "center" });
 
   return doc;
 }
 
+// ── IMPRESSÃO HTML ────────────────────────────────────────────────────────────
+async function printReciboHTML(saleId) {
+  var sale  = await db.get("sales", saleId);
+  if (!sale) return;
+  var store = (await db.get("settings", "store")) || {};
+  var items = sale.items || [];
+  var total = (sale.total || 0) - (sale.totalDevolvido || 0);
+
+  var html = [
+    "<!DOCTYPE html><html><head><meta charset='UTF-8'>",
+    "<title>Recibo " + String(sale.id).padStart(6,"0") + "</title>",
+    "<style>",
+    "  * { box-sizing:border-box; margin:0; padding:0; }",
+    "  body { font-family: 'Courier New', monospace; font-size: 11px;",
+    "         width: 80mm; margin: 0 auto; padding: 8px; color: #111; }",
+    "  .center { text-align: center; }",
+    "  .bold   { font-weight: bold; }",
+    "  .lg     { font-size: 14px; }",
+    "  .xl     { font-size: 18px; font-weight: bold; }",
+    "  .sm     { font-size: 9px; color: #666; }",
+    "  .divider-dash { border: none; border-top: 1px dashed #999; margin: 6px 0; }",
+    "  .divider-solid{ border: none; border-top: 1px solid #333; margin: 6px 0; }",
+    "  .row    { display:flex; justify-content:space-between; padding: 2px 0; }",
+    "  .total-box { background:#5b21b6; color:#fff; padding:6px 8px;",
+    "               border-radius:4px; display:flex; justify-content:space-between;",
+    "               margin:6px 0; font-weight:bold; font-size:13px; }",
+    "  .hash   { font-size:16px; font-weight:bold; color:#5b21b6;",
+    "            letter-spacing:3px; text-align:center; margin:6px 0; }",
+    "  @media print {",
+    "    body { width: 80mm; }",
+    "    @page { size: 80mm auto; margin: 0; }",
+    "  }",
+    "</style></head><body>",
+
+    // Cabeçalho
+    "<div class='center'>",
+    store.logo ? "<img src='" + store.logo + "' style='width:40px;height:40px;object-fit:contain;margin-bottom:4px'/><br/>" : "",
+    "<div class='bold lg'>" + (store.name || "Kontaki") + "</div>",
+    store.address ? "<div class='sm'>" + store.address + "</div>" : "",
+    store.phone   ? "<div class='sm'>" + store.phone   + "</div>" : "",
+    store.nif     ? "<div class='sm'>NIF: " + store.nif + "</div>" : "",
+    "</div>",
+
+    "<hr class='divider-dash'/>",
+
+    "<div class='row'>",
+    "<span class='bold'>Recibo Nº " + String(sale.id).padStart(6,"0") + "</span>",
+    "<span class='sm'>" + fmtDate(sale.date) + "</span>",
+    "</div>",
+
+    sale.clientName ? "<div class='row'><span class='bold'>Cliente: " + sale.clientName + "</span></div>" : "",
+    sale.clientPhone ? "<div class='sm'>Tel: " + sale.clientPhone + "</div>" : "",
+
+    "<hr class='divider-dash'/>",
+
+    // Itens
+    items.map(function(i) {
+      return "<div><div class='bold'>" + i.name + "</div>" +
+             "<div class='row sm'><span>" + i.qty + " x " + fmt(i.price) + "</span>" +
+             "<span class='bold' style='color:#111'>" + fmt(i.price * i.qty) + "</span></div></div>";
+    }).join(""),
+
+    "<hr class='divider-solid'/>",
+
+    sale.discount > 0 ? "<div class='row'><span>Desconto</span><span>- " + fmt(sale.discount) + "</span></div>" : "",
+    sale.ivaPct > 0   ? "<div class='row'><span>IVA " + sale.ivaPct + "%</span><span>+ " + fmt(sale.ivaValor||0) + "</span></div>" : "",
+
+    "<div class='total-box'><span>TOTAL</span><span>" + fmt(total) + "</span></div>",
+
+    "<div class='row sm'>",
+    "<span>Pagamento: " + (sale.payMethod||"") + "</span>",
+    sale.recebido > 0 ? "<span>Recebido: " + fmt(sale.recebido) + "</span>" : "",
+    "</div>",
+    sale.troco > 0 ? "<div class='row'><span>Troco</span><span class='bold'>" + fmt(sale.troco) + "</span></div>" : "",
+
+    "<hr class='divider-dash'/>",
+
+    "<div class='hash'>" + (sale.hash||"") + "</div>",
+
+    "<div class='center sm'>",
+    "<div>Documento de gestão interna</div>",
+    "<div>Sem validade fiscal perante a AGT</div>",
+    "<div style='margin-top:4px;color:#5b21b6;font-weight:bold'>Kontaki · Introxeer Technology</div>",
+    "</div>",
+
+    "<br/><br/>",
+    "</body></html>"
+  ].join("\n");
+
+  var win = window.open("", "_blank", "width=400,height=600");
+  if (!win) { alert("Permite pop-ups para imprimir."); return; }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(function() { win.print(); }, 500);
+}
+
+// ── EXPORTS ───────────────────────────────────────────────────────────────────
 export async function gerarReciboPDF(saleId) {
   var sale  = await db.get("sales", saleId);
   if (!sale) return;
@@ -110,15 +236,13 @@ export async function partilharReciboPDF(saleId) {
   var doc = buildPdfDoc(sale, store);
   if (!doc) return;
 
-  var blob = doc.output("blob");
+  var blob  = doc.output("blob");
   var fname = "recibo_" + String(saleId).padStart(6,"0") + ".pdf";
-  var file = new File([blob], fname, { type:"application/pdf" });
+  var file  = new File([blob], fname, { type:"application/pdf" });
 
   if (navigator.canShare && navigator.canShare({ files:[file] })) {
-    try {
-      await navigator.share({ files:[file], title:"Recibo Kontaki" });
-      return;
-    } catch(e) {}
+    try { await navigator.share({ files:[file], title:"Recibo Kontaki" }); return; }
+    catch(e) {}
   }
 
   var url = URL.createObjectURL(blob);
@@ -126,3 +250,5 @@ export async function partilharReciboPDF(saleId) {
   a.href = url; a.download = fname; a.click();
   URL.revokeObjectURL(url);
 }
+
+export { printReciboHTML };

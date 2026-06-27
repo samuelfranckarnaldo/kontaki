@@ -47,50 +47,45 @@ export function openProductForm(p = {}) {
 }
 
 function renderStats() {
-  const active = products.filter(p => p.active);
-  const total  = active.length;
-  const low    = active.filter(p => (p.stock||0)>0 && (p.stock||0)<=(p.minStock||5)).length;
-  const zero   = active.filter(p => (p.stock||0)===0).length;
-  const lojaQty= active.reduce((a,p)=>a+(p.stock||0),0);
-  const armQty = active.reduce((a,p)=>a+(p.warehouseStock||0),0);
-  const lojaVal= active.reduce((a,p)=>a+(p.stock||0)*p.price,0);
-  const armVal = active.reduce((a,p)=>a+(p.warehouseStock||0)*p.price,0);
+  const active  = products.filter(p => p.active);
+  const total   = active.length;
+  const low     = active.filter(p => (p.stock||0)>0 && (p.stock||0)<=(p.minStock||5)).length;
+  const zero    = active.filter(p => (p.stock||0)===0).length;
+  const lojaQty = active.reduce((a,p)=>a+(p.stock||0),0);
+  const armQty  = active.reduce((a,p)=>a+(p.warehouseStock||0),0);
+  const lojaVal = active.reduce((a,p)=>a+(p.stock||0)*p.price,0);
+  const armVal  = active.reduce((a,p)=>a+(p.warehouseStock||0)*p.price,0);
 
-  el("produtos-stats").innerHTML =
-    `<div class="stat-card" style="border-left:3px solid #5b21b6;cursor:pointer" onclick="window._filterProd('all')">` +
-    `<div class="stat-label" style="color:#5b21b6">Total produtos</div>` +
-    `<div class="stat-val" style="color:#5b21b6">${total}</div>` +
-    `<div style="font-size:10px;color:#7c3aed;margin-top:4px">Ver todos</div>` +
+  const s = el("produtos-stats");
+  s.style.gridTemplateColumns = "1fr 1fr 1fr";
+  s.style.gap = "8px";
+
+  s.innerHTML =
+    // Linha 1 — 3 cards de alerta
+    _statCard({ label:"Produtos", value:total, sub:"activos", color:"var(--primary)", icon:"package", filter:"all", clickable:true }) +
+    _statCard({ label:"Stock baixo", value:low, sub:"a repor", color:"var(--warning)", icon:"alert-triangle", filter:"low", clickable:low>0 }) +
+    _statCard({ label:"Esgotados", value:zero, sub:"sem stock", color:"var(--danger)", icon:"x-circle", filter:"zero", clickable:zero>0 }) +
+    // Linha 2 — 2 cards de stock
+    `<div class="prod-stat-wide">` +
+    `<div class="prod-stat-wide-row">` +
+    `<div><div class="prod-stat-wide-label">Loja</div><div class="prod-stat-wide-val">${lojaQty.toLocaleString("pt-AO")} <span>un</span></div><div class="prod-stat-wide-sub">${fmt(lojaVal)}</div></div>` +
+    `<div style="text-align:right"><div class="prod-stat-wide-label">Armazém</div><div class="prod-stat-wide-val" style="color:var(--info)">${armQty.toLocaleString("pt-AO")} <span>un</span></div><div class="prod-stat-wide-sub">${fmt(armVal)}</div></div>` +
     `</div>` +
-    `<div class="stat-card" style="border-left:3px solid #d97706;cursor:pointer" onclick="window._filterProd('low')">` +
-    `<div class="stat-label" style="color:#d97706">Stock baixo</div>` +
-    `<div class="stat-val" style="color:#d97706">${low}</div>` +
-    `<div style="font-size:10px;color:#d97706;margin-top:4px">Ver lista</div>` +
-    `</div>` +
-    `<div class="stat-card" style="border-left:3px solid #dc2626;cursor:pointer" onclick="window._filterProd('zero')">` +
-    `<div class="stat-label" style="color:#dc2626">Esgotados</div>` +
-    `<div class="stat-val" style="color:#dc2626">${zero}</div>` +
-    `<div style="font-size:10px;color:#dc2626;margin-top:4px">Ver lista</div>` +
-    `</div>` +
-    `<div class="stat-card" style="grid-column:span 1;border-left:3px solid #16a34a">` +
-    `<div class="stat-label" style="color:#16a34a">Stock Loja</div>` +
-    `<div class="stat-val" style="color:#16a34a;font-size:15px">${lojaQty.toLocaleString("pt-AO")}</div>` +
-    `<div style="font-size:10px;color:#71717a;margin-top:2px">${fmt(lojaVal)}</div>` +
-    `</div>` +
-    `<div class="stat-card" style="grid-column:span 1;border-left:3px solid #5b21b6">` +
-    `<div class="stat-label" style="color:#5b21b6">Stock Armazem</div>` +
-    `<div class="stat-val" style="color:#5b21b6;font-size:15px">${armQty.toLocaleString("pt-AO")}</div>` +
-    `<div style="font-size:10px;color:#71717a;margin-top:2px">${fmt(armVal)}</div>` +
-    `</div>` +
-    `<div class="stat-card" style="grid-column:span 2;border-left:3px solid #2563eb">` +
-    `<div class="stat-label" style="color:#2563eb">Total combinado</div>` +
-    `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">` +
-    `<div class="stat-val" style="color:#2563eb;font-size:15px">${(lojaQty+armQty).toLocaleString("pt-AO")} un</div>` +
-    `<div style="font-size:12px;font-weight:700;color:#2563eb">${fmt(lojaVal+armVal)}</div>` +
+    `<div class="prod-stat-total-row">` +
+    `<span class="prod-stat-total-label">Total combinado</span>` +
+    `<span class="prod-stat-total-val">${(lojaQty+armQty).toLocaleString("pt-AO")} un · ${fmt(lojaVal+armVal)}</span>` +
     `</div></div>`;
 
-  el("produtos-stats").style.gridTemplateColumns = "repeat(3,1fr)";
-  refreshIcons(el("produtos-stats"));
+  refreshIcons(s);
+}
+
+function _statCard({label, value, sub, color, icon, filter, clickable}) {
+  return `<div class="prod-stat-card${clickable?" prod-stat-clickable":""}" ${clickable?`onclick="window._filterProd('${filter}')"`:""}>`+
+    `<div class="prod-stat-icon" style="background:${color}20;color:${color}"><i data-lucide="${icon}"></i></div>`+
+    `<div class="prod-stat-val2" style="color:${color}">${value}</div>`+
+    `<div class="prod-stat-label2">${label}</div>`+
+    `<div class="prod-stat-sub">${sub}</div>`+
+    `</div>`;
 }
 
 window._filterProd = (mode) => {
@@ -173,22 +168,74 @@ window._openProdMenu = (id) => {
         ["Categoria", p.category, ""],
     ...(p.barcode?[["GTIN",p.barcode,""]]:[] ),
   ];
+  const shopS = p.stock || 0;
+  const whS   = p.warehouseStock || 0;
+  const margin= p.costPrice ? Math.round(((p.price-p.costPrice)/p.price)*100) : null;
+  const cColor= {"Alimentacao":"#f97316","Bebidas":"#3b82f6","Higiene":"#ec4899","Limpeza":"#10b981","Outro":"#6b7280"}[p.category]||"#6b7280";
+
   openModal(p.name,
-    `<div style="margin-bottom:14px">` +
-    rows.map(([k,v,c]) =>
-      `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f4f4f5">` +
-      `<span style="color:#71717a;font-size:13px">${k}</span>` +
-      `<span style="font-weight:700;font-size:14px;color:${c||"#18181b"}">${v}</span>` +
-      `</div>`).join("") +
+    // Header do produto
+    `<div class="prod-modal-header">
+      <div class="prod-modal-avatar" style="background:${cColor}20;color:${cColor}">${(p.name||"P").charAt(0).toUpperCase()}</div>
+      <div>
+        <div class="prod-modal-name">${p.name}</div>
+        <div class="prod-modal-cat" style="background:${cColor}15;color:${cColor}">${p.category||"Outro"}</div>
+      </div>
+      <div class="prod-modal-price">${fmt(p.price)}</div>
+    </div>` +
+
+    // Stock cards
+    `<div class="prod-modal-stock">
+      <div class="prod-modal-stock-card" style="background:var(--primary-light)">
+        <div class="prod-modal-stock-label">Loja</div>
+        <div class="prod-modal-stock-val" style="color:var(--primary)">${shopS}</div>
+        <div class="prod-modal-stock-unit">${p.unit||"un"}</div>
+      </div>
+      <div class="prod-modal-stock-card" style="background:var(--info-light)">
+        <div class="prod-modal-stock-label">Armazém</div>
+        <div class="prod-modal-stock-val" style="color:var(--info)">${whS}</div>
+        <div class="prod-modal-stock-unit">${p.unit||"un"}</div>
+      </div>
+      <div class="prod-modal-stock-card" style="background:var(--border2)">
+        <div class="prod-modal-stock-label">Total</div>
+        <div class="prod-modal-stock-val" style="color:var(--text)">${shopS+whS}</div>
+        <div class="prod-modal-stock-unit">${p.unit||"un"}</div>
+      </div>
+    </div>` +
+
+    // Info detalhes
+    `<div class="prod-modal-info">` +
+    (p.costPrice ? `<div class="prod-modal-info-row"><span>Preço custo</span><span>${fmt(p.costPrice)}</span></div>` : "") +
+    (margin!==null ? `<div class="prod-modal-info-row"><span>Margem</span><span style="color:var(--success);font-weight:700">${fmt(p.price-p.costPrice)} (${margin}%)</span></div>` : "") +
+    `<div class="prod-modal-info-row"><span>Stock mínimo</span><span>${p.minStock||5} ${p.unit||"un"}</span></div>` +
+    (p.barcode ? `<div class="prod-modal-info-row"><span>Código de barras</span><span style="font-family:monospace">${p.barcode}</span></div>` : "") +
     `</div>` +
+
+    // Acções
     (user.role==="admin" ?
-      `<div style="display:flex;flex-direction:column;gap:8px">` +
-      `<button class="btn btn-outline btn-full" onclick="window._editProd(${p.id})"><i data-lucide="edit-3"></i> Editar</button>` +
-      `<button class="btn btn-ghost btn-full" onclick="window._openTransfer(${p.id})"><i data-lucide="arrow-right-left"></i> Armazem → Loja</button>` +
-      `<button class="btn btn-ghost btn-full" onclick="window._openAdjustProd(${p.id})"><i data-lucide="refresh-cw"></i> Ajustar stock</button>` +
-      `<button class="btn btn-danger btn-full" style="margin-top:4px" onclick="window._deactivateProd(${p.id})"><i data-lucide="trash-2"></i> Desativar</button>` +
-      `</div>` : "") +
-    `<button class="btn btn-ghost btn-full" onclick="window._closeModal()" style="margin-top:8px">Fechar</button>`);
+      `<div class="prod-modal-actions">
+        <button class="btn btn-primary btn-full" onclick="window._editProd(${p.id})">
+          <i data-lucide="edit-3"></i> Editar produto
+        </button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button class="btn btn-ghost btn-full" onclick="window._openTransfer(${p.id})">
+            <i data-lucide="arrow-right-left"></i> Transferir
+          </button>
+          <button class="btn btn-ghost btn-full" onclick="window._openAdjustProd(${p.id})">
+            <i data-lucide="refresh-cw"></i> Ajustar
+          </button>
+        </div>
+        <button class="btn btn-ghost btn-full" onclick="window._closeModal()" style="color:var(--text3)">
+          Fechar
+        </button>
+        <button onclick="window._deactivateProd(${p.id})"
+          style="background:none;border:none;color:var(--danger);font-size:12px;
+                 cursor:pointer;font-family:inherit;padding:4px;text-align:center;width:100%">
+          Desativar produto
+        </button>
+      </div>` :
+      `<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>`
+    ));
   refreshIcons(el("modal-box"));
 };
 
