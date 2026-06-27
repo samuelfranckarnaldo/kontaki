@@ -594,8 +594,17 @@ async function openCheckout() {
     // Posicionar abaixo do input usando coordenadas absolutas
     if (inp) {
       var rect = inp.getBoundingClientRect();
-      wrap.style.top  = (rect.bottom + 6) + "px";
-      wrap.style.left = "20px";
+      var spaceBelow = window.innerHeight - rect.bottom;
+      var spaceAbove = rect.top;
+      // Se há mais espaço acima (teclado aberto), abre para cima
+      if (spaceBelow < 200 && spaceAbove > spaceBelow) {
+        wrap.style.bottom = (window.innerHeight - rect.top + 6) + "px";
+        wrap.style.top    = "auto";
+      } else {
+        wrap.style.top    = (rect.bottom + 6) + "px";
+        wrap.style.bottom = "auto";
+      }
+      wrap.style.left  = "20px";
       wrap.style.right = "20px";
     }
     wrap.style.display = "block";
@@ -827,93 +836,135 @@ window._confirmarVenda = async () => {
 // ── RECIBO ────────────────────────────────────────────────────────────────────
 function showReceipt(d) {
   window._lastSaleId = d.sid;
-  const storeName = (d.store&&d.store.name)||"Kontaki";
-  const storeAddr = (d.store&&d.store.address)||"";
-  const storePhone= (d.store&&d.store.phone)||"";
-  const storeLogo = (d.store&&d.store.logo)||"";
-  const nif       = (d.store&&d.store.nif)||"";
+  const storeName  = (d.store&&d.store.name)  || "Kontaki";
+  const storeAddr  = (d.store&&d.store.address)|| "";
+  const storePhone = (d.store&&d.store.phone)  || "";
+  const storeLogo  = (d.store&&d.store.logo)   || "";
+  const nif        = (d.store&&d.store.nif)    || "";
+  const nItems     = d.items.reduce(function(a,i){return a+i.qty;},0);
 
   openModal("",
-    `<div style="background:#fff;font-family:'DM Sans',Arial,sans-serif">
+    `<div style="font-family:'DM Sans',Arial,sans-serif">
 
-      <!-- Cabeçalho verde sucesso -->
-      <div style="background:linear-gradient(135deg,#059669,#10b981);padding:20px 16px;text-align:center;margin:-20px -20px 0;border-radius:16px 16px 0 0">
-        <div style="width:52px;height:52px;background:rgba(255,255,255,.25);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px">
-          <i data-lucide="check" style="width:26px;height:26px;color:#fff;stroke-width:3"></i>
+      <div style="background:linear-gradient(135deg,#059669,#10b981);
+                  padding:24px 20px 20px;text-align:center;
+                  margin:-20px -20px 0;border-radius:20px 20px 0 0">
+        <div style="width:56px;height:56px;background:rgba(255,255,255,.2);
+                    border-radius:50%;display:flex;align-items:center;
+                    justify-content:center;margin:0 auto 12px;
+                    border:2px solid rgba(255,255,255,.4)">
+          <i data-lucide="check" style="width:28px;height:28px;color:#fff;stroke-width:3"></i>
         </div>
-        <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:2px;letter-spacing:-.5px">${fmt(d.total)}</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.75)">${d.items.reduce(function(a,i){return a+i.qty;},0)} ${d.items.reduce(function(a,i){return a+i.qty;},0)===1?"item":"itens"} · Venda concluída</div>
+        <div style="font-size:32px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1">${fmt(d.total)}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.8);margin-top:6px">
+          ${nItems} ${nItems===1?"item":"itens"} · Venda concluída
+        </div>
       </div>
 
-      <!-- Corpo do recibo — estilo talão -->
-      <div style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin:16px 0 14px">
+      <div style="border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;margin:16px 0 0">
 
-        <!-- Info da loja -->
-        <div style="padding:14px 16px;text-align:center;background:#f9fafb;border-bottom:1px dashed #d1d5db">
-          ${storeLogo?`<img src="${storeLogo}" style="width:36px;height:36px;object-fit:contain;margin:0 auto 6px;display:block;border-radius:6px"/>`:``}
-          <div style="font-size:14px;font-weight:700;color:#111827">${storeName}</div>
-          ${storeAddr?`<div style="font-size:11px;color:#6b7280;margin-top:1px">${storeAddr}</div>`:""}
-          ${storePhone?`<div style="font-size:11px;color:#6b7280">${storePhone}</div>`:""}
-          ${nif?`<div style="font-size:11px;color:#6b7280">NIF: ${nif}</div>`:""}
-          <div style="font-size:10px;color:#9ca3af;margin-top:6px">Nº ${String(d.sid).padStart(6,"0")} · ${fmtDate(d.saleDate)}</div>
+        <div style="padding:14px 16px;text-align:center;background:#fafafa;border-bottom:1px dashed #d1d5db">
+          ${storeLogo?`<img src="${storeLogo}" style="width:40px;height:40px;object-fit:contain;margin:0 auto 6px;display:block;border-radius:8px"/>`:``}
+          <div style="font-size:15px;font-weight:800;color:#111827">${storeName}</div>
+          ${storeAddr  ? `<div style="font-size:11px;color:#6b7280;margin-top:2px">${storeAddr}</div>`  : ""}
+          ${storePhone ? `<div style="font-size:11px;color:#6b7280">${storePhone}</div>`                : ""}
+          ${nif        ? `<div style="font-size:11px;color:#6b7280">NIF: ${nif}</div>`                  : ""}
+          <div style="font-size:10px;color:#9ca3af;margin-top:6px;font-weight:600">
+            Nº ${String(d.sid).padStart(6,"0")} · ${fmtDate(d.saleDate)}
+          </div>
         </div>
 
-        ${d.clientName?`<div style="padding:10px 16px;border-bottom:1px dashed #d1d5db;display:flex;align-items:center;gap:8px"><i data-lucide="user" style="width:13px;height:13px;color:#6b7280;flex-shrink:0"></i><span style="font-size:13px;font-weight:600;color:#111827">${d.clientName}</span></div>`:""}
+        ${d.clientName ? `
+        <div style="padding:10px 16px;border-bottom:1px dashed #d1d5db;
+                    display:flex;align-items:center;gap:10px;background:#fff">
+          <div style="width:32px;height:32px;background:#ede9fe;border-radius:8px;
+                      display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i data-lucide="user" style="width:14px;height:14px;color:#5b21b6"></i>
+          </div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#111827">${d.clientName}</div>
+            ${d.clientPhone ? `<div style="font-size:11px;color:#6b7280;margin-top:1px">${d.clientPhone}</div>` : ""}
+          </div>
+        </div>` : ""}
 
-        <!-- Itens -->
-        <div style="padding:12px 16px;border-bottom:1px dashed #d1d5db">
+        <div style="padding:10px 16px;border-bottom:1px dashed #d1d5db;background:#fff">
           ${d.items.map(i=>`
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0">
-            <div>
-              <span style="font-size:13px;color:#374151">${i.name}</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0">
+            <div style="flex:1;min-width:0">
+              <span style="font-size:13px;color:#374151;font-weight:600">${i.name}</span>
               <span style="font-size:11px;color:#9ca3af;margin-left:6px">×${i.qty}</span>
             </div>
-            <span style="font-size:13px;font-weight:600;color:#111827">${fmt(i.price*i.qty)}</span>
+            <span style="font-size:13px;font-weight:700;color:#111827;flex-shrink:0">${fmt(i.price*i.qty)}</span>
           </div>`).join("")}
         </div>
 
-        <!-- Totais -->
-        <div style="padding:12px 16px;border-bottom:1px dashed #d1d5db;background:#f9fafb">
-          ${d.da>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span style="color:#6b7280">Desconto</span><span style="color:#059669;font-weight:600">− ${fmt(d.da)}</span></div>`:""}
-          ${d.ivaPct>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span style="color:#6b7280">IVA ${d.ivaPct}%</span><span style="color:#d97706;font-weight:600">+ ${fmt(d.ivaVal)}</span></div>`:""}
-          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;margin-top:4px;border-top:1.5px solid #e5e7eb">
-            <span style="font-size:14px;font-weight:700;color:#111827">Total</span>
-            <span style="font-size:18px;font-weight:700;color:#5b21b6">${fmt(d.total)}</span>
+        <div style="padding:12px 16px;background:#fafafa;border-bottom:1px dashed #d1d5db">
+          ${d.da>0?`
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">
+            <span style="color:#6b7280">Desconto</span>
+            <span style="color:#059669;font-weight:600">− ${fmt(d.da)}</span>
+          </div>`:""}
+          <div style="display:flex;justify-content:space-between;align-items:center;
+                      padding:10px 12px;background:#5b21b6;border-radius:10px;margin-top:6px">
+            <span style="font-size:14px;font-weight:700;color:#ddd6fe">Total</span>
+            <span style="font-size:20px;font-weight:800;color:#fff">${fmt(d.total)}</span>
           </div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px">
-            <span style="color:#6b7280;text-transform:capitalize">${d.payMethod}</span>
-            ${d.recebido>0?`<span style="color:#6b7280">Recebido: ${fmt(d.recebido)} · Troco: <strong style="color:#059669">${fmt(d.troco)}</strong></span>`:""}
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:8px;color:#6b7280">
+            <span style="text-transform:capitalize;font-weight:600">${d.payMethod}</span>
+            ${d.recebido>0?`<span>Recebido: ${fmt(d.recebido)} · Troco: <strong style="color:#059669">${fmt(d.troco)}</strong></span>`:""}
           </div>
         </div>
 
-        <!-- QR + Código -->
-        <div style="padding:14px 16px;text-align:center;display:flex;align-items:center;gap:14px">
+        <div style="padding:14px 16px;display:flex;align-items:center;gap:14px;background:#fff">
           <div id="receipt-qr" style="flex-shrink:0"></div>
-          <div style="text-align:left">
-            <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Código de verificação</div>
-            <div style="font-size:18px;font-weight:800;color:#5b21b6;letter-spacing:2px">${d.hash}</div>
-            <div style="font-size:10px;color:#9ca3af;margin-top:4px;line-height:1.4">Scan para verificar<br/>autenticidade</div>
+          <div>
+            <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;
+                        letter-spacing:.6px;margin-bottom:5px;font-weight:700">Verificação</div>
+            <div style="font-size:20px;font-weight:800;color:#5b21b6;letter-spacing:3px">${d.hash}</div>
+            <div style="font-size:10px;color:#9ca3af;margin-top:4px;line-height:1.5">
+              Scan para verificar autenticidade
+            </div>
           </div>
         </div>
 
-        <!-- Rodapé -->
-        <div style="padding:10px 16px;text-align:center;background:#f9fafb;border-top:1px dashed #d1d5db">
-          <div style="font-size:10px;color:#9ca3af;line-height:1.8">Documento de gestão interna · Sem validade fiscal perante a AGT</div>
-          <div style="font-size:10px;color:#c4b5fd;font-weight:600;margin-top:2px">Powered by Kontaki · Introxeer Technology</div>
+        <div style="padding:10px 16px;text-align:center;background:#fafafa;border-top:1px dashed #d1d5db">
+          <div style="font-size:9px;color:#9ca3af;line-height:1.8">
+            Documento de gestão interna · Sem validade fiscal perante a AGT
+          </div>
+          <div style="font-size:10px;color:#7c3aed;font-weight:700;margin-top:2px">
+            Powered by Kontaki · Introxeer Technology
+          </div>
         </div>
       </div>
 
-      <!-- Botões de acção -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px">
-        <button onclick="window._partilharReciboPDF(${d.sid})" style="padding:13px 8px;background:#25D366;color:#fff;border:none;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-          <i data-lucide="share-2" style="width:15px;height:15px"></i> Partilhar
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+        <button onclick="window._printRecibo(${d.sid})"
+          style="width:100%;padding:14px;background:var(--primary);color:#fff;border:none;
+                 border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;
+                 font-family:inherit;display:flex;align-items:center;justify-content:center;
+                 gap:8px;box-shadow:0 4px 14px rgba(91,33,182,.3)">
+          <i data-lucide="printer" style="width:17px;height:17px"></i> Imprimir talão
         </button>
-        <button onclick="window._gerarReciboPDF(${d.sid})" style="padding:13px 8px;background:#ede9fe;color:#5b21b6;border:none;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-          <i data-lucide="printer" style="width:15px;height:15px"></i> PDF
-        </button>
-        <button onclick="window._closeModal()" style="padding:13px 8px;background:#f4f4f5;color:#6b7280;border:none;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-          Fechar
-        </button>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <button onclick="window._partilharReciboPDF(${d.sid})"
+            style="padding:13px 6px;background:#f0fdf4;color:#16a34a;border:none;
+                   border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;
+                   font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px">
+            <i data-lucide="share-2" style="width:14px;height:14px"></i> WhatsApp
+          </button>
+          <button onclick="window._gerarReciboPDF(${d.sid})"
+            style="padding:13px 6px;background:#ede9fe;color:#5b21b6;border:none;
+                   border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;
+                   font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px">
+            <i data-lucide="download" style="width:14px;height:14px"></i> PDF
+          </button>
+          <button onclick="window._closeModal()"
+            style="padding:13px 6px;background:#f4f4f5;color:#6b7280;border:none;
+                   border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;
+                   font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px">
+            <i data-lucide="x" style="width:14px;height:14px"></i> Fechar
+          </button>
+        </div>
       </div>
     </div>`);
 

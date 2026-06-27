@@ -34,6 +34,18 @@ export var router = {
 
     refreshIcons(el("bottom-nav"));
     refreshIcons(el("topbar"));
+    // Mostrar nome da loja no topbar
+    (async function() {
+      var store = await (await import("./db.js")).db.get("settings","store");
+      var titleEl = el("topbar-title");
+      if (titleEl && store && store.name) titleEl.textContent = store.name;
+    })();
+    // Botão dashboard
+    window._openDashboard = function() {
+      var existing = document.getElementById("dashboard-overlay");
+      if (existing) { existing.remove(); return; }
+      import("./components/dashboard.js").then(function(m){ m.loadDashboard(); });
+    };
     initDarkMode();
     checkStockAlerts();
     checkBadges();
@@ -60,23 +72,24 @@ export var router = {
     var addBtn   = el("btn-topbar-add");
     var quickBtn = el("btn-topbar-quick");
 
-    if (qrBtn)    qrBtn.style.display    = "none";
-    if (addBtn)   { addBtn.style.display = "none"; addBtn.onclick = null; }
-    if (quickBtn) quickBtn.style.display = "none";
+    // Esconder todos os botões
+    if (qrBtn)    qrBtn.classList.remove("visible");
+    if (addBtn)   { addBtn.classList.remove("visible"); addBtn.onclick = null; }
+    if (quickBtn) quickBtn.classList.remove("visible");
 
     if (pageId === "vender") {
-      if (quickBtn) quickBtn.style.display = "flex";
-      if (qrBtn)    qrBtn.style.display    = "flex";
+      if (quickBtn) quickBtn.classList.add("visible");
+      if (qrBtn)    qrBtn.classList.add("visible");
     }
     if (pageId === "produtos") {
       if (addBtn) {
-        addBtn.style.display = "flex";
+        addBtn.classList.add("visible");
         addBtn.onclick = function() { openProductForm(); };
       }
     }
     if (pageId === "fiados") {
       if (addBtn) {
-        addBtn.style.display = "flex";
+        addBtn.classList.add("visible");
         addBtn.onclick = function() { if (window._openFiadoAdd) window._openFiadoAdd(); };
       }
     }
@@ -88,5 +101,4 @@ export var router = {
   },
 };
 
-window.router = router;
 window.router = router;

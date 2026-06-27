@@ -207,7 +207,7 @@ async function loadStock(from, to) {
         return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #f4f4f5">' +
           '<div>' +
           '<div style="font-size:13px;font-weight:600">' + m.productName + '</div>' +
-          '<div style="font-size:11px;color:#71717a;margin-top:2px">' + m.type + ' · ' + fmtDate(m.createdAt) + '</div>' +
+          '<div style="font-size:11px;color:#71717a;margin-top:2px">' + (({"sale":"Venda","purchase":"Compra","transfer_in":"Entrada","transfer_out":"Sa\u00edda","adjustment":"Ajuste"})[m.type]||m.type) + ' · ' + fmtDate(m.createdAt) + '</div>' +
           '</div>' +
           '<div style="text-align:right">' +
           '<div style="font-size:14px;font-weight:700;color:' + color + '">' + (m.qty > 0 ? "+" : "") + m.qty + '</div>' +
@@ -247,8 +247,13 @@ async function loadAuditoria(from, to) {
 
   const importedSessions = sessions.filter(function(s) { return s.isImported; });
   const openIncidents    = incidents.filter(function(i) { return i.status === "open"; });
-  const chain            = sessions.filter(function(s) { return !s.isImported; })
-    .sort(function(a,b) { return a.id - b.id; });
+  const seenUuids = new Set();
+  const chain = sessions.filter(function(s) {
+    if (s.isImported) return false;
+    if (s.uuid && seenUuids.has(s.uuid)) return false;
+    if (s.uuid) seenUuids.add(s.uuid);
+    return true;
+  }).sort(function(a,b) { return a.id - b.id; });
 
   el("historico-list").innerHTML =
 

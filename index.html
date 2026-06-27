@@ -112,15 +112,18 @@ document.addEventListener("DOMContentLoaded", function() {
 <div id="app" style="display:none">
 
   <div id="topbar" class="topbar">
+    <button class="topbar-btn" id="btn-topbar-dashboard" onclick="window._openDashboard()">
+      <i data-lucide="layout-dashboard"></i>
+    </button>
     <span id="topbar-title" class="topbar-title">Kontaki</span>
     <div style="display:flex;gap:4px">
-      <button class="topbar-btn" id="btn-topbar-quick" style="display:none" title="Modo Caixa Rápida">
+      <button class="topbar-btn topbar-btn-hide" id="btn-topbar-quick" title="Modo Caixa Rápida">
         <i data-lucide="zap"></i>
       </button>
-      <button class="topbar-btn" id="btn-topbar-qr" style="display:none">
+      <button class="topbar-btn topbar-btn-hide" id="btn-topbar-qr">
         <i data-lucide="scan-qr-code"></i>
       </button>
-      <button class="topbar-btn" id="btn-topbar-add" style="display:none">
+      <button class="topbar-btn topbar-btn-hide" id="btn-topbar-add">
         <i data-lucide="plus"></i>
       </button>
     </div>
@@ -432,21 +435,26 @@ document.addEventListener("DOMContentLoaded", function() {
   <!-- BOTTOM NAV -->
   <div id="bottom-nav" class="bottom-nav">
     <button class="nav-item active" data-page="vender">
-      <i data-lucide="shopping-bag" style="width:26px;height:26px"></i>
+      <i data-lucide="shopping-bag"></i>
+      <span class="nav-label">Vender</span>
     </button>
     <button class="nav-item" data-page="produtos">
-      <i data-lucide="box" style="width:26px;height:26px"></i>
+      <i data-lucide="box"></i>
+      <span class="nav-label">Produtos</span>
       <span id="produtos-badge" class="nav-badge" style="display:none"></span>
     </button>
     <button class="nav-item" data-page="fiados">
-      <i data-lucide="wallet" style="width:26px;height:26px"></i>
+      <i data-lucide="wallet"></i>
+      <span class="nav-label">Fiados</span>
       <span id="fiados-badge" class="nav-badge" style="display:none"></span>
     </button>
     <button class="nav-item" data-page="historico">
-      <i data-lucide="history" style="width:26px;height:26px"></i>
+      <i data-lucide="history"></i>
+      <span class="nav-label">Histórico</span>
     </button>
     <button class="nav-item" data-page="perfil">
-      <i data-lucide="user" style="width:26px;height:26px"></i>
+      <i data-lucide="user"></i>
+      <span class="nav-label">Perfil</span>
     </button>
   </div>
 </div>

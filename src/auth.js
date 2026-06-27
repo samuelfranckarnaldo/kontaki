@@ -40,6 +40,7 @@ async function _renderLoginUsers() {
   if (!list) return;
 
   const active = users.filter(u => u.active !== false);
+  console.log("[Auth] Utilizadores encontrados:", users.length, "activos:", active.length);
 
   if (!active.length) {
     list.innerHTML = '<div style="text-align:center;color:#a1a1aa;font-size:13px;padding:20px">Nenhum utilizador encontrado.<br/>Reinicia o setup.</div>';

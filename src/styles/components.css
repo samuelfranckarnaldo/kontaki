@@ -519,29 +519,7 @@
 #login-step-pin  { display: none; flex-direction: column; width: 100%; }
 #login-step-pin.active { display: flex; }
 
-/* ── LOGIN PAGE REDESIGN v2 ─────────────────────────────────────────────────── */
-#login-page {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0;
-  background: #f5f3ff;
-}
-
-.login-box {
-  width: 100%;
-  max-width: 480px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: #fff;
-  border-radius: 0 0 32px 32px;
-  padding: 56px 28px 32px;
-  box-shadow: 0 8px 32px rgba(91,33,182,.10);
-}
+/* LOGIN PAGE REDESIGN v2 — movido para layout.css */
 
 .login-logo { text-align: center; margin-bottom: 32px; }
 
@@ -1368,3 +1346,22 @@
 .hist-sale-total-old { font-size: 12px; font-weight: 600; color: var(--text4); text-decoration: line-through; }
 .hist-sale-total-new { font-size: 15px; font-weight: 800; color: var(--warning); }
 .hist-sale-disc      { font-size: 10px; color: var(--danger); margin-top: 2px; }
+
+/* ── ALERTAS DE STOCK ───────────────────────────────────────────────────────── */
+.prod-alert-btn {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 11px 14px; border: none; border-radius: 12px;
+  font-size: 12px; font-family: var(--font); cursor: pointer;
+  text-align: left; transition: all .15s;
+}
+.prod-alert-btn:active { transform: scale(.98); }
+.prod-alert-btn span { flex: 1; line-height: 1.4; }
+
+.prod-alert-danger {
+  background: var(--danger-light); color: var(--danger);
+  border: 1px solid #fca5a5;
+}
+.prod-alert-warning {
+  background: var(--warning-light); color: var(--warning);
+  border: 1px solid #fcd34d;
+}

@@ -12,37 +12,123 @@ let filterMode = "all";
 export async function initProdutos() {
   products = await db.getAll("products");
   el("produtos-search").oninput = () => { filterMode="all"; renderList(); };
+  renderAlerts();
   renderStats();
   renderList();
 }
 
+function renderAlerts() {
+  var active   = products.filter(function(p){ return p.active; });
+  var zero     = active.filter(function(p){ return (p.stock||0) === 0; });
+  var low      = active.filter(function(p){ return (p.stock||0) > 0 && (p.stock||0) <= (p.minStock||5); });
+
+  // Remover alertas antigos
+  var old = document.getElementById("produtos-alerts");
+  if (old) old.remove();
+
+  if (!zero.length && !low.length) return;
+
+  var wrap = document.createElement("div");
+  wrap.id = "produtos-alerts";
+  wrap.style.cssText = "display:flex;flex-direction:column;gap:6px;margin-bottom:10px";
+
+  if (zero.length) {
+    var btn = document.createElement("button");
+    btn.className = "prod-alert-btn prod-alert-danger";
+    btn.onclick = function() { window._filterProd("zero"); };
+    btn.innerHTML =
+      '<i data-lucide="x-circle" style="width:15px;height:15px;flex-shrink:0"></i>' +
+      '<span><strong>' + zero.length + ' produto' + (zero.length>1?"s":"") + ' esgotado' + (zero.length>1?"s":"") + '</strong>' +
+      ' · ' + zero.slice(0,2).map(function(p){return p.name;}).join(", ") + (zero.length>2?" e mais...":"") + '</span>' +
+      '<i data-lucide="chevron-right" style="width:14px;height:14px;margin-left:auto;flex-shrink:0"></i>';
+    wrap.appendChild(btn);
+  }
+
+  if (low.length) {
+    var btn2 = document.createElement("button");
+    btn2.className = "prod-alert-btn prod-alert-warning";
+    btn2.onclick = function() { window._filterProd("low"); };
+    btn2.innerHTML =
+      '<i data-lucide="alert-triangle" style="width:15px;height:15px;flex-shrink:0"></i>' +
+      '<span><strong>' + low.length + ' produto' + (low.length>1?"s":"") + ' com stock baixo</strong>' +
+      ' · ' + low.slice(0,2).map(function(p){return p.name;}).join(", ") + (low.length>2?" e mais...":"") + '</span>' +
+      '<i data-lucide="chevron-right" style="width:14px;height:14px;margin-left:auto;flex-shrink:0"></i>';
+    wrap.appendChild(btn2);
+  }
+
+  // Inserir antes dos stats
+  var stats = el("produtos-stats");
+  if (stats && stats.parentNode) {
+    stats.parentNode.insertBefore(wrap, stats);
+  }
+  refreshIcons(wrap);
+}
+
 export function openProductForm(p = {}) {
   const cats = ["Alimentacao","Bebidas","Higiene","Limpeza","Outro"];
-  openModal(p.id ? "Editar Produto" : "Novo Produto",
-    `<div style="display:flex;flex-direction:column;gap:14px">` +
-    `<div class="field"><label>Nome *</label><input id="pf-name" value="${p.name||""}" placeholder="Ex: Arroz 1kg"/></div>` +
-    `<div class="field-row">` +
-    `<div class="field"><label>Preco Venda (Kz) *</label><input type="number" id="pf-price" value="${p.price||""}" placeholder="0"/></div>` +
-    `<div class="field"><label>Preco Custo (Kz)</label><input type="number" id="pf-cost" value="${p.costPrice||""}" placeholder="Opcional"/></div>` +
-    `</div>` +
-    `<div class="field"><label>Unidade</label><input id="pf-unit" value="${p.unit||"unid"}" placeholder="unid"/></div>` +
-    `<div style="background:#ede9fe;border-radius:12px;padding:14px">` +
-    `<div style="font-size:12px;font-weight:700;color:#5b21b6;margin-bottom:10px">STOCK</div>` +
-    `<div class="field-row">` +
-    `<div class="field"><label>Stock Loja</label><input type="number" id="pf-stock" value="${p.stock||0}"/></div>` +
-    `<div class="field"><label>Stock Armazem</label><input type="number" id="pf-warehouse" value="${p.warehouseStock||0}"/></div>` +
-    `</div>` +
-    `<div class="field" style="margin-top:10px"><label>Stock Minimo (alerta)</label><input type="number" id="pf-minstock" value="${p.minStock||5}"/></div>` +
-    `</div>` +
-    `<div class="field-row">` +
-    `<div class="field"><label>Categoria</label><select id="pf-cat">${cats.map(c=>`<option ${p.category===c?"selected":""}>${c}</option>`).join("")}</select></div>` +
-    `<div class="field"><label>Codigo Barras (unidade)</label><input id="pf-bar" value="${p.barcode||""}" placeholder="GTIN da unidade"/></div>` +
-    `<div class="field"><label>Codigo Embalagem Mae (opcional)</label><input id="pf-bar-mae" value="${p.masterBarcode||""}" placeholder="GTIN da caixa/fardo"/></div>` +
-    `</div></div>` +
-    `<div class="form-actions">` +
-    `<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>` +
-    `<button class="btn btn-primary btn-full" onclick="window._saveProduto(${p.id||0})"><i data-lucide="save"></i> ${p.id?"Actualizar":"Adicionar"}</button>` +
-    `</div>`);
+  const isEdit = !!p.id;
+  openModal(isEdit ? "Editar Produto" : "Novo Produto",
+    `<div style="display:flex;flex-direction:column;gap:12px">
+
+      <div class="field">
+        <label>Nome do produto *</label>
+        <input id="pf-name" value="${p.name||""}" placeholder="Ex: Arroz 1kg" autocomplete="off"/>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Preço de venda (Kz) *</label>
+          <input type="number" id="pf-price" value="${p.price||""}" placeholder="0" min="0"/>
+        </div>
+        <div class="field">
+          <label>Preço de custo (Kz)</label>
+          <input type="number" id="pf-cost" value="${p.costPrice||""}" placeholder="Opcional" min="0"/>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Unidade</label>
+          <input id="pf-unit" value="${p.unit||"unid"}" placeholder="unid"/>
+        </div>
+        <div class="field">
+          <label>Categoria</label>
+          <select id="pf-cat">${cats.map(c=>`<option ${p.category===c?"selected":""}>${c}</option>`).join("")}</select>
+        </div>
+      </div>
+
+      <div style="background:var(--primary-light);border-radius:12px;padding:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px">Stock</div>
+        <div class="field-row" style="margin-bottom:10px">
+          <div class="field">
+            <label>Stock Loja</label>
+            <input type="number" id="pf-stock" value="${p.stock||0}" min="0"
+              style="font-size:18px;font-weight:700;text-align:center;padding:12px"/>
+          </div>
+          <div class="field">
+            <label>Stock Armazém</label>
+            <input type="number" id="pf-warehouse" value="${p.warehouseStock||0}" min="0"
+              style="font-size:18px;font-weight:700;text-align:center;padding:12px"/>
+          </div>
+        </div>
+        <div class="field">
+          <label>Stock mínimo (alerta)</label>
+          <input type="number" id="pf-minstock" value="${p.minStock||5}" min="0"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Código de barras (opcional)</label>
+        <input id="pf-bar" value="${p.barcode||""}" placeholder="GTIN da unidade" autocomplete="off"/>
+      </div>
+
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
+      <button class="btn btn-primary btn-full" onclick="window._saveProduto(${p.id||0})">
+        <i data-lucide="save"></i> ${isEdit?"Actualizar":"Adicionar"}
+      </button>
+    </div>`);
   refreshIcons(el("modal-box"));
 }
 
@@ -92,6 +178,9 @@ window._filterProd = (mode) => {
   filterMode = mode;
   el("produtos-search").value = "";
   renderList();
+  // Scroll para a lista
+  var listEl = el("produtos-list");
+  if (listEl) setTimeout(function(){ listEl.scrollIntoView({behavior:"smooth",block:"start"}); }, 100);
 };
 
 function renderList() {
@@ -228,7 +317,7 @@ window._openProdMenu = (id) => {
   refreshIcons(el("modal-box"));
 };
 
-window._editProd = async (id) => { closeModal(); const p = await db.get("products",id); openProductForm(p); };
+window._editProd = async (id) => { const p = await db.get("products",id); closeModal(); setTimeout(function(){ openProductForm(p); }, 50); };
 
 window._deactivateProd = async (id) => {
   if (!confirm("Desativar este produto?")) return;
