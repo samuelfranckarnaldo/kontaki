@@ -30,8 +30,27 @@ const PAY_DESC = {
 
 export async function initVender() {
   products = await db.getAll("products").then(p => p.filter(x => x.active));
-  cart     = [];
   _storeIvaCache = null;
+
+  // Restaurar carrinho guardado
+  try {
+    var saved = localStorage.getItem("kontaki-cart");
+    if (saved) {
+      var savedCart = JSON.parse(saved);
+      // Validar que os produtos ainda existem e têm stock suficiente
+      cart = savedCart.filter(function(item) {
+        var p = products.find(function(p){ return p.id === item.id; });
+        return p && p.stock > 0;
+      }).map(function(item) {
+        var p = products.find(function(p){ return p.id === item.id; });
+        return Object.assign({}, item, {
+          stock: p.stock, price: p.price, name: p.name
+        });
+      });
+    } else {
+      cart = [];
+    }
+  } catch(e) { cart = []; }
 
   const btnScanner   = el("btn-scanner");
   const btnLimpar    = el("btn-limpar");
@@ -320,6 +339,9 @@ function renderCart() {
   var itemsEl = el("cart-items");
   if (!itemsEl) return;
 
+  // Persistir carrinho
+  try { localStorage.setItem("kontaki-cart", JSON.stringify(cart)); } catch(e){}
+
   if (!cart.length) {
     itemsEl.innerHTML = `<div class="cart-empty-state">
       <i data-lucide="shopping-cart"></i>
@@ -442,6 +464,7 @@ function toggleDiscType() {
 
 function limpar() {
   cart = []; lastRemoved = null;
+  try { localStorage.removeItem("kontaki-cart"); } catch(e){}
   var old = document.getElementById("undo-toast");
   if (old) old.remove();
   payMethod = "dinheiro"; discType = "pct";

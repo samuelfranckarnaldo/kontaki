@@ -1202,51 +1202,67 @@
 
 /* Card cliente */
 .fiado-card {
-  background: var(--bg2); border-radius: 14px;
+  background: var(--bg2); border-radius: 16px;
   border: 1px solid var(--border2); margin-bottom: 10px;
   overflow: hidden; box-shadow: var(--shadow-sm);
-  cursor: pointer; transition: box-shadow .15s;
+  cursor: pointer; transition: all .15s;
 }
-.fiado-card:active { box-shadow: none; }
+.fiado-card:active { transform: scale(.99); box-shadow: none; }
 
 .fiado-card-header {
   display: flex; align-items: center; gap: 12px;
   padding: 14px 16px;
 }
 .fiado-card-avatar {
-  width: 40px; height: 40px; border-radius: 12px;
-  background: var(--primary-light); color: var(--primary);
-  font-size: 16px; font-weight: 800;
+  width: 44px; height: 44px; border-radius: 14px;
+  font-size: 18px; font-weight: 800;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  flex-shrink: 0; transition: all .15s;
 }
 .fiado-card-info  { flex: 1; min-width: 0; }
 .fiado-card-name  { font-size: 15px; font-weight: 700; color: var(--text); }
-.fiado-card-meta  { font-size: 11px; color: var(--text4); margin-top: 2px; }
+.fiado-card-meta  { font-size: 11px; color: var(--text4); margin-top: 3px; }
 .fiado-card-right { text-align: right; flex-shrink: 0; }
-.fiado-card-total { font-size: 16px; font-weight: 800; color: var(--warning); }
-.fiado-badge-pago { font-size: 12px; font-weight: 700; color: var(--success); }
+.fiado-card-total { font-size: 17px; font-weight: 800; color: var(--warning); }
+.fiado-card-count { font-size: 10px; color: var(--text4); margin-top: 2px; }
 
-/* Entrada */
-.fiado-entry-row {
+.fiado-badge-saldo {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 700; color: var(--success);
+}
+
+/* Acção rápida — 1 entrada em aberto */
+.fiado-quick-pay {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 16px; border-top: 1px solid var(--border2);
   background: var(--bg);
 }
-.fiado-entry-left { flex: 1; }
-.fiado-entry-val  { font-size: 14px; font-weight: 700; }
-.fiado-entry-open { color: var(--warning); }
-.fiado-entry-paid { color: var(--text4); }
-.fiado-entry-check{ font-size: 10px; color: var(--success); margin-left: 4px; font-weight: 700; }
-.fiado-entry-date { font-size: 11px; color: var(--text4); margin-top: 2px; }
+.fiado-quick-info { display: flex; flex-direction: column; gap: 2px; }
+.fiado-quick-val  { font-size: 14px; font-weight: 700; color: var(--warning); }
+.fiado-quick-date { font-size: 11px; color: var(--text4); }
+
+/* Múltiplos pagamentos */
+.fiado-multi-badge {
+  padding: 10px 16px; border-top: 1px solid var(--border2);
+  background: var(--warning-light);
+  font-size: 12px; font-weight: 600; color: var(--warning);
+  text-align: center;
+}
+
+.fiado-entry-open  { color: var(--warning); }
+.fiado-entry-paid  { color: var(--text4); }
+.fiado-entry-check { font-size: 10px; color: var(--success); margin-left: 4px; font-weight: 700; }
+.fiado-entry-date  { font-size: 11px; color: var(--text4); margin-top: 2px; }
+
 .fiado-pay-btn {
   display: flex; align-items: center; gap: 5px;
-  padding: 8px 14px; background: var(--success); color: #fff;
+  padding: 9px 16px; background: var(--success); color: #fff;
   border: none; border-radius: 10px; font-size: 12px; font-weight: 700;
   cursor: pointer; font-family: var(--font); flex-shrink: 0;
-  transition: all .15s;
+  transition: all .15s; box-shadow: 0 2px 8px rgba(22,163,74,.25);
 }
-.fiado-pay-btn:active { transform: scale(.96); }
+.fiado-pay-btn:active { transform: scale(.96); box-shadow: none; }
+
 .fiado-more {
   font-size: 11px; color: var(--text4);
   padding: 8px 16px; text-align: center;
@@ -1364,4 +1380,137 @@
 .prod-alert-warning {
   background: var(--warning-light); color: var(--warning);
   border: 1px solid #fcd34d;
+}
+
+/* ── FIADOS v2 ──────────────────────────────────────────────────────────────── */
+.fc {
+  background: var(--bg2); border-radius: 16px;
+  border: 1px solid var(--border2); margin-bottom: 10px;
+  overflow: hidden; box-shadow: var(--shadow-sm);
+  cursor: pointer; transition: all .15s;
+}
+.fc:active { transform: scale(.99); box-shadow: none; }
+
+.fc-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+}
+.fc-avatar {
+  width: 44px; height: 44px; border-radius: 14px;
+  font-size: 18px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.fc-info   { flex: 1; min-width: 0; }
+.fc-name   { font-size: 15px; font-weight: 700; color: var(--text); }
+.fc-meta   { font-size: 11px; color: var(--text4); margin-top: 3px; }
+.fc-right  { text-align: right; flex-shrink: 0; }
+.fc-total  { font-size: 17px; font-weight: 800; color: var(--warning); }
+.fc-open-count { font-size: 10px; color: var(--text4); margin-top: 2px; }
+.fc-saldo  {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 700; color: var(--success);
+}
+
+.fc-action {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; border-top: 1px solid var(--border2);
+  background: var(--bg);
+}
+.fc-action-val  { font-size: 14px; font-weight: 700; color: var(--warning); }
+.fc-action-date { font-size: 11px; color: var(--text4); margin-top: 2px; }
+
+.fc-pay-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 9px 16px; background: var(--success); color: #fff;
+  border: none; border-radius: 10px; font-size: 12px; font-weight: 700;
+  cursor: pointer; font-family: var(--font); flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(22,163,74,.25); transition: all .15s;
+}
+.fc-pay-btn:active { transform: scale(.96); box-shadow: none; }
+
+.fc-detail-btn {
+  padding: 9px 14px; background: var(--primary-light); color: var(--primary);
+  border: none; border-radius: 10px; font-size: 12px; font-weight: 700;
+  cursor: pointer; font-family: var(--font); flex-shrink: 0;
+}
+
+/* Modal */
+.fc-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px; border-radius: 14px; margin-bottom: 16px;
+}
+.fc-modal-open  { background: var(--warning-light); }
+.fc-modal-saldo { background: var(--success-light); }
+.fc-modal-label { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .4px; }
+.fc-modal-total { font-size: 24px; font-weight: 800; color: var(--text); margin-top: 4px; }
+
+.fc-modal-entries {
+  border: 1px solid var(--border2); border-radius: 14px;
+  overflow: hidden; margin-bottom: 16px;
+}
+.fc-modal-entry {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 14px; border-bottom: 1px solid var(--border2);
+  background: var(--bg2);
+}
+.fc-modal-entry:last-child { border-bottom: none; }
+.fc-modal-entry-left { flex: 1; }
+.fc-modal-entry-val  { font-size: 14px; font-weight: 700; }
+.fc-modal-entry-date { font-size: 11px; color: var(--text4); margin-top: 2px; }
+.fc-val-open { color: var(--warning); }
+.fc-val-paid { color: var(--text4); }
+.fc-paid-tag { font-size: 10px; color: var(--success); margin-left: 6px; font-weight: 700; }
+.fc-paid-icon { color: var(--success); }
+
+.fc-pay-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--border2); border-radius: 14px;
+  padding: 16px; margin-bottom: 16px;
+}
+.fc-pay-modal-label { font-size: 11px; color: var(--text3); font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+.fc-pay-modal-name  { font-size: 16px; font-weight: 700; color: var(--text); margin-top: 3px; }
+.fc-pay-modal-val   { font-size: 20px; font-weight: 800; color: var(--warning); margin-top: 3px; }
+
+/* ── PERFIL — GRUPOS ────────────────────────────────────────────────────────── */
+.perfil-group-label {
+  font-size: 11px; font-weight: 700; color: var(--text4);
+  text-transform: uppercase; letter-spacing: .6px;
+  padding: 16px 4px 8px; margin-top: 4px;
+}
+.perfil-group {
+  background: var(--bg2); border-radius: 16px;
+  border: 1px solid var(--border2); overflow: hidden;
+  box-shadow: var(--shadow-sm); margin-bottom: 4px;
+}
+.perfil-group .perfil-menu-item {
+  border-radius: 0; box-shadow: none; border: none;
+  border-bottom: 1px solid var(--border2);
+}
+.perfil-group .perfil-menu-item:last-child { border-bottom: none; }
+
+.perfil-logout-btn {
+  margin-top: 16px; border-radius: 16px !important;
+  border: 1px solid #fca5a5 !important;
+  background: #fff5f5 !important;
+}
+
+/* Header do perfil */
+.perfil-header {
+  padding: 28px 20px 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  background: var(--bg2);
+}
+.perfil-avatar {
+  width: 80px; height: 80px; border-radius: 24px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-mid));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px; font-weight: 800; color: #fff;
+  box-shadow: 0 8px 24px rgba(91,33,182,.25);
+}
+.perfil-name { font-size: 20px; font-weight: 800; color: var(--text); }
+.perfil-role {
+  font-size: 12px; font-weight: 600; color: var(--primary);
+  background: var(--primary-light); padding: 4px 12px;
+  border-radius: 20px;
 }

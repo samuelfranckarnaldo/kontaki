@@ -6,7 +6,7 @@ import { initFiados }                      from "./components/fiados.js";
 import { initHistorico }                   from "./components/historico.js";
 import { initPerfil }                      from "./components/perfil.js";
 import { initCamera }                      from "./components/camera.js";
-import { initDarkMode, checkStockAlerts, checkBadges } from "./components/extras.js";
+import { initDarkMode, checkStockAlerts, checkBadges, startRealtimeSync } from "./components/extras.js";
 import { loadDashboard }                    from "./components/dashboard.js";
 
 var PAGES = {
@@ -47,10 +47,11 @@ export var router = {
       import("./components/dashboard.js").then(function(m){ m.loadDashboard(); });
     };
     initDarkMode();
+    startRealtimeSync();
     checkStockAlerts();
     checkBadges();
     initQuickMode();
-    setTimeout(function() { self.go("vender"); loadDashboard(); }, 50);
+    setTimeout(function() { self.go("vender"); }, 50);
   },
 
   go: function(pageId) {
@@ -73,23 +74,23 @@ export var router = {
     var quickBtn = el("btn-topbar-quick");
 
     // Esconder todos os botões
-    if (qrBtn)    qrBtn.classList.remove("visible");
-    if (addBtn)   { addBtn.classList.remove("visible"); addBtn.onclick = null; }
-    if (quickBtn) quickBtn.classList.remove("visible");
+    if (qrBtn)    { qrBtn.style.display    = "none"; }
+    if (addBtn)   { addBtn.style.display   = "none"; addBtn.onclick = null; }
+    if (quickBtn) { quickBtn.style.display = "none"; }
 
     if (pageId === "vender") {
-      if (quickBtn) quickBtn.classList.add("visible");
-      if (qrBtn)    qrBtn.classList.add("visible");
+      if (quickBtn) quickBtn.style.display = "flex";
+      if (qrBtn)    qrBtn.style.display    = "flex";
     }
     if (pageId === "produtos") {
       if (addBtn) {
-        addBtn.classList.add("visible");
+        addBtn.style.display = "flex";
         addBtn.onclick = function() { openProductForm(); };
       }
     }
     if (pageId === "fiados") {
       if (addBtn) {
-        addBtn.classList.add("visible");
+        addBtn.style.display = "flex";
         addBtn.onclick = function() { if (window._openFiadoAdd) window._openFiadoAdd(); };
       }
     }

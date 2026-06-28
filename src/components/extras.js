@@ -343,3 +343,19 @@ function kpiBox(label, value, color) {
     '</div>';
 }
 
+
+
+// ── SYNC EM TEMPO REAL ───────────────────────────────────────────────────────
+var _syncInterval = null;
+
+export function startRealtimeSync() {
+  if (_syncInterval) clearInterval(_syncInterval);
+  _syncInterval = setInterval(function() {
+    checkBadges();
+    checkStockAlerts();
+  }, 15000); // a cada 15 segundos
+}
+
+export function stopRealtimeSync() {
+  if (_syncInterval) { clearInterval(_syncInterval); _syncInterval = null; }
+}
