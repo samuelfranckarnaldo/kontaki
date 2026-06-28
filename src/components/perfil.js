@@ -122,9 +122,14 @@ function renderMenu() {
 }
 
 function setupSubpageButtons() {
-  ["stock","incidentes","equipa","loja","senha","dashboard"].forEach(name => {
-    const btn = document.getElementById("btn-back-" + name);
-    if (btn) btn.onclick = () => showSubpage(null);
+  ["stock","incidentes","equipa","loja","senha","dashboard","clientes",
+   "despesas","contabilidade","assinatura","contactos","configuracoes",
+   "seguranca","turno","fornecedores"].forEach(function(name) {
+    var btn = document.getElementById("btn-back-" + name);
+    if (btn) btn.onclick = function() {
+      var sp = document.getElementById("subpage-" + name);
+      if (sp) sp.style.display = "none";
+    };
   });
 
   const pwBtn   = el("btn-change-pw");
@@ -442,27 +447,39 @@ async function loadContabilidade() {
   var vendasHoje = sales.filter(function(s){ return (s.date||"").startsWith(hoje); });
 
   // Receita = só vendas pagas (exclui fiados em aberto)
-  var receitaMes  = vendasMes.filter(function(s){ return s.payMethod!=="fiado"||s.fiadoPago; }).reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
-  var receitaAno  = vendasAno.filter(function(s){ return s.payMethod!=="fiado"||s.fiadoPago; }).reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
-  var receitaHoje = vendasHoje.filter(function(s){ return s.payMethod!=="fiado"||s.fiadoPago; }).reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
-  var receitaFiadoMes = vendasMes.filter(function(s){ return s.payMethod==="fiado"&&!s.fiadoPago; }).reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  // Receita total = todas as vendas (fiado é receita pendente)
+  var receitaMes  = vendasMes.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  var receitaAno  = vendasAno.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  var receitaHoje = vendasHoje.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  // Fiado recebido = fiados pagos no mês
+  var receitaFiadoMes = fiados.filter(function(f){ return f.status==="paid" && (f.paidAt||"").startsWith(mes); })
+    .reduce(function(a,f){ return a+(f.amount||0); },0);
+  // Fiado pendente = fiados em aberto
+  var fiadoPendenteMes = fiados.filter(function(f){ return f.status==="open"; })
+    .reduce(function(a,f){ return a+(f.amount||0); },0);
 
   // Custo das vendas (COGS)
   var prodMap = {};
   products.forEach(function(p){ prodMap[p.id]=p; });
 
+  // COGS = custo dos produtos vendidos menos devoluções
   var cogsMes = vendasMes.reduce(function(a,s){
-    return a + (s.items||[]).reduce(function(b,i){
+    var custoVenda = (s.items||[]).reduce(function(b,i){
       var p = prodMap[i.id];
       return b + (p ? (p.costPrice||0)*i.qty : 0);
     },0);
+    // Desconto proporcional de devoluções
+    var propDev = s.total > 0 ? (s.totalDevolvido||0)/s.total : 0;
+    return a + custoVenda * (1 - propDev);
   },0);
 
   var cogsAno = vendasAno.reduce(function(a,s){
-    return a + (s.items||[]).reduce(function(b,i){
+    var custoVenda = (s.items||[]).reduce(function(b,i){
       var p = prodMap[i.id];
       return b + (p ? (p.costPrice||0)*i.qty : 0);
     },0);
+    var propDev = s.total > 0 ? (s.totalDevolvido||0)/s.total : 0;
+    return a + custoVenda * (1 - propDev);
   },0);
 
   // Lucro bruto
@@ -502,45 +519,64 @@ async function loadContabilidade() {
     porMetodo[s.payMethod] = (porMetodo[s.payMethod]||0) + s.total;
   });
 
+  // Devoluções do mês
+  var devMes = vendasMes.reduce(function(a,s){ return a+(s.totalDevolvido||0); },0);
+
   wrap.innerHTML =
-    // KPIs principais
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Resumo do Mês</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">' +
-    kpi("Receita mensal", fmt(receitaMes), "#16a34a", "trending-up") +
-    kpi("Lucro bruto", fmt(lucroMes), lucroMes>=0?"#16a34a":"#dc2626", "dollar-sign") +
-    kpi("Margem bruta", margemMes+"%", lucroMes>=0?"#5b21b6":"#dc2626", "percent") +
-    kpi("COGS do mês", fmt(cogsMes), "#d97706", "package") +
-    kpi("Compras", fmt(comprasMes), "#dc2626", "shopping-bag") +
-    kpi("Despesas gerais", fmt(despesasMes), "#dc2626", "receipt") +
-    kpi("Lucro Líquido", fmt(lucroLiquido), lucroLiquido>=0?"#16a34a":"#dc2626", "wallet") +
-    kpi("Fiado aberto", fmt(fiadoAberto), "#d97706", "credit-card") +
-    kpi("Fiado pendente (mês)", fmt(receitaFiadoMes||0), "#d97706", "clock") +
+    // ── HERO — resultado do mês ──
+    '<div class="conta-hero" style="background:' + (lucroLiquido>=0?'linear-gradient(135deg,#059669,#10b981)':'linear-gradient(135deg,#dc2626,#ef4444)') + '">' +
+    '<div class="conta-hero-label">Resultado do mês</div>' +
+    '<div class="conta-hero-val">' + fmt(lucroLiquido) + '</div>' +
+    '<div class="conta-hero-sub">' + (lucroLiquido>=0?'▲ Lucro':'▼ Prejuízo') + ' · ' + vendasMes.length + ' vendas · margem ' + margemMes + '%</div>' +
     '</div>' +
 
-    // Receita hoje vs mês vs ano
-    '<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid #f4f4f5">' +
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Receitas por período</div>' +
-    row("Hoje", fmt(receitaHoje), vendasHoje.length+" vendas") +
-    row("Este mês", fmt(receitaMes), vendasMes.length+" vendas") +
-    row("Este ano", fmt(receitaAno), vendasAno.length+" vendas") +
-    row("Fiado recebido", fmt(fiadoRecebido), fiados.filter(function(f){return f.status==="paid";}).length+" pagos") +
+    // ── KPIs em grid ──
+    '<div class="conta-section-label">Resumo do mês</div>' +
+    '<div class="conta-grid">' +
+    contaKpi("Receita", fmt(receitaMes), "#16a34a", "trending-up") +
+    contaKpi("Custo vendas", fmt(cogsMes), "#d97706", "package") +
+    contaKpi("Lucro bruto", fmt(lucroMes), lucroMes>=0?"#16a34a":"#dc2626", "dollar-sign") +
+    contaKpi("Despesas", fmt(despesasMes), "#dc2626", "receipt") +
+    contaKpi("Compras", fmt(comprasMes), "#6b7280", "shopping-cart") +
+    contaKpi("Devoluções", fmt(devMes), devMes>0?"#d97706":"#16a34a", "rotate-ccw") +
+    '</div>' +
+
+    // ── Fiados ──
+    '<div class="conta-section-label">Fiados</div>' +
+    '<div class="conta-card">' +
+    contaRow("Fiado recebido este mês", fmt(receitaFiadoMes), "#16a34a") +
+    contaRow("Fiado pendente total", fmt(fiadoPendenteMes||0), "#d97706") +
+    contaRow("Fiado em aberto", fmt(fiadoAberto), "#dc2626") +
+    '</div>' +
+
+    // Receitas por período
+    '<div class="conta-section-label">Receitas por período</div>' +
+    '<div class="conta-card">' +
+    contaRow("Hoje", fmt(receitaHoje), "#16a34a", vendasHoje.length+" "+(vendasHoje.length===1?"venda":"vendas")) +
+    contaRow("Este mês", fmt(receitaMes), "#16a34a", vendasMes.length+" vendas") +
+    contaRow("Este ano", fmt(receitaAno), "#16a34a", vendasAno.length+" vendas") +
+    contaRow("Fiado recebido", fmt(receitaFiadoMes), "#5b21b6", fiados.filter(function(f){return f.status==="paid";}).length+" pagos") +
     '</div>' +
 
     // Top produtos
     (topProd.length ?
-    '<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid #f4f4f5">' +
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Top Produtos (mês)</div>' +
+    '<div class="conta-section-label">Top produtos do mês</div>' +
+    '<div class="conta-card" style="padding:14px">' +
     topProd.map(function(p,i){
       var pct = receitaMes>0?Math.round((p.total/receitaMes)*100):0;
-      return '<div style="margin-bottom:10px">' +
-        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">' +
-        '<span style="font-weight:600">'+(i+1)+'. '+p.name+'</span>' +
-        '<span style="font-weight:700;color:#16a34a">'+fmt(p.total)+'</span>' +
+      var medals = ["🥇","🥈","🥉","4.","5."];
+      return '<div style="margin-bottom:12px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+        '<span style="font-size:16px">' + medals[i] + '</span>' +
+        '<span style="font-size:13px;font-weight:700;color:var(--text)">' + p.name + '</span>' +
         '</div>' +
-        '<div style="height:6px;background:#f4f4f5;border-radius:3px;overflow:hidden">' +
-        '<div style="height:100%;width:'+pct+'%;background:#5b21b6;border-radius:3px"></div>' +
+        '<span style="font-size:13px;font-weight:700;color:var(--success)">' + fmt(p.total) + '</span>' +
         '</div>' +
-        '<div style="font-size:11px;color:#a1a1aa;margin-top:2px">'+p.qty+' unidades · '+pct+'% da receita</div>' +
+        '<div style="height:5px;background:var(--border2);border-radius:3px;overflow:hidden">' +
+        '<div style="height:100%;width:' + pct + '%;background:var(--primary);border-radius:3px;transition:width .5s"></div>' +
+        '</div>' +
+        '<div style="font-size:10px;color:var(--text4);margin-top:3px">' + p.qty + ' un · ' + pct + '% da receita</div>' +
         '</div>';
     }).join("") +
     '</div>' : "") +
@@ -587,6 +623,25 @@ async function loadContabilidade() {
   wrap.appendChild(pdfBtn);
 
   refreshIcons(wrap);
+}
+
+function contaKpi(label, value, color, icon) {
+  return '<div class="conta-kpi">' +
+    '<div class="conta-kpi-icon" style="color:' + color + ';background:' + color + '20">' +
+    '<i data-lucide="' + icon + '" style="width:14px;height:14px"></i></div>' +
+    '<div class="conta-kpi-val" style="color:' + color + '">' + value + '</div>' +
+    '<div class="conta-kpi-label">' + label + '</div>' +
+    '</div>';
+}
+
+function contaRow(label, value, color, sub) {
+  return '<div class="conta-row">' +
+    '<div>' +
+    '<div class="conta-row-label">' + label + '</div>' +
+    (sub ? '<div class="conta-row-sub">' + sub + '</div>' : '') +
+    '</div>' +
+    '<div class="conta-row-val" style="color:' + color + '">' + value + '</div>' +
+    '</div>';
 }
 
 function kpi(label, value, color, icon) {
