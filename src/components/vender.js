@@ -404,7 +404,11 @@ async function renderSummary() {
   var finBtn = el("btn-finalizar");
   if (finBtn) {
     var cartCount = cart.reduce(function(a,i){return a+i.qty;},0);
-    finBtn.disabled = cartCount === 0;
+    var { getSession } = await import("../auth.js");
+    var semTurno = !getSession();
+    finBtn.disabled = cartCount === 0 || semTurno;
+    finBtn.title = semTurno ? "Abre um turno para vender" : "";
+    finBtn.style.opacity = semTurno ? "0.5" : "";
   }
   var totalEl2 = el("total-val");
   if (totalEl2) totalEl2.textContent = fmt(total);
@@ -473,6 +477,12 @@ function limpar() {
 
 // ── CHECKOUT ──────────────────────────────────────────────────────────────────
 async function openCheckout() {
+  const { getSession } = await import("../auth.js");
+  if (!getSession()) {
+    const { toast } = await import("../toast.js");
+    toast("Abre um turno antes de vender.", "error");
+    return;
+  }
   if (!cart.length) { toast("Carrinho vazio.", "error"); return; }
   await getStoreIva();
   const existingClients = await db.getAll("clients");

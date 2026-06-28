@@ -207,6 +207,8 @@ window._openFiadoCliente = async (encodedName) => {
 };
 
 window._pagarTudo = async (encodedName) => {
+  const { getSession } = await import("../auth.js");
+  if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
   const name    = decodeURIComponent(encodedName);
   const all     = await db.getAll("fiado");
   const entries = all.filter(f => f.clientName === name && f.status === "open");
@@ -247,6 +249,8 @@ function openFiadoAdd(prefillName = "") {
 }
 
 window._saveFiado = async () => {
+  const { getSession } = await import("../auth.js");
+  if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
   const name = el("fa-name").value.trim();
   const amt  = Number(el("fa-amt").value);
   if (!name || !amt) { toast("Nome e valor são obrigatórios.", "error"); return; }
@@ -288,6 +292,8 @@ window._openPayModal = async (id) => {
 };
 
 window._confirmPay = async (id, fullAmt) => {
+  const { getSession } = await import("../auth.js");
+  if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
   const e   = await db.get("fiado", id);
   const amt = Number(el("pay-amt").value);
   if (isNaN(amt) || amt <= 0 || amt > e.amount) { toast("Valor inválido.", "error"); return; }

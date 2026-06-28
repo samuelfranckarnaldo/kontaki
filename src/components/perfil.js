@@ -10,7 +10,7 @@ import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { getUser, logout, changePasswordAuth, createUser } from "../auth.js";
-import { getLicense, PLANS, activateLicense } from "../license.js";
+import { getLicense, loadLicense, activateLicense, PLANS, showUpgradeBanner } from "../license.js";
 import { gerarRelatorioPDF } from "./extras.js";
 
 export async function initPerfil() {
@@ -126,10 +126,7 @@ function setupSubpageButtons() {
    "despesas","contabilidade","assinatura","contactos","configuracoes",
    "seguranca","turno","fornecedores"].forEach(function(name) {
     var btn = document.getElementById("btn-back-" + name);
-    if (btn) btn.onclick = function() {
-      var sp = document.getElementById("subpage-" + name);
-      if (sp) sp.style.display = "none";
-    };
+    if (btn) btn.onclick = function() { window._perfilBack(); };
   });
 
   const pwBtn   = el("btn-change-pw");
@@ -139,6 +136,10 @@ function setupSubpageButtons() {
   if (lojaBtn) lojaBtn.onclick = saveStoreSettings;
   if (userBtn) userBtn.onclick = openUserAdd;
 }
+
+window._perfilBack = function() {
+  showSubpage(null);
+};
 
 window._perfilNav = async (page) => {
   if (page === "logout") { logout(); return; }
@@ -159,7 +160,9 @@ window._perfilNav = async (page) => {
   if (page === "seguranca")    await loadSegurancaPage();
   if (page === "turno")        await loadTurnoPage();
   if (page === "fornecedores") await loadFornecedoresPage();
-
+  if (page === "clientes")     await loadClientesPage();
+  if (page === "despesas")     await loadDespesasPage();
+  if (page === "senha")        loadSenhaPage();
 };
 
 function showSubpage(name) {
@@ -668,58 +671,175 @@ function fmt(v) {
 }
 
 async function loadAssinatura() {
-  var wrap = document.getElementById("assinatura-content");
+  await loadLicense();
+  var lic   = getLicense();
+  var plan  = PLANS[lic.plan] || PLANS.solo;
+  var wrap  = document.getElementById("assinatura-content");
   if (!wrap) return;
 
-  var sk = await db.get("settings","storeKey");
-  var hasKey = !!(sk&&sk.value);
+  var isExpired  = lic.status === "expired";
+  var isTrial    = lic.status === "trial";
+  var daysLeft   = lic.daysLeft || 0;
+  var warnExpiry = lic.status === "active" && daysLeft <= 7 && daysLeft > 0;
 
-  wrap.innerHTML =
-    '<div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);border-radius:16px;padding:20px;color:#fff;text-align:center;margin-bottom:16px">' +
-    '<i data-lucide="award" style="width:40px;height:40px;color:#ddd6fe;margin-bottom:12px"></i>' +
-    '<div style="font-size:18px;font-weight:700;margin-bottom:4px">Kontaki Beta</div>' +
-    '<div style="font-size:13px;color:#ddd6fe;margin-bottom:12px">Versão 1.0.0-beta · Introxeer Technology</div>' +
-    '<div style="background:rgba(255,255,255,.15);border-radius:10px;padding:10px;font-size:12px;color:#ddd6fe">' +
-    'Plano Beta gratuito · Sem limite de vendas · Dados locais seguros' +
-    '</div></div>' +
+  wrap.innerHTML = "";
 
-    '<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #f4f4f5">' +
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Estado da licença</div>' +
-    statusRow("Versão", "1.0.0-beta", "#5b21b6") +
-    statusRow("Plano", "Beta Gratuito", "#16a34a") +
-    statusRow("Chave HMAC", hasKey?"Configurada":"Não configurada", hasKey?"#16a34a":"#dc2626") +
-    statusRow("Dados", "Armazenamento local (offline)", "#5b21b6") +
-    statusRow("Validade", "Acesso durante período Beta", "#d97706") +
-    '</div>' +
-
-    '<div style="background:#fef3c7;border:1.5px solid #fde68a;border-radius:12px;padding:14px;margin-bottom:12px">' +
-    '<div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:6px">⚠ Versão Beta</div>' +
-    '<div style="font-size:12px;color:#92400e;line-height:1.6">' +
-    'Esta é uma versão de teste. Exporta backups regularmente para não perder dados. ' +
-    'A versão final terá sincronização cloud e suporte completo.' +
-    '</div></div>' +
-
-    '<div style="background:#fff;border-radius:12px;padding:14px;border:1px solid #f4f4f5;margin-bottom:12px">' +
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Código de activação</div>' +
-    '<div style="font-size:13px;color:#71717a;margin-bottom:10px;line-height:1.5">Recebeste um código de activação da Introxeer Technology? Insere aqui:</div>' +
-    '<div class="field" style="margin-bottom:10px"><input id="activation-code" placeholder="Ex: KTKI-XXXX-XXXX-XXXX" style="text-align:center;font-size:16px;font-weight:700;letter-spacing:2px;text-transform:uppercase"/></div>' +
-    '<button onclick="window._activarLicenca()" style="width:100%;padding:13px;background:#5b21b6;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Activar licença</button>' +
+  // ── Hero ──
+  var hero = document.createElement("div");
+  hero.className = "lic-hero";
+  hero.innerHTML =
+    '<div class="lic-hero-icon"><i data-lucide="award"></i></div>' +
+    '<div class="lic-hero-plan">' + plan.name + '</div>' +
+    '<div class="lic-hero-sub">Introxeer · Kontaki v1.0.0</div>' +
+    '<div class="lic-hero-badge">' +
+      '<i data-lucide="' + (isExpired?"x-circle":isTrial?"clock":"check-circle") + '" style="width:14px;height:14px"></i>' +
+      (isExpired ? "Licença expirada" : isTrial ? "Período de avaliação" : "Licença activa") +
     '</div>';
+  wrap.appendChild(hero);
+
+  // ── Banner expirado ──
+  if (isExpired) {
+    var expBanner = document.createElement("div");
+    expBanner.className = "lic-expired-banner";
+    expBanner.innerHTML =
+      '<i data-lucide="alert-circle"></i>' +
+      '<div class="lic-expired-text"><strong>Licença expirada.</strong> Renova o teu plano para continuar a usar o Kontaki.</div>';
+    wrap.appendChild(expBanner);
+  }
+
+  // ── Aviso de expiração próxima ──
+  if (warnExpiry) {
+    var warnEl = document.createElement("div");
+    warnEl.className = "lic-expiry-warn";
+    warnEl.innerHTML =
+      '<i data-lucide="clock" style="width:16px;height:16px;color:#d97706;flex-shrink:0"></i>' +
+      'A tua licença expira em <strong style="margin:0 3px">' + daysLeft + '</strong> dia' + (daysLeft!==1?"s":"") + '. Renova para não perder acesso.';
+    wrap.appendChild(warnEl);
+  }
+
+  // ── Limites do plano ──
+  var limitsEl = document.createElement("div");
+  limitsEl.className = "lic-limits";
+  var maxProd = plan.maxProducts >= 999999 ? "∞" : plan.maxProducts;
+  var maxUser = plan.maxUsers >= 999999 ? "∞" : plan.maxUsers;
+  var maxDev  = plan.maxDevices >= 999999 ? "∞" : plan.maxDevices;
+  limitsEl.innerHTML =
+    '<div class="lic-limit-item"><div class="lic-limit-val">' + maxProd + '</div><div class="lic-limit-label">Produtos</div></div>' +
+    '<div class="lic-limit-item"><div class="lic-limit-val">' + maxUser + '</div><div class="lic-limit-label">Utilizadores</div></div>' +
+    '<div class="lic-limit-item"><div class="lic-limit-val">' + maxDev + '</div><div class="lic-limit-label">Dispositivos</div></div>';
+  wrap.appendChild(limitsEl);
+
+  // ── Estado da licença ──
+  var statusCard = document.createElement("div");
+  statusCard.className = "lic-status-card";
+
+  var sk = await db.get("settings","storeKey");
+  var hasKey = !!(sk && sk.value);
+
+  var expDate = lic.expiresAt
+    ? new Date(lic.expiresAt).toLocaleDateString("pt-PT",{day:"2-digit",month:"long",year:"numeric"})
+    : isTrial ? "30 dias de avaliação" : "—";
+
+  statusCard.innerHTML =
+    '<div class="lic-status-title">Estado da licença</div>' +
+    licRow("Plano", plan.name + " · " + plan.price.toLocaleString() + " Kz/mês", "var(--primary)") +
+    licRow("Estado", isExpired?"Expirada":isTrial?"Avaliação":"Activa", isExpired?"var(--danger)":isTrial?"var(--warning)":"var(--success)") +
+    licRow("Validade", expDate, isExpired?"var(--danger)":warnExpiry?"var(--warning)":"var(--text)") +
+    licRow("Chave HMAC", hasKey?"Configurada":"Não configurada", hasKey?"var(--success)":"var(--danger)") +
+    licRow("Armazenamento", "Local (offline)", "var(--primary)") +
+    (lic.code ? licRow("Código", lic.code.slice(0,9)+"···", "var(--text3)") : "");
+  wrap.appendChild(statusCard);
+
+  // ── Activar / Renovar licença ──
+  var actCard = document.createElement("div");
+  actCard.className = "lic-activate-card";
+  actCard.innerHTML =
+    '<div class="lic-activate-title">' + (lic.code ? "Renovar licença" : "Activar licença") + '</div>' +
+    '<div class="lic-activate-sub">Recebeste um código da Introxeer? Insere aqui para activar ou renovar o teu plano.</div>' +
+    '<div class="field" style="margin-bottom:12px">' +
+      '<input class="lic-code-input" id="activation-code" placeholder="KTKI-XXXX-XXXX-XXXX" maxlength="19"/>' +
+    '</div>' +
+    '<button class="btn btn-primary btn-full btn-lg" onclick="window._activarLicenca()">' +
+      '<i data-lucide="zap"></i> Activar licença' +
+    '</button>';
+  wrap.appendChild(actCard);
+
+  // ── Lista de planos ──
+  var plansLabel = document.createElement("div");
+  plansLabel.className = "desp-section-label";
+  plansLabel.style.marginTop = "8px";
+  plansLabel.textContent = "Planos disponíveis";
+  wrap.appendChild(plansLabel);
+
+  var planDefs = [
+    { key:"solo",       features:["Vendas e stock","Fiados e clientes","Contabilidade","Recuperação de PIN","Suporte: documentação"] },
+    { key:"team",       features:["Tudo do Solo","Scanner QR de produtos","Suporte WhatsApp"] },
+    { key:"business",   features:["Tudo do Team","Verificação de recibo por QR"] },
+    { key:"pro",        features:["Tudo do Business","Suporte prioritário"] },
+    { key:"enterprise", features:["Tudo do Pro","Suporte dedicado"] },
+  ];
+
+  planDefs.forEach(function(pd) {
+    var p       = PLANS[pd.key];
+    var isActive = lic.plan === pd.key;
+    var maxProd  = p.maxProducts >= 999999 ? "∞" : p.maxProducts;
+    var maxUser  = p.maxUsers >= 999999 ? "∞" : p.maxUsers;
+    var maxDev   = p.maxDevices >= 999999 ? "∞" : p.maxDevices;
+
+    var card = document.createElement("div");
+    card.className = "plan-card" + (isActive ? " plan-active" : "");
+    card.innerHTML =
+      '<div class="plan-card-header">' +
+        '<div>' +
+          '<div class="plan-card-name">' + p.name + (isActive ? ' <span class="plan-card-badge">Actual</span>' : '') + '</div>' +
+        '</div>' +
+        '<div class="plan-card-price">' + p.price.toLocaleString() + ' Kz<span>/mês</span></div>' +
+      '</div>' +
+      '<div class="plan-card-limits">' +
+        '<div class="plan-card-limit">' + maxProd + ' produtos</div>' +
+        '<div class="plan-card-limit">' + maxUser + ' utilizador' + (p.maxUsers!==1?'es':'') + '</div>' +
+        '<div class="plan-card-limit">' + maxDev + ' dispositivo' + (p.maxDevices!==1?'s':'') + '</div>' +
+      '</div>' +
+      '<div class="plan-card-features">' +
+        pd.features.map(function(f) {
+          return '<div class="plan-card-feature"><i data-lucide="check"></i>' + f + '</div>';
+        }).join('') +
+      '</div>';
+    wrap.appendChild(card);
+  });
+
+  // ── Contacto ──
+  var contactEl = document.createElement("div");
+  contactEl.style.cssText = "text-align:center;padding:12px 0 20px;font-size:12px;color:var(--text4);line-height:1.6";
+  contactEl.innerHTML =
+    'Para adquirir ou renovar um plano,<br>contacta a <strong style="color:var(--primary)">Introxeer</strong> via ' +
+    '<a href="https://wa.me/244900000000" style="color:var(--primary);font-weight:700;text-decoration:none">WhatsApp</a>.';
+  wrap.appendChild(contactEl);
 
   refreshIcons(wrap);
 }
 
-function statusRow(label, value, color) {
-  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f4f4f5">' +
-    '<span style="font-size:13px;color:#71717a">'+label+'</span>' +
-    '<span style="font-size:13px;font-weight:700;color:'+color+'">'+value+'</span>' +
+function licRow(label, value, color) {
+  return '<div class="lic-status-row">' +
+    '<span class="lic-status-label">' + label + '</span>' +
+    '<span class="lic-status-val" style="color:' + color + '">' + value + '</span>' +
     '</div>';
 }
 
-window._activarLicenca = function() {
-  var code = document.getElementById("activation-code");
-  if (!code||!code.value.trim()) { toast("Insere o código de activação.","error"); return; }
-  toast("Código enviado para validação. Aguarda resposta da Introxeer Technology.","info");
+
+window._activarLicenca = async function() {
+  var input = document.getElementById("activation-code");
+  if (!input || !input.value.trim()) { toast("Insere o código de activação.", "error"); return; }
+  var btn = document.querySelector("#assinatura-content .btn-primary");
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader"></i> A validar...'; refreshIcons(btn); }
+  try {
+    var result = await activateLicense(input.value.trim());
+    toast("Plano " + result.planName + " activado!", "success");
+    await loadAssinatura();
+  } catch(err) {
+    toast(err.message, "error");
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="zap"></i> Activar licença'; refreshIcons(btn); }
+  }
 };
 
 async function loadContactos() {
@@ -872,3 +992,10 @@ window._removeLogo = async function() {
   renderLogoPreview(null);
   toast("Logótipo removido.","success");
 };
+
+function loadSenhaPage() {
+  var wrap = document.getElementById("subpage-senha");
+  if (!wrap) return;
+  var btn = document.getElementById("btn-back-senha");
+  if (btn) btn.onclick = function() { window._perfilBack(); };
+}

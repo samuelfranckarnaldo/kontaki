@@ -17,8 +17,8 @@ async function renderTurno() {
   var wrap    = document.getElementById("turno-content");
   if (!wrap) return;
 
-  var sessions = await db.getAll("sessions");
-  var sales    = await db.getAll("sales");
+  var sessions     = await db.getAll("sessions");
+  var sales        = await db.getAll("sales");
   var sessionSales = session ? sales.filter(function(s){ return s.sessionId===session.id; }) : [];
   var totalVendas  = sessionSales.reduce(function(a,s){ return a+(s.total||0); },0);
   var duration     = session ? sessionService.getTurnoDuration(session.openedAt) : null;
@@ -33,84 +33,106 @@ async function renderTurno() {
   var html = "";
 
   if (session) {
+    // ── Cabeçalho do turno activo ──
     html +=
-      '<div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);border-radius:14px;padding:16px;color:#fff;margin-bottom:12px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
-      '<div>' +
-      '<div style="font-size:11px;color:#ddd6fe;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Turno activo</div>' +
-      '<div style="font-size:20px;font-weight:700;margin-top:4px">' + user.name + '</div>' +
-      '<div style="font-size:12px;color:#ddd6fe;margin-top:4px">Desde ' + fmtDate(session.openedAt) + '</div>' +
-      '</div>' +
-      '<div style="text-align:right">' +
-      '<div style="font-size:22px;font-weight:700">' + (duration?duration.str:"") + '</div>' +
-      (duration&&duration.warn?'<div style="font-size:10px;color:#fde68a;margin-top:2px">⚠ Turno longo</div>':"") +
-      '</div></div></div>' +
+      '<div style="background:linear-gradient(135deg,#4c1d95,#6d28d9);border-radius:16px;padding:20px;color:#fff;margin-bottom:16px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">' +
+          '<div>' +
+            '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#c4b5fd;margin-bottom:6px">Turno activo</div>' +
+            '<div style="font-size:18px;font-weight:700;line-height:1.2">' + user.name + '</div>' +
+            '<div style="font-size:12px;color:#c4b5fd;margin-top:4px">desde ' + fmtDate(session.openedAt) + '</div>' +
+          '</div>' +
+          '<div style="background:rgba(255,255,255,.12);border-radius:10px;padding:8px 12px;text-align:center">' +
+            '<div style="font-size:20px;font-weight:800;line-height:1">' + (duration?duration.str:"—") + '</div>' +
+            '<div style="font-size:10px;color:#c4b5fd;margin-top:2px">duração</div>' +
+            (duration&&duration.warn?'<div style="font-size:9px;color:#fde68a;margin-top:3px">⚠ longo</div>':"") +
+          '</div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+          '<div style="background:rgba(255,255,255,.1);border-radius:10px;padding:12px">' +
+            '<div style="font-size:10px;color:#c4b5fd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Vendas</div>' +
+            '<div style="font-size:18px;font-weight:800">' + fmt(totalVendas) + '</div>' +
+            '<div style="font-size:11px;color:#c4b5fd;margin-top:2px">' + sessionSales.length + ' transacções</div>' +
+          '</div>' +
+          '<div style="background:rgba(255,255,255,.1);border-radius:10px;padding:12px">' +
+            '<div style="font-size:10px;color:#c4b5fd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">ID do turno</div>' +
+            '<div style="font-size:11px;font-weight:700;word-break:break-all;line-height:1.4;margin-top:2px">' + (session.uuid||"sem uuid...").slice(0,20) + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
 
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">' +
-      '<div class="stat-card" style="border-left:3px solid #16a34a">' +
-      '<div class="stat-label" style="color:#16a34a">Vendas</div>' +
-      '<div class="stat-val" style="color:#16a34a;font-size:15px">' + fmt(totalVendas) + '</div>' +
-      '<div style="font-size:11px;color:#71717a;margin-top:2px">' + sessionSales.length + ' transações</div>' +
-      '</div>' +
-      '<div class="stat-card" style="border-left:3px solid #5b21b6">' +
-      '<div class="stat-label" style="color:#5b21b6">UUID</div>' +
-      '<div style="font-size:10px;font-weight:600;color:#5b21b6;margin-top:4px;word-break:break-all">' +
-      (session.uuid||"sem uuid").slice(0,18) + '...</div>' +
-      '</div></div>';
-
+    // ── Aviso sem chave HMAC ──
     if (!hasStoreKey) {
-      html += '<div style="background:#fef3c7;border:1.5px solid #fde68a;border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;gap:10px">' +
-        '<i data-lucide="alert-triangle" style="width:18px;height:18px;color:#d97706;flex-shrink:0"></i>' +
-        '<div style="font-size:12px;color:#92400e;line-height:1.5"><strong>Sem chave HMAC.</strong><br/>O .ktk será exportado sem assinatura.</div>' +
+      html +=
+        '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:flex-start;gap:10px">' +
+          '<i data-lucide="alert-triangle" style="width:16px;height:16px;color:#d97706;flex-shrink:0;margin-top:1px"></i>' +
+          '<div style="font-size:12px;color:#92400e;line-height:1.5"><strong>Sem chave HMAC</strong> — o .ktk será exportado sem assinatura digital.</div>' +
         '</div>';
     }
 
+    // ── Acções ──
     html +=
-      '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">' +
-      '<button onclick="window._fecharTurno()" style="width:100%;padding:14px;background:#dc2626;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 12px rgba(220,38,38,.25)">' +
-      '<i data-lucide="log-out" style="width:18px;height:18px"></i>Fechar turno e exportar .ktk</button>' +
-      '<button onclick="window._verVendasTurno()" style="width:100%;padding:12px;background:#f4f4f5;color:#5b21b6;border:1.5px solid #ddd6fe;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">' +
-      'Ver vendas deste turno (' + sessionSales.length + ')</button>' +
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">' +
+        '<button onclick="window._fecharTurno()" style="width:100%;padding:15px;background:#dc2626;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(220,38,38,.3);letter-spacing:.2px">' +
+          '<i data-lucide="log-out" style="width:17px;height:17px"></i>Fechar turno e exportar .ktk' +
+        '</button>' +
+        '<button onclick="window._verVendasTurno()" style="width:100%;padding:13px;background:#fff;color:#5b21b6;border:1.5px solid #ddd6fe;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
+          '<i data-lucide="receipt" style="width:16px;height:16px"></i>Ver vendas deste turno (' + sessionSales.length + ')' +
+        '</button>' +
       '</div>';
+
   } else {
+    // ── Sem turno activo ──
     html +=
-      '<div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:14px;padding:20px;text-align:center;margin-bottom:14px;border:1.5px solid #bbf7d0">' +
-      '<i data-lucide="clock" style="width:36px;height:36px;color:#16a34a;margin-bottom:10px"></i>' +
-      '<div style="font-size:15px;font-weight:700;color:#15803d;margin-bottom:6px">Nenhum turno activo</div>' +
-      '<div style="font-size:13px;color:#16a34a;margin-bottom:14px">Inicia um novo turno para começar a vender</div>' +
-      '<button onclick="window._abrirTurno()" style="padding:13px 28px;background:#16a34a;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">' +
-      '<i data-lucide="play" style="width:16px;height:16px;vertical-align:middle;margin-right:6px"></i>Abrir Turno</button>' +
+      '<div style="background:#fff;border:1.5px solid #e4e4e7;border-radius:16px;padding:28px 20px;text-align:center;margin-bottom:16px">' +
+        '<div style="width:52px;height:52px;background:#f4f4f5;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px">' +
+          '<i data-lucide="timer" style="width:24px;height:24px;color:#71717a"></i>' +
+        '</div>' +
+        '<div style="font-size:15px;font-weight:700;color:#18181b;margin-bottom:6px">Nenhum turno activo</div>' +
+        '<div style="font-size:13px;color:#71717a;margin-bottom:18px;line-height:1.5">Abre um turno para começar<br>a registar vendas e despesas.</div>' +
+        '<button onclick="window._abrirTurno()" style="padding:13px 28px;background:#5b21b6;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(91,33,182,.25)">' +
+          '<i data-lucide="play" style="width:16px;height:16px"></i>Abrir turno' +
+        '</button>' +
       '</div>';
   }
 
-  // Importar KTK — disponível para todos os roles
+  // ── Importar KTK ──
   html +=
-    '<div style="margin-bottom:14px">' +
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Importar ficheiro .ktk</div>' +
-    '<label style="display:flex;align-items:center;justify-content:center;gap:10px;padding:16px;border:2px dashed #ddd6fe;border-radius:12px;background:#faf5ff;cursor:pointer">' +
-    '<i data-lucide="upload" style="width:20px;height:20px;color:#5b21b6"></i>' +
-    '<span style="font-size:14px;font-weight:600;color:#5b21b6">Importar .ktk</span>' +
-    '<input type="file" accept=".ktk,.json" style="display:none" onchange="window._handleKtkImport(this)"/>' +
-    '</label></div>';
+    '<div style="margin-bottom:20px">' +
+      '<div style="font-size:11px;font-weight:700;color:#a1a1aa;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Importar ficheiro .ktk</div>' +
+      '<label style="display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;border:1.5px dashed #ddd6fe;border-radius:12px;background:#faf5ff;cursor:pointer;transition:background .2s">' +
+        '<i data-lucide="upload" style="width:18px;height:18px;color:#7c3aed"></i>' +
+        '<span style="font-size:13px;font-weight:600;color:#7c3aed">Seleccionar ficheiro .ktk</span>' +
+        '<input type="file" accept=".ktk,.json" style="display:none" onchange="window._handleKtkImport(this)"/>' +
+      '</label>' +
+    '</div>';
 
-  // Turnos anteriores
+  // ── Turnos anteriores ──
   if (closedSessions.length) {
-    html += '<div><div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Turnos anteriores</div>';
+    html += '<div><div style="font-size:11px;font-weight:700;color:#a1a1aa;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Turnos anteriores</div>';
     closedSessions.forEach(function(s) {
-      var color = s.validated?"#16a34a":s.hasIncidents?"#dc2626":"#5b21b6";
-      var label = s.validated?"Validado":s.hasIncidents?"Com incidentes":s.isImported?"Importado":"Fechado";
-      var bg    = s.validated?"#dcfce7":s.hasIncidents?"#fee2e2":"#ede9fe";
+      var isValidated  = s.validated;
+      var hasIncidents = s.hasIncidents;
+      var isImported   = s.isImported;
+      var color  = isValidated?"#16a34a":hasIncidents?"#dc2626":"#5b21b6";
+      var bgPill = isValidated?"#dcfce7":hasIncidents?"#fee2e2":"#ede9fe";
+      var label  = isValidated?"Validado":hasIncidents?"Com incidentes":isImported?"Importado":"Fechado";
       html +=
-        '<div style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;border-left:4px solid '+color+';box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center">' +
-        '<div>' +
-        '<div style="font-size:14px;font-weight:700">' + (s.userName||"Desconhecido") + '</div>' +
-        '<div style="font-size:11px;color:#71717a;margin-top:2px">' + fmtDate(s.openedAt) + (s.closedAt?" → "+fmtDate(s.closedAt):"") + '</div>' +
-        '</div>' +
-        '<div style="text-align:right">' +
-        '<div style="font-size:14px;font-weight:700;color:#16a34a">' + fmt(s.totalVendas||0) + '</div>' +
-        '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+bg+';color:'+color+'">' + label + '</span>' +
-        '</div></div></div>';
+        '<div style="background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:8px;border:1px solid #f4f4f5;box-shadow:0 1px 3px rgba(0,0,0,.05);display:flex;align-items:center;gap:12px">' +
+          '<div style="width:36px;height:36px;border-radius:10px;background:' + bgPill + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+            '<i data-lucide="' + (isValidated?"shield-check":hasIncidents?"alert-circle":"clock") + '" style="width:16px;height:16px;color:' + color + '"></i>' +
+          '</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-size:13px;font-weight:700;color:#18181b">' + (s.userName||"Desconhecido") + '</div>' +
+            '<div style="font-size:11px;color:#a1a1aa;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
+              fmtDate(s.openedAt) + (s.closedAt?" → "+fmtDate(s.closedAt):"") +
+            '</div>' +
+          '</div>' +
+          '<div style="text-align:right;flex-shrink:0">' +
+            '<div style="font-size:14px;font-weight:700;color:#16a34a">' + fmt(s.totalVendas||0) + '</div>' +
+            '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:' + bgPill + ';color:' + color + '">' + label + '</span>' +
+          '</div>' +
+        '</div>';
     });
     html += '</div>';
   }

@@ -5,9 +5,7 @@ import { openModal, closeModal } from "../modal.js";
 
 export async function loadClientes() {
   var btn = document.getElementById("btn-back-clientes");
-  if (btn) btn.onclick = function() {
-    document.getElementById("subpage-clientes").style.display = "none";
-  };
+  if (btn) btn.onclick = function() { window._perfilBack(); };
   await renderClientes();
 }
 
