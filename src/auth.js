@@ -36,6 +36,17 @@ async function _renderLoginUsers() {
   const storeName = document.getElementById("login-store-name");
   if (storeName && store) storeName.textContent = store.name || "Kontaki";
 
+  const logoWrap = document.getElementById("login-logo-wrap");
+  if (logoWrap && store && store.logo) {
+    logoWrap.innerHTML = "";
+    logoWrap.className = "";
+    var img = document.createElement("img");
+    img.src = store.logo;
+    img.className = "login-store-logo";
+    img.alt = store.name || "Logo";
+    logoWrap.appendChild(img);
+  }
+
   const list = document.getElementById("login-users-list");
   if (!list) return;
 

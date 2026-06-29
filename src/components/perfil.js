@@ -344,10 +344,56 @@ async function loadLoja() {
     if (el2) el2.value = val;
   });
   if (s.logo) renderLogoPreview(s.logo);
+
+  var upload = document.getElementById("logo-upload");
+  if (upload) {
+    upload.onchange = function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = async function(ev) {
+        var dataUrl = ev.target.result;
+        var existing = (await db.get("settings", "store")) || {};
+        await db.put("settings", Object.assign({}, existing, { key: "store", logo: dataUrl }));
+        renderLogoPreview(dataUrl);
+        toast("Logo guardado.", "success");
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+
+  var removeBtn = document.getElementById("btn-remove-logo");
+  if (removeBtn) {
+    removeBtn.onclick = async function() {
+      var existing = (await db.get("settings", "store")) || {};
+      await db.put("settings", Object.assign({}, existing, { key: "store", logo: null }));
+      var prev = document.getElementById("logo-preview");
+  var img  = document.getElementById("logo-img");
+  if (prev && img) {
+    img.src = dataUrl;
+    prev.style.display = "block";
+    return;
+  }
+      if (prev) prev.style.display = "none";
+      toast("Logo removido.", "success");
+    };
+  }
 }
 
 async function saveStoreSettings() {
-  await db.put("settings", { key: "store", name: val("ss-name"), address: val("ss-addr"), phone: val("ss-phone") });
+  var existing = (await db.get("settings", "store")) || {};
+  var ivaRaw = val("ss-iva").replace(",", ".");
+  var ivaVal = parseFloat(ivaRaw);
+  await db.put("settings", Object.assign({}, existing, {
+    key:      "store",
+    name:     val("ss-name"),
+    address:  val("ss-addr"),
+    phone:    val("ss-phone"),
+    province: val("ss-province"),
+    nif:      val("ss-nif"),
+    email:    val("ss-email"),
+    iva:      isNaN(ivaVal) ? 0 : ivaVal
+  }));
   toast("Dados guardados.", "success");
 }
 
@@ -978,6 +1024,12 @@ window._uploadLogo = function(input) {
 
 function renderLogoPreview(dataUrl) {
   var prev = document.getElementById("logo-preview");
+  var img  = document.getElementById("logo-img");
+  if (prev && img) {
+    img.src = dataUrl;
+    prev.style.display = "block";
+    return;
+  }
   if (!prev) return;
   if (dataUrl) {
     prev.innerHTML = '<div style="display:flex;align-items:center;gap:10px;background:#f4f4f5;border-radius:10px;padding:8px"><img src="' + dataUrl + '" style="width:48px;height:48px;object-fit:contain;border-radius:8px;background:#fff"/><button onclick="window._removeLogo()" style="background:none;border:none;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Remover</button></div>';

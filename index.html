@@ -25,9 +25,9 @@
 <div id="login-page">
   <div class="login-box">
     <div class="login-logo">
-      <div class="login-logo-mark"><i data-lucide="zap"></i></div>
+      <div id="login-logo-wrap"><div class="login-brand-text">Kontaki</div></div>
       <h1>Kontaki</h1>
-      <p id="login-store-name"> </p>
+      <p id="login-store-name" class="login-store-name-text"></p>
     </div>
 
     <!-- STEP 1: Selecciona utilizador -->
@@ -307,14 +307,46 @@ document.addEventListener("DOMContentLoaded", function() {
         <div class="page-inner">
           <button class="btn btn-ghost btn-sm" id="btn-back-loja">← Voltar</button>
           <div style="font-size:17px;font-weight:700;margin:8px 0 16px">Dados da Loja</div>
-          <div class="vender-card" style="display:flex;flex-direction:column;gap:14px">
-            <div class="field"><label>Nome da Loja</label><input id="ss-name"/></div>
-            <div class="field"><label>Endereço</label><input id="ss-addr"/></div>
-            <div class="field"><label>Telefone</label><input id="ss-phone"/></div>
-            <button class="btn btn-primary btn-full" id="btn-save-loja">
-              <i data-lucide="save"></i> Guardar
-            </button>
+
+          <div class="card" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px">
+            <div class="field"><label>Nome da Loja</label><input id="ss-name" placeholder="Ex: Mercearia da Maria"/></div>
+            <div class="field"><label>Telefone</label><input id="ss-phone" type="tel" placeholder="Ex: 923 000 000"/></div>
+            <div class="field"><label>Email</label><input id="ss-email" type="email" placeholder="Ex: loja@email.com"/></div>
+            <div class="field"><label>Endereço</label><input id="ss-addr" placeholder="Ex: Rua X, Bairro Y"/></div>
+            <div class="field"><label>Província</label>
+              <select id="ss-province">
+                <option value="">Seleccionar...</option>
+                <option>Bengo</option><option>Benguela</option><option>Bié</option>
+                <option>Cabinda</option><option>Cuando Cubango</option><option>Cuanza Norte</option>
+                <option>Cuanza Sul</option><option>Cunene</option><option>Huambo</option>
+                <option>Huíla</option><option>Luanda</option><option>Lunda Norte</option>
+                <option>Lunda Sul</option><option>Malanje</option><option>Moxico</option>
+                <option>Namibe</option><option>Uíge</option><option>Zaire</option>
+              </select>
+            </div>
+            <div class="field"><label>NIF</label><input id="ss-nif" placeholder="Ex: 5000000000LA041"/></div>
+            <div class="field"><label>IVA (%)</label><input id="ss-iva" type="number" min="0" max="100" step="0.1" placeholder="0 = sem IVA"/></div>
           </div>
+
+          <div class="card" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
+            <div style="font-size:13px;font-weight:700;color:var(--text2)">Logo da Loja</div>
+            <div id="logo-preview" style="display:none;margin-bottom:4px">
+              <img id="logo-img" style="width:80px;height:80px;object-fit:contain;border-radius:12px;border:1px solid var(--border)"/>
+            </div>
+            <div style="display:flex;gap:8px">
+              <label class="btn btn-outline btn-sm" style="cursor:pointer;flex:1;justify-content:center">
+                <i data-lucide="upload"></i> Carregar logo
+                <input type="file" id="logo-upload" accept="image/*" style="display:none"/>
+              </label>
+              <button class="btn btn-ghost btn-sm" id="btn-remove-logo" style="color:var(--danger)">
+                <i data-lucide="trash-2"></i>
+              </button>
+            </div>
+          </div>
+
+          <button class="btn btn-primary btn-full" id="btn-save-loja">
+            <i data-lucide="save"></i> Guardar
+          </button>
         </div>
       </div>
 
