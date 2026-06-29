@@ -1772,3 +1772,115 @@
   font-weight: 500;
   margin-top: 4px;
 }
+
+/* ── LOJA SUBPAGE REDESIGN ──────────────────────────────────────────────────── */
+.loja-section-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  margin: 4px 0 20px;
+}
+.loja-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  margin: 20px 0 8px;
+}
+.loja-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 4px 16px;
+  display: flex;
+  flex-direction: column;
+}
+.loja-card .field {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border2);
+  margin: 0;
+}
+.loja-card .field:last-child {
+  border-bottom: none;
+}
+.loja-card .field label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 4px;
+  display: block;
+}
+.loja-card .field input,
+.loja-card .field select {
+  border: none;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  background: transparent;
+  width: 100%;
+  outline: none;
+  font-family: var(--font);
+}
+.loja-card .field input::placeholder { color: var(--text4); }
+.field-required { color: var(--danger); margin-left: 2px; }
+.field-hint {
+  font-size: 11px;
+  color: var(--text4);
+  margin-top: 4px;
+  display: block;
+}
+
+/* Logo card */
+.loja-logo-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+.loja-logo-left { flex-shrink: 0; }
+.logo-preview-wrap { display: none; }
+.logo-preview-img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.logo-placeholder {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius);
+  border: 2px dashed var(--border);
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text4);
+}
+.logo-placeholder i, .logo-placeholder svg { width: 28px; height: 28px; }
+.loja-logo-right { flex: 1; min-width: 0; }
+.loja-logo-hint {
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.5;
+  margin: 2px 0 10px;
+}
+.loja-logo-actions { display: flex; gap: 8px; }
+.logo-upload-label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.btn-remove-logo { color: var(--danger) !important; }

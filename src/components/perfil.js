@@ -364,19 +364,7 @@ async function loadLoja() {
 
   var removeBtn = document.getElementById("btn-remove-logo");
   if (removeBtn) {
-    removeBtn.onclick = async function() {
-      var existing = (await db.get("settings", "store")) || {};
-      await db.put("settings", Object.assign({}, existing, { key: "store", logo: null }));
-      var prev = document.getElementById("logo-preview");
-  var img  = document.getElementById("logo-img");
-  if (prev && img) {
-    img.src = dataUrl;
-    prev.style.display = "block";
-    return;
-  }
-      if (prev) prev.style.display = "none";
-      toast("Logo removido.", "success");
-    };
+    removeBtn.onclick = window._removeLogo;
   }
 }
 
@@ -1023,18 +1011,18 @@ window._uploadLogo = function(input) {
 };
 
 function renderLogoPreview(dataUrl) {
-  var prev = document.getElementById("logo-preview");
-  var img  = document.getElementById("logo-img");
-  if (prev && img) {
-    img.src = dataUrl;
-    prev.style.display = "block";
-    return;
-  }
-  if (!prev) return;
+  var prev        = document.getElementById("logo-preview");
+  var img         = document.getElementById("logo-img");
+  var placeholder = document.getElementById("logo-placeholder");
+
   if (dataUrl) {
-    prev.innerHTML = '<div style="display:flex;align-items:center;gap:10px;background:#f4f4f5;border-radius:10px;padding:8px"><img src="' + dataUrl + '" style="width:48px;height:48px;object-fit:contain;border-radius:8px;background:#fff"/><button onclick="window._removeLogo()" style="background:none;border:none;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Remover</button></div>';
+    if (img)         { img.src = dataUrl; }
+    if (prev)        { prev.style.display = "block"; }
+    if (placeholder) { placeholder.style.display = "none"; }
   } else {
-    prev.innerHTML = "";
+    if (img)         { img.src = ""; }
+    if (prev)        { prev.style.display = "none"; }
+    if (placeholder) { placeholder.style.display = "flex"; }
   }
 }
 

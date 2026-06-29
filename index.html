@@ -26,7 +26,7 @@
   <div class="login-box">
     <div class="login-logo">
       <div id="login-logo-wrap"><div class="login-brand-text">Kontaki</div></div>
-      <h1>Kontaki</h1>
+
       <p id="login-store-name" class="login-store-name-text"></p>
     </div>
 
@@ -303,17 +303,60 @@ document.addEventListener("DOMContentLoaded", function() {
         </div>
       </div>
 
-      <div id="subpage-loja" style="display:none">
+      <div id="subpage-loja" class="subpage" style="display:none">
         <div class="page-inner">
           <button class="btn btn-ghost btn-sm" id="btn-back-loja">← Voltar</button>
-          <div style="font-size:17px;font-weight:700;margin:8px 0 16px">Dados da Loja</div>
 
-          <div class="card" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px">
-            <div class="field"><label>Nome da Loja</label><input id="ss-name" placeholder="Ex: Mercearia da Maria"/></div>
-            <div class="field"><label>Telefone</label><input id="ss-phone" type="tel" placeholder="Ex: 923 000 000"/></div>
-            <div class="field"><label>Email</label><input id="ss-email" type="email" placeholder="Ex: loja@email.com"/></div>
-            <div class="field"><label>Endereço</label><input id="ss-addr" placeholder="Ex: Rua X, Bairro Y"/></div>
-            <div class="field"><label>Província</label>
+          <div class="loja-section-title">Dados da Loja</div>
+
+          <div class="loja-logo-card">
+            <div class="loja-logo-left">
+              <div id="logo-preview" class="logo-preview-wrap">
+                <img id="logo-img" class="logo-preview-img" alt="Logo"/>
+              </div>
+              <div id="logo-placeholder" class="logo-placeholder">
+                <i data-lucide="image"></i>
+              </div>
+            </div>
+            <div class="loja-logo-right">
+              <div class="loja-card-title">Logo da Loja</div>
+              <div class="loja-logo-hint">PNG ou JPG · máx. 2MB<br/>Aparece nos recibos e no login</div>
+              <div class="loja-logo-actions">
+                <label class="btn btn-outline btn-sm logo-upload-label">
+                  <i data-lucide="upload"></i> Carregar
+                  <input type="file" id="logo-upload" accept="image/png,image/jpeg,image/jpg,image/webp" style="display:none"/>
+                </label>
+                <button class="btn btn-ghost btn-sm btn-remove-logo" id="btn-remove-logo">
+                  <i data-lucide="trash-2"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="loja-group-label">Informação Básica</div>
+          <div class="loja-card">
+            <div class="field">
+              <label>Nome da Loja <span class="field-required">*</span></label>
+              <input id="ss-name" placeholder="Ex: Mercearia Central"/>
+            </div>
+            <div class="field">
+              <label>Telefone</label>
+              <input id="ss-phone" type="tel" placeholder="Ex: 923 000 000"/>
+            </div>
+            <div class="field">
+              <label>Email</label>
+              <input id="ss-email" type="email" placeholder="Ex: loja@email.com"/>
+            </div>
+          </div>
+
+          <div class="loja-group-label">Localização</div>
+          <div class="loja-card">
+            <div class="field">
+              <label>Endereço</label>
+              <input id="ss-addr" placeholder="Ex: Rua X, Bairro Y"/>
+            </div>
+            <div class="field">
+              <label>Província</label>
               <select id="ss-province">
                 <option value="">Seleccionar...</option>
                 <option>Bengo</option><option>Benguela</option><option>Bié</option>
@@ -324,28 +367,23 @@ document.addEventListener("DOMContentLoaded", function() {
                 <option>Namibe</option><option>Uíge</option><option>Zaire</option>
               </select>
             </div>
-            <div class="field"><label>NIF</label><input id="ss-nif" placeholder="Ex: 5000000000LA041"/></div>
-            <div class="field"><label>IVA (%)</label><input id="ss-iva" type="number" min="0" max="100" step="0.1" placeholder="0 = sem IVA"/></div>
           </div>
 
-          <div class="card" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
-            <div style="font-size:13px;font-weight:700;color:var(--text2)">Logo da Loja</div>
-            <div id="logo-preview" style="display:none;margin-bottom:4px">
-              <img id="logo-img" style="width:80px;height:80px;object-fit:contain;border-radius:12px;border:1px solid var(--border)"/>
+          <div class="loja-group-label">Informação Fiscal</div>
+          <div class="loja-card">
+            <div class="field">
+              <label>NIF</label>
+              <input id="ss-nif" placeholder="Ex: 5000000000LA041"/>
             </div>
-            <div style="display:flex;gap:8px">
-              <label class="btn btn-outline btn-sm" style="cursor:pointer;flex:1;justify-content:center">
-                <i data-lucide="upload"></i> Carregar logo
-                <input type="file" id="logo-upload" accept="image/*" style="display:none"/>
-              </label>
-              <button class="btn btn-ghost btn-sm" id="btn-remove-logo" style="color:var(--danger)">
-                <i data-lucide="trash-2"></i>
-              </button>
+            <div class="field">
+              <label>IVA (%)</label>
+              <input id="ss-iva" type="number" min="0" max="100" step="0.1" placeholder="0"/>
+              <span class="field-hint">Deixar 0 se não aplicar IVA</span>
             </div>
           </div>
 
           <button class="btn btn-primary btn-full" id="btn-save-loja">
-            <i data-lucide="save"></i> Guardar
+            <i data-lucide="save"></i> Guardar Dados
           </button>
         </div>
       </div>
