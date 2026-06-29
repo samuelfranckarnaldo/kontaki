@@ -225,26 +225,45 @@ document.addEventListener("DOMContentLoaded", function() {
 
     <!-- HISTÓRICO -->
     <div class="page" id="pg-historico">
-      <div class="page-inner">
-        <div style="display:flex;gap:8px;align-items:flex-end">
-          <div class="field" style="flex:1">
-            <label>De</label>
-            <input type="date" id="hist-from" class="date-input"/>
+
+      <div class="hist-filter-bar">
+        <div class="hist-date-shortcuts">
+          <button class="hist-shortcut active" id="hist-sc-hoje" onclick="window._histShortcut('hoje',this)">Hoje</button>
+          <button class="hist-shortcut" id="hist-sc-semana" onclick="window._histShortcut('semana',this)">Semana</button>
+          <button class="hist-shortcut" id="hist-sc-mes" onclick="window._histShortcut('mes',this)">Mês</button>
+          <button class="hist-shortcut" id="hist-sc-custom" onclick="window._histShortcut('custom',this)">Personalizado</button>
+        </div>
+        <div class="hist-date-inputs" id="hist-date-inputs" style="display:none">
+          <div class="hist-date-field">
+            <span class="hist-date-label">De</span>
+            <input type="date" id="hist-from" class="hist-date-input"/>
           </div>
-          <div class="field" style="flex:1">
-            <label>Até</label>
-            <input type="date" id="hist-to" class="date-input"/>
+          <div class="hist-date-sep">→</div>
+          <div class="hist-date-field">
+            <span class="hist-date-label">Até</span>
+            <input type="date" id="hist-to" class="hist-date-input"/>
           </div>
           <button class="btn btn-primary btn-sm" id="btn-hist-filter">
             <i data-lucide="search"></i>
           </button>
         </div>
-        <div style="background:#f4f4f5;border-radius:10px;padding:4px;display:flex;gap:2px;margin-top:4px" id="historico-tabs"></div>
-        <div id="historico-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px"></div>
-        <div id="historico-chart" class="vender-card" style="display:none;margin-top:0"></div>
-        <button id="btn-export-csv" class="btn btn-ghost btn-full btn-sm" style="display:none;margin-top:0"><i data-lucide="download"></i> Exportar CSV</button>
-        <button id="btn-export-pdf" class="btn btn-ghost btn-full btn-sm" style="display:none;margin-top:4px;color:#dc2626;border-color:#fca5a5"><i data-lucide="file-text"></i> Relatório PDF mensal</button>
-        <div class="list-card" style="margin-top:0" id="historico-list"></div>
+      </div>
+
+      <div class="hist-tabs" id="historico-tabs"></div>
+
+      <div class="hist-content">
+        <div id="historico-hero" class="hist-hero" style="display:none"></div>
+        <div id="historico-stats" class="hist-stats-grid"></div>
+        <div id="historico-chart" class="hist-chart-wrap" style="display:none"></div>
+        <div class="hist-actions" id="hist-actions" style="display:none">
+          <button id="btn-export-csv" class="btn btn-ghost btn-sm btn-full">
+            <i data-lucide="download"></i> Exportar CSV
+          </button>
+          <button id="btn-export-pdf" class="btn btn-ghost btn-sm btn-full hist-btn-pdf">
+            <i data-lucide="file-text"></i> Relatório PDF mensal
+          </button>
+        </div>
+        <div id="historico-list" class="hist-list"></div>
       </div>
     </div>
 

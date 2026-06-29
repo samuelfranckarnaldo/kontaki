@@ -7,14 +7,33 @@ import { printRecibo }                  from "../print.js";
 import { openDevolucao, gerarRelatorioPDF } from "./extras.js";
 
 let activeTab = "geral";
+let activeShortcut = "hoje";
 
-function toLocalDateStr(isoString) {
-  if (!isoString) return "";
-  var d = new Date(isoString);
-  var y = d.getFullYear();
-  var m = String(d.getMonth()+1).padStart(2,"0");
-  var day = String(d.getDate()).padStart(2,"0");
-  return y + "-" + m + "-" + day;
+function toLocalDateStr(iso) {
+  if (!iso) return "";
+  var d = new Date(iso);
+  return d.getFullYear() + "-" +
+    String(d.getMonth()+1).padStart(2,"0") + "-" +
+    String(d.getDate()).padStart(2,"0");
+}
+
+function getShortcutDates(sc) {
+  var now = new Date();
+  var y = now.getFullYear();
+  var m = now.getMonth();
+  var d = now.getDate();
+  var t = today();
+  if (sc === "hoje")   return { from: t, to: t };
+  if (sc === "semana") {
+    var day = now.getDay();
+    var diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    var mon = new Date(now.setDate(diff));
+    return { from: toLocalDateStr(mon.toISOString()), to: today() };
+  }
+  if (sc === "mes") {
+    return { from: y+"-"+String(m+1).padStart(2,"0")+"-01", to: t };
+  }
+  return null;
 }
 
 export async function initHistorico() {
@@ -23,410 +42,484 @@ export async function initHistorico() {
   el("btn-hist-filter").onclick = loadData;
 
   renderTabs();
-  await loadData();
+  applyShortcut("hoje");
+}
+
+window._histShortcut = function(sc, btn) {
+  activeShortcut = sc;
+  document.querySelectorAll(".hist-shortcut").forEach(function(b) {
+    b.classList.remove("active");
+  });
+  if (btn) btn.classList.add("active");
+
+  var dateInputs = el("hist-date-inputs");
+  if (sc === "custom") {
+    if (dateInputs) dateInputs.style.display = "flex";
+  } else {
+    if (dateInputs) dateInputs.style.display = "none";
+    applyShortcut(sc);
+  }
+};
+
+function applyShortcut(sc) {
+  var dates = getShortcutDates(sc);
+  if (!dates) return;
+  setVal("hist-from", dates.from);
+  setVal("hist-to",   dates.to);
+  loadData();
 }
 
 function renderTabs() {
-  const tabs = [
-    { id:"geral",    label:"Geral"    },
-    { id:"stock",    label:"Stock"    },
-    { id:"auditoria",label:"Auditoria"},
+  var tabs = [
+    { id:"geral",     label:"Geral"     },
+    { id:"stock",     label:"Stock"     },
+    { id:"auditoria", label:"Auditoria" },
   ];
-
-  const wrap = el("historico-tabs");
+  var wrap = el("historico-tabs");
   if (!wrap) return;
-
-  wrap.innerHTML = tabs.map(t =>
-    '<button onclick="window._histTab(\'' + t.id + '\')" ' +
-    'style="flex:1;padding:9px;border:none;border-radius:8px;font-family:inherit;' +
-    'font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;' +
-    'background:' + (activeTab===t.id?"#5b21b6":"transparent") + ';' +
-    'color:' + (activeTab===t.id?"#fff":"#71717a") + '">' +
-    t.label + '</button>'
-  ).join("");
+  wrap.innerHTML = tabs.map(function(t) {
+    return '<button class="hist-tab' + (activeTab===t.id?" active":"") + '" onclick="window._histTab(\'' + t.id + '\')">' + t.label + '</button>';
+  }).join("");
 }
 
-window._histTab = async (tab) => {
+window._histTab = async function(tab) {
   activeTab = tab;
   renderTabs();
   await loadData();
 };
 
 async function loadData() {
-  const from = val("hist-from");
-  const to   = val("hist-to");
-
+  var from = val("hist-from");
+  var to   = val("hist-to");
   if (activeTab === "geral")     await loadGeral(from, to);
   if (activeTab === "stock")     await loadStock(from, to);
   if (activeTab === "auditoria") await loadAuditoria(from, to);
 }
 
 // ── GERAL ─────────────────────────────────────────────────────────────────────
-async function loadGeral(from, to) {
-  const sales   = await db.getAll("sales");
-  const fiados  = await db.getAll("fiado");
-  const incidents = await db.getAll("incidents");
+function payIcon(method) {
+  if (!method) return "💵";
+  var m = method.toLowerCase();
+  if (m.includes("dinheiro") || m.includes("cash"))  return "💵";
+  if (m.includes("transfer") || m.includes("banco")) return "🏦";
+  if (m.includes("fiado") || m.includes("crédito"))  return "📋";
+  return "💳";
+}
 
-  const filtered = sales.filter(function(s) {
-    const d = toLocalDateStr(s.date);
+function payClass(method) {
+  if (!method) return "hist-sale-avatar--dinheiro";
+  var m = method.toLowerCase();
+  if (m.includes("dinheiro") || m.includes("cash"))  return "hist-sale-avatar--dinheiro";
+  if (m.includes("transfer") || m.includes("banco")) return "hist-sale-avatar--transferencia";
+  if (m.includes("fiado") || m.includes("crédito"))  return "hist-sale-avatar--fiado";
+  return "hist-sale-avatar--outros";
+}
+
+async function loadGeral(from, to) {
+  var sales    = await db.getAll("sales");
+  var fiados   = await db.getAll("fiado");
+  var incidents = await db.getAll("incidents");
+
+  var filtered = sales.filter(function(s) {
+    var d = toLocalDateStr(s.date);
     return d >= from && d <= to;
   }).reverse();
 
-  const total    = filtered.reduce(function(a,s) { return a+((s.total||0)-(s.totalDevolvido||0)); }, 0);
-  const byM      = {};
-  filtered.forEach(function(s) { byM[s.payMethod] = (byM[s.payMethod]||0) + s.total; });
+  var total     = filtered.reduce(function(a,s) { return a+((s.total||0)-(s.totalDevolvido||0)); }, 0);
+  var nVendas   = filtered.length;
+  var ticket    = nVendas > 0 ? total / nVendas : 0;
+  var fiadoAb   = fiados.filter(function(f) { return f.status==="open"; })
+                    .reduce(function(a,f) { return a+(f.amount||0); }, 0);
+  var devTotal  = filtered.reduce(function(a,s) { return a+(s.totalDevolvido||0); }, 0);
+  var incOpen   = incidents.filter(function(i) { return i.status==="open"; }).length;
 
-  const fiadoAberto = fiados.filter(function(f) { return f.status==="open"; })
-    .reduce(function(a,f) { return a+(f.amount||0); }, 0);
-
-  const incOpen = incidents.filter(function(i) { return i.status==="open"; }).length;
-
-  // Stats
-  let statsHtml =
-    '<div class="stat-card" style="border-left:3px solid #16a34a">' +
-    '<div class="stat-label" style="color:#16a34a">Total período</div>' +
-    '<div class="stat-val" style="color:#16a34a;font-size:16px">' + fmt(total) + '</div>' +
-    '</div>' +
-    '<div class="stat-card" style="border-left:3px solid #5b21b6">' +
-    '<div class="stat-label" style="color:#5b21b6">Nº vendas</div>' +
-    '<div class="stat-val" style="color:#5b21b6">' + filtered.length + '</div>' +
-    '</div>' +
-    '<div class="stat-card" style="border-left:3px solid #d97706">' +
-    '<div class="stat-label" style="color:#d97706">Fiado aberto</div>' +
-    '<div class="stat-val" style="color:#d97706;font-size:14px">' + fmt(fiadoAberto) + '</div>' +
-    '</div>' +
-    '<div class="stat-card" style="border-left:3px solid #dc2626">' +
-    '<div class="stat-label" style="color:#dc2626">Incidentes</div>' +
-    '<div class="stat-val" style="color:#dc2626">' + incOpen + '</div>' +
-    '</div>';
-
-  el("historico-stats").innerHTML = statsHtml;
-
-  // Gráfico
-  if (filtered.length > 0) {
-    const byDay = {};
-    filtered.forEach(function(s) {
-      const d = (s.date || "").split("T")[0];
-      byDay[d] = (byDay[d]||0) + s.total;
-    });
-    const days = Object.keys(byDay).sort();
-    const maxV = Math.max.apply(null, Object.values(byDay).concat([1]));
-
-    el("historico-chart").style.display = "block";
-    el("historico-chart").innerHTML =
-      '<div style="font-size:11px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Vendas por dia</div>' +
-      '<div style="display:flex;align-items:flex-end;gap:4px;height:80px">' +
-      days.map(function(d) {
-        const pct   = Math.max(6, Math.round((byDay[d]/maxV)*100));
-        const label = d.slice(5);
-        return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">' +
-          '<div style="font-size:9px;color:#71717a">' + fmt(byDay[d]).split(" ")[0] + '</div>' +
-          '<div style="width:100%;background:#5b21b6;border-radius:4px 4px 0 0;height:' + pct + '%"></div>' +
-          '<div style="font-size:9px;color:#71717a;white-space:nowrap">' + label + '</div>' +
-          '</div>';
-      }).join("") +
-      '</div>';
-  } else {
-    el("historico-chart").style.display = "none";
+  // Hero
+  var hero = el("historico-hero");
+  if (hero) {
+    hero.style.display = "block";
+    hero.innerHTML =
+      '<div class="hist-hero-label">Total do período</div>' +
+      '<div class="hist-hero-val">' + fmt(total) + '</div>' +
+      '<div class="hist-hero-sub">' + nVendas + ' ' + (nVendas===1?"venda":"vendas") + ' · ticket médio ' + fmt(ticket) + '</div>';
   }
 
-  // Botão exportar
-  const exportBtn = el("btn-export-csv");
-  if (exportBtn) {
-    exportBtn.style.display = "block";
-    exportBtn.onclick = function() { exportCSV(filtered); };
+  // KPIs
+  var stats = el("historico-stats");
+  if (stats) {
+    stats.innerHTML =
+      kpi("Nº Vendas",     nVendas,         "var(--primary)",  "") +
+      kpi("Ticket Médio",  fmt(ticket),     "var(--info)",     "") +
+      kpi("Fiado Aberto",  fmt(fiadoAb),    "var(--warning)",  "") +
+      kpi("Devoluções",    fmt(devTotal),   devTotal>0?"var(--danger)":"var(--success)", incOpen+" incidente"+(incOpen===1?"":"s"));
+  }
+
+  // Gráfico
+  var chart = el("historico-chart");
+  if (chart) {
+    if (filtered.length > 0) {
+      var byDay = {};
+      filtered.forEach(function(s) {
+        var d = (s.date||"").split("T")[0];
+        byDay[d] = (byDay[d]||0) + ((s.total||0)-(s.totalDevolvido||0));
+      });
+      var days = Object.keys(byDay).sort();
+      var maxV = Math.max.apply(null, Object.values(byDay).concat([1]));
+      chart.style.display = "block";
+      chart.innerHTML =
+        '<div class="hist-chart-title">Vendas por dia</div>' +
+        '<div class="hist-chart-bars">' +
+        days.map(function(d) {
+          var pct = Math.max(4, Math.round((byDay[d]/maxV)*100));
+          return '<div class="hist-chart-col">' +
+            '<div class="hist-chart-bar" style="height:' + pct + '%"></div>' +
+            '<div class="hist-chart-day">' + d.slice(5) + '</div>' +
+            '</div>';
+        }).join("") +
+        '</div>';
+    } else {
+      chart.style.display = "none";
+    }
+  }
+
+  // Acções
+  var actions = el("hist-actions");
+  if (actions) {
+    actions.style.display = filtered.length > 0 ? "flex" : "none";
+    var exportBtn = el("btn-export-csv");
+    if (exportBtn) exportBtn.onclick = function() { exportCSV(filtered); };
+    var pdfBtn = el("btn-export-pdf");
+    if (pdfBtn) {
+      pdfBtn.style.display = getUser().role==="admin" ? "flex" : "none";
+      pdfBtn.onclick = function() { gerarRelatorioPDF(); };
+    }
   }
 
   // Lista
+  var list = el("historico-list");
+  if (!list) return;
+
   if (!filtered.length) {
-    el("historico-list").innerHTML =
-      '<div class="empty-state">' +
-      '<i data-lucide="clock" style="width:36px;height:36px;color:#a1a1aa;margin-bottom:10px"></i>' +
-      '<div class="empty-state-title">Sem vendas no período</div>' +
-      '<div class="empty-state-sub">Ajusta o intervalo de datas.</div>' +
+    list.innerHTML =
+      '<div class="hist-empty">' +
+      '<i data-lucide="clock"></i>' +
+      '<div class="hist-empty-title">Sem vendas no período</div>' +
+      '<div class="hist-empty-sub">Ajusta o intervalo de datas.</div>' +
       '</div>';
-    refreshIcons(el("historico-list")); return;
+    refreshIcons(list); return;
   }
 
-  el("historico-list").innerHTML = filtered.map(function(s) {
-    var devBadge = s.temDevolucao
-      ? '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#d97706;margin-left:6px">↩ Dev.</span>'
-      : "";
-    var totalLiq = s.total - (s.totalDevolvido||0);
-    return '<div class="historico-item" onclick="window._openSaleDetail(' + s.id + ')">' +
-      '<div>' +
-      '<div class="historico-id">Venda #' + s.id + devBadge + '</div>' +
-      '<div class="historico-meta">' + fmtDate(s.date) + ' · ' + (s.items ? s.items.length : 0) + ' item(s) · ' + s.payMethod +
-      (s.clientName ? ' · ' + s.clientName : '') + '</div>' +
-      '</div>' +
-      '<div style="text-align:right;flex-shrink:0">' +
-      '<div class="historico-total"' + (s.temDevolucao?' style="text-decoration:line-through;color:#a1a1aa;font-size:13px"':'') + '>' + fmt(s.total) + '</div>' +
-      (s.temDevolucao ? '<div style="font-size:13px;font-weight:700;color:#d97706">' + fmt(totalLiq) + '</div>' : '') +
-      (s.discount > 0 ? '<div style="font-size:11px;color:#dc2626">-' + fmt(s.discount) + ' desc.</div>' : '') +
+  list.innerHTML = filtered.map(function(s) {
+    var totalLiq = (s.total||0) - (s.totalDevolvido||0);
+    var hasDev   = s.temDevolucao && (s.totalDevolvido||0) > 0;
+    return '<div class="hist-sale-card" onclick="window._openSaleDetail(' + s.id + ')">' +
+      '<div class="hist-sale-avatar ' + payClass(s.payMethod) + '">' + payIcon(s.payMethod) + '</div>' +
+      '<div class="hist-sale-info">' +
+      '<div class="hist-sale-id">Venda #' + String(s.id).padStart(4,"0") +
+      (hasDev ? ' <span class="hist-badge-dev">↩ Dev.</span>' : '') + '</div>' +
+      '<div class="hist-sale-meta">' + fmtDate(s.date) +
+      (s.clientName ? " · " + s.clientName : "") +
+      " · " + (s.items?s.items.length:0) + " " + (s.items&&s.items.length===1?"item":"itens") +
+      '</div></div>' +
+      '<div class="hist-sale-right">' +
+      (hasDev
+        ? '<div class="hist-sale-total--dev">' + fmt(s.total) + '</div>' +
+          '<div class="hist-sale-total-liq">' + fmt(totalLiq) + '</div>'
+        : '<div class="hist-sale-total">' + fmt(s.total) + '</div>') +
+      (s.discount>0 ? '<div style="font-size:10px;color:var(--danger)">-'+fmt(s.discount)+' desc.</div>' : '') +
       '</div></div>';
   }).join("");
 
-  refreshIcons(el("historico-list"));
+  refreshIcons(list);
+}
+
+function kpi(label, val, color, sub) {
+  return '<div class="hist-kpi">' +
+    '<div class="hist-kpi-label">' + label + '</div>' +
+    '<div class="hist-kpi-val" style="color:' + color + '">' + val + '</div>' +
+    (sub ? '<div class="hist-kpi-sub">' + sub + '</div>' : '') +
+    '</div>';
 }
 
 // ── STOCK ─────────────────────────────────────────────────────────────────────
-async function loadStock(from, to) {
-  el("historico-stats").innerHTML = "";
-  el("historico-chart").style.display = "none";
+var typeLabels = {
+  sale:"Venda", purchase:"Compra", transfer_in:"Entrada", transfer_out:"Saída",
+  adjustment:"Ajuste", session_open:"Sessão", session_close:"Sessão",
+  incident:"Incidente", incident_resolved:"Incidente resolvido"
+};
+var typeColors = {
+  sale:"#dc2626", purchase:"#16a34a", transfer_in:"#2563eb", transfer_out:"#d97706",
+  adjustment:"#7c3aed", session_open:"#9ca3af", session_close:"#9ca3af",
+  incident:"#dc2626", incident_resolved:"#16a34a"
+};
+var typeBg = {
+  sale:"#fee2e2", purchase:"#dcfce7", transfer_in:"#dbeafe", transfer_out:"#fef3c7",
+  adjustment:"#ede9fe", session_open:"#f3f4f6", session_close:"#f3f4f6",
+  incident:"#fee2e2", incident_resolved:"#dcfce7"
+};
 
-  const movements = await db.getAll("stockMovements");
-  const filtered  = movements.filter(function(m) {
-    const d = toLocalDateStr(m.createdAt);
+async function loadStock(from, to) {
+  var hero = el("historico-hero");
+  var stats = el("historico-stats");
+  var chart = el("historico-chart");
+  var actions = el("hist-actions");
+  if (hero)    hero.style.display  = "none";
+  if (stats)   stats.innerHTML     = "";
+  if (chart)   chart.style.display = "none";
+  if (actions) actions.style.display = "none";
+
+  var movements = await db.getAll("stockMovements");
+  var filtered  = movements.filter(function(m) {
+    var d = toLocalDateStr(m.createdAt);
     return d >= from && d <= to;
   });
 
-  const local    = filtered.filter(function(m) { return m.imported !== true; });
-  const imported = filtered.filter(function(m) { return m.imported === true; });
+  var local    = filtered.filter(function(m) { return m.imported !== true; });
+  var imported = filtered.filter(function(m) { return m.imported === true; });
 
-  const typeColors = {
-    sale:              "#dc2626",
-    purchase:          "#16a34a",
-    transfer_in:       "#2563eb",
-    transfer_out:      "#d97706",
-    adjustment:        "#7c3aed",
-    session_open:      "#71717a",
-    session_close:     "#71717a",
-    incident:          "#dc2626",
-    incident_resolved: "#16a34a",
-  };
+  var list = el("historico-list");
+  if (!list) return;
 
-  function renderMovements(list, title, emptyMsg) {
-    if (!list.length) {
-      return '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">' + title + '</div>' +
-        '<div style="font-size:13px;color:#a1a1aa;text-align:center;padding:16px;background:#fff;border-radius:10px;margin-bottom:14px">' + emptyMsg + '</div>';
-    }
-    return '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">' + title + ' (' + list.length + ')</div>' +
-      '<div class="list-card" style="margin-bottom:14px">' +
-      list.slice(0,50).map(function(m) {
-        const color = typeColors[m.type] || "#71717a";
-        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #f4f4f5">' +
-          '<div>' +
-          '<div style="font-size:13px;font-weight:600">' + m.productName + '</div>' +
-          '<div style="font-size:11px;color:#71717a;margin-top:2px">' + (({"sale":"Venda","purchase":"Compra","transfer_in":"Entrada","transfer_out":"Sa\u00edda","adjustment":"Ajuste"})[m.type]||m.type) + ' · ' + fmtDate(m.createdAt) + '</div>' +
+  function renderMovBlock(arr, title) {
+    if (!arr.length) return '<div class="hist-section-label">' + title + '</div>' +
+      '<div class="hist-empty" style="padding:24px"><div class="hist-empty-sub">Nenhum movimento no período</div></div>';
+
+    return '<div class="hist-section-label">' + title + ' (' + arr.length + ')</div>' +
+      '<div class="hist-mov-card">' +
+      arr.slice(0,50).map(function(m) {
+        var color = typeColors[m.type] || "#9ca3af";
+        var bg    = typeBg[m.type]    || "#f3f4f6";
+        var label = typeLabels[m.type] || m.type;
+        var sign  = m.qty > 0 ? "+" : "";
+        return '<div class="hist-mov-item">' +
+          '<div class="hist-mov-icon" style="background:' + bg + ';color:' + color + '">' + sign + m.qty + '</div>' +
+          '<div style="flex:1">' +
+          '<div class="hist-mov-name">' + m.productName + '</div>' +
+          '<div class="hist-mov-meta">' + label + ' · ' + fmtDate(m.createdAt) + '</div>' +
           '</div>' +
           '<div style="text-align:right">' +
-          '<div style="font-size:14px;font-weight:700;color:' + color + '">' + (m.qty > 0 ? "+" : "") + m.qty + '</div>' +
-          '<div style="font-size:11px;color:#a1a1aa">' + m.qtyBefore + ' → ' + m.qtyAfter + '</div>' +
+          '<div class="hist-mov-qty" style="color:' + color + '">' + sign + m.qty + '</div>' +
+          '<div class="hist-mov-range">' + (m.qtyBefore||0) + ' → ' + (m.qtyAfter||0) + '</div>' +
           '</div></div>';
       }).join("") +
-      (list.length > 50 ? '<div style="padding:10px 14px;font-size:12px;color:#a1a1aa">+' + (list.length-50) + ' mais registos</div>' : '') +
+      (arr.length>50 ? '<div style="padding:10px 14px;font-size:12px;color:var(--text4)">+' + (arr.length-50) + ' mais</div>' : '') +
       '</div>';
   }
 
-  el("historico-list").innerHTML =
-    renderMovements(local,    "Movimentos Locais",    "Nenhum movimento local no período") +
-    renderMovements(imported, "Movimentos Importados","Nenhum movimento importado no período");
-
-  refreshIcons(el("historico-list"));
-
-  const exportBtn = el("btn-export-csv");
-  if (exportBtn) {
-    exportBtn.style.display = "block";
-    exportBtn.onclick = function() { exportMovementsCSV(filtered); };
-  }
+  list.innerHTML = renderMovBlock(local, "Movimentos Locais") + renderMovBlock(imported, "Movimentos Importados");
+  refreshIcons(list);
 }
 
 // ── AUDITORIA ─────────────────────────────────────────────────────────────────
 async function loadAuditoria(from, to) {
-  el("historico-stats").innerHTML = "";
-  el("historico-chart").style.display = "none";
+  var hero    = el("historico-hero");
+  var stats   = el("historico-stats");
+  var chart   = el("historico-chart");
+  var actions = el("hist-actions");
+  if (hero)    hero.style.display    = "none";
+  if (stats)   stats.innerHTML       = "";
+  if (chart)   chart.style.display   = "none";
+  if (actions) actions.style.display = "none";
 
-  const [sessions, incidents, users] = await Promise.all([
-    db.getAll("sessions"),
-    db.getAll("incidents"),
-    db.getAll("users"),
-  ]);
+  var sessions  = await db.getAll("sessions");
+  var incidents = await db.getAll("incidents");
 
-  const userMap = {};
-  users.forEach(function(u) { userMap[u.id] = u.name; });
-
-  const importedSessions = sessions.filter(function(s) { return s.isImported; });
-  const openIncidents    = incidents.filter(function(i) { return i.status === "open"; });
-  const seenUuids = new Set();
-  const chain = sessions.filter(function(s) {
+  var importedSessions = sessions.filter(function(s) { return s.isImported; });
+  var openIncidents    = incidents.filter(function(i) { return i.status==="open"; });
+  var seenUuids = new Set();
+  var chain = sessions.filter(function(s) {
     if (s.isImported) return false;
     if (s.uuid && seenUuids.has(s.uuid)) return false;
     if (s.uuid) seenUuids.add(s.uuid);
     return true;
   }).sort(function(a,b) { return a.id - b.id; });
 
-  el("historico-list").innerHTML =
+  var list = el("historico-list");
+  if (!list) return;
 
-    // Cadeia de responsabilidade
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Cadeia de responsabilidade</div>' +
-    '<div class="list-card" style="margin-bottom:14px">' +
+  function dotColor(s) {
+    if (s.status==="open")    return "var(--success)";
+    if (s.hasIncidents)       return "var(--danger)";
+    return "var(--primary)";
+  }
+  function badgeBg(s) {
+    if (s.status==="open")  return "#dcfce7";
+    if (s.hasIncidents)     return "#fee2e2";
+    return "#ede9fe";
+  }
+  function badgeLabel(s) {
+    if (s.status==="open")  return "Activo";
+    if (s.hasIncidents)     return "Incidentes";
+    return "Fechado";
+  }
+
+  list.innerHTML =
+    '<div class="hist-section-label">Cadeia de Responsabilidade</div>' +
+    '<div class="hist-timeline">' +
     (chain.length === 0
-      ? '<div style="padding:16px;text-align:center;font-size:13px;color:#a1a1aa">Sem sessões registadas</div>'
-      : chain.map(function(s, i) {
-          const color = s.status==="open" ? "#16a34a" : s.hasIncidents ? "#dc2626" : "#5b21b6";
-          return '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f4f4f5">' +
-            (i > 0 ? '<div style="width:2px;height:20px;background:#ddd;margin-left:8px;position:absolute;margin-top:-30px"></div>' : '') +
-            '<div style="width:10px;height:10px;border-radius:50%;background:' + color + ';flex-shrink:0"></div>' +
-            '<div style="flex:1">' +
-            '<div style="font-size:13px;font-weight:600">' + s.userName + '</div>' +
-            '<div style="font-size:11px;color:#71717a">' + fmtDate(s.openedAt) + (s.closedAt ? " → "+fmtDate(s.closedAt) : " (aberto)") + '</div>' +
-            (s.uuid ? '<div style="font-size:9px;color:#a1a1aa;font-family:monospace">' + s.uuid.slice(0,16) + '...</div>' : '') +
+      ? '<div class="hist-empty" style="padding:24px"><div class="hist-empty-sub">Sem sessões registadas</div></div>'
+      : chain.map(function(s) {
+          return '<div class="hist-timeline-item">' +
+            '<div class="hist-timeline-dot" style="background:' + dotColor(s) + '"></div>' +
+            '<div class="hist-timeline-info">' +
+            '<div class="hist-timeline-name">' + s.userName + '</div>' +
+            '<div class="hist-timeline-date">' + fmtDate(s.openedAt) + (s.closedAt?" → "+fmtDate(s.closedAt):" (em curso)") + '</div>' +
+            (s.uuid ? '<div class="hist-timeline-uuid">' + s.uuid.slice(0,20) + '...</div>' : '') +
             '</div>' +
-            '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' +
-            (s.status==="open"?"#dcfce7":s.hasIncidents?"#fee2e2":"#ede9fe") + ';color:' + color + '">' +
-            (s.status==="open"?"Activo":s.hasIncidents?"Incidentes":"Fechado") + '</span>' +
+            '<span class="badge-status" style="background:' + badgeBg(s) + ';color:' + dotColor(s) + '">' + badgeLabel(s) + '</span>' +
             '</div>';
         }).join("")
     ) +
     '</div>' +
 
-    // Sessões importadas
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Sessões importadas (' + importedSessions.length + ')</div>' +
-    '<div class="list-card" style="margin-bottom:14px">' +
+    '<div class="hist-section-label" style="margin-top:4px">Sessões Importadas (' + importedSessions.length + ')</div>' +
+    '<div class="hist-timeline">' +
     (importedSessions.length === 0
-      ? '<div style="padding:16px;text-align:center;font-size:13px;color:#a1a1aa">Nenhum KTK importado</div>'
+      ? '<div class="hist-empty" style="padding:24px"><div class="hist-empty-sub">Nenhum ficheiro .ktk importado</div></div>'
       : importedSessions.map(function(s) {
-          return '<div style="padding:10px 14px;border-bottom:1px solid #f4f4f5">' +
-            '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
-            '<div>' +
-            '<div style="font-size:13px;font-weight:600">' + s.userName + '</div>' +
-            '<div style="font-size:11px;color:#71717a">' + fmtDate(s.openedAt) + (s.closedAt?" → "+fmtDate(s.closedAt):"") + '</div>' +
-            '<div style="font-size:11px;color:#71717a">Loja: ' + (s.lojaNome||"?") + '</div>' +
+          return '<div class="hist-timeline-item">' +
+            '<div class="hist-timeline-dot" style="background:var(--info)"></div>' +
+            '<div class="hist-timeline-info">' +
+            '<div class="hist-timeline-name">' + s.userName + '</div>' +
+            '<div class="hist-timeline-date">' + (s.lojaNome||"?") + ' · ' + fmtDate(s.openedAt) + '</div>' +
             '</div>' +
             '<div style="text-align:right">' +
-            '<div style="font-size:13px;font-weight:700;color:#16a34a">' + fmt(s.totalVendas||0) + '</div>' +
-            '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' +
-            (s.hashLegacy?"#fef3c7":"#dcfce7") + ';color:' + (s.hashLegacy?"#d97706":"#16a34a") + '">' +
-            (s.hashLegacy?"Hash legado":"HMAC válido") + '</span>' +
-            '</div></div></div>';
+            '<div style="font-size:13px;font-weight:700;color:var(--success)">' + fmt(s.totalVendas||0) + '</div>' +
+            '<span class="badge-status" style="background:' + (s.hashLegacy?"#fef3c7":"#dcfce7") + ';color:' + (s.hashLegacy?"var(--warning)":"var(--success)") + '">' + (s.hashLegacy?"Hash legado":"HMAC válido") + '</span>' +
+            '</div></div>';
         }).join("")
     ) +
     '</div>' +
 
-    // Incidentes em aberto
-    '<div style="font-size:12px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Incidentes em aberto (' + openIncidents.length + ')</div>' +
-    '<div class="list-card">' +
+    '<div class="hist-section-label" style="margin-top:4px;color:var(--danger)">Incidentes em Aberto (' + openIncidents.length + ')</div>' +
+    '<div class="hist-timeline">' +
     (openIncidents.length === 0
-      ? '<div style="padding:16px;text-align:center;font-size:13px;color:#a1a1aa">Sem incidentes em aberto</div>'
+      ? '<div class="hist-empty" style="padding:24px"><div class="hist-empty-sub">Sem incidentes em aberto ✓</div></div>'
       : openIncidents.map(function(i) {
-          return '<div style="padding:10px 14px;border-bottom:1px solid #f4f4f5">' +
-            '<div style="display:flex;justify-content:space-between">' +
-            '<div>' +
-            '<div style="font-size:13px;font-weight:600;color:#dc2626">' + i.productName + '</div>' +
-            '<div style="font-size:11px;color:#71717a">' + fmtDate(i.createdAt) + '</div>' +
+          return '<div class="hist-timeline-item">' +
+            '<div class="hist-timeline-dot" style="background:var(--danger)"></div>' +
+            '<div class="hist-timeline-info">' +
+            '<div class="hist-timeline-name" style="color:var(--danger)">' + i.productName + '</div>' +
+            '<div class="hist-timeline-date">' + fmtDate(i.createdAt) + '</div>' +
             '</div>' +
-            '<div style="font-size:13px;font-weight:700;color:#dc2626">' +
-            (i.diff > 0 ? "+" : "") + i.diff + '</div>' +
-            '</div></div>';
+            '<div style="font-size:15px;font-weight:800;color:var(--danger)">' + (i.diff>0?"+":"") + i.diff + '</div>' +
+            '</div>';
         }).join("")
     ) +
     '</div>';
 
-  refreshIcons(el("historico-list"));
-
-  const exportBtn = el("btn-export-csv");
-  if (exportBtn) exportBtn.style.display = "none";
+  refreshIcons(list);
 }
 
 // ── DETALHE DE VENDA ──────────────────────────────────────────────────────────
 window._openSaleDetail = async function(id) {
-  const s     = await db.get("sales", id);
+  var s     = await db.get("sales", id);
   if (!s) return;
-  const store = (await db.get("settings","store")) || {};
 
-  openModal("Venda #"+s.id,
-    '<div style="background:#f4f4f5;border-radius:12px;padding:14px;margin-bottom:14px">' +
-    [["Data",fmtDate(s.date)],["Pagamento",s.payMethod],
-     ["Subtotal",fmt(s.subtotal||s.total)],
-     ...(s.discount>0?[["Desconto","- "+fmt(s.discount)]]:[]),
-     ["Total",fmt(s.total)],
-     ...(s.clientName?[["Cliente",s.clientName]]:[]),
-     ...(s.clientPhone?[["Telefone",s.clientPhone]]:[]),
-    ].map(function(kv) {
-      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e4e4e7;font-size:13px">' +
-        '<span style="color:#71717a">' + kv[0] + '</span>' +
-        '<span style="font-weight:600">' + kv[1] + '</span></div>';
-    }).join("") +
+  var hasDev   = s.temDevolucao && (s.totalDevolvido||0) > 0;
+  var totalLiq = (s.total||0) - (s.totalDevolvido||0);
+  var isAdmin  = getUser().role === "admin";
+
+  openModal("Venda #" + String(s.id).padStart(4,"0"),
+    '<div class="hist-detail-wrap">' +
+
+    '<div class="hist-detail-info">' +
+    detailRow("Data",       fmtDate(s.date)) +
+    detailRow("Pagamento",  s.payMethod||"—") +
+    (s.clientName  ? detailRow("Cliente",  s.clientName)  : "") +
+    (s.clientPhone ? detailRow("Telefone", s.clientPhone) : "") +
+    detailRow("Subtotal",   fmt(s.subtotal||s.total)) +
+    (s.discount>0  ? detailRow("Desconto", "- "+fmt(s.discount)) : "") +
+    detailRow("Total",      fmt(s.total), true) +
+    (hasDev ? detailRow("Líquido", fmt(totalLiq), true, "var(--warning)") : "") +
     '</div>' +
-    '<div style="margin-bottom:14px">' +
+
+    '<div class="hist-section-label">Itens</div>' +
+    '<div class="hist-detail-info">' +
     (s.items||[]).map(function(i) {
-      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f4f4f5;font-size:13px">' +
-        '<span>' + i.name + ' x' + i.qty + '</span>' +
-        '<span style="font-weight:600">' + fmt(i.price*i.qty) + '</span></div>';
+      return detailRow(i.name + " x" + i.qty, fmt(i.price*i.qty));
     }).join("") +
     '</div>' +
-    '<div style="font-size:11px;color:#a1a1aa;text-align:center;margin-bottom:14px">Código: ' + (s.hash||"N/A") + '</div>' +
-    (s.temDevolucao ? '<div style="background:#fef3c7;border-radius:10px;padding:12px;margin-bottom:14px">' +
-      '<div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:6px">↩ Devoluções registadas</div>' +
-      (s.devolucoes||[]).map(function(d){
-        return '<div style="font-size:12px;color:#71717a;margin-bottom:4px">' + fmtDate(d.date) + ' · ' + d.itens.join(", ") + ' · <strong style="color:#d97706">-' + fmt(d.total) + '</strong></div>';
+
+    (hasDev ?
+      '<div class="hist-dev-box">' +
+      '<div class="hist-dev-title">↩ Devoluções registadas</div>' +
+      (s.devolucoes||[]).map(function(d) {
+        return '<div class="hist-dev-row">' + fmtDate(d.date) + ' · ' + d.itens.join(", ") +
+          ' · <strong style="color:var(--warning)">-' + fmt(d.total) + '</strong></div>';
       }).join("") +
-      '<div style="font-size:13px;font-weight:700;color:#d97706;margin-top:6px;padding-top:6px;border-top:1px solid #fde68a">Líquido: ' + fmt(s.total-(s.totalDevolvido||0)) + '</div>' +
-      '</div>' : '') +
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Imprimir</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">' +
-    ['58mm','80mm','a5','a4'].map(function(f) {
-      return '<button onclick="window._printSale(' + s.id + ',\'' + f + '\')" ' +
-        'style="padding:10px;background:#f4f4f5;border:1.5px solid #e4e4e7;border-radius:8px;' +
-        'font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:#18181b">' +
-        f.toUpperCase() + '</button>';
+      '</div>' : "") +
+
+    '<div class="hist-section-label">Imprimir</div>' +
+    '<div class="hist-print-grid">' +
+    ["58mm","80mm","A5","A4"].map(function(f) {
+      return '<button class="hist-print-btn" onclick="window._printSale(' + s.id + ',\'' + f.toLowerCase() + '\')">' + f + '</button>';
     }).join("") +
     '</div>' +
+
+    '<div class="hist-detail-actions">' +
+    '<button class="btn btn-outline btn-full" onclick="window._gerarReciboPDF(' + s.id + ')">' +
+    '<i data-lucide="file-text"></i> Gerar PDF</button>' +
+    '<button class="btn btn-outline btn-full hist-btn-whatsapp" onclick="window._partilharReciboPDF(' + s.id + ')">' +
+    '<i data-lucide="share-2"></i> Partilhar</button>' +
+    (isAdmin ? '<button class="btn btn-outline btn-full hist-btn-dev" onclick="window._abrirDevolucao(' + s.id + ')">' +
+    '<i data-lucide="rotate-ccw"></i> Registar Devolução</button>' : "") +
+    '</div>' +
+
     '<div class="form-actions">' +
-    '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">' +
-      '<button onclick="window._gerarReciboPDF(' + s.id + ')" style="padding:12px;background:#ede9fe;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#5b21b6;display:flex;align-items:center;justify-content:center;gap:8px"><i data-lucide="file-text" style="width:15px;height:15px"></i> Gerar PDF</button>' +
-      '<button onclick="window._partilharReciboPDF(' + s.id + ')" style="padding:12px;background:#f0fdf4;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#16a34a;display:flex;align-items:center;justify-content:center;gap:8px"><i data-lucide="share-2" style="width:15px;height:15px"></i> Partilhar WhatsApp</button>' +
-      '<button onclick="window._abrirDevolucao(' + s.id + ')" style="padding:12px;background:#fef3c7;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#92400e;display:flex;align-items:center;justify-content:center;gap:8px"><i data-lucide="rotate-ccw" style="width:15px;height:15px"></i> Registar Devolução</button>' +
-      '</div>' +
     '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>' +
     '<button class="btn btn-primary btn-full" onclick="window._printSale(' + s.id + ',\'58mm\')">' +
-    '<i data-lucide="printer"></i> Imprimir talão</button>' +
-    '</div>');
+    '<i data-lucide="printer"></i> Imprimir Talão</button>' +
+    '</div></div>'
+  );
 
   refreshIcons(el("modal-box"));
 };
 
+function detailRow(label, value, bold, color) {
+  return '<div class="hist-detail-row">' +
+    '<span class="hist-detail-label">' + label + '</span>' +
+    '<span class="hist-detail-val"' + (bold?(' style="font-weight:800' + (color?';color:'+color:'') + '"'):'') + '>' + value + '</span>' +
+    '</div>';
+}
+
 window._printSale = async function(id, format) {
-  const s     = await db.get("sales", id);
-  const store = (await db.get("settings","store")) || {};
+  var s     = await db.get("sales", id);
+  var store = (await db.get("settings","store")) || {};
   closeModal();
   printRecibo(s, store, format);
 };
 
-// ── EXPORTAÇÕES ───────────────────────────────────────────────────────────────
+window._gerarReciboPDF     = async (id) => { await gerarReciboPDF(id);     };
+window._partilharReciboPDF = async (id) => { await partilharReciboPDF(id); };
+window._abrirDevolucao     = async (id) => { closeModal(); await openDevolucao(id); };
+
+// ── EXPORTS CSV ───────────────────────────────────────────────────────────────
 function exportCSV(sales) {
-  const header = "ID,Data,Cliente,Pagamento,Subtotal,Desconto,Total,Itens";
-  const rows   = sales.map(function(s) {
-    return s.id+',"'+fmtDate(s.date)+'","'+(s.clientName||"")+'","'+s.payMethod+'",'+
-      (s.subtotal||s.total)+","+(s.discount||0)+","+s.total+
-      ',"'+((s.items||[]).map(function(i){return i.name+"x"+i.qty;}).join("|"))+'"';
+  var rows = [["ID","Data","Cliente","Itens","Total","Desconto","Pagamento","Devolvido"]];
+  sales.forEach(function(s) {
+    rows.push([
+      s.id, fmtDate(s.date), s.clientName||"",
+      (s.items||[]).map(function(i){return i.name+"x"+i.qty;}).join(";"),
+      s.total, s.discount||0, s.payMethod||"", s.totalDevolvido||0
+    ]);
   });
-  downloadCSV([header].concat(rows).join("\n"), "vendas_kontaki.csv");
+  var csv = rows.map(function(r){return r.join(",");}).join("\n");
+  var blob = new Blob([csv],{type:"text/csv"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "vendas_" + today() + ".csv";
+  a.click();
 }
 
 function exportMovementsCSV(movements) {
-  const header = "ID,Data,Produto,Tipo,Local,Qty,Antes,Depois,Importado,Nota";
-  const rows   = movements.map(function(m) {
-    return m.id+',"'+fmtDate(m.createdAt)+'","'+m.productName+'","'+m.type+'","'+
-      m.location+'",'+m.qty+","+m.qtyBefore+","+m.qtyAfter+","+(m.imported?"sim":"não")+',"'+(m.note||"")+'"';
+  var rows = [["ID","Produto","Tipo","Qty","Antes","Depois","Data"]];
+  movements.forEach(function(m) {
+    rows.push([m.id,m.productName,m.type,m.qty,m.qtyBefore,m.qtyAfter,fmtDate(m.createdAt)]);
   });
-  downloadCSV([header].concat(rows).join("\n"), "movimentos_kontaki.csv");
+  var csv = rows.map(function(r){return r.join(",");}).join("\n");
+  var blob = new Blob([csv],{type:"text/csv"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "stock_" + today() + ".csv";
+  a.click();
 }
-
-function downloadCSV(csv, filename) {
-  const blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
-  a.href=url; a.download=filename; a.click();
-  URL.revokeObjectURL(url);
-}
-
-window._closeModal = closeModal;
-
-window._abrirDevolucao = async function(id) {
-  closeModal();
-  setTimeout(function(){ openDevolucao(id); }, 100);
-};
-
-window._gerarReciboPDF    = gerarReciboPDF;
-window._partilharReciboPDF = partilharReciboPDF;

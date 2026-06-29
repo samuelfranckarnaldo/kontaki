@@ -14,13 +14,30 @@ import { getLicense, loadLicense, activateLicense, PLANS, showUpgradeBanner } fr
 import { gerarRelatorioPDF } from "./extras.js";
 
 export async function initPerfil() {
-  const user = getUser();
+  const user  = getUser();
+  const store = (await db.get("settings", "store")) || {};
+
   var avatarEl = el("perfil-avatar");
   var nameEl   = el("perfil-name");
   var roleEl   = el("perfil-role");
-  if (avatarEl) avatarEl.textContent = user.name.charAt(0).toUpperCase();
-  if (nameEl)   nameEl.textContent   = user.name;
-  if (roleEl)   roleEl.textContent   = user.role === "admin" ? "Administrador" : "Operador de Caixa";
+
+  if (nameEl) nameEl.textContent = user.name;
+  if (roleEl) roleEl.textContent = user.role === "admin" ? "Administrador" : "Operador de Caixa";
+
+  if (avatarEl) {
+    if (store.logo) {
+      avatarEl.innerHTML = "";
+      avatarEl.className = "perfil-avatar perfil-avatar--logo";
+      var img = document.createElement("img");
+      img.src = store.logo;
+      img.className = "perfil-avatar-logo-img";
+      img.alt = store.name || "Logo";
+      avatarEl.appendChild(img);
+    } else {
+      avatarEl.className = "perfil-avatar";
+      avatarEl.textContent = user.name.charAt(0).toUpperCase();
+    }
+  }
 
   renderMenu();
   setupSubpageButtons();
@@ -174,7 +191,7 @@ function showSubpage(name) {
   const menu   = el("perfil-menu");
   const header = el("perfil-header");
   if (menu)   menu.style.display   = name ? "none" : "block";
-  if (header) header.style.display = name ? "none" : "block";
+  if (header) header.style.display = name ? "none" : "flex";
   if (name) {
     const node = el("subpage-" + name);
     if (node) node.style.display = "block";

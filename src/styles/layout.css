@@ -7,7 +7,7 @@
   height: 100vh;
   max-width: 480px;
   margin: 0 auto;
-  background: var(--bg2);
+  background: var(--bg);
   position: relative;
   overflow: hidden;
 }
@@ -21,7 +21,7 @@
   background: linear-gradient(135deg, #5b21b6, #7c3aed);
   flex-shrink: 0;
   position: sticky; top: 0; z-index: 50;
-  box-shadow: 0 2px 12px rgba(91,33,182,.25);
+  box-shadow: 0 2px 12px rgba(91,33,182,.2);
 }
 .topbar-title {
   font-size: 18px;
@@ -82,7 +82,7 @@
 .bottom-nav {
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
   width: 100%; max-width: 480px; display: flex; align-items: center;
-  background: var(--bg2); padding: 6px 0 max(6px, env(safe-area-inset-bottom));
+  background: var(--bg);
   flex-shrink: 0; z-index: 100;
   box-shadow: 0 -4px 20px rgba(0,0,0,.06);
   border-top: 1px solid var(--border2);
@@ -176,7 +176,7 @@
 }
 
 /* Compensar topbar */
-.page-inner { padding-top: 8px !important; }
+.page-inner { padding: 0 16px 80px; flex: 1; }
 
 /* Botões voltar do perfil */
 .subpage .btn-back, #subpage-stock .btn-ghost, #subpage-incidentes .btn-ghost,
@@ -190,17 +190,17 @@
 }
 
 /* Espaçamento entre topbar e conteúdo */
-.page-inner { padding-top: 8px !important; padding-bottom: 80px !important; }
+
 
 /* Subpáginas do perfil - espaço para o botão voltar */
-.subpage .page-inner, [id^="subpage-"] .page-inner { padding-top: 12px !important; }
+.subpage .page-inner, [id^="subpage-"] .page-inner { padding-top: 16px !important; }
 
 /* ── MAIN CONTAINER ─────────────────────────────────────────────────────────── */
 #main {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: var(--bg);
+
 }
 
 /* ── LOGIN ──────────────────────────────────────────────────────────────────── */
