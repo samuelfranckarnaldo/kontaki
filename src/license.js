@@ -2,44 +2,36 @@ import { db } from "./db.js";
 
 var _license = null;
 
-// ── Planos oficiais Kontaki ───────────────────────────────────────────────────
 export var PLANS = {
-  solo: {
-    name: "Solo", price: 1000,
-    maxProducts: 30, maxUsers: 1, maxDevices: 1,
-    features: ["vendas","stock","fiados","clientes","historico","contabilidade","despesas","pin_recovery"],
+  basic: {
+    name: "Basic", price: 500,
+    maxProducts: 30, maxUsers: 2, maxDevices: 1,
+    features: ["vendas","stock","fiados","clientes","despesas","pin_recovery","historico","scanner","venda_rapida","dashboard"],
   },
-  team: {
-    name: "Team", price: 2500,
-    maxProducts: 100, maxUsers: 2, maxDevices: 2,
-    features: ["vendas","stock","fiados","clientes","historico","contabilidade","despesas","pin_recovery","scanner"],
-  },
-  business: {
-    name: "Business", price: 5000,
-    maxProducts: 250, maxUsers: 5, maxDevices: 4,
-    features: ["vendas","stock","fiados","clientes","historico","contabilidade","despesas","pin_recovery","scanner","receipt_verify"],
+  standard: {
+    name: "Standard", price: 1000,
+    maxProducts: 100, maxUsers: 5, maxDevices: 2,
+    features: ["vendas","stock","fiados","clientes","despesas","pin_recovery","historico","scanner","venda_rapida","dashboard","contabilidade","fornecedores","backup","relatorio_funcionario"],
   },
   pro: {
-    name: "Pro", price: 10000,
+    name: "Pro", price: 5000,
     maxProducts: 500, maxUsers: 10, maxDevices: 5,
-    features: ["all"],
+    features: ["vendas","stock","fiados","clientes","despesas","pin_recovery","historico","scanner","venda_rapida","dashboard","contabilidade","fornecedores","backup","relatorio_funcionario","pdf_contabilidade","recibo_qr","logotipo","equipe"],
   },
   enterprise: {
-    name: "Enterprise", price: 15000,
+    name: "Enterprise", price: 10000,
     maxProducts: 999999, maxUsers: 999999, maxDevices: 10,
     features: ["all"],
   },
 };
 
-// URL da API do Kontaki Console
 var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
-// ── Carregar licença do IndexedDB ─────────────────────────────────────────────
 export async function loadLicense() {
   try {
     var lic = await db.get("settings", "license");
     if (!lic || !lic.plan) {
-      _license = { plan: "solo", status: "trial", daysLeft: 30, expiresAt: null, code: null };
+      _license = { plan: "basic", status: "trial", daysLeft: 7, expiresAt: null, code: null };
     } else {
       var now      = Date.now();
       var exp      = lic.expiresAt ? new Date(lic.expiresAt).getTime() : null;
@@ -56,32 +48,29 @@ export async function loadLicense() {
       };
     }
   } catch(e) {
-    _license = { plan: "solo", status: "trial", daysLeft: 30, expiresAt: null };
+    _license = { plan: "basic", status: "trial", daysLeft: 7, expiresAt: null };
   }
   return _license;
 }
 
 export function getLicense() {
-  return _license || { plan: "solo", status: "trial", daysLeft: 30 };
+  return _license || { plan: "basic", status: "trial", daysLeft: 7 };
 }
 
-// ── Verificar feature ─────────────────────────────────────────────────────────
 export function hasFeature(feature) {
   var lic  = getLicense();
   if (lic.status === "expired") return false;
-  var plan = PLANS[lic.plan] || PLANS.solo;
+  var plan = PLANS[lic.plan] || PLANS.basic;
   if (plan.features.includes("all")) return true;
   return plan.features.includes(feature);
 }
 
-// ── Verificar limite ──────────────────────────────────────────────────────────
 export function getPlanLimit(key) {
   var lic  = getLicense();
-  var plan = PLANS[lic.plan] || PLANS.solo;
-  return plan[key] !== undefined ? plan[key] : PLANS.solo[key];
+  var plan = PLANS[lic.plan] || PLANS.basic;
+  return plan[key] !== undefined ? plan[key] : PLANS.basic[key];
 }
 
-// ── Gerar ou recuperar deviceId ───────────────────────────────────────────────
 async function getDeviceId() {
   var d = await db.get("settings", "deviceId");
   if (d && d.value) return d.value;
@@ -90,22 +79,19 @@ async function getDeviceId() {
   return id;
 }
 
-// ── Activar licença via API ───────────────────────────────────────────────────
 export async function activateLicense(code) {
   code = code.toUpperCase().trim().replace(/\s/g, "");
 
-  // Validar formato básico
   var parts = code.split("-");
-  if (parts.length !== 4 || parts[0] !== "KTKI") {
-    throw new Error("Formato inválido. Exemplo: KTKI-XXXX-XXXX-XXXX");
+  if (parts.length < 4 || parts[0] !== "KTKI") {
+    throw new Error("Formato inválido. Exemplo: KTKI-PROO-2026-XXXXXXXX");
   }
 
   var deviceId = await getDeviceId();
 
-  // Chamar API do Console
   var res, data;
   try {
-    res = await fetch(CONSOLE_API + "/license/activate", {
+    res = await fetch(CONSOLE_API + "/activate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, deviceId }),
@@ -115,11 +101,10 @@ export async function activateLicense(code) {
     throw new Error("Sem ligação à internet. Liga-te e tenta novamente.");
   }
 
-  if (!res.ok || !data.valid) {
-    throw new Error(data.message || "Código inválido ou já utilizado.");
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || "Código inválido ou já utilizado.");
   }
 
-  // Guardar licença localmente
   var licData = {
     key:           "license",
     plan:          data.plan,
@@ -128,7 +113,7 @@ export async function activateLicense(code) {
     activatedAt:   new Date().toISOString(),
     expiresAt:     data.expiresAt,
     lastValidated: new Date().toISOString(),
-    serverTime:    data.serverTime,
+    serverTime:    data.serverTime || new Date().toISOString(),
   };
   await db.put("settings", licData);
 
@@ -141,16 +126,19 @@ export async function activateLicense(code) {
     deviceId:  deviceId,
   };
 
-  return { plan: data.plan, planName: PLANS[data.plan]?.name || data.plan, expiresAt: data.expiresAt };
+  return {
+    plan:      data.plan,
+    planName:  PLANS[data.plan]?.name || data.plan,
+    expiresAt: data.expiresAt
+  };
 }
 
-// ── Validar licença online periodicamente ─────────────────────────────────────
 export async function validateLicenseOnline() {
   var lic = await db.get("settings", "license");
   if (!lic || !lic.code) return;
 
   try {
-    var res = await fetch(CONSOLE_API + "/license/validate", {
+    var res = await fetch(CONSOLE_API + "/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code: lic.code, deviceId: lic.deviceId }),
@@ -158,52 +146,39 @@ export async function validateLicenseOnline() {
     var data = await res.json();
 
     if (!res.ok || !data.valid) {
-      // Licença revogada ou expirada no servidor
       await db.put("settings", { ...lic, status: "expired" });
       _license = { ...(_license||{}), status: "expired" };
       return false;
     }
 
-    // Actualizar dados locais com resposta do servidor
     var updated = {
       ...lic,
       expiresAt:     data.expiresAt,
       lastValidated: new Date().toISOString(),
-      serverTime:    data.serverTime,
+      serverTime:    data.serverTime || new Date().toISOString(),
     };
     await db.put("settings", updated);
 
-    // Detectar manipulação de data
-    var deviceNow  = Date.now();
-    var serverNow  = new Date(data.serverTime).getTime();
-    var diff       = deviceNow - serverNow;
-    if (diff < -300000) {
-      // Data do dispositivo está mais de 5 minutos atrás do servidor
-      showDateWarning();
-    }
+    var deviceNow = Date.now();
+    var serverNow = data.serverTime ? new Date(data.serverTime).getTime() : deviceNow;
+    if (deviceNow - serverNow < -300000) showDateWarning();
 
     return true;
   } catch(e) {
-    // Sem internet — usar cache local, válido por 7 dias
     if (lic.lastValidated) {
-      var lastVal   = new Date(lic.lastValidated).getTime();
-      var daysSince = (Date.now() - lastVal) / 86400000;
-      if (daysSince > 7) {
-        showOfflineWarning();
-      }
+      var daysSince = (Date.now() - new Date(lic.lastValidated).getTime()) / 86400000;
+      if (daysSince > 7) showOfflineWarning();
     }
     return null;
   }
 }
 
-// ── Avisos ────────────────────────────────────────────────────────────────────
 function showDateWarning() {
-  var old = document.getElementById("date-warning-banner");
-  if (old) return;
+  if (document.getElementById("date-warning-banner")) return;
   var b = document.createElement("div");
   b.id = "date-warning-banner";
   b.style.cssText = "position:fixed;top:0;left:0;right:0;background:#dc2626;color:#fff;padding:14px 16px;z-index:99999;text-align:center;font-size:13px;font-weight:600;font-family:inherit";
-  b.innerHTML = "⚠ Data do dispositivo incorrecta. Acerta a data e liga a internet para continuar.";
+  b.textContent = "Data do dispositivo incorrecta. Acerta a data e liga a internet para continuar.";
   document.body.appendChild(b);
 }
 

@@ -128,13 +128,52 @@ async function renderDespesas() {
         '<div class="desp-item-meta">' + e.category + ' · ' + fmtDate(e.date) + '</div>' +
       '</div>' +
       '<div class="desp-item-val">' + fmt(e.amount) + '</div>' +
-      '<button class="desp-item-del" onclick="window._deleteDespesa(' + e.id + ')"><i data-lucide="trash-2" style="width:15px;height:15px"></i></button>';
+      '<div style="display:flex;gap:4px">' +
+      '<button class="desp-item-edit" onclick="window._editDespesa(' + e.id + ')"><i data-lucide="pencil" style="width:15px;height:15px"></i></button>' +
+      '<button class="desp-item-del" onclick="window._deleteDespesa(' + e.id + ')"><i data-lucide="trash-2" style="width:15px;height:15px"></i></button>' +
+      '</div>';
     listEl.appendChild(item);
   });
 
   wrap.appendChild(listEl);
   refreshIcons(wrap);
 }
+
+window._editDespesa = async function(id) {
+  var e = await db.get("expenses", id);
+  if (!e) return;
+  openModal("Editar Despesa",
+    '<div style="display:flex;flex-direction:column;gap:14px">' +
+    '<div class="field"><label>Descrição *</label><input id="de-desc" value="' + e.description + '" placeholder="Ex: Renda de Junho"/></div>' +
+    '<div class="field"><label>Categoria</label><select id="de-cat">' + CATEGORIAS.map(function(c){ return '<option' + (c===e.category?' selected':'') + '>' + c + '</option>'; }).join("") + '</select></div>' +
+    '<div class="field"><label>Valor (Kz) *</label><input type="number" id="de-amount" value="' + e.amount + '" placeholder="0"/></div>' +
+    '<div class="field"><label>Data</label><input type="date" id="de-date" value="' + (e.date||"").slice(0,10) + '"/></div>' +
+    '</div>' +
+    '<div class="form-actions">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+    '<button class="btn btn-primary btn-full" style="background:var(--danger)" onclick="window._updateDespesa(' + id + ')"><i data-lucide="save"></i> Guardar</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+};
+
+window._updateDespesa = async function(id) {
+  var { getSession } = await import("../auth.js");
+  if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
+  var desc   = (el("de-desc")||{}).value.trim();
+  var amount = Number((el("de-amount")||{}).value);
+  if (!desc)         { toast("A descrição é obrigatória.", "error"); return; }
+  if (!amount || amount <= 0) { toast("O valor deve ser maior que zero.", "error"); return; }
+  var existing = await db.get("expenses", id);
+  await db.put("expenses", Object.assign({}, existing, {
+    description: desc,
+    category: (el("de-cat")||{}).value || "Outro",
+    amount: amount,
+    date: (el("de-date")||{}).value || existing.date,
+  }));
+  toast("Despesa actualizada.", "success");
+  closeModal();
+  await renderDespesas();
+};
 
 window._openDespesaForm = function() {
   openModal("Nova Despesa",

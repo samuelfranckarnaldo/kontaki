@@ -244,6 +244,10 @@ window._confirmarFecho = async function() {
     // Fecha sessão
     await sessionService.closeSession(session.id);
 
+    // Limpar sessão no auth
+    var authMod = await import("../auth.js");
+    if (authMod._setSession) authMod._setSession(null);
+
     // Gera incidentes para diferenças
     var incCount = 0;
     for (var i=0; i<products.length; i++) {

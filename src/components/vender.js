@@ -65,7 +65,15 @@ export async function initVender() {
 
   btnScanner.onclick   = () => initCamera(onBarcode);
   btnLimpar.onclick    = limpar;
-  btnFinalizar.onclick = openCheckout;
+  btnFinalizar.onclick = async function() {
+    var { getSession } = await import("../auth.js");
+    if (!getSession()) {
+      var { toast } = await import("../toast.js");
+      toast("Abre um turno para poder vender.", "error");
+      return;
+    }
+    openCheckout();
+  };
 
 
   // Verificação QR — abre modal de escolha

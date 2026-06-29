@@ -2126,3 +2126,13 @@
 .hist-btn-whatsapp { color: #16a34a; border-color: #bbf7d0; }
 .hist-btn-dev { color: var(--warning); border-color: #fde68a; }
 .badge-status { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+
+/* ── DESPESAS EDIT BTN ──────────────────────────────────────────────────────── */
+.desp-item-edit {
+  width: 30px; height: 30px;
+  border: none; border-radius: var(--radius-sm);
+  background: var(--primary-light); color: var(--primary);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: var(--transition);
+}
+.desp-item-edit:active { background: #ddd6fe; }
