@@ -808,7 +808,7 @@ async function loadAssinatura() {
     '<div class="lic-activate-title">' + (lic.code ? "Renovar licença" : "Activar licença") + '</div>' +
     '<div class="lic-activate-sub">Recebeste um código da Introxeer? Insere aqui para activar ou renovar o teu plano.</div>' +
     '<div class="field" style="margin-bottom:12px">' +
-      '<input class="lic-code-input" id="activation-code" placeholder="KTKI-XXXX-XXXX-XXXX" maxlength="19"/>' +
+      '<input class="lic-code-input" id="activation-code" placeholder="KTKI-XXXX-XXXX-XXXXXXXX" maxlength="27"/>' +
     '</div>' +
     '<button class="btn btn-primary btn-full btn-lg" onclick="window._activarLicenca()">' +
       '<i data-lucide="zap"></i> Activar licença' +
