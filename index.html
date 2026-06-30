@@ -506,15 +506,34 @@ document.addEventListener("DOMContentLoaded", function() {
       <div id="subpage-senha" style="display:none">
         <div class="page-inner">
           <button class="btn btn-ghost btn-sm" id="btn-back-senha">← Voltar</button>
-          <div style="font-size:17px;font-weight:700;margin:8px 0 16px">Alterar Senha</div>
-          <div class="vender-card" style="display:flex;flex-direction:column;gap:14px">
-            <div class="field"><label>Senha actual</label><input type="password" id="pw-cur"/></div>
-            <div class="field"><label>Nova senha</label><input type="password" id="pw-new"/></div>
-            <div class="field"><label>Confirmar</label><input type="password" id="pw-conf"/></div>
-            <button class="btn btn-primary btn-full" id="btn-change-pw">
-              <i data-lucide="lock"></i> Alterar Senha
-            </button>
+          <div class="loja-section-title">Alterar PIN</div>
+          <div class="pin-change-hint">O PIN tem sempre 6 dígitos numéricos. É usado para entrar na tua conta.</div>
+          <div class="loja-card">
+            <div class="field">
+              <label>PIN Actual</label>
+              <div class="pin-input-wrap">
+                <input type="password" id="pw-cur" inputmode="numeric" maxlength="6" pattern="[0-9]*" placeholder="••••••"/>
+                <button type="button" class="pin-eye-btn" onclick="window._togglePinField('pw-cur',this)"><i data-lucide="eye"></i></button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Novo PIN</label>
+              <div class="pin-input-wrap">
+                <input type="password" id="pw-new" inputmode="numeric" maxlength="6" pattern="[0-9]*" placeholder="••••••"/>
+                <button type="button" class="pin-eye-btn" onclick="window._togglePinField('pw-new',this)"><i data-lucide="eye"></i></button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Confirmar Novo PIN</label>
+              <div class="pin-input-wrap">
+                <input type="password" id="pw-conf" inputmode="numeric" maxlength="6" pattern="[0-9]*" placeholder="••••••"/>
+                <button type="button" class="pin-eye-btn" onclick="window._togglePinField('pw-conf',this)"><i data-lucide="eye"></i></button>
+              </div>
+            </div>
           </div>
+          <button class="btn btn-primary btn-full" id="btn-change-pw">
+            <i data-lucide="lock"></i> Alterar PIN
+          </button>
         </div>
       </div>
 

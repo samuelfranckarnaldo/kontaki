@@ -2136,3 +2136,77 @@
   flex-shrink: 0; transition: var(--transition);
 }
 .desp-item-edit:active { background: #ddd6fe; }
+
+/* ── EQUIPA / TEAM CARDS ────────────────────────────────────────────────────── */
+.team-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+}
+.team-card-avatar {
+  width: 44px; height: 44px;
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+}
+.team-card-avatar--admin { background: var(--primary); }
+.team-card-avatar--caixa { background: var(--success); }
+.team-card-info { flex: 1; min-width: 0; }
+.team-card-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.team-card-you { font-size: 11px; font-weight: 600; color: var(--text4); }
+.team-card-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.team-card-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.team-card-btn {
+  width: 32px; height: 32px;
+  border: none; border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text3);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: var(--transition);
+}
+.team-card-btn i, .team-card-btn svg { width: 15px; height: 15px; }
+.team-card-btn:active { background: var(--border2); }
+.team-card-btn--danger { color: var(--danger); }
+.team-card-btn--danger:active { background: #fee2e2; }
+
+/* PIN input com olho */
+.pin-input-wrap { position: relative; }
+.pin-input-wrap input {
+  width: 100%; letter-spacing: 6px; font-size: 16px; font-weight: 700;
+  padding-right: 40px;
+}
+.pin-eye-btn {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px; border: none; background: none;
+  color: var(--text3); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.pin-eye-btn i, .pin-eye-btn svg { width: 18px; height: 18px; }
+
+/* Role toggle */
+.role-toggle { display: flex; gap: 8px; }
+.role-toggle-btn {
+  flex: 1; padding: 12px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--bg);
+  font-family: var(--font); font-size: 13px; font-weight: 600;
+  color: var(--text3); cursor: pointer; transition: var(--transition);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.role-toggle-btn i, .role-toggle-btn svg { width: 16px; height: 16px; }
+.role-toggle-btn.active {
+  background: var(--primary-light); border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* ── PIN CHANGE HINT ────────────────────────────────────────────────────────── */
+.pin-change-hint {
+  font-size: 12px;
+  color: var(--text3);
+  line-height: 1.5;
+  margin: -8px 0 16px;
+}

@@ -152,6 +152,10 @@ function setupSubpageButtons() {
   if (pwBtn)   pwBtn.onclick   = changePassword;
   if (lojaBtn) lojaBtn.onclick = saveStoreSettings;
   if (userBtn) userBtn.onclick = openUserAdd;
+  ["pw-cur","pw-new","pw-conf"].forEach(function(id) {
+    var inp = document.getElementById(id);
+    if (inp) inp.oninput = function() { this.value = this.value.replace(/\D/g,"").slice(0,6); };
+  });
 }
 
 window._perfilBack = function() {
@@ -293,59 +297,84 @@ window._resolveInc = async (id) => {
 
 async function loadEquipa() {
   const [users, sessions] = await Promise.all([db.getAll("users"), db.getAll("sessions")]);
-  el("users-list").innerHTML = users.map(u => {
-    const ns = sessions.filter(s => s.userId === u.id).length;
-    return `
-      <div style="display:flex;justify-content:space-between;align-items:center;
-                  padding:14px 16px;border-bottom:1px solid #f4f4f5;gap:10px">
-        <div>
-          <div style="font-weight:700;font-size:14px">${u.name}</div>
-          <div style="font-size:12px;color:#71717a">@${u.username} · ${u.role} · ${ns} sessões</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;
-                       background:${u.active ? "#dcfce7" : "#fee2e2"};
-                       color:${u.active ? "#16a34a" : "#dc2626"}">
-            ${u.active ? "Ativo" : "Inativo"}
-          </span>
-          ${u.id !== getUser().id
-            ? `<button class="btn btn-ghost btn-sm" onclick="window._toggleUser(${u.id})">${u.active ? "Desativar" : "Ativar"}</button>`
-            : ""}
-        </div>
-      </div>`;
+  const me = getUser();
+  el("users-list").innerHTML = users.map(function(u) {
+    const ns = sessions.filter(function(s){ return s.userId === u.id; }).length;
+    const isMe = u.id === me.id;
+    return (
+      '<div class="team-card">' +
+      '<div class="team-card-avatar team-card-avatar--' + (u.role==="admin"?"admin":"caixa") + '">' + u.name.charAt(0).toUpperCase() + '</div>' +
+      '<div class="team-card-info">' +
+      '<div class="team-card-name">' + u.name + (isMe ? ' <span class="team-card-you">(tu)</span>' : '') + '</div>' +
+      '<div class="team-card-meta">@' + u.username + ' · ' + (u.role==="admin"?"Administrador":"Caixa") + ' · ' + ns + ' sessões</div>' +
+      '</div>' +
+      '<div class="team-card-actions">' +
+      '<span class="badge-status" style="background:' + (u.active?"#dcfce7":"#fee2e2") + ';color:' + (u.active?"var(--success)":"var(--danger)") + '">' + (u.active?"Activo":"Inactivo") + '</span>' +
+      (!isMe ?
+        '<button class="team-card-btn" onclick="window._toggleUser(' + u.id + ')" title="' + (u.active?"Desactivar":"Activar") + '">' +
+        '<i data-lucide="' + (u.active?"user-x":"user-check") + '"></i></button>' +
+        '<button class="team-card-btn team-card-btn--danger" onclick="window._deleteUser(' + u.id + ')" title="Eliminar">' +
+        '<i data-lucide="trash-2"></i></button>'
+        : '') +
+      '</div></div>'
+    );
   }).join("");
+  refreshIcons(el("users-list"));
 }
 
 function openUserAdd() {
-  openModal("Novo Funcionário", `
-    <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="field"><label>Nome Completo *</label><input id="uf-name"/></div>
-      <div class="field"><label>Username *</label><input id="uf-user"/></div>
-      <div class="field"><label>Senha *</label><input type="password" id="uf-pass"/></div>
-      <div class="field"><label>Perfil</label>
-        <select id="uf-role">
-          <option value="caixa">Caixa</option>
-          <option value="admin">Admin</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
-      <button class="btn btn-primary btn-full" onclick="window._saveUser()">
-        <i data-lucide="user-plus"></i> Adicionar
-      </button>
-    </div>`);
+  openModal("Novo Funcionário",
+    '<div style="display:flex;flex-direction:column;gap:14px">' +
+    '<div class="field"><label>Nome Completo *</label><input id="uf-name" placeholder="Ex: Maria Silva"/></div>' +
+    '<div class="field"><label>Username *</label><input id="uf-user" placeholder="Ex: maria"/></div>' +
+    '<div class="field"><label>PIN (6 dígitos) *</label>' +
+    '<div class="pin-input-wrap">' +
+    '<input type="password" id="uf-pin" inputmode="numeric" maxlength="6" pattern="[0-9]*" placeholder="••••••"/>' +
+    '<button type="button" class="pin-eye-btn" onclick="window._toggleUfPin(this)"><i data-lucide="eye"></i></button>' +
+    '</div></div>' +
+    '<div class="field"><label>Perfil</label>' +
+    '<div class="role-toggle">' +
+    '<button type="button" class="role-toggle-btn active" id="uf-role-caixa" onclick="window._setUfRole(\'caixa\')">' +
+    '<i data-lucide="shopping-bag"></i> Caixa</button>' +
+    '<button type="button" class="role-toggle-btn" id="uf-role-admin" onclick="window._setUfRole(\'admin\')">' +
+    '<i data-lucide="shield"></i> Admin</button>' +
+    '</div></div>' +
+    '</div>' +
+    '<div class="form-actions">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+    '<button class="btn btn-primary btn-full" onclick="window._saveUser()">' +
+    '<i data-lucide="user-plus"></i> Adicionar</button>' +
+    '</div>');
+  window._ufRole = "caixa";
   refreshIcons(el("modal-box"));
 }
+
+window._toggleUfPin = function(btn) {
+  var input = document.getElementById("uf-pin");
+  if (!input) return;
+  var isHidden = input.type === "password";
+  input.type = isHidden ? "text" : "password";
+  btn.innerHTML = '<i data-lucide="' + (isHidden?"eye-off":"eye") + '"></i>';
+  refreshIcons(btn.parentElement);
+};
+
+window._setUfRole = function(role) {
+  window._ufRole = role;
+  var caixaBtn = document.getElementById("uf-role-caixa");
+  var adminBtn = document.getElementById("uf-role-admin");
+  if (caixaBtn) caixaBtn.classList.toggle("active", role==="caixa");
+  if (adminBtn) adminBtn.classList.toggle("active", role==="admin");
+};
 
 window._saveUser = async () => {
   const name     = el("uf-name").value.trim();
   const username = el("uf-user").value.trim();
-  const password = el("uf-pass").value;
-  const role     = el("uf-role").value;
-  if (!name || !username || !password) { toast("Preencha todos os campos.", "error"); return; }
+  const pin      = el("uf-pin").value.trim();
+  const role     = window._ufRole || "caixa";
+  if (!name || !username || !pin) { toast("Preencha todos os campos.", "error"); return; }
+  if (!/^\d{6}$/.test(pin)) { toast("O PIN deve ter exactamente 6 dígitos.", "error"); return; }
   try {
-    await createUser(name, username, password, role);
+    await createUser(name, username, pin, role);
     toast("Funcionário adicionado.", "success");
     closeModal();
     loadEquipa();
@@ -357,7 +386,16 @@ window._saveUser = async () => {
 window._toggleUser = async (id) => {
   const u = await db.get("users", id);
   await db.put("users", { ...u, active: !u.active });
-  toast(u.active ? "Desativado." : "Ativado.", "success");
+  toast(u.active ? "Desactivado." : "Activado.", "success");
+  loadEquipa();
+};
+
+window._deleteUser = async (id) => {
+  const u = await db.get("users", id);
+  if (!u) return;
+  if (!confirm("Eliminar " + u.name + "? Esta acção é irreversível. O histórico de vendas e sessões deste funcionário será mantido para auditoria, mas ele deixará de poder entrar no sistema.")) return;
+  await db.delete("users", id);
+  toast("Funcionário eliminado.", "success");
   loadEquipa();
 };
 
@@ -420,16 +458,26 @@ async function saveStoreSettings() {
 
 async function changePassword() {
   const cur = val("pw-cur"), nw = val("pw-new"), conf = val("pw-conf");
-  if (!cur || !nw) { toast("Preencha todos os campos.", "error"); return; }
-  if (nw !== conf)  { toast("As senhas não coincidem.", "error"); return; }
+  if (!cur || !nw || !conf) { toast("Preencha todos os campos.", "error"); return; }
+  if (!/^\d{6}$/.test(nw)) { toast("O novo PIN deve ter exactamente 6 dígitos numéricos.", "error"); return; }
+  if (nw !== conf) { toast("Os PINs não coincidem.", "error"); return; }
   try {
     await changePasswordAuth(cur, nw);
-    toast("Senha alterada com sucesso.", "success");
+    toast("PIN alterado com sucesso.", "success");
     el("pw-cur").value = ""; el("pw-new").value = ""; el("pw-conf").value = "";
   } catch(err) {
     toast(err.message, "error");
   }
 }
+
+window._togglePinField = function(id, btn) {
+  var input = document.getElementById(id);
+  if (!input) return;
+  var isHidden = input.type === "password";
+  input.type = isHidden ? "text" : "password";
+  btn.innerHTML = '<i data-lucide="' + (isHidden?"eye-off":"eye") + '"></i>';
+  refreshIcons(btn.parentElement);
+};
 
 window._closeModal = closeModal;
 
