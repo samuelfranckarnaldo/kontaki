@@ -8,6 +8,7 @@ import { initPerfil }                      from "./components/perfil.js";
 import { initCamera }                      from "./components/camera.js";
 import { initDarkMode, checkStockAlerts, checkBadges, startRealtimeSync } from "./components/extras.js";
 import { loadDashboard }                    from "./components/dashboard.js";
+import { hasFeature, getLicense }          from "./license.js";
 
 var PAGES = {
   vender:    { init: initVender    },
@@ -22,6 +23,19 @@ var TITLES = {
   fiados: "Fiados",  historico: "Histórico", perfil: "Perfil",
 };
 
+// Mapa de features por página/botão
+var FEATURE_MAP = {
+  historico: "historico",
+  dashboard: "dashboard",
+  quickmode: "venda_rapida",
+};
+
+function bloqueado(feature) {
+  import("./license.js").then(function(m) {
+    m.showUpgradeBanner("Esta função requer um plano superior. Contacta a Introxeer para fazer upgrade.");
+  });
+}
+
 export var router = {
   init: function() {
     var self = this;
@@ -30,32 +44,50 @@ export var router = {
     });
 
     var qrBtn = el("btn-topbar-qr");
-    if (qrBtn) qrBtn.addEventListener("click", function() { initCamera(window._onVerifyQR); });
+    if (qrBtn) qrBtn.addEventListener("click", function() {
+      if (!hasFeature("scanner")) { bloqueado("scanner"); return; }
+      initCamera(window._onVerifyQR);
+    });
 
     refreshIcons(el("bottom-nav"));
     refreshIcons(el("topbar"));
+
     // Mostrar nome da loja no topbar
     (async function() {
       var store = await (await import("./db.js")).db.get("settings","store");
       var titleEl = el("topbar-title");
       if (titleEl && store && store.name) titleEl.textContent = store.name;
     })();
+
     // Botão dashboard
     window._openDashboard = function() {
+      if (!hasFeature("dashboard")) { bloqueado("dashboard"); return; }
       var existing = document.getElementById("dashboard-overlay");
       if (existing) { existing.remove(); return; }
       import("./components/dashboard.js").then(function(m){ m.loadDashboard(); });
     };
+
     initDarkMode();
     startRealtimeSync();
     checkStockAlerts();
     checkBadges();
-    initQuickMode();
+
+    // Quick mode só se tiver feature
+    if (hasFeature("venda_rapida")) {
+      initQuickMode();
+    }
+
     setTimeout(function() { self.go("vender"); }, 50);
   },
 
   go: function(pageId) {
     if (!PAGES[pageId]) return;
+
+    // Verificar acesso à página
+    if (pageId === "historico" && !hasFeature("historico")) {
+      bloqueado("historico");
+      return;
+    }
 
     document.querySelectorAll(".page").forEach(function(p) { p.classList.remove("active"); });
     document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.remove("active"); });
@@ -73,14 +105,13 @@ export var router = {
     var addBtn   = el("btn-topbar-add");
     var quickBtn = el("btn-topbar-quick");
 
-    // Esconder todos os botões
     if (qrBtn)    { qrBtn.style.display    = "none"; }
     if (addBtn)   { addBtn.style.display   = "none"; addBtn.onclick = null; }
     if (quickBtn) { quickBtn.style.display = "none"; }
 
     if (pageId === "vender") {
-      if (quickBtn) quickBtn.style.display = "flex";
-      if (qrBtn)    qrBtn.style.display    = "flex";
+      if (quickBtn && hasFeature("venda_rapida")) quickBtn.style.display = "flex";
+      if (qrBtn && hasFeature("scanner"))         qrBtn.style.display    = "flex";
     }
     if (pageId === "produtos") {
       if (addBtn) {

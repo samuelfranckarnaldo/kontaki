@@ -158,8 +158,24 @@ window._perfilBack = function() {
   showSubpage(null);
 };
 
+var PAGE_FEATURE = {
+  contabilidade: "contabilidade",
+  fornecedores:  "fornecedores",
+  equipa:        "equipe",
+  turno:         "historico",
+};
+
 window._perfilNav = async (page) => {
   if (page === "logout") { logout(); return; }
+
+  if (PAGE_FEATURE[page]) {
+    var mod = await import("../license.js");
+    if (!mod.hasFeature(PAGE_FEATURE[page])) {
+      mod.showUpgradeBanner("Esta função requer um plano superior. Contacta a Introxeer para fazer upgrade.");
+      return;
+    }
+  }
+
   showSubpage(page);
   if (page === "stock") {
     showSubpage(null);
@@ -997,7 +1013,13 @@ async function loadDespesasPage() {
 }
 
 // ── LOGOTIPO DA LOJA ──────────────────────────────────────────────────────────
-window._uploadLogo = function(input) {
+window._uploadLogo = async function(input) {
+  const licMod = await import("../license.js");
+  if (!licMod.hasFeature("logotipo")) {
+    licMod.showUpgradeBanner("Logotipo da loja disponível a partir do plano Pro. Contacta a Introxeer para upgrade.");
+    input.value = "";
+    return;
+  }
   var file = input.files[0];
   if (!file) return;
   var reader = new FileReader();

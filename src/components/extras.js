@@ -216,6 +216,11 @@ window._confirmarDevolucao = async function() {
 
 // ── RELATÓRIO PDF MENSAL ──────────────────────────────────────────────────────
 export async function gerarRelatorioPDF() {
+  const licMod = await import("../license.js");
+  if (!licMod.hasFeature("pdf_contabilidade")) {
+    licMod.showUpgradeBanner("Exportar PDF disponível a partir do plano Pro. Contacta a Introxeer para upgrade.");
+    return;
+  }
   var now   = new Date();
   var mes   = now.toISOString().slice(0, 7);
   var label = now.toLocaleDateString("pt-AO", { month: "long", year: "numeric" });

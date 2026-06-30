@@ -478,10 +478,10 @@ window._saveProduto = async (id) => {
     // Verifica limite do plano antes de criar
     const allProducts = await db.getAll("products");
     const activeCount = allProducts.filter(function(p){ return p.active; }).length;
-    const store2 = (await db.get("settings","store")) || {};
-    const planLimit = store2.planLimit || 99999;
+    const licMod = await import("../license.js");
+    const planLimit = licMod.getPlanLimit("maxProducts");
     if (activeCount >= planLimit) {
-      toast("Limite de " + planLimit + " produtos atingido para o teu plano. Contacta o suporte para upgrade.", "error");
+      toast("Limite de " + planLimit + " produtos atingido para o teu plano. Contacta a Introxeer para upgrade.", "error");
       return;
     }
     // CRIAR — stock inicial gera StockMovement real
