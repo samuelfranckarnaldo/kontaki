@@ -331,13 +331,38 @@ export const ktkService = {
     await db.put("sessions",{...session,ktkHash:ktk.hash});
     return ktk;
   },
-  async import(ktk) {
+  // Importa o .ktk para a área pendente — NÃO toca em sessions/incidents/stock ainda.
+  async stageImport(ktk) {
     requireRole("admin");
     if(!ktk.id_sessao||!ktk.funcionario||!ktk.loja_id||!ktk.versao) throw new Error("INVALID_FORMAT");
+
     const dup=await sessionService.checkDuplicate(ktk.id_sessao);
     if(dup) throw new Error(`DUPLICATE:${dup.id}:${dup.openedAt}`);
+
+    const pending=await db.getAll("ktkImports");
+    const dupPending=pending.find(p=>p.sessionUuid===ktk.id_sessao && p.status==="pending");
+    if(dupPending) throw new Error(`PENDING_DUPLICATE:${dupPending.id}`);
+
     const hashResult=await validateKtkHash(ktk);
     if(!hashResult.valid&&!hashResult.legacy) throw new Error("INVALID_HASH");
+
+    const importId=await db.add("ktkImports",{
+      sessionUuid:ktk.id_sessao, ktk, hashResult,
+      status:"pending", importedAt:new Date().toISOString(),
+      importedBy:getUser().id,
+    });
+    return {importId,hashResult,incidentCount:(ktk.incidentes||[]).length};
+  },
+
+  // Aplica um import pendente: cria sessão/movimentos/incidentes (não mexe em stock de produtos).
+  async confirmImport(importId) {
+    requireRole("admin");
+    const rec=await db.get("ktkImports",importId);
+    if(!rec || rec.status!=="pending") throw new Error("Importação não encontrada ou já processada.");
+    const ktk=rec.ktk;
+    const dup=await sessionService.checkDuplicate(ktk.id_sessao);
+    if(dup) { await db.put("ktkImports",{...rec,status:"rejected",rejectedReason:"Duplicado no momento da confirmação"}); throw new Error(`DUPLICATE:${dup.id}:${dup.openedAt}`); }
+
     const user=getUser();
     const sessionId=await db.add("sessions",{
       uuid:ktk.id_sessao, userId:ktk.funcionario_id, userName:ktk.funcionario,
@@ -348,7 +373,7 @@ export const ktkService = {
       hasIncidents:(ktk.incidentes||[]).length>0,
       validated:true, validatedBy:user.id, validatedAt:new Date().toISOString(),
       ktkHash:ktk.hash, importedKtkUuid:ktk.id_sessao,
-      isImported:true, hashLegacy:hashResult.legacy,
+      isImported:true, hashLegacy:rec.hashResult?.legacy,
       lojaId:ktk.loja_id, lojaNome:ktk.loja_nome,
     });
     for(const m of (ktk.stock_movements||[])) {
@@ -363,7 +388,54 @@ export const ktkService = {
         createdAt:inc.date||new Date().toISOString(),
       });
     }
-    return {sessionId,hashResult,incidentCount:(ktk.incidentes||[]).length};
+    await db.put("ktkImports",{...rec,status:"confirmed",confirmedAt:new Date().toISOString(),confirmedBy:user.id,sessionId});
+    return {sessionId,incidentCount:(ktk.incidentes||[]).length};
+  },
+
+  async rejectImport(importId,reason) {
+    requireRole("admin");
+    const rec=await db.get("ktkImports",importId);
+    if(!rec) throw new Error("Importação não encontrada.");
+    await db.put("ktkImports",{...rec,status:"rejected",rejectedReason:reason||"",rejectedAt:new Date().toISOString(),rejectedBy:getUser().id});
+  },
+
+  async getPending() {
+    const all=await db.getAll("ktkImports");
+    return all.filter(p=>p.status==="pending").sort((a,b)=>new Date(a.importedAt)-new Date(b.importedAt));
+  },
+
+  // Compara vendas de todos os imports pendentes por produto, ordenadas por hora real da venda.
+  // Sinaliza quando o mesmo produto é vendido em 2+ sessões/turnos dentro de uma janela curta.
+  async detectConflicts(windowMinutes=10) {
+    const pending=await this.getPending();
+    const byProduct={};
+    pending.forEach(p=>{
+      const ktk=p.ktk;
+      (ktk.vendas||[]).forEach(v=>{
+        (v.items||[]).forEach(it=>{
+          const key=it.id;
+          if(!byProduct[key]) byProduct[key]=[];
+          byProduct[key].push({
+            productId:it.id, productName:it.name, qty:it.qty,
+            date:v.date, funcionario:ktk.funcionario, sessionUuid:ktk.id_sessao, importId:p.id,
+          });
+        });
+      });
+    });
+    const conflicts=[];
+    Object.keys(byProduct).forEach(pid=>{
+      const events=byProduct[pid].sort((a,b)=>new Date(a.date)-new Date(b.date));
+      const sessionsInvolved=new Set(events.map(e=>e.sessionUuid));
+      if(sessionsInvolved.size<2) return;
+      for(let i=1;i<events.length;i++) {
+        const gapMin=(new Date(events[i].date)-new Date(events[i-1].date))/60000;
+        if(gapMin<=windowMinutes && events[i].sessionUuid!==events[i-1].sessionUuid) {
+          conflicts.push({productId:Number(pid),productName:events[i].productName,events:events,gapMinutes:Math.round(gapMin)});
+          break;
+        }
+      }
+    });
+    return {byProduct,conflicts};
   },
 };
 

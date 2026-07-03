@@ -4,7 +4,6 @@
   flex-direction: column;
   height: 100dvh;
   height: 100vh;
-  height: 100vh;
   max-width: 480px;
   margin: 0 auto;
   background: var(--bg);
@@ -46,7 +45,6 @@
 .topbar-btn:active { background: rgba(255,255,255,.25); transform: scale(.93); }
 .topbar-btn i, .topbar-btn svg { width: 18px; height: 18px; }
 
-/* Badge nos botões da topbar */
 .topbar-btn .badge {
   position: absolute; top: -4px; right: -4px;
   min-width: 16px; height: 16px; background: #ef4444;
@@ -76,7 +74,7 @@
   -webkit-overflow-scrolling: touch;
 }
 .page.active { display: flex; animation: fadeIn .2s ease; }
-.page-inner  { padding: 16px; flex: 1; }
+.page-inner  { padding: 0 16px 80px; flex: 1; }
 
 /* ── BOTTOM NAV ─────────────────────────────────────────────────────────────── */
 .bottom-nav {
@@ -103,17 +101,15 @@
 .nav-item i, .nav-item svg { width: 20px; height: 20px; transition: all .2s ease; }
 .nav-label { font-size: 10px; font-weight: 600; line-height: 1; }
 .nav-item.active { color: var(--primary); }
-.nav-item.active i, .nav-item.active svg { 
+.nav-item.active i, .nav-item.active svg {
   stroke: var(--primary); transform: scale(1.1);
 }
-/* Indicador ativo - bolinha roxa no topo */
 .nav-item.active::before {
   content: ''; position: absolute; top: -1px; left: 50%;
   transform: translateX(-50%); width: 24px; height: 3px;
   background: var(--primary); border-radius: 0 0 3px 3px;
 }
 
-/* Badge */
 .nav-badge {
   position: absolute; top: 6px; right: calc(50% - 18px);
   min-width: 18px; height: 18px; background: #ef4444;
@@ -122,61 +118,6 @@
   padding: 0 4px; border: 2px solid var(--bg2);
   animation: pulse 2s infinite;
 }
-
-/* ── LOGIN ──────────────────────────────────────────────────────────────────── */
-.login-page {
-  min-height: 100dvh;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: linear-gradient(160deg, #f5f3ff 0%, #ede9fe 50%, #ddd6fe 100%);
-}
-.login-box {
-  background: var(--bg2);
-  border-radius: var(--radius-xl);
-  padding: 28px 24px;
-  width: 100%;
-  max-width: 360px;
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-}
-.login-logo {
-  text-align: center;
-  margin-bottom: 24px;
-}
-.login-logo-mark {
-  width: 64px;
-  height: 64px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-mid));
-  border-radius: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 12px;
-  box-shadow: 0 8px 24px rgba(91,33,182,.3);
-}
-.login-logo-mark i { width: 30px; height: 30px; color: #fff; }
-.login-logo h1 { font-size: 24px; margin-bottom: 4px; }
-.login-logo p  { font-size: 13px; color: var(--text3); }
-
-/* ── SUBPAGES DO PERFIL ─────────────────────────────────────────────────────── */
-.subpage {
-  position: absolute;
-  inset: 0;
-  overflow-y: auto;
-  background: var(--bg);
-  z-index: 5;
-  animation: slideUp .25s ease;
-}
-
-/* Compensar topbar */
-.page-inner { padding: 0 16px 80px; flex: 1; }
 
 /* Botões voltar do perfil */
 .subpage .btn-back, #subpage-stock .btn-ghost, #subpage-incidentes .btn-ghost,
@@ -189,10 +130,6 @@
   margin-bottom: 12px; display: inline-flex;
 }
 
-/* Espaçamento entre topbar e conteúdo */
-
-
-/* Subpáginas do perfil - espaço para o botão voltar */
 .subpage .page-inner, [id^="subpage-"] .page-inner { padding-top: 16px !important; }
 
 /* ── MAIN CONTAINER ─────────────────────────────────────────────────────────── */
@@ -200,10 +137,9 @@
   flex: 1;
   position: relative;
   overflow: hidden;
-
 }
 
-/* ── LOGIN ──────────────────────────────────────────────────────────────────── */
+/* ── LOGIN ──────────────────────────────────────────────────────────────── */
 #login-page {
   min-height: 100dvh;
   display: flex;
@@ -211,17 +147,203 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: #f5f3ff;
+  background: #ffffff;
 }
+
 .login-box {
-  background: #fff;
-  border-radius: 24px;
-  padding: 32px 24px;
   width: 100%;
   max-width: 360px;
-  box-shadow: 0 8px 40px rgba(91,33,182,.12);
-  border: 1px solid #ede9fe;
   display: flex;
   flex-direction: column;
   align-items: center;
+  background: #fff;
+  border-radius: var(--radius-xl);
+  padding: 32px 24px;
+  box-shadow: 0 8px 40px rgba(91,33,182,.10), 0 1px 3px rgba(0,0,0,.05);
+  border: 1px solid var(--border2);
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.login-brand-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text4);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.login-store-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  object-fit: cover;
+  margin: 0 auto 12px;
+  box-shadow: 0 8px 24px rgba(91,33,182,.15);
+}
+.login-store-name-text {
+  font-size: 26px;
+  font-weight: 800;
+  color: #18181b;
+  margin-top: 6px;
+  letter-spacing: -.3px;
+}
+
+.login-step-label {
+  font-size: 15px;
+  color: var(--text3);
+  text-align: center;
+  margin: 20px 0 20px;
+  font-weight: 500;
+}
+
+.login-users-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.login-terms {
+  font-size: 10.5px;
+  color: var(--text4);
+  text-align: center;
+  margin-top: 20px;
+  line-height: 1.6;
+  opacity: .7;
+}
+.login-terms button {
+  background: none; border: none; padding: 0;
+  color: var(--primary); font-weight: 600;
+  font-size: 11.5px; cursor: pointer; font-family: inherit;
+  text-decoration: underline;
+}
+
+#login-step-pin {
+  width: 100%;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+}
+.login-pin-card {
+  width: 100%;
+  max-width: 264px;
+  background: #fafafa;
+  border: 1.5px solid #f0f0f2;
+  border-radius: 20px;
+  padding: 16px 14px 18px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 auto;
+}
+#login-step-pin.active { display: flex; }
+
+#login-pin-user {
+  background: #fff;
+  border: 1.5px solid #ede9fe;
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.pin-dots {
+  display: flex;
+  gap: 10px;
+  margin: 4px 0 18px;
+}
+.pin-dot {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: #fafafa;
+  transition: all .15s ease;
+}
+.pin-dot.filled {
+  background: var(--primary);
+  border-color: var(--primary);
+  transform: scale(1.06);
+}
+
+.login-err {
+  height: 18px;
+  margin-bottom: 8px;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.login-err.show { opacity: 1; }
+.login-err span {
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 228px;
+}
+.pin-btn-g {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 1.5px solid #e4e4e7;
+  background: #fff;
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .12s ease;
+  -webkit-tap-highlight-color: transparent;
+  margin: 0 auto;
+}
+.pin-btn-g:active {
+  background: var(--primary-light);
+  color: var(--primary);
+  transform: scale(.94);
+}
+.pin-btn-back, .pin-btn-del {
+  background: transparent;
+  color: #71717a;
+}
+.pin-btn-back i, .pin-btn-del i { width: 20px; height: 20px; }
+
+.login-forgot-btn {
+  background: none;
+  border: none;
+  color: var(--text3);
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 24px;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: underline;
+}
+
+.login-footer-brand {
+  margin-top: 32px;
+  width: 100%;
+  text-align: center;
+  font-family: 'Playfair Display', serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text3);
+  opacity: .8;
 }

@@ -11,22 +11,66 @@ export function getUser()    { return currentUser; }
 export function getSession() { return currentSession; }
 export function _setSession(s) { currentSession = s; if (currentUser) currentUser.sessionId = s ? s.id : null; }
 
+function ensurePinCardStyle() {
+  if (document.getElementById("login-pin-card-style")) return;
+  var styleTag = document.createElement("style");
+  styleTag.id = "login-pin-card-style";
+  styleTag.textContent =
+    ".login-pin-btn:active { transform:scale(.92); background:#f5f3ff !important; border-color:#c4b5fd !important; }" +
+    ".login-pin-btn-ghost:active { background:#f4f4f5 !important; }" +
+    "@keyframes loginPinDotPop { 0% { transform:scale(1) } 50% { transform:scale(1.25) } 100% { transform:scale(1.06) } }" +
+    ".login-pin-dot-filled { animation:loginPinDotPop .25s ease; }";
+  document.head.appendChild(styleTag);
+}
+
+function renderPinCard() {
+  var container = document.getElementById("login-pin-container");
+  if (!container) return;
+
+  container.innerHTML = [
+    '<div style="background:#fafafa;border:1.5px solid #f0f0f2;border-radius:20px;padding:16px 14px 18px;max-width:264px;width:100%;box-sizing:border-box;margin:0 auto;display:flex;flex-direction:column;align-items:center">',
+
+      '<div id="login-pin-user" style="display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #ede9fe;border-radius:14px;padding:10px 12px;margin-bottom:14px;width:100%;box-sizing:border-box"></div>',
+
+      '<div style="font-size:12.5px;font-weight:600;color:#71717a;text-align:center;margin-bottom:14px" id="login-pin-label">Introduz o teu PIN</div>',
+
+      '<div id="pin-dots" style="display:flex;gap:8px;justify-content:center;margin-bottom:16px"></div>',
+
+      '<div id="login-err" class="login-err" style="text-align:center">',
+        '<span id="login-err-msg">PIN incorrecto</span>',
+      '</div>',
+
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:228px;margin:0 auto">',
+        [1,2,3,4,5,6,7,8,9,'back','0','del'].map(function(n) {
+          if (n === 'back') return '<button onclick="window._backToRole()" class="login-pin-btn login-pin-btn-ghost" style="width:60px;height:60px;border-radius:50%;background:transparent;border:none;cursor:pointer;color:#a1a1aa;margin:0 auto;display:flex;align-items:center;justify-content:center"><i data-lucide="arrow-left" style="width:19px;height:19px"></i></button>';
+          if (n === 'del')  return '<button onclick="window._pinKey(String.fromCharCode(9003))" class="login-pin-btn login-pin-btn-ghost" style="width:60px;height:60px;border-radius:50%;background:transparent;border:none;cursor:pointer;color:#71717a;margin:0 auto;display:flex;align-items:center;justify-content:center"><i data-lucide="delete" style="width:19px;height:19px"></i></button>';
+          return '<button onclick="window._pinKey(\'' + n + '\')" class="login-pin-btn" style="width:60px;height:60px;border-radius:50%;background:#fff;border:1.5px solid #e4e4e7;font-size:19px;font-weight:500;cursor:pointer;font-family:inherit;color:#18181b;margin:0 auto;display:flex;align-items:center;justify-content:center">' + n + '</button>';
+        }).join(''),
+      '</div>',
+    '</div>',
+
+    '<button id="btn-forgot-pw" class="login-forgot-btn">Esqueci o PIN</button>',
+  ].join('');
+
+  refreshIcons(container);
+
+  var forgotBtn = document.getElementById("btn-forgot-pw");
+  if (forgotBtn) forgotBtn.addEventListener("click", openForgotPassword);
+}
+
 export function initAuth() {
   const list = document.getElementById("login-users-list");
-  const pin  = document.getElementById("login-pin-user");
 
-  if (!list || !pin) {
+  if (!list) {
     console.warn("Auth UI não pronta.");
     return;
   }
 
+  ensurePinCardStyle();
+  renderPinCard();
   _renderLoginUsers();
-  _initPinKeypad();
 
   if (window.lucide) window.lucide.createIcons();
-
-  const forgotBtn = document.getElementById("btn-forgot-pw");
-  if (forgotBtn) forgotBtn.addEventListener("click", openForgotPassword);
 }
 
 async function _renderLoginUsers() {
@@ -51,7 +95,6 @@ async function _renderLoginUsers() {
   if (!list) return;
 
   const active = users.filter(u => u.active !== false);
-  console.log("[Auth] Utilizadores encontrados:", users.length, "activos:", active.length);
 
   if (!active.length) {
     list.innerHTML = '<div style="text-align:center;color:#a1a1aa;font-size:13px;padding:20px">Nenhum utilizador encontrado.<br/>Reinicia o setup.</div>';
@@ -59,22 +102,22 @@ async function _renderLoginUsers() {
   }
 
   list.innerHTML = "";
-  
+
   active.forEach(u => {
     const isAdmin = u.role === "admin";
     const color   = isAdmin ? "#5b21b6" : "#16a34a";
-    const bg      = isAdmin ? "#ede9fe" : "#f0fdf4";
-    const border  = isAdmin ? "#ddd6fe" : "#bbf7d0";
+    const bg      = "#fff";
+    const border  = "#e4e4e7";
     const label   = isAdmin ? "Administrador" : "Operador de Caixa";
 
     const btn = document.createElement("button");
-    btn.style.cssText = 
-      "display:flex;align-items:center;gap:14px;padding:14px 16px;background:" + bg + 
+    btn.style.cssText =
+      "display:flex;align-items:center;gap:14px;padding:14px 16px;background:" + bg +
       ";border:2px solid " + border + ";border-radius:14px;cursor:pointer;" +
       "font-family:inherit;text-align:left;width:100%;margin-bottom:8px;transition:all 0.2s";
-    
-    btn.innerHTML = 
-      '<div style="width:48px;height:48px;background:' + color + 
+
+    btn.innerHTML =
+      '<div style="width:48px;height:48px;background:' + color +
       ';border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;font-weight:700;color:#fff">' +
       (u.avatar || u.name.charAt(0).toUpperCase()) +
       '</div>' +
@@ -82,21 +125,14 @@ async function _renderLoginUsers() {
       '</div><div style="font-size:12px;color:' + color + ';margin-top:2px">' + label +
       '</div></div>';
 
-    btn.onmouseenter = function() {
-      this.style.transform = "translateY(-1px)";
-      this.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-    };
-    btn.onmouseleave = function() {
-      this.style.transform = "translateY(0)";
-      this.style.boxShadow = "none";
-    };
-
     btn.onclick = () => _selectUserHandler(u.id);
     list.appendChild(btn);
   });
 
   if (window.lucide) window.lucide.createIcons();
 }
+
+window._selectUser = _selectUserHandler;
 
 async function _selectUserHandler(userId) {
   const users = await db.getAll("users");
@@ -108,8 +144,7 @@ async function _selectUserHandler(userId) {
 
   const stepRole = document.getElementById("login-step-role");
   const stepPin  = document.getElementById("login-step-pin");
-  
-  // Usa flex para compatibilidade com CSS
+
   if (stepRole) stepRole.style.display = "none";
   if (stepPin) {
     stepPin.style.display = "flex";
@@ -118,37 +153,39 @@ async function _selectUserHandler(userId) {
 
   const pinUserEl = document.getElementById("login-pin-user");
   if (pinUserEl) {
-    pinUserEl.innerHTML = 
-      '<div style="width:40px;height:40px;background:#5b21b6;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">' +
+    pinUserEl.innerHTML =
+      '<div style="width:36px;height:36px;background:#5b21b6;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;flex-shrink:0">' +
       (_selectedUser.avatar || _selectedUser.name.charAt(0).toUpperCase()) +
       '</div>' +
-      '<div style="font-size:15px;font-weight:600;color:#18181b">' + _selectedUser.name + '</div>';
+      '<div style="font-size:14px;font-weight:600;color:#18181b">' + _selectedUser.name + '</div>';
   }
 
   const errEl = document.getElementById("login-err");
   if (errEl) errEl.classList.remove("show");
-  
+
   if (window.lucide) window.lucide.createIcons();
 }
 
-window._selectUser = _selectUserHandler;
-
 function _updatePinDots() {
-  for (let i = 0; i < 6; i++) {
-    const dot = document.getElementById("pdot-" + i);
-    if (dot) {
-      dot.classList.toggle("filled", i < _pinBuffer.length);
-    }
-  }
+  var dotsEl = document.getElementById("pin-dots");
+  if (!dotsEl) return;
+  dotsEl.innerHTML = [0,1,2,3,4,5].map(function(i) {
+    var filled = i < _pinBuffer.length;
+    return '<div class="' + (filled ? 'login-pin-dot-filled' : '') + '" style="width:38px;height:38px;border-radius:50%;border:2px solid ' +
+      (filled ? '#5b21b6' : '#e4e4e7') + ';background:' + (filled ? '#5b21b6' : '#fafafa') +
+      ';display:flex;align-items:center;justify-content:center;transition:background .15s ease,border-color .15s ease;flex-shrink:0;' +
+      (filled ? 'transform:scale(1.06)' : '') +
+      '"></div>';
+  }).join('');
+
   const errEl = document.getElementById("login-err");
   if (errEl && _pinBuffer.length > 0) {
     errEl.classList.remove("show");
   }
 }
 
-// TECLADO PIN - Funções globais chamadas pelo HTML
 window._pinKey = function(key) {
-  if (key === '⌫' || key === 'del' || key === 'delete') {
+  if (key === '⌫' || key === 'del' || key === 'delete' || key === String.fromCharCode(9003)) {
     _pinBuffer = _pinBuffer.slice(0, -1);
   } else if (_pinBuffer.length < 6) {
     _pinBuffer += key;
@@ -162,48 +199,47 @@ window._pinKey = function(key) {
 window._backToRole = function() {
   _pinBuffer = "";
   _selectedUser = null;
-  
+
   const stepRole = document.getElementById("login-step-role");
   const stepPin  = document.getElementById("login-step-pin");
-  
+
   if (stepRole) stepRole.style.display = "flex";
   if (stepPin) {
     stepPin.style.display = "none";
     stepPin.classList.remove("active");
   }
-  
+
   _updatePinDots();
 };
 
 async function _verifyPin() {
   if (!_selectedUser) return;
-  
+
   try {
     const valid = await verifyPassword(_pinBuffer, _selectedUser.passwordHash);
-    
+
     if (!valid) {
       const errEl = document.getElementById("login-err");
       const errMsg = document.getElementById("login-err-msg");
       if (errEl) errEl.classList.add("show");
       if (errMsg) errMsg.textContent = "PIN incorrecto";
-      
+
       const dotsContainer = document.getElementById("pin-dots");
       if (dotsContainer) {
         dotsContainer.style.animation = "none";
         dotsContainer.offsetHeight;
         dotsContainer.style.animation = "shake 0.5s ease";
       }
-      
+
       _pinBuffer = "";
       _updatePinDots();
-      
+
       setTimeout(() => { if (errEl) errEl.classList.remove("show"); }, 2000);
       return;
     }
-    
-    // PIN CORRETO!
+
     currentUser = _selectedUser;
-    
+
     const session = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2),
       userId: currentUser.id,
@@ -214,35 +250,32 @@ async function _verifyPin() {
       fiados: [],
       incidentes: [],
     };
-    
+
     await db.add("sessions", session);
     currentSession = session;
     currentUser.sessionId = session.id;
-    
+
     localStorage.setItem("kontaki_session", JSON.stringify({
       userId: currentUser.id,
       sessionId: session.id
     }));
-    
-    // Transição
+
     const loginPage = document.getElementById("login-page");
     const app = document.getElementById("app");
-    
+
     if (loginPage) loginPage.style.display = "none";
     if (app) app.style.display = "flex";
-    
-    // Inicializa o router
+
     if (window.router) {
       setTimeout(() => window.router.init(), 100);
     }
-    
-    // Carrega dashboard
+
     import("./components/dashboard.js").then(m => {
       if (m.loadDashboard) m.loadDashboard();
     }).catch(() => {});
-    
+
     if (window.lucide) window.lucide.createIcons();
-    
+
   } catch (err) {
     console.error("Erro PIN:", err);
     _pinBuffer = "";
@@ -271,15 +304,15 @@ export function logout() {
 
   const app = document.getElementById("app");
   const loginPage = document.getElementById("login-page");
-  
+
   if (app) app.style.display = "none";
   if (loginPage) loginPage.style.display = "flex";
-  
+
   const stepRole = document.getElementById("login-step-role");
   const stepPin  = document.getElementById("login-step-pin");
   if (stepRole) stepRole.style.display = "flex";
   if (stepPin)  { stepPin.style.display = "none"; stepPin.classList.remove("active"); }
-  
+
   _updatePinDots();
   _renderLoginUsers();
 }
@@ -288,16 +321,16 @@ export async function restoreSession() {
   try {
     const saved = localStorage.getItem("kontaki_session");
     if (!saved) return false;
-    
+
     const data = JSON.parse(saved);
     const users = await db.getAll("users");
     const user = users.find(u => u.id === data.userId);
     if (!user) { localStorage.removeItem("kontaki_session"); return false; }
-    
+
     const sessions = await db.getAll("sessions");
     const session = sessions.find(s => s.id === data.sessionId && s.status === "open");
     if (!session) { localStorage.removeItem("kontaki_session"); return false; }
-    
+
     currentUser = user;
     currentUser.sessionId = session.id;
     currentSession = session;
@@ -308,14 +341,12 @@ export async function restoreSession() {
   }
 }
 
-// ============ FUNÇÕES PARA PERFIL.JS ============
-
 export async function changePasswordAuth(currentPassword, newPassword) {
   if (!currentUser) throw new Error("Nenhum usuário logado");
-  
+
   const valid = await verifyPassword(currentPassword, currentUser.passwordHash);
   if (!valid) throw new Error("Senha atual incorreta");
-  
+
   const newHash = await hashPassword(newPassword);
   currentUser.passwordHash = newHash;
   await db.put("users", currentUser);
@@ -325,14 +356,14 @@ export async function createUser(name, username, password, role) {
   if (!currentUser || currentUser.role !== "admin") {
     throw new Error("Apenas administradores podem criar usuários");
   }
-  
+
   const users = await db.getAll("users");
   if (users.find(u => u.username === username)) {
     throw new Error("Nome de usuário já existe");
   }
-  
+
   const passwordHash = await hashPassword(password);
-  
+
   const newUser = {
     name,
     username,
@@ -343,7 +374,7 @@ export async function createUser(name, username, password, role) {
     avatar: name.charAt(0).toUpperCase(),
     createdAt: new Date().toISOString(),
   };
-  
+
   const id = await db.add("users", newUser);
   return id;
 }

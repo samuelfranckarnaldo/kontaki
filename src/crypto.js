@@ -25,3 +25,16 @@ export async function generateResetToken(userId, code) {
   const payload = userId + ":" + code + ":" + Math.floor(Date.now() / 86400000);
   return sha256hex("kontaki-reset-v1:" + payload);
 }
+
+// ── ASSINATURA DE CONVITES (equipa) ──────────────────────────────────────
+const INVITE_SECRET = "kontaki-invite-v1";
+
+export async function signInvite(payload) {
+  const data = payload.storeId + ":" + payload.storeName + ":" + payload.inviteCode + ":" + payload.createdAt;
+  return sha256hex(INVITE_SECRET + ":" + data);
+}
+
+export async function verifyInviteSignature(payload, signature) {
+  const expected = await signInvite(payload);
+  return expected === signature;
+}

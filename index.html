@@ -22,7 +22,7 @@
 <body>
 
 <!-- LOGIN -->
-<div id="login-page">
+<div id="login-page" style="display:none">
   <div class="login-box">
     <div class="login-logo">
       <div id="login-logo-wrap"><div class="login-brand-text">Kontaki</div></div>
@@ -40,43 +40,12 @@
         e a
         <button onclick="window._showPrivacidade()">Privacidade</button>
       </div>
+      <div class="login-footer-brand">Introxeer</div>
     </div>
 
     <!-- STEP 2: PIN -->
     <div id="login-step-pin">
-      <div id="login-pin-user" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;margin-bottom:16px"></div>
-
-      <div class="login-step-label">Introduz o teu PIN</div>
-
-      <div id="pin-dots" class="pin-dots">
-        <div id="pdot-0" class="pin-dot"></div>
-        <div id="pdot-1" class="pin-dot"></div>
-        <div id="pdot-2" class="pin-dot"></div>
-        <div id="pdot-3" class="pin-dot"></div>
-        <div id="pdot-4" class="pin-dot"></div>
-        <div id="pdot-5" class="pin-dot"></div>
-      </div>
-
-      <div id="login-err" class="login-err">
-        <span id="login-err-msg">PIN incorrecto</span>
-      </div>
-
-      <div class="pin-keypad">
-        <button onclick="window._pinKey('1')" class="pin-btn-g">1</button>
-        <button onclick="window._pinKey('2')" class="pin-btn-g">2</button>
-        <button onclick="window._pinKey('3')" class="pin-btn-g">3</button>
-        <button onclick="window._pinKey('4')" class="pin-btn-g">4</button>
-        <button onclick="window._pinKey('5')" class="pin-btn-g">5</button>
-        <button onclick="window._pinKey('6')" class="pin-btn-g">6</button>
-        <button onclick="window._pinKey('7')" class="pin-btn-g">7</button>
-        <button onclick="window._pinKey('8')" class="pin-btn-g">8</button>
-        <button onclick="window._pinKey('9')" class="pin-btn-g">9</button>
-        <button onclick="window._backToRole()" class="pin-btn-g pin-btn-back"><i data-lucide="arrow-left"></i></button>
-        <button onclick="window._pinKey('0')" class="pin-btn-g">0</button>
-        <button onclick="window._pinKey('⌫')" class="pin-btn-g pin-btn-del"><i data-lucide="delete"></i></button>
-      </div>
-
-      <button id="btn-forgot-pw" class="login-forgot-btn">Esqueci o PIN</button>
+      <div id="login-pin-container"></div>
     </div>
   </div>
 </div>
@@ -727,6 +696,36 @@ window._showTermos = function() {
   document.body.appendChild(d);
 };
 
+window._showUsoAceitavel = function() {
+  var d = document.createElement("div");
+  d.style.position = 'fixed';
+  d.style.top = '0';
+  d.style.left = '0';
+  d.style.right = '0';
+  d.style.bottom = '0';
+  d.style.background = 'rgba(0,0,0,.6)';
+  d.style.zIndex = '9999';
+  d.style.display = 'flex';
+  d.style.alignItems = 'flex-end';
+  d.innerHTML =
+    "<div style='background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:24px'>" +
+    "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px'>" +
+    "<div style='font-size:17px;font-weight:700'>Política de Uso Aceitável</div>" +
+    "<button onclick='window._closeOverlay(this)' style='background:#f4f4f5;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px'>x</button></div>" +
+    "<div style='font-size:13px;color:#444;line-height:1.9'>" +
+    "<b>1. Objectivo</b><br/>Esta política define o que é permitido e proibido ao usar o Kontaki.<br/><br/>" +
+    "<b>2. Usos proibidos</b><br/>É proibido usar o Kontaki para: lavagem de dinheiro, evasão fiscal deliberada, registo de transacções falsas, ou qualquer actividade ilegal segundo a lei angolana.<br/><br/>" +
+    "<b>3. Licenças e revenda</b><br/>É proibido revender, partilhar ou sublicenciar o acesso ao Kontaki sem autorização escrita da Introxeer.<br/><br/>" +
+    "<b>4. Integridade dos dados</b><br/>É proibido adulterar ficheiros de turno (.ktk), tentar contornar validações de licença, ou manipular registos de auditoria.<br/><br/>" +
+    "<b>5. Segurança</b><br/>É proibido tentar aceder a dados de outras lojas, contornar mecanismos de autenticação, ou explorar vulnerabilidades do sistema.<br/><br/>" +
+    "<b>6. Consequências</b><br/>A violação desta política pode resultar em suspensão ou revogação da licença, sem reembolso.<br/><br/>" +
+    "<b>7. Contacto</b><br/>Dúvidas sobre esta política: info@introxeer.co.ao" +
+    "</div>" +
+    "<button onclick='window._closeOverlay(this)' style='width:100%;padding:14px;background:#5b21b6;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:16px'>Li e aceito</button>" +
+    "</div>";
+  document.body.appendChild(d);
+};
+
 window._showPrivacidade = function() {
   var d = document.createElement("div");
   d.style.position = 'fixed';
@@ -752,6 +751,14 @@ window._showPrivacidade = function() {
     "</div>";
   document.body.appendChild(d);
 };
+</script>
+<script>
+window.addEventListener('error', function(e) {
+  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;color:red;white-space:pre-wrap">ERRO: ' + e.message + '\nFicheiro: ' + e.filename + '\nLinha: ' + e.lineno + ':' + e.colno + '</div>' + document.body.innerHTML;
+});
+window.addEventListener('unhandledrejection', function(e) {
+  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;color:red;white-space:pre-wrap">PROMISE ERRO: ' + (e.reason && e.reason.stack ? e.reason.stack : e.reason) + '</div>' + document.body.innerHTML;
+});
 </script>
 <script type="module" src="./src/main.js"></script>
   <script>

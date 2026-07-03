@@ -126,18 +126,7 @@
   display: flex; align-items: center; justify-content: center;
   font-size: 22px; color: var(--primary); transition: all .12s ease;
 }
-.pin-dot.filled { background: var(--primary); border-color: var(--primary); color: #fff; }
-.pin-dot.error  { background: var(--danger-light); border-color: var(--danger); animation: shake .3s ease; }
 
-.pin-btn-g {
-  width: 72px; height: 72px; border-radius: 50%;
-  background: var(--bg2); border: none;
-  font-size: 24px; font-weight: 400; cursor: pointer;
-  font-family: var(--font); color: var(--text);
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 6px rgba(0,0,0,.08); transition: all .1s ease;
-}
-.pin-btn-g:active { background: var(--primary-light); color: var(--primary); transform: scale(.93); }
 
 /* ── PERFIL ─────────────────────────────────────────────────────────────────── */
 
@@ -395,7 +384,6 @@
 .login-users-list  { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .pin-dots          { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
 .login-err         { display: none; background: var(--danger-light); border-radius: 8px; padding: 10px; text-align: center; font-size: 13px; color: var(--danger); margin-bottom: 12px; }
-.pin-keypad        { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; max-width: 260px; margin: 0 auto 16px; }
 .pin-btn-back      { background: transparent !important; box-shadow: none !important; color: var(--text3); }
 .pin-btn-back i, .pin-btn-back svg { width: 20px; height: 20px; }
 .pin-btn-del       { background: transparent !important; box-shadow: none !important; color: var(--danger); }
@@ -403,16 +391,6 @@
 .login-forgot-btn  { background: none; border: none; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--font); padding: 8px; text-align: center; width: 100%; }
 
 /* ── LOGIN — REDESIGN ───────────────────────────────────────────────────────── */
-#login-page {
-  background: #f8f7ff;
-}
-.login-box {
-  background: #fff;
-  border-radius: 24px;
-  padding: 32px 24px;
-  box-shadow: 0 8px 40px rgba(91,33,182,.12), 0 1px 3px rgba(0,0,0,.06);
-  border: 1px solid #ede9fe;
-}
 .login-logo-mark {
   border-radius: 20px;
   box-shadow: 0 8px 24px rgba(91,33,182,.25);
@@ -478,23 +456,7 @@
   display: flex; align-items: center; justify-content: center;
   font-size: 20px; color: #5b21b6; transition: all .12s ease;
 }
-.pin-dot.filled { background: #5b21b6; border-color: #5b21b6; color: #fff; }
-.pin-dot.error  { background: #fee2e2; border-color: #dc2626; animation: shake .3s ease; }
 
-.pin-keypad {
-  display: grid; grid-template-columns: repeat(3,1fr);
-  gap: 10px; max-width: 260px; margin: 0 auto 20px;
-}
-.pin-btn-g {
-  width: 72px; height: 72px; border-radius: 50%;
-  background: #fff; border: 1.5px solid #e5e7eb;
-  font-size: 22px; font-weight: 500; cursor: pointer;
-  font-family: inherit; color: #111827;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 1px 3px rgba(0,0,0,.08); transition: all .1s ease;
-  margin: 0 auto;
-}
-.pin-btn-g:active { background: #ede9fe; border-color: #5b21b6; color: #5b21b6; transform: scale(.93); }
 .pin-btn-back { background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: #6b7280 !important; }
 .pin-btn-back i, .pin-btn-back svg { width: 20px; height: 20px; }
 .pin-btn-del  { background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: #dc2626 !important; }
@@ -589,33 +551,6 @@
   font-size: 10px; color: #5b21b6;
   transition: all .15s cubic-bezier(.34,1.56,.64,1);
 }
-.pin-dot.filled {
-  background: #5b21b6; border-color: #5b21b6;
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(91,33,182,.3);
-}
-.pin-dot.error {
-  background: #fee2e2; border-color: #dc2626;
-  animation: shake .3s ease;
-}
-.pin-keypad {
-  display: grid; grid-template-columns: repeat(3,1fr);
-  gap: 12px; max-width: 264px; margin: 0 auto 20px;
-}
-.pin-btn-g {
-  width: 72px; height: 72px; border-radius: 50%;
-  background: #fff; border: 1.5px solid #f0eeff;
-  font-size: 24px; font-weight: 400; cursor: pointer;
-  font-family: inherit; color: #111827;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 8px rgba(91,33,182,.08);
-  transition: all .1s ease; margin: 0 auto;
-}
-.pin-btn-g:active {
-  background: #ede9fe; border-color: #5b21b6;
-  color: #5b21b6; transform: scale(.92);
-  box-shadow: none;
-}
 .pin-btn-back {
   background: transparent !important; border-color: transparent !important;
   box-shadow: none !important; color: #9ca3af !important;
@@ -651,7 +586,8 @@
 .pin-dot.filled {
   background: #5b21b6 !important;
   border-color: #5b21b6 !important;
-  transform: scale(1.1);
+  transform: scale(1.08) !important;
+  transition: all .15s ease;
 }
 
 .login-err {
@@ -1759,20 +1695,6 @@
 .user-card-role--caixa { color: var(--success); }
 
 /* ── LOGIN BRAND ────────────────────────────────────────────────────────────── */
-.login-brand-text {
-  font-size: 36px;
-  font-weight: 800;
-  color: var(--primary);
-  letter-spacing: -1px;
-  line-height: 1;
-  margin-bottom: 4px;
-}
-.login-store-name-text {
-  font-size: 14px;
-  color: var(--text3);
-  font-weight: 500;
-  margin-top: 4px;
-}
 
 /* ── LOJA SUBPAGE REDESIGN ──────────────────────────────────────────────────── */
 .loja-section-title {

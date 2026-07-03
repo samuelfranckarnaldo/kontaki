@@ -1,6 +1,7 @@
 import { loadLicense } from "./license.js";
 import { seed, db } from "./db.js";
 import { checkSetup } from "./setup.js";
+import { showOnboarding } from "./onboarding.js";
 import { initAuth } from "./auth.js";
 import { initModal } from "./modal.js";
 import { logger } from "./logger.js";
@@ -19,7 +20,7 @@ async function boot() {
   const hasUsers = users && users.length > 0;
 
   if (!hasUsers) {
-    await checkSetup();
+    await showOnboarding();
     return;
   }
 
@@ -31,9 +32,8 @@ async function boot() {
   }
 
   const login = document.getElementById("login-users-list");
-  const pin   = document.getElementById("login-pin-user");
 
-  if (!login || !pin) {
+  if (!login) {
     console.error("Login UI não existe no DOM. Abortando auth.");
     return;
   }

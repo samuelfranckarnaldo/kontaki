@@ -17,6 +17,16 @@ async function renderTurno() {
   var wrap    = document.getElementById("turno-content");
   if (!wrap) return;
 
+  // Migração: sessões antigas sem UUID recebem um agora
+  if (session && !session.uuid) {
+    var { generateUUID } = await import("../services.js");
+    var newUuid = generateUUID();
+    await db.put("sessions", Object.assign({}, session, { uuid: newUuid }));
+    session.uuid = newUuid;
+    var authMod = await import("../auth.js");
+    if (authMod._setSession) authMod._setSession(session);
+  }
+
   var sessions     = await db.getAll("sessions");
   var sales        = await db.getAll("sales");
   var sessionSales = session ? sales.filter(function(s){ return s.sessionId===session.id; }) : [];
@@ -96,16 +106,17 @@ async function renderTurno() {
       '</div>';
   }
 
-  // ── Importar KTK ──
-  html +=
-    '<div style="margin-bottom:20px">' +
-      '<div style="font-size:11px;font-weight:700;color:#a1a1aa;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Importar ficheiro .ktk</div>' +
-      '<label style="display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;border:1.5px dashed #ddd6fe;border-radius:12px;background:#faf5ff;cursor:pointer;transition:background .2s">' +
-        '<i data-lucide="upload" style="width:18px;height:18px;color:#7c3aed"></i>' +
-        '<span style="font-size:13px;font-weight:600;color:#7c3aed">Seleccionar ficheiro .ktk</span>' +
-        '<input type="file" accept=".ktk,.json" style="display:none" onchange="window._handleKtkImport(this)"/>' +
-      '</label>' +
-    '</div>';
+  // ── Importar — apenas admin, com atalho para o Escritório ──
+  if (user.role === "admin") {
+    html +=
+      '<div style="margin-bottom:20px">' +
+        '<div style="font-size:11px;font-weight:700;color:#a1a1aa;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Importar ficheiros de turno</div>' +
+        '<button onclick="window._showSubpage(\'escritorio\')" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;border:1.5px dashed #ddd6fe;border-radius:12px;background:#faf5ff;cursor:pointer;font-family:inherit">' +
+          '<i data-lucide="archive" style="width:18px;height:18px;color:#7c3aed"></i>' +
+          '<span style="font-size:13px;font-weight:600;color:#7c3aed">Abrir o Escritório</span>' +
+        '</button>' +
+      '</div>';
+  }
 
   // ── Turnos anteriores ──
   if (closedSessions.length) {
@@ -433,23 +444,14 @@ function showKtkViewer(ktk, hashResult) {
     stockHtml + incHtml + fiadoHtml +
     '</div>' +
 
-    '<div style="margin-bottom:14px">' +
-    '<div style="font-size:12px;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Contagem física (opcional)</div>' +
-    '<div style="font-size:12px;color:#71717a;margin-bottom:10px;line-height:1.5">Insere a quantidade encontrada fisicamente para gerar incidentes automaticamente.</div>' +
-    Object.values(ktk.stock_esperado||{}).map(function(r){
-      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f4f4f5">' +
-        '<div style="flex:1"><div style="font-size:13px;font-weight:600">' + r.productName + '</div>' +
-        '<div style="font-size:11px;color:#71717a">Esperado: ' + r.expected + ' ' + r.unit + '</div></div>' +
-        '<input type="number" min="0" placeholder="—" ' +
-        'onchange="window._ktkContagemManual[' + r.productId + ']=parseInt(this.value)" ' +
-        'style="width:70px;padding:7px;border:1.5px solid #ddd6fe;border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
-        '</div>';
-    }).join("") +
+    '<div style="background:#ede9fe;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start">' +
+    '<i data-lucide="archive" style="width:16px;height:16px;color:#5b21b6;flex-shrink:0;margin-top:1px"></i>' +
+    '<div style="font-size:12px;color:#5b21b6;line-height:1.5">Este turno será enviado para o <strong>Escritório</strong>, onde podes rever, comparar com outros turnos pendentes, e confirmar o stock final.</div>' +
     '</div>' +
     '<div style="display:flex;gap:8px;margin-top:14px;border-top:1px solid #f4f4f5;padding-top:14px">' +
     '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>' +
-    '<button class="btn btn-primary btn-full" onclick="window._confirmarImportKtk()" style="background:#16a34a">' +
-    '<i data-lucide="check-circle"></i> Validar e importar</button>' +
+    '<button class="btn btn-primary btn-full" onclick="window._confirmarImportKtk()">' +
+    '<i data-lucide="send"></i> Enviar para o Escritório</button>' +
     '</div>');
 
   refreshIcons(el("modal-box"));
@@ -459,43 +461,15 @@ window._confirmarImportKtk = async function() {
   var ktk = window._ktkPendente;
   if (!ktk) { toast("Nenhum KTK pendente.","error"); return; }
   try {
-    var result = await ktkService.import(ktk);
-
-    // Aplica contagem manual — gera incidentes adicionais
-    var contagem = window._ktkContagemManual || {};
-    var user = getUser();
-    var extraInc = 0;
-    for (var pid in contagem) {
-      var found    = contagem[pid];
-      var stockExp = ktk.stock_esperado && ktk.stock_esperado[pid];
-      var expected = stockExp ? stockExp.expected : 0;
-      var diff     = found - expected;
-      if (!isNaN(found) && diff !== 0) {
-        await db.add("incidents", {
-          productId:   Number(pid),
-          productName: stockExp ? stockExp.productName : "Produto " + pid,
-          expected:    expected,
-          found:       found,
-          diff:        diff,
-          sessionId:   result.sessionId,
-          responsibleSessionId: null,
-          foundBy:     user.id,
-          status:      "open",
-          note:        "Contagem manual na importação KTK",
-          createdAt:   new Date().toISOString(),
-        });
-        extraInc++;
-      }
-    }
-
+    await ktkService.stageImport(ktk);
     window._ktkPendente = null;
     window._ktkContagemManual = {};
-    var totalInc = result.incidentCount + extraInc;
-    toast("Turno importado. " + totalInc + " incidente(s) registado(s).","success");
+    toast("Turno enviado para o Escritório — aguarda revisão e confirmação.","success");
     closeModal();
     await renderTurno();
   } catch(err) {
     if (err.message.startsWith("DUPLICATE:")) toast("Este turno já foi importado.","error");
+    else if (err.message.startsWith("PENDING_DUPLICATE:")) toast("Este turno já está pendente no Escritório.","error");
     else if (err.message==="INVALID_HASH") toast("Hash inválido — ficheiro modificado.","error");
     else if (err.message==="INVALID_FORMAT") toast("Formato .ktk inválido.","error");
     else toast("Erro: "+err.message,"error");
