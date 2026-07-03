@@ -25,6 +25,13 @@ export async function initPerfil() {
   if (nameEl) nameEl.textContent = user.name;
   if (roleEl) roleEl.textContent = user.role === "admin" ? "Administrador" : "Operador de Caixa";
 
+  var chipEl = el("perfil-plan-chip");
+  if (chipEl) {
+    var lic = getLicense();
+    var planInfo = PLANS[lic.plan] || PLANS.basic;
+    chipEl.textContent = planInfo.name + (store.name ? " · " + store.name : "");
+  }
+
   if (avatarEl) {
     if (store.logo) {
       avatarEl.innerHTML = "";
@@ -121,21 +128,47 @@ function renderMenu() {
 
   const items = [...(user.role === "admin" ? adminItems : caixaItems), ...commonItems];
 
-  el("perfil-menu").innerHTML =
-    '<div class="perfil-menu-wrap">' +
-    items.map(function(item) {
-      return '<button class="perfil-menu-item" onclick="window._perfilNav(\'' + item.page + '\')">' +
-        '<div class="perfil-menu-item-left">' +
-        '<div class="perfil-menu-icon" style="background:' + item.color + '">' +
-        '<i data-lucide="' + item.icon + '" style="color:' + item.iconColor + '"></i>' +
-        '</div><div>' +
-        '<div style="font-size:15px;font-weight:600">' + item.label + '</div>' +
-        (item.sub ? '<div style="font-size:12px;color:#71717a;margin-top:2px">' + item.sub + '</div>' : '') +
-        '</div></div>' +
-        '<span class="perfil-menu-chevron">›</span>' +
-        '</button>';
-    }).join("") +
-    '</div>';
+  function renderItem(item) {
+    return '<button class="perfil-menu-item" onclick="window._perfilNav(\'' + item.page + '\')">' +
+      '<div class="perfil-menu-item-left">' +
+      '<div class="perfil-menu-icon" style="background:' + item.color + '">' +
+      '<i data-lucide="' + item.icon + '" style="color:' + item.iconColor + '"></i>' +
+      '</div><div>' +
+      '<div style="font-size:15px;font-weight:600">' + item.label + '</div>' +
+      (item.sub ? '<div style="font-size:12px;color:#71717a;margin-top:2px">' + item.sub + '</div>' : '') +
+      '</div></div>' +
+      '<span class="perfil-menu-chevron">›</span>' +
+      '</button>';
+  }
+
+  var grouped = items.filter(function(i) { return i.group; });
+  var ungrouped = items.filter(function(i) { return !i.group; });
+
+  var groupOrder = [];
+  grouped.forEach(function(i) {
+    if (groupOrder.indexOf(i.group) === -1) groupOrder.push(i.group);
+  });
+
+  var html = groupOrder.map(function(groupName) {
+    var groupItems = grouped.filter(function(i) { return i.group === groupName; });
+    return '<div class="perfil-group-label">' + groupName + '</div>' +
+      '<div class="perfil-group">' +
+      groupItems.map(renderItem).join("") +
+      '</div>';
+  }).join("");
+
+  html += ungrouped.map(function(item) {
+    return '<button class="perfil-menu-item perfil-logout-btn" onclick="window._perfilNav(\'' + item.page + '\')">' +
+      '<div class="perfil-menu-item-left">' +
+      '<div class="perfil-menu-icon" style="background:' + item.color + '">' +
+      '<i data-lucide="' + item.icon + '" style="color:' + item.iconColor + '"></i>' +
+      '</div><div>' +
+      '<div style="font-size:15px;font-weight:600;color:' + item.iconColor + '">' + item.label + '</div>' +
+      '</div></div>' +
+      '</button>';
+  }).join("");
+
+  el("perfil-menu").innerHTML = '<div class="perfil-menu-wrap">' + html + '</div>';
 
   refreshIcons(el("perfil-menu"));
 }

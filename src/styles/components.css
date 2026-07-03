@@ -1409,6 +1409,18 @@
 .fc-pay-modal-name  { font-size: 16px; font-weight: 700; color: var(--text); margin-top: 3px; }
 .fc-pay-modal-val   { font-size: 20px; font-weight: 800; color: var(--warning); margin-top: 3px; }
 
+/* ── PERFIL — CHIP DE PLANO ────────────────────────────────────────────────── */
+.perfil-plan-chip {
+  margin-top: 10px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(91,33,182,.08);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+
 /* ── PERFIL — GRUPOS ────────────────────────────────────────────────────────── */
 .perfil-group-label {
   font-size: 11px; font-weight: 700; color: var(--text4);
