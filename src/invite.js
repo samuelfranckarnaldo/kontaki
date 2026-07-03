@@ -15,7 +15,7 @@ export async function ensureStoreId() {
 }
 
 // Gera o payload do convite, assinado
-export async function generateInvite(inviteCode) {
+export async function generateInvite(inviteCode, role) {
   var store = await db.get("settings", "store");
   if (!store) throw new Error("Loja não configurada.");
 
@@ -25,6 +25,7 @@ export async function generateInvite(inviteCode) {
     storeId: storeId,
     storeName: store.name || "Loja",
     inviteCode: inviteCode.trim().toUpperCase(),
+    role: role === "admin" ? "admin" : "caixa",
     createdAt: new Date().toISOString(),
   };
 
@@ -44,6 +45,7 @@ export async function verifyInvite(payload) {
     storeId: payload.storeId,
     storeName: payload.storeName,
     inviteCode: payload.inviteCode,
+    role: payload.role,
     createdAt: payload.createdAt,
   };
 

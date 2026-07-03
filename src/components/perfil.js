@@ -9,6 +9,7 @@ import { db }                    from "../db.js";
 import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
+import { generateInvite } from "../invite.js";
 import { getUser, logout, changePasswordAuth, createUser } from "../auth.js";
 import { getLicense, loadLicense, activateLicense, PLANS, showUpgradeBanner } from "../license.js";
 import { gerarRelatorioPDF } from "./extras.js";
@@ -153,6 +154,8 @@ function setupSubpageButtons() {
   if (pwBtn)   pwBtn.onclick   = changePassword;
   if (lojaBtn) lojaBtn.onclick = saveStoreSettings;
   if (userBtn) userBtn.onclick = openUserAdd;
+  var inviteBtn = el("btn-invite-device");
+  if (inviteBtn) inviteBtn.onclick = openInviteDevice;
   ["pw-cur","pw-new","pw-conf"].forEach(function(id) {
     var inp = document.getElementById(id);
     if (inp) inp.oninput = function() { this.value = this.value.replace(/\D/g,"").slice(0,6); };
@@ -322,6 +325,79 @@ async function loadEquipa() {
   }).join("");
   refreshIcons(el("users-list"));
 }
+
+function openInviteDevice() {
+  window._inviteRole = "caixa";
+  openModal("Convidar Operador",
+    '<div style="display:flex;flex-direction:column;gap:14px">' +
+    '<div style="font-size:13px;color:#71717a;line-height:1.5">Cria um código curto para o teu funcionário usar noutro telemóvel.</div>' +
+    '<div class="field"><label>Função do Operador *</label>' +
+    '<div class="role-toggle">' +
+    '<button type="button" class="role-toggle-btn active" id="inv-role-caixa" onclick="window._setInviteRole(\'caixa\')">' +
+    '<i data-lucide="shopping-bag"></i> Caixa</button>' +
+    '<button type="button" class="role-toggle-btn" id="inv-role-admin" onclick="window._setInviteRole(\'admin\')">' +
+    '<i data-lucide="shield"></i> Admin</button>' +
+    '</div></div>' +
+    '<div class="field"><label>Código de Convite *</label><input id="inv-code" placeholder="Ex: MERC2026" style="text-transform:uppercase"/></div>' +
+    '<button class="btn btn-primary btn-full" onclick="window._generateInviteQR()">' +
+    '<i data-lucide="qr-code"></i> Gerar QR</button>' +
+    '<div id="inv-qr-wrap" style="display:none;flex-direction:column;align-items:center;gap:12px;padding-top:8px">' +
+    '<div id="inv-qr-box" style="padding:12px;background:#fff;border-radius:14px;border:1.5px solid #e4e4e7"></div>' +
+    '<div id="inv-code-display" style="font-size:13px;color:#71717a;text-align:center"></div>' +
+    '<button class="btn btn-outline btn-full" onclick="window._downloadInviteFile()">' +
+    '<i data-lucide="download"></i> Descarregar ficheiro</button>' +
+    '</div>' +
+    '</div>' +
+    '<div class="form-actions">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+}
+
+window._setInviteRole = function(r) {
+  window._inviteRole = r;
+  var caixaBtn = document.getElementById("inv-role-caixa");
+  var adminBtn = document.getElementById("inv-role-admin");
+  if (caixaBtn) caixaBtn.classList.toggle("active", r === "caixa");
+  if (adminBtn) adminBtn.classList.toggle("active", r === "admin");
+};
+
+window._generateInviteQR = async function() {
+  var codeInput = document.getElementById("inv-code");
+  var code = codeInput ? codeInput.value.trim() : "";
+  if (!code) { alert("Insere um código de convite."); return; }
+
+  try {
+    var payload = await generateInvite(code, window._inviteRole);
+    window._currentInvitePayload = payload;
+
+    var qrWrap = document.getElementById("inv-qr-wrap");
+    var qrBox = document.getElementById("inv-qr-box");
+    var codeDisplay = document.getElementById("inv-code-display");
+
+    if (qrWrap) qrWrap.style.display = "flex";
+    if (codeDisplay) codeDisplay.textContent = "Código: " + payload.inviteCode;
+
+    var { generateQR } = await import("../utils.js");
+    generateQR(JSON.stringify(payload), qrBox, 180);
+  } catch (err) {
+    alert(err.message || "Erro ao gerar convite.");
+  }
+};
+
+window._downloadInviteFile = function() {
+  var payload = window._currentInvitePayload;
+  if (!payload) return;
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "convite-" + payload.inviteCode + ".ktkinvite";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 function openUserAdd() {
   openModal("Novo Funcionário",
@@ -789,7 +865,7 @@ function fmt(v) {
 async function loadAssinatura() {
   await loadLicense();
   var lic   = getLicense();
-  var plan  = PLANS[lic.plan] || PLANS.solo;
+  var plan  = PLANS[lic.plan] || PLANS.basic;
   var wrap  = document.getElementById("assinatura-content");
   if (!wrap) return;
 
@@ -888,10 +964,9 @@ async function loadAssinatura() {
   wrap.appendChild(plansLabel);
 
   var planDefs = [
-    { key:"solo",       features:["Vendas e stock","Fiados e clientes","Contabilidade","Recuperação de PIN","Suporte: documentação"] },
-    { key:"team",       features:["Tudo do Solo","Scanner QR de produtos","Suporte WhatsApp"] },
-    { key:"business",   features:["Tudo do Team","Verificação de recibo por QR"] },
-    { key:"pro",        features:["Tudo do Business","Suporte prioritário"] },
+    { key:"basic",      features:["Vendas e stock","Fiados e clientes","Recuperação de PIN","Histórico e dashboard"] },
+    { key:"standard",   features:["Tudo do Basic","Contabilidade","Fornecedores","Backup e relatórios"] },
+    { key:"pro",        features:["Tudo do Standard","PDF de contabilidade","Recibo com QR","Logotipo","Equipa"] },
     { key:"enterprise", features:["Tudo do Pro","Suporte dedicado"] },
   ];
 

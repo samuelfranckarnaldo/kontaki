@@ -263,7 +263,7 @@ function showStaffProfile(payload) {
     await db.add("users", {
       name: name, username: username,
       passwordHash: pinHash, password: null,
-      role: "caixa", active: true,
+      role: payload.role === "admin" ? "admin" : "caixa", active: true,
       avatar: name.charAt(0).toUpperCase(),
       createdAt: new Date().toISOString(),
     });
