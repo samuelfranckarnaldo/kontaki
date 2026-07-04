@@ -104,6 +104,9 @@ export async function checkStockAlerts() {
 
 // ── DEVOLUÇÃO DE PRODUTOS ─────────────────────────────────────────────────────
 export async function openDevolucao(saleId) {
+  var { getSession } = await import("../auth.js");
+  if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
+
   var sale = await db.get("sales", saleId);
   if (!sale) { toast("Venda não encontrada.", "error"); return; }
 
@@ -136,6 +139,9 @@ export async function openDevolucao(saleId) {
 }
 
 window._confirmarDevolucao = async function() {
+  var { getSession } = await import("../auth.js");
+  if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
+
   var sale = window._saleParaDevolucao;
   if (!sale) return;
 

@@ -196,6 +196,23 @@ window._fecharTurno = async function() {
   var incidents    = await db.getAll("incidents");
   var sessionInc   = incidents.filter(function(i){ return i.sessionId===session.id; });
 
+  var cashEsperado = sessionSales.filter(function(s){ return s.payMethod==="dinheiro"; })
+    .reduce(function(a,s){ return a+(s.total||0); },0);
+  var cashHtml =
+    '<div style="background:#fff;border:1.5px solid #ddd6fe;border-radius:12px;padding:14px;margin-bottom:14px">' +
+      '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Conferência de caixa (dinheiro)</div>' +
+      '<div style="margin-bottom:10px">' +
+        '<div style="font-size:11px;color:#71717a">Esperado em caixa</div>' +
+        '<div style="font-size:18px;font-weight:800;color:#18181b">' + fmt(cashEsperado) + '</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px">' +
+        '<label style="font-size:12px;color:#71717a;flex-shrink:0">Dinheiro contado:</label>' +
+        '<input type="number" id="cash-conf-input" min="0" step="1" value="' + cashEsperado + '" ' +
+        'style="flex:1;padding:9px;border:1.5px solid #ddd6fe;border-radius:8px;text-align:center;font-size:15px;font-weight:700;font-family:inherit"/>' +
+      '</div>' +
+      '<div style="font-size:10px;color:#a1a1aa;margin-top:8px;line-height:1.4">Conta o dinheiro físico na gaveta e ajusta o valor acima. Vendas por Multicaixa/transferência não entram nesta contagem.</div>' +
+    '</div>';
+
   // Calcula stock esperado por produto
   var stockMap = {};
   products.forEach(function(p){
@@ -227,6 +244,7 @@ window._fecharTurno = async function() {
     '<div><div style="color:#71717a">Vendas</div><div style="font-weight:700;font-size:15px">' + sessionSales.length + '</div></div>' +
     '<div><div style="color:#71717a">Incidentes</div><div style="font-weight:700;color:' + (sessionInc.length?"#dc2626":"#16a34a") + ';font-size:15px">' + sessionInc.length + '</div></div>' +
     '</div></div>' +
+    cashHtml +
     '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Confirma o stock encontrado fisicamente:</div>' +
     '<div style="max-height:300px;overflow-y:auto;margin-bottom:14px">' + rows + '</div>' +
     '<div class="form-actions">' +
@@ -251,6 +269,14 @@ window._confirmarFecho = async function() {
     contagens[p.id] = inp ? parseInt(inp.value)||0 : p.stock;
   });
 
+  var cashInput    = document.getElementById("cash-conf-input");
+  var allSales     = await db.getAll("sales");
+  var sessSalesNow = allSales.filter(function(s){ return s.sessionId===session.id; });
+  var cashEsperado = sessSalesNow.filter(function(s){ return s.payMethod==="dinheiro"; })
+    .reduce(function(a,s){ return a+(s.total||0); },0);
+  var cashContado  = cashInput ? (parseFloat(cashInput.value)||0) : cashEsperado;
+  var cashDiff     = cashContado - cashEsperado;
+
   try {
     // Fecha sessão
     await sessionService.closeSession(session.id);
@@ -258,6 +284,27 @@ window._confirmarFecho = async function() {
     // Limpar sessão no auth
     var authMod = await import("../auth.js");
     if (authMod._setSession) authMod._setSession(null);
+
+    // Regista conferência de caixa na sessão
+    var closedSessionRec = await db.get("sessions", session.id);
+    if (closedSessionRec) {
+      await db.put("sessions", Object.assign({}, closedSessionRec, {
+        cashExpected: cashEsperado, cashCounted: cashContado, cashDiff: cashDiff
+      }));
+    }
+
+    // Gera incidente se houver diferença de caixa
+    if (cashDiff !== 0) {
+      await db.add("incidents",{
+        productId:null, productName:"Numerário (Caixa)",
+        expected:cashEsperado, found:cashContado, diff:cashDiff,
+        sessionId:session.id, responsibleSessionId:null,
+        foundBy:user.id, responsible:null,
+        status:"open", type:"caixa",
+        note:"Diferença de caixa no fecho de turno",
+        createdAt:new Date().toISOString(),
+      });
+    }
 
     // Gera incidentes para diferenças
     var incCount = 0;
@@ -294,6 +341,7 @@ window._confirmarFecho = async function() {
       '<div style="font-size:16px;font-weight:700;margin-bottom:6px">Turno fechado!</div>' +
       '<div style="font-size:13px;color:#71717a;margin-bottom:6px">Partilha o ficheiro .ktk com o patrão.</div>' +
       (incCount>0?'<div style="background:#fee2e2;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;margin-top:6px">⚠ '+incCount+' incidente(s) gerado(s) por diferença de stock.</div>':"") +
+      (cashDiff!==0?'<div style="background:#fee2e2;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;margin-top:6px">⚠ Diferença de caixa: '+(cashDiff>0?"+":"")+fmt(cashDiff)+'.</div>':"") +
       (!ktk.hash?'<div style="background:#fef3c7;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#92400e">⚠ Sem assinatura HMAC.</div>':"") +
       '</div>' +
       '<div style="display:flex;flex-direction:column;gap:8px">' +

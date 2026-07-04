@@ -223,7 +223,10 @@ window._addFiadoCliente = (encodedName) => {
   openFiadoAdd(decodeURIComponent(encodedName));
 };
 
-function openFiadoAdd(prefillName = "") {
+async function openFiadoAdd(prefillName = "") {
+  const { getSession } = await import("../auth.js");
+  if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
+
   openModal("Registar Fiado",
     `<div style="display:flex;flex-direction:column;gap:14px">
       <div class="field">

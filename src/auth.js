@@ -239,25 +239,38 @@ async function _verifyPin() {
     }
 
     currentUser = _selectedUser;
+    currentSession = null;
+    currentUser.sessionId = null;
 
-    const session = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2),
-      userId: currentUser.id,
-      userName: currentUser.name,
-      openedAt: new Date().toISOString(),
-      status: "open",
-      vendas: [],
-      fiados: [],
-      incidentes: [],
-    };
+    // Login só autentica. Não cria turno — abrir turno é sempre acção manual em "Meu Turno".
+    // Se já houver um turno aberto (legítimo, com uuid), reconecta a ele.
+    try {
+      const sessions = await db.getAll("sessions");
 
-    await db.add("sessions", session);
-    currentSession = session;
-    currentUser.sessionId = session.id;
+      // Migração: fecha sessões antigas criadas pelo próprio login (formato legado, sem uuid)
+      const legacyOpen = sessions.filter(s => s.status === "open" && s.userId === currentUser.id && !s.uuid);
+      for (const ls of legacyOpen) {
+        await db.put("sessions", Object.assign({}, ls, {
+          status: "closed",
+          closedAt: new Date().toISOString(),
+          note: (ls.note || "") + " [auto-fechado: sessão legada criada no login]"
+        }));
+      }
+
+      const openSession = sessions
+        .filter(s => s.status === "open" && s.userId === currentUser.id && s.uuid)
+        .sort((a, b) => b.id - a.id)[0];
+      if (openSession) {
+        currentSession = openSession;
+        currentUser.sessionId = openSession.id;
+      }
+    } catch (e) {
+      console.error("Erro ao procurar/limpar turnos no login:", e);
+    }
 
     localStorage.setItem("kontaki_session", JSON.stringify({
       userId: currentUser.id,
-      sessionId: session.id
+      sessionId: currentUser.sessionId || null
     }));
 
     const loginPage = document.getElementById("login-page");
@@ -328,7 +341,7 @@ export async function restoreSession() {
     if (!user) { localStorage.removeItem("kontaki_session"); return false; }
 
     const sessions = await db.getAll("sessions");
-    const session = sessions.find(s => s.id === data.sessionId && s.status === "open");
+    const session = sessions.find(s => s.id === data.sessionId && s.status === "open" && s.uuid);
     if (!session) { localStorage.removeItem("kontaki_session"); return false; }
 
     currentUser = user;

@@ -45,3 +45,15 @@ export function initCamera(onDetected) {
 
   btnClose.onclick = stop;
 }
+
+
+export function openCameraForInvite(onInvite) {
+  initCamera(function(rawValue) {
+    try {
+      var data = JSON.parse(rawValue);
+      onInvite(data);
+    } catch (e) {
+      alert("QR code inválido. Pede um novo convite ao teu patrão.");
+    }
+  });
+}

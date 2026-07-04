@@ -50,7 +50,6 @@ export async function initPerfil() {
   renderMenu();
   setupSubpageButtons();
   renderPwaButton();
-  renderVersionFooter();
 }
 
 function renderPwaButton() {
@@ -72,26 +71,6 @@ function renderPwaButton() {
   refreshIcons(div);
 }
 
-function renderVersionFooter() {
-  var existing = document.getElementById("perfil-version-footer");
-  if (existing) existing.remove();
-  var pg = el("pg-perfil");
-  if (!pg) return;
-  var div = document.createElement("div");
-  div.id = "perfil-version-footer";
-  div.style.cssText = "padding:16px;text-align:center;border-top:1px solid #f4f4f5;margin-top:8px";
-  div.innerHTML =
-    '<div style="font-size:12px;color:#a1a1aa;line-height:1.8">' +
-    'Kontaki v1.0.0-beta<br/>' +
-    'Introxeer Technology · Angola<br/>' +
-    '<button onclick="window._showTermos()" style="background:none;border:none;color:#5b21b6;' +
-    'font-size:11px;cursor:pointer;font-family:inherit;text-decoration:underline">Termos</button>' +
-    ' · ' +
-    '<button onclick="window._showPrivacidade()" style="background:none;border:none;color:#5b21b6;' +
-    'font-size:11px;cursor:pointer;font-family:inherit;text-decoration:underline">Privacidade</button>' +
-    '</div>';
-  pg.appendChild(div);
-}
 
 function renderMenu() {
   const user = getUser();
@@ -123,6 +102,7 @@ function renderMenu() {
     { label: "Alterar PIN",       sub: "Mudar PIN de acesso",            icon: "lock",           color: "#f4f4f5", iconColor: "#5b21b6", page: "senha",         group: "Sistema"    },
     { label: "Assinatura",        sub: "Licença e plano activo",         icon: "award",          color: "#ede9fe", iconColor: "#5b21b6", page: "assinatura",    group: "Sistema"    },
     { label: "Contactos",         sub: "Suporte Introxeer Technology",   icon: "headphones",     color: "#dbeafe", iconColor: "#2563eb", page: "contactos",     group: "Sistema"    },
+    { label: "Sobre",             sub: "Termos, ajuda e versão",         icon: "info",           color: "#f4f4f5", iconColor: "#71717a", page: "sobre",         group: "Sistema"    },
     { label: "Terminar Sessão",   sub: "",                               icon: "log-out",        color: "#fee2e2", iconColor: "#dc2626", page: "logout",        group: null         },
   ];
 
@@ -176,7 +156,7 @@ function renderMenu() {
 function setupSubpageButtons() {
   ["stock","incidentes","equipa","loja","senha","dashboard","clientes",
    "despesas","contabilidade","assinatura","contactos","configuracoes",
-   "seguranca","turno","fornecedores"].forEach(function(name) {
+   "seguranca","turno","fornecedores","sobre"].forEach(function(name) {
     var btn = document.getElementById("btn-back-" + name);
     if (btn) btn.onclick = function() { window._perfilBack(); };
   });
@@ -237,10 +217,11 @@ window._perfilNav = async (page) => {
   if (page === "clientes")     await loadClientesPage();
   if (page === "despesas")     await loadDespesasPage();
   if (page === "senha")        loadSenhaPage();
+  if (page === "sobre")        loadSobre();
 };
 
 function showSubpage(name) {
-  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","clientes","despesas","assinatura","contactos","escritorio"];
+  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","clientes","despesas","assinatura","contactos","escritorio","sobre"];
   subpages.forEach(s => {
     const node = el("subpage-" + s);
     if (node) node.style.display = "none";
@@ -326,8 +307,11 @@ window._clearResolvedIncidents = async function() {
 window._resolveInc = async (id) => {
   const i = await db.get("incidents", id);
   await db.put("incidents", { ...i, status: "resolved", resolvedAt: new Date().toISOString(), resolvedBy: getUser().id });
-  const p = await db.get("products", i.productId);
-  if (p) await db.put("products", { ...p, stock: i.countedStock, physicalStock: i.countedStock });
+  if (i.productId != null) {
+    const p = await db.get("products", i.productId);
+    const novoStock = (i.countedStock != null) ? i.countedStock : i.found;
+    if (p && novoStock != null) await db.put("products", { ...p, stock: novoStock, physicalStock: novoStock });
+  }
   toast("Incidente resolvido.", "success");
   loadIncidentes();
 };
@@ -915,8 +899,8 @@ async function loadAssinatura() {
   hero.innerHTML =
     '<div class="lic-hero-icon"><i data-lucide="award"></i></div>' +
     '<div class="lic-hero-plan">' + plan.name + '</div>' +
-    '<div class="lic-hero-sub">Introxeer · Kontaki v1.0.0</div>' +
-    '<div class="lic-hero-badge">' +
+    '<div class="lic-hero-price">' + plan.price.toLocaleString() + ' Kz<span>/mês</span></div>' +
+    '<div class="lic-hero-badge lic-hero-badge--' + (isExpired?"expired":isTrial?"trial":"active") + '">' +
       '<i data-lucide="' + (isExpired?"x-circle":isTrial?"clock":"check-circle") + '" style="width:14px;height:14px"></i>' +
       (isExpired ? "Licença expirada" : isTrial ? "Período de avaliação" : "Licença activa") +
     '</div>';
@@ -981,7 +965,7 @@ async function loadAssinatura() {
   actCard.innerHTML =
     '<div class="lic-activate-title">' + (lic.code ? "Renovar licença" : "Activar licença") + '</div>' +
     '<div class="lic-activate-sub">Recebeste um código da Introxeer? Insere aqui para activar ou renovar o teu plano.</div>' +
-    '<div class="field" style="margin-bottom:12px">' +
+    '<div class="field lic-activate-field">' +
       '<input class="lic-code-input" id="activation-code" placeholder="KTKI-XXXX-XXXX-XXXXXXXX" maxlength="27"/>' +
     '</div>' +
     '<button class="btn btn-primary btn-full btn-lg" onclick="window._activarLicenca()">' +
@@ -989,10 +973,12 @@ async function loadAssinatura() {
     '</button>';
   wrap.appendChild(actCard);
 
+  var codeInputEl = document.getElementById("activation-code");
+  if (codeInputEl) codeInputEl.oninput = formatLicenseCodeInput;
+
   // ── Lista de planos ──
   var plansLabel = document.createElement("div");
-  plansLabel.className = "desp-section-label";
-  plansLabel.style.marginTop = "8px";
+  plansLabel.className = "planos-section-title";
   plansLabel.textContent = "Planos disponíveis";
   wrap.appendChild(plansLabel);
 
@@ -1041,6 +1027,20 @@ async function loadAssinatura() {
   wrap.appendChild(contactEl);
 
   refreshIcons(wrap);
+}
+
+function formatLicenseCodeInput() {
+  var raw = this.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  var groups = [4, 4, 4, 8];
+  var out = "";
+  var pos = 0;
+  for (var g = 0; g < groups.length; g++) {
+    if (pos >= raw.length) break;
+    if (out) out += "-";
+    out += raw.slice(pos, pos + groups[g]);
+    pos += groups[g];
+  }
+  this.value = out;
 }
 
 function licRow(label, value, color) {
@@ -1227,6 +1227,90 @@ window._removeLogo = async function() {
   await db.put("settings", Object.assign({}, s, { logo: null }));
   renderLogoPreview(null);
   toast("Logótipo removido.","success");
+};
+
+function loadSobre() {
+  var wrap = document.getElementById("sobre-content");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+
+  var items = [
+    { label: "Termos do Consumidor",          icon: "file-text",    action: "window._showTermos()" },
+    { label: "Política de Privacidade",       icon: "shield-check", action: "window._showPrivacidade()" },
+    { label: "Política de Uso Aceitável",     icon: "file-text",    action: "window._showPlaceholderDoc('Política de Uso Aceitável')" },
+    { label: "Licença de Utilização (EULA)",  icon: "award",        action: "window._showLicencaEula()" },
+    { label: "Ajuda",                         icon: "help-circle",  action: "window._showAjudaFAQ()" },
+    { label: "Documentação",                  icon: "book-open",    action: "window._showPlaceholderDoc('Documentação')" },
+  ];
+
+  var list = document.createElement("div");
+  list.className = "perfil-group";
+  items.forEach(function(item) {
+    var btn = document.createElement("button");
+    btn.className = "perfil-menu-item";
+    btn.setAttribute("onclick", item.action);
+    btn.innerHTML =
+      '<div class="perfil-menu-item-left">' +
+      '<div class="perfil-menu-icon" style="background:#f4f4f5">' +
+      '<i data-lucide="' + item.icon + '" style="color:#71717a"></i>' +
+      '</div><div>' +
+      '<div style="font-size:15px;font-weight:600">' + item.label + '</div>' +
+      '</div></div>' +
+      '<span class="perfil-menu-chevron">›</span>';
+    list.appendChild(btn);
+  });
+  wrap.appendChild(list);
+
+  var footer = document.createElement("div");
+  footer.className = "sobre-footer";
+  footer.innerHTML = "Kontaki v1.0.0-beta<br/>Introxeer Technology · Angola";
+  wrap.appendChild(footer);
+
+  refreshIcons(wrap);
+}
+
+window._showPlaceholderDoc = function(title) {
+  openModal(title,
+    '<div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:16px">' +
+    'Este documento está em preparação. Contacta a Introxeer Technology para mais informações.' +
+    '</div>' +
+    '<a href="https://wa.me/244900000000" target="_blank" class="btn btn-primary btn-full" style="text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px">' +
+    '<i data-lucide="message-circle"></i> Falar via WhatsApp</a>' +
+    '<button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="window._closeModal()">Fechar</button>');
+  refreshIcons(el("modal-box"));
+};
+
+window._showAjudaFAQ = function() {
+  var faqs = [
+    ["Como funciona o Kontaki sem internet?", "O Kontaki funciona totalmente offline. Todos os dados ficam guardados no teu dispositivo, e a sincronização entre Escritório e Caixa é feita por ficheiro, sem depender de ligação permanente à internet."],
+    ["Esqueci o meu PIN, o que faço?", "Pede a um administrador da tua loja para repor o teu PIN em Equipa. Se és o único administrador, contacta o suporte da Introxeer."],
+    ["Como faço backup dos meus dados?", "Vai a Configurações → Backup para exportar uma cópia dos teus dados. Recomendamos fazer isto regularmente."],
+    ["O que acontece se a avaliação expirar?", "Após o período de avaliação, algumas funcionalidades ficam bloqueadas até activares um plano em Assinatura."],
+    ["Posso usar o Kontaki em mais de um dispositivo?", "Depende do teu plano. O número de dispositivos permitido está indicado em Assinatura."],
+    ["Como contacto o suporte?", "Vai a Contactos, no menu do Perfil, para falar com a Introxeer Technology via WhatsApp."]
+  ];
+  var body = faqs.map(function(f) {
+    return '<div style="margin-bottom:14px">' +
+      '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">' + f[0] + '</div>' +
+      '<div style="font-size:12px;color:var(--text3);line-height:1.5">' + f[1] + '</div>' +
+      '</div>';
+  }).join("");
+  openModal("Ajuda", body + '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>');
+  refreshIcons(el("modal-box"));
+};
+
+window._showLicencaEula = function() {
+  var text =
+    '<div style="font-size:12px;color:var(--text3);line-height:1.6;max-height:50vh;overflow-y:auto;padding-right:4px">' +
+    '<p><strong>1. Objecto.</strong> Este Acordo de Licença de Utilizador Final ("EULA") rege o uso do software Kontaki, propriedade da Introxeer Technology.</p>' +
+    '<p><strong>2. Concessão de Licença.</strong> A Introxeer Technology concede ao utilizador uma licença não exclusiva, intransmissível e limitada para usar o Kontaki de acordo com o plano de assinatura activo, indicado na secção Assinatura.</p>' +
+    '<p><strong>3. Restrições.</strong> É proibido copiar, modificar, descompilar ou redistribuir o software sem autorização escrita da Introxeer Technology.</p>' +
+    '<p><strong>4. Dados.</strong> Os dados inseridos no Kontaki (vendas, stock, clientes) pertencem ao utilizador. O armazenamento é local e offline, salvo quando o utilizador optar por sincronização ou backup manual.</p>' +
+    '<p><strong>5. Limitação de Responsabilidade.</strong> O software é fornecido "tal como está". A Introxeer Technology não garante disponibilidade ininterrupta nem se responsabiliza por perdas decorrentes de uso indevido ou falhas do dispositivo do utilizador.</p>' +
+    '<p><strong>6. Vigência.</strong> Esta licença vigora enquanto a assinatura estiver activa. O não pagamento pode resultar em suspensão de funcionalidades, conforme descrito na secção Assinatura.</p>' +
+    '<p><strong>7. Lei Aplicável.</strong> Este EULA rege-se pelas leis da República de Angola.</p>' +
+    '</div>';
+  openModal("Licença de Utilização", text + '<button class="btn btn-ghost btn-full" style="margin-top:14px" onclick="window._closeModal()">Fechar</button>');
 };
 
 function loadSenhaPage() {
