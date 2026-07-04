@@ -24,9 +24,9 @@ async function renderFornecedores() {
   ]);
   const suppliers = allSuppliers.filter(function(s){ return s.active !== false; });
 
-  const totalCompras = purchases.reduce((a,p) => a+(p.total||0), 0);
-  const mesAtual     = new Date().toISOString().slice(0,7);
-  const comprasMes   = purchases.filter(p => (p.date || "").startsWith(mesAtual)).reduce((a,p) => a+(p.total||0), 0);
+  const comprasAtivas = purchases.filter(function(p){ return p.archived !== true; });
+  const mesAtual      = new Date().toISOString().slice(0,7);
+  const comprasMes    = comprasAtivas.filter(p => (p.date || "").startsWith(mesAtual)).reduce((a,p) => a+(p.total||0), 0);
 
   el("fornecedores-content").innerHTML =
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
@@ -50,8 +50,9 @@ async function renderFornecedores() {
       </div>` :
       `<div class="list-card" style="margin-bottom:10px">` +
       suppliers.map(s => {
-        const comprasSupp = purchases.filter(p => p.supplierId === s.id);
+        const comprasSupp = comprasAtivas.filter(p => p.supplierId === s.id);
         const totalSupp   = comprasSupp.reduce((a,p) => a+(p.total||0), 0);
+        const saldoSupp   = comprasSupp.reduce((a,p) => a+((p.total||0)-(p.amountPaid||0)), 0);
         return `<div style="padding:13px 14px;border-bottom:1px solid #f4f4f5;
                              display:flex;justify-content:space-between;align-items:center"
                      onclick="window._openSupplierDetail(${s.id})">
@@ -60,6 +61,7 @@ async function renderFornecedores() {
             <div style="font-size:11px;color:#71717a;margin-top:2px">
               ${s.phone||""} ${s.contact ? " · "+s.contact : ""}
             </div>
+            ${saldoSupp > 0 ? `<div style="font-size:11px;color:#dc2626;font-weight:700;margin-top:2px">Deves ${fmt(saldoSupp)}</div>` : ""}
           </div>
           <div style="text-align:right">
             <div style="font-size:13px;font-weight:700;color:#5b21b6">${fmt(totalSupp)}</div>
@@ -72,11 +74,12 @@ async function renderFornecedores() {
     // Últimas compras
     `<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;
                  letter-spacing:.4px;margin:10px 0 8px">Últimas compras</div>` +
-    (purchases.length === 0 ?
+    (comprasAtivas.length === 0 ?
       `<div style="font-size:13px;color:#a1a1aa;text-align:center;padding:20px">Nenhuma compra registada.</div>` :
       `<div class="list-card">` +
-      purchases.slice(-10).reverse().map(p => {
+      comprasAtivas.slice(-10).reverse().map(p => {
         const supp = suppliers.find(s => s.id === p.supplierId);
+        const saldo = (p.total||0) - (p.amountPaid||0);
         return `<div style="padding:12px 14px;border-bottom:1px solid #f4f4f5">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div>
@@ -85,10 +88,12 @@ async function renderFornecedores() {
               <div style="font-size:11px;color:#71717a;margin-top:2px">
                 ${(p.items||[]).map(i => i.productName+"×"+i.qty).join(", ")}
               </div>
+              ${saldo > 0 ? `<div style="font-size:11px;color:#dc2626;font-weight:700;margin-top:2px">Falta pagar: ${fmt(saldo)}</div>` : `<div style="font-size:11px;color:#16a34a;font-weight:700;margin-top:2px">Pago</div>`}
             </div>
             <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
               <div style="font-size:14px;font-weight:700;color:#dc2626">${fmt(p.total)}</div>
               <button onclick="window._editCompra(${p.id})" style="background:none;border:none;color:#5b21b6;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Editar</button>
+              <button onclick="window._archivePurchase(${p.id})" style="background:none;border:none;color:#71717a;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Arquivar</button>
             </div>
           </div>
         </div>`;
@@ -98,12 +103,82 @@ async function renderFornecedores() {
   refreshIcons(el("fornecedores-content"));
 }
 
+// ── COMPONENTE: SELECT CUSTOMIZADO (bottom sheet) ────────────────────────────
+function ensureCselStyle() {
+  if (document.getElementById("csel-style")) return;
+  var style = document.createElement("style");
+  style.id = "csel-style";
+  style.textContent =
+    "@keyframes cselFadeIn { from { opacity:0 } to { opacity:1 } }" +
+    "@keyframes cselSlideUp { from { transform:translateY(100%) } to { transform:translateY(0) } }" +
+    ".csel-trigger { width:100%; display:flex; align-items:center; justify-content:space-between; " +
+    "padding:11px 14px; border:1.5px solid #e4e4e7; border-radius:10px; background:#fff; " +
+    "font-family:inherit; font-size:14px; color:#18181b; cursor:pointer; text-align:left; }" +
+    ".csel-trigger:active { border-color:#5b21b6; background:#fafafa; }" +
+    ".csel-trigger .csel-placeholder { color:#a1a1aa; }" +
+    ".csel-option:active { background:#f5f3ff !important; }";
+  document.head.appendChild(style);
+}
+
+function cselField(label, triggerId, placeholder) {
+  return `<div class="field">
+    <label>${label}</label>
+    <button type="button" class="csel-trigger" id="${triggerId}">
+      <span class="csel-placeholder">${placeholder}</span>
+      <i data-lucide="chevron-down" style="width:16px;height:16px;color:#a1a1aa;flex-shrink:0"></i>
+    </button>
+  </div>`;
+}
+
+function openCselSheet(title, options, onPick) {
+  ensureCselStyle();
+  var overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;animation:cselFadeIn .2s ease";
+
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:70vh;
+                display:flex;flex-direction:column;animation:cselSlideUp .25s ease">
+      <div style="padding:16px 20px;border-bottom:1px solid #f4f4f5;display:flex;
+                  justify-content:space-between;align-items:center;flex-shrink:0">
+        <div style="font-size:15px;font-weight:700;color:#18181b">${title}</div>
+        <button id="csel-close" style="background:#f4f4f5;border:none;width:30px;height:30px;
+                border-radius:50%;cursor:pointer;color:#71717a;display:flex;align-items:center;
+                justify-content:center">
+          <i data-lucide="x" style="width:16px;height:16px"></i>
+        </button>
+      </div>
+      <div style="overflow-y:auto;padding:8px 0">
+        ${options.map(function(o) {
+          return `<button type="button" class="csel-option" data-value="${o.value}"
+                  style="width:100%;display:flex;align-items:center;justify-content:space-between;
+                  padding:13px 20px;background:none;border:none;cursor:pointer;font-family:inherit;
+                  text-align:left;font-size:14px;color:#18181b">
+            <span>${o.label}${o.sub ? `<span style="display:block;font-size:11px;color:#a1a1aa;margin-top:1px">${o.sub}</span>` : ""}</span>
+          </button>`;
+        }).join("")}
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  refreshIcons(overlay);
+
+  overlay.querySelector("#csel-close").onclick = function() { overlay.remove(); };
+  overlay.querySelectorAll(".csel-option").forEach(function(btn) {
+    btn.onclick = function() {
+      var opt = options.find(function(o){ return String(o.value) === btn.getAttribute("data-value"); });
+      overlay.remove();
+      onPick(opt);
+    };
+  });
+}
+
+// ── FORNECEDOR (formulário) ──────────────────────────────────────────────────
 function openFornecedorForm(s = {}) {
   openModal(s.id ? "Editar Fornecedor" : "Novo Fornecedor",
     `<div style="display:flex;flex-direction:column;gap:14px">
       <div class="field"><label>Nome *</label><input id="sf-name" value="${s.name||""}" placeholder="Ex: Distribuidora ABC"/></div>
       <div class="field"><label>Telefone</label><input id="sf-phone" value="${s.phone||""}" placeholder="923 000 000"/></div>
-      <div class="field"><label>Contacto</label><input id="sf-contact" value="${s.contact||""}" placeholder="Nome do responsável"/></div>
+      <div class="field"><label>Pessoa de Contacto</label><input id="sf-contact" value="${s.contact||""}" placeholder="Ex: João, gerente de vendas"/></div>
       <div class="field"><label>Notas</label><input id="sf-notes" value="${s.notes||""}" placeholder="Opcional..."/></div>
     </div>
     <div class="form-actions">
@@ -120,7 +195,7 @@ window._openSupplierDetail = async (id) => {
   openModal(s.name,
     `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
       ${s.phone   ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f4f4f5"><span style="color:#71717a;font-size:13px">Telefone</span><span style="font-weight:600">${s.phone}</span></div>` : ""}
-      ${s.contact ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f4f4f5"><span style="color:#71717a;font-size:13px">Contacto</span><span style="font-weight:600">${s.contact}</span></div>` : ""}
+      ${s.contact ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f4f4f5"><span style="color:#71717a;font-size:13px">Pessoa de Contacto</span><span style="font-weight:600">${s.contact}</span></div>` : ""}
       ${s.notes   ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f4f4f5"><span style="color:#71717a;font-size:13px">Notas</span><span style="font-weight:600">${s.notes}</span></div>` : ""}
     </div>
     <div class="form-actions">
@@ -154,6 +229,20 @@ window._saveSupplier = async (id) => {
   renderFornecedores();
 };
 
+// ── COMPRA (formulário com selects customizados) ─────────────────────────────
+var _cpState = { supplierId: null, productId: null, dest: "warehouse", payment: "paid" };
+var _cpSuppliers = [];
+var _cpProducts = [];
+
+const DEST_OPTIONS = [
+  { value: "warehouse", label: "Armazém" },
+  { value: "shop",       label: "Loja" },
+];
+const PAYMENT_OPTIONS = [
+  { value: "paid",   label: "Pago no acto" },
+  { value: "credit", label: "A Crédito" },
+];
+
 async function openCompraForm() {
   const [suppliers, products] = await Promise.all([
     db.getAll("suppliers"),
@@ -162,20 +251,19 @@ async function openCompraForm() {
 
   if (!suppliers.length) { toast("Adiciona um fornecedor primeiro.", "error"); return; }
 
+  _cpSuppliers = suppliers;
+  _cpProducts  = products;
+  _cpState = {
+    supplierId: suppliers[0].id,
+    productId:  products.length ? products[0].id : null,
+    dest: "warehouse",
+    payment: "paid",
+  };
+
   openModal("Registar Compra",
     `<div style="display:flex;flex-direction:column;gap:14px">
-      <div class="field">
-        <label>Fornecedor *</label>
-        <select id="cp-supplier">
-          ${suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join("")}
-        </select>
-      </div>
-      <div class="field">
-        <label>Produto *</label>
-        <select id="cp-product">
-          ${products.map(p => `<option value="${p.id}">${p.name}</option>`).join("")}
-        </select>
-      </div>
+      ${cselField("Fornecedor *", "cp-supplier-trigger", "Seleccionar fornecedor")}
+      ${cselField("Produto *", "cp-product-trigger", products.length ? "Seleccionar produto" : "Nenhum produto disponível")}
       <div class="field-row">
         <div class="field">
           <label>Quantidade *</label>
@@ -186,12 +274,11 @@ async function openCompraForm() {
           <input type="number" id="cp-cost" placeholder="0"/>
         </div>
       </div>
-      <div class="field">
-        <label>Destino</label>
-        <select id="cp-dest">
-          <option value="warehouse">Armazém</option>
-          <option value="shop">Loja</option>
-        </select>
+      ${cselField("Destino", "cp-dest-trigger", "Armazém")}
+      ${cselField("Forma de Pagamento", "cp-payment-trigger", "Pago no acto")}
+      <div class="field" id="cp-paid-wrap" style="display:none">
+        <label>Valor já pago (Kz)</label>
+        <input type="number" id="cp-paid" placeholder="0" min="0"/>
       </div>
       <div class="field">
         <label>Notas</label>
@@ -205,16 +292,75 @@ async function openCompraForm() {
       </button>
     </div>`);
   refreshIcons(el("modal-box"));
+
+  _setCselLabel("cp-supplier-trigger", suppliers.find(s=>s.id===_cpState.supplierId));
+  _setCselLabel("cp-product-trigger", products.find(p=>p.id===_cpState.productId), true);
+  _setCselLabel("cp-dest-trigger", DEST_OPTIONS[0]);
+  _setCselLabel("cp-payment-trigger", PAYMENT_OPTIONS[0]);
+
+  var suppTrigger = document.getElementById("cp-supplier-trigger");
+  if (suppTrigger) suppTrigger.onclick = function() {
+    openCselSheet("Fornecedor", suppliers.map(s => ({ value: s.id, label: s.name })), function(opt) {
+      _cpState.supplierId = Number(opt.value);
+      _setCselLabelDirect("cp-supplier-trigger", opt.label);
+    });
+  };
+
+  var prodTrigger = document.getElementById("cp-product-trigger");
+  if (prodTrigger) prodTrigger.onclick = function() {
+    if (!products.length) { toast("Nenhum produto disponível.", "error"); return; }
+    openCselSheet("Produto", products.map(p => ({ value: p.id, label: p.name })), function(opt) {
+      _cpState.productId = Number(opt.value);
+      _setCselLabelDirect("cp-product-trigger", opt.label);
+    });
+  };
+
+  var destTrigger = document.getElementById("cp-dest-trigger");
+  if (destTrigger) destTrigger.onclick = function() {
+    openCselSheet("Destino", DEST_OPTIONS, function(opt) {
+      _cpState.dest = opt.value;
+      _setCselLabelDirect("cp-dest-trigger", opt.label);
+    });
+  };
+
+  var payTrigger = document.getElementById("cp-payment-trigger");
+  if (payTrigger) payTrigger.onclick = function() {
+    openCselSheet("Forma de Pagamento", PAYMENT_OPTIONS, function(opt) {
+      _cpState.payment = opt.value;
+      _setCselLabelDirect("cp-payment-trigger", opt.label);
+      var wrap = document.getElementById("cp-paid-wrap");
+      if (wrap) wrap.style.display = opt.value === "credit" ? "block" : "none";
+    });
+  };
+}
+
+function _setCselLabel(triggerId, obj, isProduct) {
+  var trigger = document.getElementById(triggerId);
+  if (!trigger || !obj) return;
+  var span = trigger.querySelector("span");
+  if (span) { span.textContent = obj.name || obj.label; span.classList.remove("csel-placeholder"); }
+}
+
+function _setCselLabelDirect(triggerId, text) {
+  var trigger = document.getElementById(triggerId);
+  if (!trigger) return;
+  var span = trigger.querySelector("span");
+  if (span) { span.textContent = text; span.classList.remove("csel-placeholder"); }
 }
 
 window._saveCompra = async () => {
-  const suppId  = Number(el("cp-supplier").value);
-  const prodId  = Number(el("cp-product").value);
+  const suppId  = _cpState.supplierId;
+  const prodId  = _cpState.productId;
   const qty     = Number(el("cp-qty").value);
   const cost    = Number(el("cp-cost").value);
-  const dest    = el("cp-dest").value;
+  const dest    = _cpState.dest;
+  const payMethod = _cpState.payment;
+  const total     = qty * cost;
+  const amountPaid = payMethod === "paid" ? total : Number((el("cp-paid")||{}).value || 0);
 
+  if (!prodId) { toast("Selecciona um produto.", "error"); return; }
   if (!qty || !cost) { toast("Quantidade e preço são obrigatórios.", "error"); return; }
+  if (amountPaid > total) { toast("O valor pago não pode ser maior que o total.", "error"); return; }
 
   const product = await db.get("products", prodId);
   const supplier= await db.get("suppliers", suppId);
@@ -231,8 +377,10 @@ window._saveCompra = async () => {
     supplierId:   suppId,
     supplierName: supplier.name,
     items: [{ productId: prodId, productName: product.name, qty, unitCost: cost }],
-    total:   qty * cost,
+    total,
     dest,
+    paymentStatus: amountPaid >= total ? "paid" : (amountPaid > 0 ? "partial" : "pending"),
+    amountPaid,
     notes:   el("cp-notes").value,
     userId:  getUser().id,
     date:    new Date().toISOString(),
@@ -268,6 +416,15 @@ window._deactivateSupplier = async (id) => {
   await db.put("suppliers", { ...s, active: false, deactivatedAt: new Date().toISOString() });
   toast("Fornecedor desactivado.", "success");
   closeModal();
+  renderFornecedores();
+};
+
+window._archivePurchase = async (purchaseId) => {
+  if (!confirm("Arquivar esta compra? Deixa de aparecer na lista, mas fica guardada para auditoria.")) return;
+  const p = await db.get("purchases", purchaseId);
+  if (!p) return;
+  await db.put("purchases", { ...p, archived: true, archivedAt: new Date().toISOString() });
+  toast("Compra arquivada.", "success");
   renderFornecedores();
 };
 
