@@ -1513,25 +1513,25 @@
 /* ── Despesas ──────────────────────────────────────────────────────────────── */
 .desp-hero { background: #fff; border: 1px solid var(--border2); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; }
 .desp-hero-label { font-size: 11px; font-weight: 700; color: var(--text4); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 4px; }
-.desp-hero-val { font-size: 28px; font-weight: 800; color: var(--danger); line-height: 1; }
+.desp-hero-val { font-size: 28px; font-weight: 800; color: var(--primary); line-height: 1; }
 .desp-hero-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
 
 .desp-cat-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
 .desp-cat-item { display: flex; align-items: center; gap: 10px; }
 .desp-cat-name { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.desp-cat-val { font-size: 13px; font-weight: 700; color: var(--danger); flex-shrink: 0; }
+.desp-cat-val { font-size: 13px; font-weight: 700; color: var(--text2); flex-shrink: 0; }
 .desp-cat-bar-wrap { flex: 1; height: 4px; background: var(--border2); border-radius: 2px; overflow: hidden; }
-.desp-cat-bar { height: 100%; background: var(--danger); border-radius: 2px; }
+.desp-cat-bar { height: 100%; background: var(--primary); border-radius: 2px; }
 
 .desp-section-label { font-size: 11px; font-weight: 700; color: var(--text4); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
 
 .desp-item { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--border2); }
 .desp-item:last-child { border-bottom: none; }
-.desp-item-icon { width: 36px; height: 36px; border-radius: 10px; background: #fee2e2; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.desp-item-icon i, .desp-item-icon svg { width: 16px; height: 16px; color: var(--danger); }
+.desp-item-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--primary-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.desp-item-icon i, .desp-item-icon svg { width: 16px; height: 16px; color: var(--primary); }
 .desp-item-desc { font-size: 13px; font-weight: 600; color: var(--text); }
 .desp-item-meta { font-size: 11px; color: var(--text4); margin-top: 2px; }
-.desp-item-val { font-size: 14px; font-weight: 700; color: var(--danger); margin-left: auto; flex-shrink: 0; }
+.desp-item-val { font-size: 14px; font-weight: 700; color: var(--text2); margin-left: auto; flex-shrink: 0; }
 .desp-item-del { background: none; border: none; color: var(--text4); cursor: pointer; padding: 4px; display: flex; align-items: center; flex-shrink: 0; }
 .desp-item-del:active { color: var(--danger); }
 
