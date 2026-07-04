@@ -132,6 +132,7 @@ function renderMenu() {
   const commonItems = [
     { label: "Alterar PIN",       sub: "Mudar PIN de acesso",            icon: "lock",           color: "#f4f4f5", iconColor: "#5b21b6", page: "senha",         group: "Sistema"    },
     { label: "Assinatura",        sub: "Licença e plano activo",         icon: "award",          color: "#ede9fe", iconColor: "#5b21b6", page: "assinatura",    group: "Sistema"    },
+    { label: "Ajuda",             sub: "Perguntas frequentes e como usar",icon: "help-circle",   color: "#dbeafe", iconColor: "#2563eb", page: "ajuda",         group: "Sistema"    },
     { label: "Contactos",         sub: "Suporte Introxeer Technology",   icon: "headphones",     color: "#dbeafe", iconColor: "#2563eb", page: "contactos",     group: "Sistema"    },
     { label: "Sobre",             sub: "Termos, ajuda e versão",         icon: "info",           color: "#f4f4f5", iconColor: "#71717a", page: "sobre",         group: "Sistema"    },
     { label: "Terminar Sessão",   sub: "",                               icon: "log-out",        color: "#fee2e2", iconColor: "#dc2626", page: "logout",        group: null         },
@@ -187,7 +188,7 @@ function renderMenu() {
 function setupSubpageButtons() {
   ["stock","incidentes","equipa","loja","senha","dashboard","clientes",
    "despesas","contabilidade","assinatura","contactos","configuracoes",
-   "seguranca","turno","fornecedores","escritorio","sobre"].forEach(function(name) {
+   "seguranca","turno","fornecedores","escritorio","sobre","ajuda"].forEach(function(name) {
     var btn = document.getElementById("btn-back-" + name);
     if (btn) btn.onclick = function() { window._perfilBack(); };
   });
@@ -236,6 +237,7 @@ window._perfilNav = async (page) => {
     return;
   }
   if (page === "incidentes") await loadIncidentes();
+  if (page === "ajuda") await loadAjuda();
   if (page === "equipa")     await loadEquipa();
   if (page === "loja")       await loadLoja();
   if (page === "configuracoes")  await loadConfiguracoesPage();
@@ -253,7 +255,7 @@ window._perfilNav = async (page) => {
 };
 
 function showSubpage(name) {
-  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","clientes","despesas","assinatura","contactos","escritorio","sobre"];
+  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","clientes","despesas","assinatura","contactos","escritorio","sobre","ajuda"];
   subpages.forEach(s => {
     const node = el("subpage-" + s);
     if (node) node.style.display = "none";
@@ -293,6 +295,65 @@ window._setIncFilter = function(kind, value) {
   if (kind === "status") { _incFilterStatus = value; _incShowArchived = (value === "archived"); }
   loadIncidentes();
 };
+
+var _ajudaLoaded = false;
+
+function _ajudaMatch(article, q) {
+  if (!q) return true;
+  q = q.toLowerCase();
+  if (article.title.toLowerCase().indexOf(q) !== -1) return true;
+  if (article.body.toLowerCase().indexOf(q) !== -1) return true;
+  return article.keywords.some(function(k){ return k.toLowerCase().indexOf(q) !== -1; });
+}
+
+function _renderAjuda(query) {
+  var wrap = document.getElementById("ajuda-content");
+  if (!wrap) return;
+  var articles = window._helpArticles || [];
+  var results = articles.filter(function(a){ return _ajudaMatch(a, query); });
+
+  if (!results.length) {
+    wrap.innerHTML = '<div class="empty-state"><div class="empty-state-title">Nada encontrado para "' + query + '"</div><div style="font-size:12px;color:#71717a;margin-top:4px">Tenta outra palavra, ex: "turno", "incidente", "fiado"</div></div>';
+    return;
+  }
+
+  var byCategory = {};
+  var order = [];
+  results.forEach(function(a){
+    if (!byCategory[a.category]) { byCategory[a.category] = { icon:a.categoryIcon, items:[] }; order.push(a.category); }
+    byCategory[a.category].items.push(a);
+  });
+
+  wrap.innerHTML = order.map(function(cat){
+    var group = byCategory[cat];
+    return '<div style="display:flex;align-items:center;gap:8px;margin:18px 0 10px">' +
+        '<i data-lucide="' + group.icon + '" style="width:16px;height:16px;color:var(--primary)"></i>' +
+        '<div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">' + cat + '</div>' +
+      '</div>' +
+      group.items.map(function(a){
+        return '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow-sm)">' +
+          '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:6px">' + a.title + '</div>' +
+          '<div style="font-size:13px;color:var(--text2);line-height:1.6">' + a.body + '</div>' +
+        '</div>';
+      }).join("");
+  }).join("");
+
+  refreshIcons(wrap);
+}
+
+async function loadAjuda() {
+  if (!_ajudaLoaded) {
+    var mod = await import("../help/index.js");
+    window._helpArticles = mod.helpArticles;
+    _ajudaLoaded = true;
+  }
+  var searchInput = document.getElementById("ajuda-search");
+  if (searchInput && !searchInput._wired) {
+    searchInput.oninput = function() { _renderAjuda(this.value.trim()); };
+    searchInput._wired = true;
+  }
+  _renderAjuda(searchInput ? searchInput.value.trim() : "");
+}
 
 async function loadIncidentes() {
   const [allList, sessions, users] = await Promise.all([
