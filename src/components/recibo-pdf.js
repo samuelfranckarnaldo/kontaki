@@ -2,7 +2,35 @@ import { db }           from "../db.js";
 import { fmt, fmtDate }  from "../utils.js";
 
 // ── PDF 80mm ─────────────────────────────────────────────────────────────────
-function buildPdfDoc(sale, store) {
+function getQrDataUrl(text) {
+  return new Promise(function(resolve) {
+    try {
+      var temp = document.createElement("div");
+      temp.style.cssText = "position:fixed;left:-9999px;top:-9999px";
+      document.body.appendChild(temp);
+
+      new window.QRCode(temp, {
+        text: text, width: 200, height: 200,
+        colorDark: "#18181b", colorLight: "#ffffff",
+        correctLevel: window.QRCode.CorrectLevel.M,
+      });
+
+      setTimeout(function() {
+        var canvas = temp.querySelector("canvas");
+        var dataUrl = null;
+        if (canvas) {
+          try { dataUrl = canvas.toDataURL("image/png"); } catch(e) {}
+        }
+        document.body.removeChild(temp);
+        resolve(dataUrl);
+      }, 200);
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+async function buildPdfDoc(sale, store) {
   var jsPDFLib = window.jspdf ? window.jspdf.jsPDF : null;
   if (!jsPDFLib) { alert("Biblioteca PDF não carregada."); return null; }
 
@@ -14,7 +42,7 @@ function buildPdfDoc(sale, store) {
   var total  = (sale.total || 0) - (sale.totalDevolvido || 0);
 
   // Estimar altura da página
-  var estHeight = 60 + items.length * 6 + 60;
+  var estHeight = 60 + items.length * 6 + 60 + 28;
   var doc = new jsPDFLib({ unit: "mm", format: [pageW, estHeight] });
   var y = margin;
 
@@ -60,6 +88,7 @@ function buildPdfDoc(sale, store) {
   text("Recibo Nº " + String(sale.id).padStart(6, "0"), margin, "left", 7.5, true);
   y -= 1;
   text(fmtDate(sale.date), pageW - margin, "right", 7);
+  if (sale.operatorName) { text("Atendido por " + sale.operatorName, margin, "left", 6.5); }
   y += 1;
   if (sale.clientName) {
     text("Cliente: " + sale.clientName, margin, "left", 7.5, true);
@@ -78,7 +107,7 @@ function buildPdfDoc(sale, store) {
     y += 1;
   });
 
-  line(true);
+  y += 1;
 
   // ── TOTAIS ──
   if (sale.discount > 0) {
@@ -99,25 +128,51 @@ function buildPdfDoc(sale, store) {
 
   doc.setTextColor(60, 60, 60);
   y += 2;
-  text("Pagamento: " + (sale.payMethod || ""), margin, "left", 7.5);
+  var payLabel = (sale.payMethod || "").charAt(0).toUpperCase() + (sale.payMethod || "").slice(1);
+  text("Pagamento: " + payLabel, margin, "left", 7.5);
   if (sale.recebido > 0) row("Recebido", fmt(sale.recebido), 7.5);
   if (sale.troco > 0)    row("Troco",    fmt(sale.troco),    7.5, true);
 
   y += 2;
   line(true);
 
-  // ── CÓDIGO ──
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(91, 33, 182);
-  doc.text(sale.hash || "", cX, y, { align: "center" });
-  y += 5;
+  // ── QR CODE ──
+  if (sale.hash) {
+    var qrDataUrl = await getQrDataUrl(sale.hash);
+    if (qrDataUrl) {
+      try {
+        var qrSize = 22;
+        doc.addImage(qrDataUrl, "PNG", cX - qrSize/2, y, qrSize, qrSize);
+        y += qrSize + 3;
+      } catch(e) {}
+    }
+  }
 
+  // ── CÓDIGO ──
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6);
   doc.setTextColor(150, 150, 150);
-  doc.text("Documento de gestao interna · Sem validade fiscal AGT", cX, y, { align: "center" }); y += 3;
-  doc.text("Powered by Kontaki · Introxeer Technology", cX, y, { align: "center" });
+  doc.text("CÓDIGO DE VERIFICAÇÃO", cX, y, { align: "center" }); y += 4;
+
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(60, 60, 60);
+  doc.text(sale.hash || "", cX, y, { align: "center" });
+  y += 6;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(55, 65, 81);
+  doc.text("Obrigado pela preferência!", cX, y, { align: "center" }); y += 3.5;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  doc.setTextColor(150, 150, 150);
+  doc.text("Volte sempre", cX, y, { align: "center" }); y += 5;
+
+  doc.setFontSize(6);
+  doc.setTextColor(180, 180, 180);
+  doc.text("Documento de gestão interna · Sem validade fiscal AGT", cX, y, { align: "center" }); y += 3;
+  doc.text("Powered by Kontaki · Introxeer", cX, y, { align: "center" });
 
   return doc;
 }
@@ -224,7 +279,7 @@ export async function gerarReciboPDF(saleId) {
   var sale  = await db.get("sales", saleId);
   if (!sale) return;
   var store = (await db.get("settings","store")) || {};
-  var doc = buildPdfDoc(sale, store);
+  var doc = await buildPdfDoc(sale, store);
   if (!doc) return;
   doc.save("recibo_" + String(saleId).padStart(6,"0") + ".pdf");
 }
@@ -233,7 +288,7 @@ export async function partilharReciboPDF(saleId) {
   var sale  = await db.get("sales", saleId);
   if (!sale) return;
   var store = (await db.get("settings","store")) || {};
-  var doc = buildPdfDoc(sale, store);
+  var doc = await buildPdfDoc(sale, store);
   if (!doc) return;
 
   var blob  = doc.output("blob");

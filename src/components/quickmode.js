@@ -168,9 +168,14 @@ function renderQmCart() {
   if (!wrap) return;
 
   if (!qmCart.length) {
-    wrap.innerHTML = `<div style="padding:20px;text-align:center;color:#a1a1aa;font-size:13px">
-      Pesquisa ou scan um produto para adicionar
+    wrap.innerHTML = `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;gap:12px">
+      <div style="width:56px;height:56px;background:#ede9fe;border-radius:16px;display:flex;align-items:center;justify-content:center">
+        <i data-lucide="scan-line" style="width:26px;height:26px;color:#5b21b6"></i>
+      </div>
+      <div style="font-size:14px;font-weight:600;color:#52525b">Carrinho vazio</div>
+      <div style="font-size:12.5px;color:#a1a1aa;max-width:220px;line-height:1.5">Pesquisa ou usa o scanner para adicionar produtos rapidamente</div>
     </div>`;
+    if (window.lucide) window.lucide.createIcons({ el: wrap });
     return;
   }
 
