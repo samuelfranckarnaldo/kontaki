@@ -268,6 +268,10 @@ async function loadStock(from, to) {
   if (actions) actions.style.display = "none";
 
   var movements = await db.getAll("stockMovements");
+  var users     = await db.getAll("users");
+  var usersById = {};
+  users.forEach(function(u){ usersById[u.id] = u; });
+
   var filtered  = movements.filter(function(m) {
     var d = toLocalDateStr(m.createdAt);
     return d >= from && d <= to;
@@ -290,11 +294,12 @@ async function loadStock(from, to) {
         var bg    = typeBg[m.type]    || "#f3f4f6";
         var label = typeLabels[m.type] || m.type;
         var sign  = m.qty > 0 ? "+" : "";
+        var autor = (m.userId != null && usersById[m.userId]) ? usersById[m.userId].name : "Desconhecido";
         return '<div class="hist-mov-item">' +
           '<div class="hist-mov-icon" style="background:' + bg + ';color:' + color + '">' + sign + m.qty + '</div>' +
           '<div style="flex:1">' +
           '<div class="hist-mov-name">' + m.productName + '</div>' +
-          '<div class="hist-mov-meta">' + label + ' · ' + fmtDate(m.createdAt) + '</div>' +
+          '<div class="hist-mov-meta">' + label + ' · ' + fmtDate(m.createdAt) + ' · <strong>' + autor + '</strong></div>' +
           '</div>' +
           '<div style="text-align:right">' +
           '<div class="hist-mov-qty" style="color:' + color + '">' + sign + m.qty + '</div>' +
