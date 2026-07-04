@@ -334,11 +334,22 @@ window._fecharTurno = async function() {
   var incidents    = await db.getAll("incidents");
   var sessionInc   = incidents.filter(function(i){ return i.sessionId===session.id; });
 
-  var cashEsperado = sessionSales.filter(function(s){ return s.payMethod==="dinheiro"; })
+  var allExpensesFT   = await db.getAll("expenses");
+  var sessionExpFT    = allExpensesFT.filter(function(x){ return x.sessionId===session.id && x.payMethod==="dinheiro"; });
+  var despesasDinheiro= sessionExpFT.reduce(function(a,x){ return a+(x.amount||0); },0);
+  var vendasDinheiro  = sessionSales.filter(function(s){ return s.payMethod==="dinheiro"; })
     .reduce(function(a,s){ return a+(s.total||0); },0);
+  var fundoInicial    = session.cashCountedOpen || 0;
+  var cashEsperado    = fundoInicial + vendasDinheiro - despesasDinheiro;
+
   var cashHtml =
     '<div style="background:#fff;border:1.5px solid #ddd6fe;border-radius:12px;padding:14px;margin-bottom:14px">' +
       '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Conferência de caixa (dinheiro)</div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:#71717a;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #f4f4f5">' +
+        '<div style="display:flex;justify-content:space-between"><span>Fundo inicial</span><strong style="color:#3f3f46">' + fmt(fundoInicial) + '</strong></div>' +
+        '<div style="display:flex;justify-content:space-between"><span>+ Vendas em dinheiro</span><strong style="color:#16a34a">' + fmt(vendasDinheiro) + '</strong></div>' +
+        '<div style="display:flex;justify-content:space-between"><span>− Despesas em dinheiro</span><strong style="color:#dc2626">' + fmt(despesasDinheiro) + '</strong></div>' +
+      '</div>' +
       '<div style="margin-bottom:10px">' +
         '<div style="font-size:11px;color:#71717a">Esperado em caixa</div>' +
         '<div style="font-size:18px;font-weight:800;color:#18181b">' + fmt(cashEsperado) + '</div>' +
@@ -410,8 +421,13 @@ window._confirmarFecho = async function() {
   var cashInput    = document.getElementById("cash-conf-input");
   var allSales     = await db.getAll("sales");
   var sessSalesNow = allSales.filter(function(s){ return s.sessionId===session.id; });
-  var cashEsperado = sessSalesNow.filter(function(s){ return s.payMethod==="dinheiro"; })
+  var vendasDinheiroConf = sessSalesNow.filter(function(s){ return s.payMethod==="dinheiro"; })
     .reduce(function(a,s){ return a+(s.total||0); },0);
+  var allExpensesConf    = await db.getAll("expenses");
+  var despesasDinheiroConf = allExpensesConf.filter(function(x){ return x.sessionId===session.id && x.payMethod==="dinheiro"; })
+    .reduce(function(a,x){ return a+(x.amount||0); },0);
+  var fundoInicialConf = session.cashCountedOpen || 0;
+  var cashEsperado = fundoInicialConf + vendasDinheiroConf - despesasDinheiroConf;
   var cashContado  = cashInput ? (parseFloat(cashInput.value)||0) : cashEsperado;
   var cashDiff     = cashContado - cashEsperado;
 
