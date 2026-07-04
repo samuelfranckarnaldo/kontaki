@@ -1592,6 +1592,10 @@
 
 .esc-summary-wrap { margin-bottom: 16px; }
 
+.esc-import-section { margin-bottom: 20px; }
+.esc-import-btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px; border: 1.5px dashed #ddd6fe; border-radius: 12px; background: #faf5ff; cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 600; color: #7c3aed; width: 100%; }
+.esc-import-btn i, .esc-import-btn svg { width: 18px; height: 18px; }
+
 /* ── LOJA SUBPAGE ───────────────────────────────────────────────────────────── */
 .loja-section-title {
   font-size: 17px;

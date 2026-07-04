@@ -127,6 +127,7 @@ function renderMenu() {
   const caixaItems = [
     { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno",         group: "Operações"  },
     { label: "Clientes",          sub: "Fichas e histórico de compras",  icon: "users",          color: "#dbeafe", iconColor: "#2563eb", page: "clientes",      group: "Operações"  },
+    { label: "Escritório",        sub: "Importar ficheiros de turno",    icon: "archive",        color: "#ede9fe", iconColor: "#5b21b6", page: "escritorio",    group: "Operações"  },
   ];
 
   const commonItems = [

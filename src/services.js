@@ -333,7 +333,7 @@ export const ktkService = {
   },
   // Importa o .ktk para a área pendente — NÃO toca em sessions/incidents/stock ainda.
   async stageImport(ktk) {
-    requireRole("admin");
+    requireAuth();
     if(!ktk.id_sessao||!ktk.funcionario||!ktk.loja_id||!ktk.versao) throw new Error("INVALID_FORMAT");
 
     const dup=await sessionService.checkDuplicate(ktk.id_sessao);
