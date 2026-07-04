@@ -35,7 +35,18 @@ export async function loadDashboard() {
   var despesasMes = expenses.filter(function(e){ return (e.date||"").startsWith(mes); }).reduce(function(a,e){ return a+(e.amount||0); },0);
   var stockBaixo  = products.filter(function(p){ return p.active && (p.stock||0)<=(p.minStock||5) && (p.stock||0)>0; }).length;
   var stockZero   = products.filter(function(p){ return p.active && (p.stock||0)===0; }).length;
-  var lucroMes    = totalMes - despesasMes;
+
+  // COGS (custo dos produtos vendidos) — mesma lógica da Contabilidade
+  var cogsMes = vendasMes.reduce(function(a,s){
+    var custoVenda = (s.items||[]).reduce(function(b,i){
+      var p = products.find(function(pr){ return pr.id === i.id; });
+      return b + (p ? (p.costPrice||0)*i.qty : 0);
+    }, 0);
+    var propDev = s.total > 0 ? (s.totalDevolvido||0) / s.total : 0;
+    return a + custoVenda * (1 - propDev);
+  }, 0);
+
+  var lucroMes = totalMes - cogsMes - despesasMes;
   var saldoCaixa  = vendasHoje.filter(function(s){ return s.payMethod==="dinheiro"; })
     .reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
 

@@ -52,13 +52,6 @@ export var router = {
     refreshIcons(el("bottom-nav"));
     refreshIcons(el("topbar"));
 
-    // Mostrar nome da loja no topbar
-    (async function() {
-      var store = await (await import("./db.js")).db.get("settings","store");
-      var titleEl = el("topbar-title");
-      if (titleEl && store && store.name) titleEl.textContent = store.name;
-    })();
-
     // Botão dashboard
     window._openDashboard = function() {
       if (!hasFeature("dashboard")) { bloqueado("dashboard"); return; }
@@ -99,7 +92,18 @@ export var router = {
     if (navBtn) navBtn.classList.add("active");
 
     var titleEl = el("topbar-title");
-    if (titleEl) titleEl.textContent = TITLES[pageId] || pageId;
+    if (titleEl) {
+      if (pageId === "vender") {
+        titleEl.textContent = TITLES[pageId] || pageId;
+        import("./db.js").then(function(m) {
+          return m.db.get("settings", "store");
+        }).then(function(store) {
+          if (titleEl && store && store.name) titleEl.textContent = store.name;
+        }).catch(function(){});
+      } else {
+        titleEl.textContent = TITLES[pageId] || pageId;
+      }
+    }
 
     var qrBtn    = el("btn-topbar-qr");
     var addBtn   = el("btn-topbar-add");

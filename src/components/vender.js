@@ -103,9 +103,8 @@ export async function initVender() {
   const qrBtn = document.getElementById("btn-topbar-qr");
   if (qrBtn) {
     qrBtn.onclick = () => {
-      initCamera(function(code) {
-        verifyCode(code);
-      });
+      var ov = document.getElementById("verify-overlay");
+      if (ov) ov.style.display = "flex";
     };
   }
 
