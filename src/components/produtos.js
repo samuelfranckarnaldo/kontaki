@@ -1,9 +1,94 @@
 import { db } from "../db.js";
 import { addStockMovement, getStock } from "../services.js";
 import { fmt, el, refreshIcons } from "../utils.js";
+import { openPicker } from "../picker.js";
+
+const UNIT_OPTIONS = ["Unidade","Outro (escrever)","Kg","Grama","Litro","Mililitro","Metro","Duzia","Par",
+  "Caixa","Fardo","Grade","Pacote","Saco","Garrafa","Lata"];
+
+const UNIT_NO_PLURAL = ["Kg"];
+function pluralizeUnit(unit, count) {
+  if (!unit) return unit;
+  if (count === 1) return unit;
+  if (UNIT_NO_PLURAL.includes(unit)) return unit;
+  if (/r$/.test(unit)) return unit + "es";
+  if (/s$/.test(unit)) return unit;
+  return unit + "s";
+}
+function fmtNum(n) {
+  return Number(n).toLocaleString("pt-AO");
+}
+function fmtKzClean(n) {
+  const rounded = Math.round(n);
+  const isWhole = Math.abs(n - rounded) < 0.005;
+  return isWhole ? `${fmtNum(rounded)} Kz` : fmt(n);
+}
+
+const CATEGORY_OPTIONS = ["Alimentacao","Bebidas","Higiene","Limpeza","Outro"];
+
+function pickerButtonHTML(idPrefix, displayValue) {
+  return `
+    <button type="button" id="${idPrefix}-btn" onclick="window._openFieldPicker('${idPrefix}')"
+      style="width:100%;text-align:left;background:#fff;border:1px solid var(--border2);border-radius:10px;
+      padding:12px;font-size:14px;color:#18181b;font-family:inherit;display:flex;justify-content:space-between;align-items:center;cursor:pointer">
+      <span id="${idPrefix}-display">${displayValue}</span>
+      <i data-lucide="chevron-down" style="width:16px;height:16px;color:var(--text3)"></i>
+    </button>
+    <input type="hidden" id="${idPrefix}-value" value="${displayValue}"/>
+  `;
+}
+
+function unitSelectHTML(idPrefix, currentValue) {
+  return pickerButtonHTML(idPrefix, currentValue || "Unidade");
+}
+
+function categorySelectHTML(idPrefix, currentValue) {
+  return pickerButtonHTML(idPrefix, currentValue || "Outro");
+}
+
+const FIELD_PICKER_CONFIG = {
+  unit: { title:"Escolher unidade", options:UNIT_OPTIONS, allowCustom:true, customLabel:"Outro (escrever)" },
+  category: { title:"Escolher categoria", options:CATEGORY_OPTIONS, allowCustom:false },
+};
+
+window._openFieldPicker = (idPrefix) => {
+  const kind = idPrefix.includes("cat") ? "category" : "unit";
+  const cfg = FIELD_PICKER_CONFIG[kind];
+  const current = el(idPrefix + "-value") ? el(idPrefix + "-value").value : cfg.options[0];
+  openPicker(cfg.title, cfg.options, current, (val) => {
+    el(idPrefix + "-display").textContent = val;
+    el(idPrefix + "-value").value = val;
+    if (idPrefix === "rc-punit") {
+      var ql = el("rc-qty-label");
+      if (ql) ql.textContent = "Quantidade comprada (em " + val + ")";
+      var pl = el("rc-price-label");
+      if (pl) pl.innerHTML = "Preço por <span style=\"color:var(--primary);font-weight:700\">" + val + "</span>";
+      var fl = el("rc-pfactor-label");
+      (async () => {
+        var saleUnit = "unid";
+        if (window._rcCurrentId) {
+          var prod = await db.get("products", window._rcCurrentId);
+          if (prod) saleUnit = prod.unit || "unid";
+        }
+        if (fl) fl.textContent = "Cada " + val + " contém quantas " + saleUnit + "?";
+      })();
+      if (window._rcCurrentId) window._updateRegistarCompraCalc(window._rcCurrentId);
+    }
+    if (idPrefix === "pf-punit") {
+      var pfl = el("pf-pfactor-label");
+      if (pfl) pfl.textContent = "Cada " + val + " contém quantas " + (window._pfSaleUnit||"unid") + "?";
+    }
+  }, { allowCustom: cfg.allowCustom, customLabel: cfg.customLabel });
+};
+
+window._readUnitValue = (idPrefix) => {
+  const v = el(idPrefix + "-value") ? el(idPrefix + "-value").value : "Unidade";
+  return v || "Unidade";
+};
 import { toast } from "../toast.js";
-import { openModal, closeModal } from "../modal.js";
+import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
+import { initCamera } from "./camera.js";
 
 let products = [];
 let viewMode = "loja";
@@ -65,68 +150,101 @@ function renderAlerts() {
 }
 
 export function openProductForm(p = {}) {
-  const cats = ["Alimentacao","Bebidas","Higiene","Limpeza","Outro"];
+  window._pfSaleUnit = p.unit || "unid";
   const isEdit = !!p.id;
   openModal(isEdit ? "Editar Produto" : "Novo Produto",
-    `<div style="display:flex;flex-direction:column;gap:12px">
+    `<div style="display:flex;flex-direction:column;gap:var(--space-3)">
 
       <div class="field">
-        <label>Nome do produto *</label>
+        <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Nome do produto *</label>
         <input id="pf-name" value="${p.name||""}" placeholder="Ex: Arroz 1kg" autocomplete="off"/>
       </div>
 
       <div class="field-row">
         <div class="field">
-          <label>Preço de venda (Kz) *</label>
-          <input type="number" id="pf-price" value="${p.price||""}" placeholder="0" min="0"/>
+          <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Preço de venda *</label>
+          <div style="position:relative">
+            <input type="number" id="pf-price" value="${p.price||""}" placeholder="0" min="0" style="padding-right:36px"/>
+            <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:var(--text-xs);color:var(--text3);font-weight:var(--weight-medium);pointer-events:none">Kz</span>
+          </div>
         </div>
         <div class="field">
-          <label>Preço de custo (Kz)</label>
-          <input type="number" id="pf-cost" value="${p.costPrice||""}" placeholder="Opcional" min="0"/>
+          <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Preço de custo</label>
+          <div style="position:relative">
+            <input type="number" id="pf-cost" value="${p.costPrice||""}" placeholder="Ex: 150" min="0" style="padding-right:36px"/>
+            <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:var(--text-xs);color:var(--text3);font-weight:var(--weight-medium);pointer-events:none">Kz</span>
+          </div>
         </div>
       </div>
 
       <div class="field-row">
         <div class="field">
-          <label>Unidade</label>
-          <input id="pf-unit" value="${p.unit||"unid"}" placeholder="unid"/>
+          <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Unidade</label>
+          ${unitSelectHTML("pf-unit", p.unit||"Unidade")}
         </div>
         <div class="field">
-          <label>Categoria</label>
-          <select id="pf-cat">${cats.map(c=>`<option ${p.category===c?"selected":""}>${c}</option>`).join("")}</select>
+          <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Categoria</label>
+          ${categorySelectHTML("pf-cat", p.category||"Outro")}
         </div>
       </div>
 
-      <div style="background:var(--primary-light);border-radius:12px;padding:14px">
-        <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px">Stock</div>
-        <div class="field-row" style="margin-bottom:10px">
+      <div style="background:rgba(91,33,182,.05);border:1px solid rgba(91,33,182,.12);border-radius:var(--radius);padding:var(--space-4)">
+        <div style="font-size:var(--text-xs);font-weight:var(--weight-strong);color:var(--primary);margin-bottom:var(--space-3);text-transform:uppercase;letter-spacing:.4px">Stock</div>
+        <div class="field-row" style="margin-bottom:var(--space-3)">
           <div class="field">
-            <label>Stock Loja</label>
+            <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Stock loja</label>
             <input type="number" id="pf-stock" value="${p.stock||0}" min="0"
-              style="font-size:18px;font-weight:700;text-align:center;padding:12px"/>
+              style="font-size:var(--text-lg);font-weight:var(--weight-strong);text-align:center;padding:var(--space-3)"/>
           </div>
           <div class="field">
-            <label>Stock Armazém</label>
+            <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Stock armazém</label>
             <input type="number" id="pf-warehouse" value="${p.warehouseStock||0}" min="0"
-              style="font-size:18px;font-weight:700;text-align:center;padding:12px"/>
+              style="font-size:var(--text-lg);font-weight:var(--weight-strong);text-align:center;padding:var(--space-3)"/>
           </div>
         </div>
         <div class="field">
-          <label>Stock mínimo (alerta)</label>
+          <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Stock mínimo (alerta)</label>
           <input type="number" id="pf-minstock" value="${p.minStock||5}" min="0"/>
         </div>
       </div>
 
+      <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+        <button type="button" id="pf-conv-toggle-btn" onclick="window._toggleConvConfigForm()" style="background:none;border:none;color:var(--primary);font-weight:var(--weight-strong);font-size:var(--text-xs);cursor:pointer;font-family:inherit;text-align:left;padding:0">
+          ${p.purchaseUnit ? "▼" : "▶"} Unidade de compra (grades, fardos, caixas...)
+        </button>
+        <div id="pf-conv-config" style="display:${p.purchaseUnit?"flex":"none"};flex-direction:column;gap:var(--space-3)">
+          <div class="field-row">
+            <div class="field">
+              <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Unidade de compra</label>
+              ${unitSelectHTML("pf-punit", p.purchaseUnit||"")}
+            </div>
+            <div class="field">
+              <label id="pf-pfactor-label" style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Cada ${p.purchaseUnit||"unidade de compra"} contém quantas ${p.unit||"unid"}?</label>
+              <input type="number" id="pf-pfactor" value="${p.conversionFactor||""}" min="1" placeholder="Ex: 24"/>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="field">
-        <label>Código de barras (opcional)</label>
-        <input id="pf-bar" value="${p.barcode||""}" placeholder="GTIN da unidade" autocomplete="off"/>
+        <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Código de barras (opcional)</label>
+        <div style="display:flex;gap:var(--space-2)">
+          <input id="pf-bar" value="${p.barcode||""}" placeholder="GTIN da unidade" autocomplete="off" style="flex:1"/>
+          <button type="button" onclick="window._scanBarcodeForProd()"
+            style="flex-shrink:0;width:44px;background:var(--primary-light);border:1.5px solid var(--border);
+                   border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <i data-lucide="camera" style="width:18px;height:18px;color:var(--primary)"></i>
+          </button>
+        </div>
       </div>
 
     </div>
-    <div class="form-actions" style="margin-top:16px">
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
+    <div style="margin-top:var(--space-5);display:flex;flex-direction:column;gap:var(--space-1)">
       <button class="btn btn-primary btn-full" onclick="window._saveProduto(${p.id||0})">
         <i data-lucide="save"></i> ${isEdit?"Actualizar":"Adicionar"}
+      </button>
+      <button onclick="window._closeModal()" style="width:100%;padding:var(--space-2);background:none;border:none;color:var(--text3);font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;font-family:inherit">
+        Cancelar
       </button>
     </div>`);
   refreshIcons(el("modal-box"));
@@ -251,30 +369,37 @@ window._openProdMenu = (id) => {
   const margin= p.costPrice ? Math.round(((p.price-p.costPrice)/p.price)*100) : null;
   const cColor= {"Alimentacao":"#f97316","Bebidas":"#3b82f6","Higiene":"#ec4899","Limpeza":"#10b981","Outro":"#6b7280"}[p.category]||"#6b7280";
 
-  openModal(p.name,
-    // Header do produto
-    `<div class="prod-modal-header">
-      <div class="prod-modal-avatar" style="background:${cColor}20;color:${cColor}">${(p.name||"P").charAt(0).toUpperCase()}</div>
-      <div>
-        <div class="prod-modal-name">${p.name}</div>
-        <div class="prod-modal-cat" style="background:${cColor}15;color:${cColor}">${p.category||"Outro"}</div>
+  openModal("",
+    // Header do produto — nome, categoria e preco agrupados, sem duplicar o titulo
+    `<div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-5)">
+      <div style="width:52px;height:52px;border-radius:var(--radius-lg);flex-shrink:0;
+        background:linear-gradient(135deg, ${cColor}, ${cColor}cc);
+        display:flex;align-items:center;justify-content:center;
+        font-size:var(--text-xl);font-weight:var(--weight-strong);color:#fff;box-shadow:0 4px 12px ${cColor}40">
+        ${(p.name||"P").charAt(0).toUpperCase()}
       </div>
-      <div class="prod-modal-price">${fmt(p.price)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:var(--text-lg);font-weight:var(--weight-strong);color:var(--text);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+        <div style="font-size:var(--text-xs);color:var(--text3);margin-top:2px">${p.category||"Outro"}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:var(--text-xl);font-weight:var(--weight-strong);color:var(--primary)">${fmt(p.price)}</div>
+      </div>
     </div>` +
 
     // Stock cards
-    `<div class="prod-modal-stock">
-      <div class="prod-modal-stock-card" style="background:var(--primary-light)">
+    `<div class="prod-modal-stock" style="margin-bottom:var(--space-5)">
+      <div class="prod-modal-stock-card" style="background:var(--primary-light);border-radius:10px">
         <div class="prod-modal-stock-label">Loja</div>
         <div class="prod-modal-stock-val" style="color:var(--primary)">${shopS}</div>
         <div class="prod-modal-stock-unit">${p.unit||"un"}</div>
       </div>
-      <div class="prod-modal-stock-card" style="background:var(--info-light)">
+      <div class="prod-modal-stock-card" style="background:var(--info-light);border-radius:10px">
         <div class="prod-modal-stock-label">Armazém</div>
         <div class="prod-modal-stock-val" style="color:var(--info)">${whS}</div>
         <div class="prod-modal-stock-unit">${p.unit||"un"}</div>
       </div>
-      <div class="prod-modal-stock-card" style="background:var(--border2)">
+      <div class="prod-modal-stock-card" style="background:var(--border2);border-radius:10px">
         <div class="prod-modal-stock-label">Total</div>
         <div class="prod-modal-stock-val" style="color:var(--text)">${shopS+whS}</div>
         <div class="prod-modal-stock-unit">${p.unit||"un"}</div>
@@ -282,38 +407,47 @@ window._openProdMenu = (id) => {
     </div>` +
 
     // Info detalhes
-    `<div class="prod-modal-info">` +
-    (p.costPrice ? `<div class="prod-modal-info-row"><span>Preço custo</span><span>${fmt(p.costPrice)}</span></div>` : "") +
-    (margin!==null ? `<div class="prod-modal-info-row"><span>Margem</span><span style="color:var(--success);font-weight:700">${fmt(p.price-p.costPrice)} (${margin}%)</span></div>` : "") +
-    `<div class="prod-modal-info-row"><span>Stock mínimo</span><span>${p.minStock||5} ${p.unit||"un"}</span></div>` +
-    (p.barcode ? `<div class="prod-modal-info-row"><span>Código de barras</span><span style="font-family:monospace">${p.barcode}</span></div>` : "") +
+    `<div style="background:var(--bg);border-radius:var(--radius-lg);padding:2px var(--space-4);margin-bottom:var(--space-5)">` +
+    (p.costPrice ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Preço custo</span><span style="font-weight:var(--weight-strong);color:var(--text)">${fmt(p.costPrice)}</span></div>` : "") +
+    (margin!==null ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Margem</span><span style="font-weight:var(--weight-strong);color:${margin<0?"var(--danger)":"var(--success)"}">${fmt(p.price-p.costPrice)} (${margin}%)</span></div>` : "") +
+    `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;font-size:var(--text-sm)"><span style="color:var(--text3)">Stock mínimo</span><span style="font-weight:var(--weight-strong);color:var(--text)">${p.minStock||5} ${p.unit||"un"}</span></div>` +
+    (p.barcode ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-top:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Código de barras</span><span style="font-family:monospace;font-weight:var(--weight-strong);color:var(--text)">${p.barcode}</span></div>` : "") +
     `</div>` +
 
     // Acções
     (user.role==="admin" ?
-      `<div class="prod-modal-actions">
-        <button class="btn btn-primary btn-full" onclick="window._editProd(${p.id})">
-          <i data-lucide="edit-3"></i> Editar produto
+      `<div class="prod-modal-actions" style="display:flex;flex-direction:column;gap:var(--space-2)">
+        <button class="btn btn-full" style="background:var(--success);color:#fff;border-radius:var(--radius);padding:var(--space-4);font-size:var(--text-base);font-weight:var(--weight-strong);box-shadow:none" onclick="window._openRegistarCompra(${p.id})">
+          <i data-lucide="shopping-cart" style="width:16px;height:16px"></i> Registar Compra
         </button>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <button class="btn btn-ghost btn-full" onclick="window._openTransfer(${p.id})">
-            <i data-lucide="arrow-right-left"></i> Transferir
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
+          <button class="btn btn-full" style="background:#fff;border:1px solid var(--border2);color:var(--text);border-radius:var(--radius);padding:var(--space-3);font-size:var(--text-sm);font-weight:var(--weight-medium)" onclick="window._openTransfer(${p.id})">
+            <i data-lucide="arrow-right-left" style="width:15px;height:15px"></i> Transferir
           </button>
-          <button class="btn btn-ghost btn-full" onclick="window._openAdjustProd(${p.id})">
-            <i data-lucide="refresh-cw"></i> Ajustar
+          <button class="btn btn-full" style="background:#fff;border:1px solid var(--border2);color:var(--text);border-radius:var(--radius);padding:var(--space-3);font-size:var(--text-sm);font-weight:var(--weight-medium)" onclick="window._openAdjustProd(${p.id})">
+            <i data-lucide="refresh-cw" style="width:15px;height:15px"></i> Ajustar
           </button>
         </div>
-        <button class="btn btn-ghost btn-full" onclick="window._closeModal()" style="color:var(--text3)">
-          Fechar
-        </button>
-        <button onclick="window._deactivateProd(${p.id})"
-          style="background:none;border:none;color:var(--danger);font-size:12px;
-                 cursor:pointer;font-family:inherit;padding:4px;text-align:center;width:100%">
-          Desativar produto
-        </button>
+        <div style="display:flex;justify-content:center;gap:var(--space-5);padding:var(--space-2) 0">
+          <button onclick="window._editProd(${p.id})" style="background:none;border:none;color:var(--text3);font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:var(--space-1)">
+            <i data-lucide="edit-3" style="width:14px;height:14px"></i> Editar
+          </button>
+          <button onclick="window._closeModal()" style="background:none;border:none;color:var(--text3);font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;font-family:inherit">
+            Fechar
+          </button>
+        </div>
+        <div style="border-top:1px solid var(--border2);margin-top:var(--space-2);padding-top:var(--space-3);text-align:center">
+          <button onclick="window._deactivateProd(${p.id})"
+            style="background:none;border:none;color:var(--danger);font-size:var(--text-xs);
+                   cursor:pointer;font-family:inherit;padding:var(--space-1);text-align:center">
+            Desativar produto
+          </button>
+        </div>
       </div>` :
       `<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>`
     ));
+  var mt = document.getElementById("modal-title");
+  if (mt && !mt.textContent) mt.style.display = "none";
   refreshIcons(el("modal-box"));
 };
 
@@ -464,8 +598,10 @@ window._saveProduto = async (id) => {
     price,
     costPrice: cost,
     minStock:Number((el("pf-minstock") ? el("pf-minstock").value : "")||5),
-    category:(el("pf-cat") ? el("pf-cat").value : "")||"Alimentacao",
-    unit:(el("pf-unit") ? el("pf-unit").value : "")||"unid",
+    category:(el("pf-cat-value") ? el("pf-cat-value").value : "")||"Alimentacao",
+    unit: window._readUnitValue("pf-unit"),
+    purchaseUnit: (function(){ const v = window._readUnitValue("pf-punit"); return v==="Unidade" ? null : v; })(),
+    conversionFactor:Number((el("pf-pfactor") ? el("pf-pfactor").value : "")||0)||null,
     active:true,
   };
 
@@ -502,3 +638,230 @@ window._saveProduto = async (id) => {
 };
 
 window._closeModal = closeModal;
+
+window._scanBarcodeForProd = () => {
+  initCamera((rawValue) => {
+    const input = el("pf-bar");
+    if (input) { input.value = rawValue; input.focus(); }
+    toast("Código lido!", "success");
+  });
+};
+
+window._toggleConvConfigForm = () => {
+  const box = el("pf-conv-config");
+  const btn = el("pf-conv-toggle-btn");
+  if (!box) return;
+  const opening = box.style.display === "none";
+  box.style.display = opening ? "flex" : "none";
+  if (btn) btn.textContent = (opening ? "▼ " : "▶ ") + "Unidade de compra (grades, fardos, caixas...)";
+};
+
+window._openRegistarCompra = async (id) => {
+  const p = await db.get("products", id);
+  if (!p) return;
+  const hasConversion = !!(p.purchaseUnit && p.conversionFactor && p.conversionFactor > 0);
+
+  openModal(`Registar Compra — ${p.name}`,
+    `<div style="display:flex;flex-direction:column;gap:var(--space-5)">
+
+      ${hasConversion ? `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);padding:2px 0;font-size:var(--text-xs);color:var(--text3)">
+        <span>${p.purchaseUnit} = ${p.conversionFactor} ${p.unit||"unid"}</span>
+        <button onclick="window._toggleConvConfig()" style="background:none;border:none;color:var(--primary);font-weight:var(--weight-medium);cursor:pointer;font-family:inherit;font-size:var(--text-xs)">Alterar</button>
+      </div>` : `
+      <div style="display:flex;align-items:flex-start;gap:var(--space-2);padding:2px 0;font-size:var(--text-xs);color:var(--text3)">
+        <i data-lucide="info" style="width:14px;height:14px;flex-shrink:0;margin-top:1px;color:#d97706"></i>
+        <span>Compra em grades, fardos ou caixas? Configure abaixo.</span>
+      </div>`}
+
+      <div id="rc-conv-config" style="display:${hasConversion?"none":"flex"};flex-direction:column;gap:var(--space-3)">
+        <div class="field-row">
+          <div class="field">
+            <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Unidade de compra</label>
+            ${unitSelectHTML("rc-punit", p.purchaseUnit||"")}
+          </div>
+          <div class="field">
+            <label id="rc-pfactor-label" style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Cada ${p.purchaseUnit||"unidade de compra"} contém quantas ${p.unit||"unid"}?</label>
+            <input type="number" id="rc-pfactor" placeholder="Ex: 24" min="1" value="${p.conversionFactor||""}"
+              oninput="window._updateRegistarCompraCalc(${p.id})"/>
+            <div style="font-size:10px;color:var(--text3);margin-top:var(--space-1)">Este valor fica guardado neste produto e é preenchido automaticamente nas próximas compras.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label id="rc-qty-label" style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Quantidade comprada</label>
+          <input type="number" id="rc-qty" value="1" min="1" oninput="window._updateRegistarCompraCalc(${id})"
+            style="font-size:var(--text-lg);font-weight:var(--weight-strong);text-align:center;padding:var(--space-3)"/>
+        </div>
+        <div class="field">
+          <label id="rc-price-label" style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Preço por <span style="color:var(--primary);font-weight:var(--weight-strong)">${p.purchaseUnit||"unidade de compra"}</span></label>
+          <input type="number" id="rc-price" placeholder="0" min="0" oninput="window._updateRegistarCompraCalc(${id})"/>
+        </div>
+      </div>
+
+      <div id="rc-calc" style="background:#fafafa;border:1px solid var(--border2);border-radius:var(--radius-lg);padding:var(--space-5) var(--space-4);display:flex;flex-direction:column;gap:var(--space-4);box-shadow:var(--shadow-sm)">
+        <div style="display:flex;align-items:center;gap:6px;font-size:var(--text-xs);font-weight:var(--weight-strong);color:var(--success)">
+          <i data-lucide="check-circle" style="width:13px;height:13px"></i> Cálculo automático
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <div>
+            <div style="font-size:var(--text-xs);font-weight:var(--weight-strong);color:var(--text3)">Stock a adicionar</div>
+            <div id="rc-calc-qty" style="font-size:var(--text-xl);font-weight:var(--weight-strong);color:var(--primary);margin-top:3px">—</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:var(--text-xs);font-weight:var(--weight-strong);color:var(--text3)">Custo por ${p.unit||"unid"}</div>
+            <div id="rc-calc-cost" style="font-size:var(--text-xl);font-weight:var(--weight-strong);color:var(--text);margin-top:3px">—</div>
+          </div>
+        </div>
+        <div id="rc-calc-formula" style="font-size:var(--text-sm);color:var(--text3);border-top:1px solid var(--border2);padding-top:var(--space-3)">—</div>
+        <div id="rc-calc-warn" style="display:none;font-size:var(--text-xs);color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3)"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:var(--text-sm)">
+          <span style="color:var(--text3)">Custo total da compra</span>
+          <span id="rc-calc-total" style="font-weight:var(--weight-strong);font-size:var(--text-xl);color:var(--text)">—</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Adicionar em</label>
+        <select id="rc-dest">
+          <option value="shop">Loja</option>
+          <option value="warehouse">Armazém</option>
+        </select>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--text3);cursor:pointer">
+        <input type="checkbox" id="rc-update-cost" checked style="width:16px;height:16px"/>
+        Atualizar preço de custo do produto
+      </label>
+
+    </div>
+    <div style="margin-top:var(--space-5);display:flex;flex-direction:column;gap:var(--space-3)">
+      <button class="btn btn-full" style="background:var(--success);color:#fff;font-size:var(--text-lg);padding:var(--space-4);box-shadow:0 4px 14px rgba(22,163,74,.25)" onclick="window._confirmCompra(${id})">
+        <i data-lucide="check"></i> Confirmar Compra
+      </button>
+      <button onclick="window._closeModal()" style="background:none;border:none;color:var(--text3);font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;font-family:inherit;padding:var(--space-2);text-align:center;width:100%">
+        Cancelar
+      </button>
+    </div>`);
+  window._rcCurrentId = id;
+  refreshIcons(el("modal-box"));
+  if (p.purchaseUnit) {
+    var ql = el("rc-qty-label");
+    if (ql) ql.textContent = "Quantidade comprada (em " + p.purchaseUnit + ")";
+    var pl = el("rc-price-label");
+    if (pl) pl.innerHTML = "Preço por <span style=\"color:var(--primary);font-weight:var(--weight-strong)\">" + p.purchaseUnit + "</span>";
+    var fl = el("rc-pfactor-label");
+    if (fl) fl.textContent = "Cada " + p.purchaseUnit + " contém quantas " + (p.unit||"unid") + "?";
+  }
+  window._updateRegistarCompraCalc(id);
+};
+
+window._toggleConvConfig = () => {
+  const box = el("rc-conv-config");
+  if (box) box.style.display = box.style.display === "none" ? "flex" : "none";
+};
+
+window._updateRegistarCompraCalc = async (id) => {
+  if (!id) return;
+  const p = await db.get("products", id);
+  if (!p) return;
+  const qty = Number((el("rc-qty")?el("rc-qty").value:"")||0);
+  const price = Number((el("rc-price")?el("rc-price").value:"")||0);
+  const factorInput = Number((el("rc-pfactor")?el("rc-pfactor").value:"")||0);
+  const factor = factorInput>0 ? factorInput : (p.conversionFactor||1);
+  const punit = window._readUnitValue("rc-punit");
+  const punitLabel = (punit && punit!=="Unidade") ? punit : (p.purchaseUnit||p.unit||"unid");
+
+  const rawTotal = qty * factor;
+  const totalUnits = Math.floor(rawTotal);
+  const isFraction = rawTotal>0 && rawTotal !== totalUnits;
+  const costPerUnit = totalUnits>0 ? (qty*price)/totalUnits : 0;
+  const totalCost = qty * price;
+
+  const calcQty = el("rc-calc-qty");
+  const calcCost = el("rc-calc-cost");
+  const calcFormula = el("rc-calc-formula");
+  const calcTotal = el("rc-calc-total");
+  const calcWarn = el("rc-calc-warn");
+
+  const saleUnit = p.unit || "unid";
+  if (calcQty) calcQty.textContent = totalUnits>0 ? `${fmtNum(totalUnits)} ${pluralizeUnit(saleUnit, totalUnits)}` : "—";
+  if (calcCost) calcCost.textContent = costPerUnit>0 ? fmt(costPerUnit) : "—";
+  if (calcFormula) calcFormula.textContent = (qty>0 && factor>0)
+    ? `${fmtNum(qty)} ${pluralizeUnit(punitLabel, qty)} × ${fmtNum(factor)} ${pluralizeUnit(saleUnit, factor)} = ${fmtNum(rawTotal)} ${pluralizeUnit(saleUnit, rawTotal)}`
+    : "—";
+  if (calcTotal) calcTotal.textContent = totalCost>0 ? fmt(totalCost) : "—";
+
+  if (calcWarn) {
+    if (isFraction) {
+      calcWarn.style.display = "block";
+      calcWarn.textContent = `O cálculo deu ${fmtNum(rawTotal)} ${pluralizeUnit(p.unit||"unid", rawTotal)} (número quebrado). Vamos arredondar para ${fmtNum(totalUnits)} ${pluralizeUnit(p.unit||"unid", totalUnits)} — nenhum stock extra é criado.`;
+    } else {
+      calcWarn.style.display = "none";
+    }
+  }
+};
+
+window._confirmCompra = async (id) => {
+  const p = await db.get("products", id);
+  if (!p) return;
+
+  const qty = Number((el("rc-qty")?el("rc-qty").value:"")||0);
+  const price = Number((el("rc-price")?el("rc-price").value:"")||0);
+  const dest = el("rc-dest") ? el("rc-dest").value : "shop";
+  const updateCost = el("rc-update-cost") ? el("rc-update-cost").checked : false;
+  const punitInput = window._readUnitValue("rc-punit") === "Unidade" ? "" : window._readUnitValue("rc-punit");
+  const pfactorInput = Number((el("rc-pfactor")?el("rc-pfactor").value:"")||0);
+
+  if (!qty || qty<=0) { toast("Quantidade invalida.","error"); return; }
+
+  const factor = pfactorInput>0 ? pfactorInput : (p.conversionFactor||1);
+  if (!factor || factor<=0) { toast("Fator de conversao invalido.","error"); return; }
+
+  const rawTotal = qty * factor;
+  const totalUnits = Math.floor(rawTotal);
+  const costPerUnit = totalUnits>0 ? (qty*price)/totalUnits : 0;
+
+  const doConfirm = async () => {
+    await addStockMovement({
+      productId:id, productName:p.name, type:"purchase", location:dest,
+      qty: totalUnits,
+      reference:"purchase",
+      note: `Compra: ${qty} ${punitInput||p.purchaseUnit||p.unit||"unid"} x ${fmt(price)}`,
+      sessionId:null,
+    });
+
+    const updateData = {};
+    if (punitInput) updateData.purchaseUnit = punitInput;
+    if (pfactorInput>0) updateData.conversionFactor = pfactorInput;
+    if (updateCost && costPerUnit>0) updateData.costPrice = costPerUnit;
+
+    if (Object.keys(updateData).length) {
+      const ex = await db.get("products", id);
+      await db.put("products", { ...ex, ...updateData, updatedAt:new Date().toISOString() });
+    }
+
+    toast("Compra registada.","success");
+    closeModal();
+    products = await db.getAll("products");
+    renderStats(); renderList();
+  };
+
+  const punitLabel = punitInput || p.purchaseUnit || p.unit || "unid";
+  const saleUnit = p.unit || "unid";
+  const totalCost = qty * price;
+
+  const recapHTML =
+    `<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:8px">Adicionar ${fmtNum(totalUnits)} ${pluralizeUnit(saleUnit,totalUnits)} ao stock?</div>` +
+    ((punitInput || p.purchaseUnit) ?
+      `<div style="font-size:12px;color:var(--text4);margin-bottom:14px">${fmtNum(qty)} ${pluralizeUnit(punitLabel,qty)} &times; ${fmtNum(factor)} ${pluralizeUnit(saleUnit,factor)} = ${fmtNum(totalUnits)} ${pluralizeUnit(saleUnit,totalUnits)}</div>` : "") +
+    `<div style="border-top:1px solid var(--border2);padding-top:12px">
+       <div style="font-size:20px;font-weight:800;color:var(--text)">${fmtKzClean(totalCost)}${price===0?" — gratuito/amostra":""}</div>
+       <div style="font-size:11px;color:var(--text3);margin-top:2px">Total a pagar</div>
+     </div>`;
+
+  confirmDialog(recapHTML, doConfirm, { title:"Confirmar compra", confirmText:"Sim, adicionar ao stock", icon:"package" });
+};
+

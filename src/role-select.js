@@ -3,6 +3,7 @@ import { hashPassword } from "./crypto.js";
 import { refreshIcons } from "./utils.js";
 import { verifyInvite, saveStoreLink } from "./invite.js";
 import { checkSetup } from "./setup.js";
+import { openCameraForInvite, stopCamera } from "./components/camera.js";
 
 function ensureAnimStyle() {
   if (document.getElementById("onb-anim-style")) return;
@@ -11,7 +12,9 @@ function ensureAnimStyle() {
   styleTag.textContent =
     "@keyframes onbFadeIn { from { opacity:0 } to { opacity:1 } }" +
     "@keyframes onbSlideIn { from { opacity:0; transform:translateY(12px) } to { opacity:1; transform:translateY(0) } }" +
-    "@keyframes onbFadeOut { from { opacity:1 } to { opacity:0 } }";
+    "@keyframes onbFadeOut { from { opacity:1 } to { opacity:0 } }" +
+    ".role-tap-btn:active { transform:scale(.97); border-color:#c4b5fd !important; background:#fafafa !important; }" +
+    ".staff-tap-btn:active { transform:scale(.97); opacity:.9; }";
   document.head.appendChild(styleTag);
 }
 
@@ -21,6 +24,7 @@ function fadeOutOverlay(overlay, cb) {
 }
 
 export async function showRoleSelect() {
+  stopCamera();
   ensureAnimStyle();
 
   var overlay = document.createElement("div");
@@ -33,7 +37,7 @@ export async function showRoleSelect() {
       '<div style="font-size:23px;font-weight:800;color:#18181b;margin-bottom:8px;letter-spacing:-.3px">Como vais usar o Kontaki?</div>',
       '<div style="font-size:13.5px;color:#71717a;margin-bottom:32px;line-height:1.5">Escolhe a opção certa para começares bem</div>',
 
-      '<button id="btn-role-owner" style="width:100%;display:flex;align-items:center;gap:14px;padding:18px;background:#fff;border:1.5px solid #e4e4e7;border-radius:16px;cursor:pointer;font-family:inherit;text-align:left;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.04);transition:border-color .15s ease">',
+      '<button id="btn-role-owner" class="role-tap-btn" style="width:100%;display:flex;align-items:center;gap:14px;padding:18px;background:#fff;border:1.5px solid #e4e4e7;border-radius:16px;cursor:pointer;font-family:inherit;text-align:left;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.04);transition:transform .1s ease,border-color .1s ease,background .1s ease">',
         '<div style="width:46px;height:46px;background:#f5f3ff;border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">',
           '<i data-lucide="store" style="width:22px;height:22px;color:#5b21b6"></i>',
         '</div>',
@@ -44,7 +48,7 @@ export async function showRoleSelect() {
         '<i data-lucide="chevron-right" style="width:18px;height:18px;color:#d4d4d8;flex-shrink:0"></i>',
       '</button>',
 
-      '<button id="btn-role-staff" style="width:100%;display:flex;align-items:center;gap:14px;padding:18px;background:#fff;border:1.5px solid #e4e4e7;border-radius:16px;cursor:pointer;font-family:inherit;text-align:left;box-shadow:0 2px 8px rgba(0,0,0,.04);transition:border-color .15s ease">',
+      '<button id="btn-role-staff" class="role-tap-btn" style="width:100%;display:flex;align-items:center;gap:14px;padding:18px;background:#fff;border:1.5px solid #e4e4e7;border-radius:16px;cursor:pointer;font-family:inherit;text-align:left;box-shadow:0 2px 8px rgba(0,0,0,.04);transition:transform .1s ease,border-color .1s ease,background .1s ease">',
         '<div style="width:46px;height:46px;background:#f0fdf4;border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">',
           '<i data-lucide="user-round" style="width:22px;height:22px;color:#16a34a"></i>',
         '</div>',
@@ -89,13 +93,13 @@ function showStaffInvite() {
       '<div style="font-size:19px;font-weight:800;color:#18181b;margin-bottom:8px">Ligar à tua loja</div>',
       '<div style="font-size:13px;color:#71717a;margin-bottom:28px;line-height:1.5">Pede ao teu patrão o QR code ou o ficheiro de convite</div>',
 
-      '<button id="btn-staff-scan" style="width:100%;padding:15px;background:#16a34a;color:#fff;border:none;border-radius:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(22,163,74,.25)">',
+      '<button id="btn-staff-scan" class="staff-tap-btn" style="width:100%;padding:15px;background:#16a34a;color:#fff;border:none;border-radius:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(22,163,74,.25);transition:transform .1s ease">',
         '<i data-lucide="scan-line" style="width:18px;height:18px"></i> Ler QR code',
       '</button>',
 
-      '<label style="width:100%;padding:15px;background:#fff;color:#18181b;border:1.5px solid #e4e4e7;border-radius:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box">',
+      '<label id="staff-import-label" class="staff-tap-btn" style="width:100%;padding:15px;background:#fff;color:#18181b;border:1.5px solid #e4e4e7;border-radius:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box;transition:transform .1s ease">',
         '<i data-lucide="upload" style="width:18px;height:18px;color:#71717a"></i> Importar ficheiro de convite',
-        '<input type="file" id="staff-file-input" accept=".ktkinvite,.json" style="display:none"/>',
+        '<input type="file" accept=".json" style="display:none" onchange="window._handleStaffFileInput(this)"/>',
       '</label>',
 
       '<div id="staff-error" style="display:none;margin-top:14px;padding:12px;background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;color:#dc2626;font-size:12px;font-weight:600"></div>',
@@ -106,26 +110,50 @@ function showStaffInvite() {
   refreshIcons(overlay);
 
   document.getElementById('btn-staff-back').onclick = function() {
+    stopCamera();
     fadeOutOverlay(overlay, showRoleSelect);
   };
 
   document.getElementById('btn-staff-scan').onclick = function() {
-    import('./components/camera.js').then(function(m) {
-      if (m.openCameraForInvite) {
-        m.openCameraForInvite(function(data) {
-          handleInvitePayload(data, overlay);
-        });
-      } else {
-        showStaffError(overlay, "Scanner de câmara ainda não disponível para convites.");
-      }
-    }).catch(function() {
+    var scanBtn = document.getElementById('btn-staff-scan');
+    var originalHTML = scanBtn.innerHTML;
+    scanBtn.innerHTML = '<i data-lucide="loader-2" style="width:18px;height:18px;animation:spin .8s linear infinite"></i> A abrir câmara...';
+    scanBtn.disabled = true;
+    refreshIcons(scanBtn);
+
+    try {
+      openCameraForInvite(function(data) {
+        handleInvitePayload(data, overlay);
+      });
+    } catch (e) {
       showStaffError(overlay, "Não foi possível abrir a câmara.");
-    });
+    }
+
+    setTimeout(function() {
+      if (scanBtn) { scanBtn.innerHTML = originalHTML; scanBtn.disabled = false; refreshIcons(scanBtn); }
+    }, 1500);
   };
 
-  document.getElementById('staff-file-input').addEventListener('change', function(e) {
-    var file = e.target.files[0];
+  window._handleStaffFileInput = function(input) {
+    var file = input.files[0];
     if (!file) return;
+
+    var label = document.getElementById('staff-import-label');
+    var originalLabelHTML = label ? label.innerHTML : null;
+    if (label) {
+      label.innerHTML = '<i data-lucide="loader-2" style="width:18px;height:18px;color:#71717a;animation:spin .8s linear infinite"></i> A processar ficheiro...';
+      refreshIcons(label);
+    }
+
+    var errEl = overlay.querySelector('#staff-error');
+    if (errEl) {
+      errEl.style.display = 'block';
+      errEl.style.background = '#f0fdf4';
+      errEl.style.borderColor = '#bbf7d0';
+      errEl.style.color = '#16a34a';
+      errEl.textContent = 'A verificar convite...';
+    }
+
     var reader = new FileReader();
     reader.onload = function(evt) {
       try {
@@ -135,13 +163,22 @@ function showStaffInvite() {
         showStaffError(overlay, "Ficheiro inválido. Pede um novo convite.");
       }
     };
+    reader.onerror = function() {
+      showStaffError(overlay, "Não foi possível ler o ficheiro.");
+    };
     reader.readAsText(file);
-  });
+  };
 }
 
 function showStaffError(overlay, msg) {
   var el = overlay.querySelector('#staff-error');
-  if (el) { el.textContent = msg; el.style.display = 'block'; }
+  if (el) {
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = '#fef2f2';
+    el.style.borderColor = '#fecaca';
+    el.style.color = '#dc2626';
+  }
 }
 
 async function handleInvitePayload(data, overlay) {

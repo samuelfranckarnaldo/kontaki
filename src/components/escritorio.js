@@ -3,7 +3,7 @@ import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { getUser } from "../auth.js";
-import { ktkService, sessionService, validateKtkHash } from "../services.js";
+import { ktkService, sessionService, validateKtkHash, catalogService } from "../services.js";
 
 export async function loadEscritorio() {
   var wrap = document.getElementById("escritorio-content");
@@ -19,10 +19,22 @@ export async function loadEscritorio() {
     '<label class="esc-import-btn">' +
     '<input type="file" accept=".ktk,application/json" style="display:none" onchange="window._handleKtkImport(this)"/>' +
     '<i data-lucide="upload"></i> Importar turno (.ktk)' +
+    '</label>' +
+    '<label class="esc-import-btn">' +
+    '<input type="file" accept=".ktkcat,application/json" style="display:none" onchange="window._handleKtkcatImport(this)"/>' +
+    '<i data-lucide="package"></i> Importar catálogo (.ktkcat)' +
     '</label>';
   wrap.appendChild(importSection);
 
   if (user.role === "admin") {
+    var exportSection = document.createElement("div");
+    exportSection.className = "esc-import-section";
+    exportSection.innerHTML =
+      '<button class="esc-import-btn" onclick="window._exportarCatalogo()">' +
+      '<i data-lucide="download"></i> Exportar catálogo (.ktkcat)' +
+      '</button>';
+    wrap.appendChild(exportSection);
+
     var all     = await db.getAll("ktkImports");
     var pending = all.filter(function(p) { return p.status === "pending"; });
 
@@ -35,6 +47,25 @@ export async function loadEscritorio() {
       '</div>';
     wrap.appendChild(summaryWrap);
 
+    var conflictResult     = await ktkService.detectConflicts();
+    var conflicts          = conflictResult.conflicts || [];
+    var conflictImportIds  = new Set();
+    conflicts.forEach(function(c) {
+      c.events.forEach(function(e) { conflictImportIds.add(e.importId); });
+    });
+
+    if (conflicts.length) {
+      var conflictBanner = document.createElement("div");
+      conflictBanner.className = "esc-conflict-banner";
+      conflictBanner.innerHTML =
+        '<i data-lucide="alert-triangle"></i>' +
+        '<div>' +
+        '<div class="esc-conflict-title">' + conflicts.length + ' possível' + (conflicts.length!==1?"eis":"") + ' conflito' + (conflicts.length!==1?"s":"") + ' de venda</div>' +
+        '<div class="esc-conflict-sub">' + conflicts.map(function(c){ return c.productName + " (" + c.gapMinutes + " min)"; }).join(", ") + '</div>' +
+        '</div>';
+      wrap.appendChild(conflictBanner);
+    }
+
     var listWrap = document.createElement("div");
     if (!pending.length) {
       listWrap.className = "empty-state";
@@ -43,9 +74,10 @@ export async function loadEscritorio() {
       listWrap.className = "esc-pending-list";
       listWrap.innerHTML = pending.map(function(p) {
         var pktk = p.ktk;
+        var hasConflict = conflictImportIds.has(p.id);
         return '<button class="esc-pending-item" onclick="window._abrirRevisaoKtk(' + p.id + ')">' +
           '<div>' +
-          '<div class="esc-pending-name">' + (pktk.funcionario||"Desconhecido") + '</div>' +
+          '<div class="esc-pending-name">' + (pktk.funcionario||"Desconhecido") + (hasConflict ? ' <span class="esc-conflict-badge">⚠</span>' : "") + '</div>' +
           '<div class="esc-pending-meta">' + fmtDate(p.importedAt) + '</div>' +
           '</div>' +
           '<span class="perfil-menu-chevron">›</span>' +
@@ -227,9 +259,9 @@ function showRevisaoModal(rec) {
     '</div>' +
     rowsHtml +
     '</div>' +
-    '<div style="display:flex;gap:8px;margin-top:14px;border-top:1px solid #f4f4f5;padding-top:14px">' +
-    '<button class="btn btn-ghost btn-full" onclick="window._rejeitarKtkPendente(' + rec.id + ')">Rejeitar</button>' +
-    '<button class="btn btn-primary btn-full" onclick="window._confirmarKtkPendente(' + rec.id + ')">' +
+    '<div class="esc-review-actions">' +
+    '<button class="esc-reject-btn" onclick="window._rejeitarKtkPendente(' + rec.id + ')">Rejeitar</button>' +
+    '<button class="btn btn-primary esc-confirm-btn" onclick="window._confirmarKtkPendente(' + rec.id + ')">' +
     '<i data-lucide="check"></i> Confirmar</button>' +
     '</div>');
   refreshIcons(el("modal-box"));
@@ -272,4 +304,55 @@ window._rejeitarKtkPendente = async function(importId) {
     toast("Erro: "+err.message,"error");
   }
 };
+
+window._exportarCatalogo = async function() {
+  try {
+    var cat = await catalogService.generate();
+    var catStr = JSON.stringify(cat, null, 2);
+    var store = (await db.get("settings","store")) || {};
+    var fname = "catalogo_" + (store.name||"loja").replace(/\s+/g,"_") + "_" + new Date().toISOString().slice(0,10) + ".ktkcat";
+    await window._shareKtkFile(encodeURIComponent(fname), encodeURIComponent(catStr));
+    toast("Catálogo gerado: " + cat.produtos.length + " produtos.","success");
+  } catch(err) {
+    toast("Erro: "+err.message,"error");
+  }
+};
+
+window._handleKtkcatImport = async function(input) {
+  var file = input.files[0];
+  if (!file) return;
+  input.value = "";
+  var text, cat;
+  try {
+    text = await file.text();
+    cat  = JSON.parse(text);
+  } catch(e) {
+    toast("Ficheiro inválido — não é JSON válido.","error"); return;
+  }
+  try {
+    var result = await catalogService.apply(cat);
+    toast("Catálogo importado — " + result.created + " novo(s), " + result.updated + " actualizado(s).","success");
+    if (result.discontinuedWithStock.length) {
+      showDiscontinuedModal(result.discontinuedWithStock);
+    }
+  } catch(err) {
+    if (err.message === "INVALID_FORMAT") toast("Formato .ktkcat inválido.","error");
+    else if (err.message === "INVALID_HASH") toast("Hash inválido — ficheiro modificado.","error");
+    else toast("Erro: "+err.message,"error");
+  }
+};
+
+function showDiscontinuedModal(items) {
+  var rows = items.map(function(d) {
+    return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f4f4f5;font-size:13px">' +
+      '<span style="font-weight:600">' + d.productName + '</span>' +
+      '<span style="color:#71717a">' + d.shopStock + ' loja · ' + d.whStock + ' armazém</span>' +
+      '</div>';
+  }).join("");
+  openModal("Produtos descontinuados",
+    '<div style="font-size:13px;color:var(--text3);line-height:1.5;margin-bottom:14px">Estes produtos já não estão no catálogo recebido, mas ainda tens stock deles. O stock não foi alterado — decide o que fazer com ele.</div>' +
+    rows +
+    '<button class="btn btn-ghost btn-full" style="margin-top:14px" onclick="window._closeModal()">Fechar</button>');
+  refreshIcons(el("modal-box"));
+}
 

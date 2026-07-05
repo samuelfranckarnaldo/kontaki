@@ -47,6 +47,22 @@ export async function validateKtkHash(ktk) {
   } catch { return {valid:false,reason:"chave_em_falta",legacy:false}; }
 }
 
+export async function generateKtkcatHash(cat) {
+  const payload=JSON.stringify({
+    versao:cat.versao, loja_id:cat.loja_id, loja_nome:cat.loja_nome,
+    produtos:(cat.produtos||[]).map(p=>({catalogId:p.catalogId,name:p.name,price:p.price})),
+  });
+  return hmacSha256(payload);
+}
+
+export async function validateKtkcatHash(cat) {
+  if(!cat.hash) return {valid:false,reason:"sem_hash",legacy:false};
+  try {
+    const expected=await generateKtkcatHash(cat);
+    return expected===cat.hash ? {valid:true,reason:"ok",legacy:false} : {valid:false,reason:"hash_invalido",legacy:false};
+  } catch { return {valid:false,reason:"chave_em_falta",legacy:false}; }
+}
+
 async function deriveKey(password) {
   const pw=await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveKey"]);
   return crypto.subtle.deriveKey(
@@ -460,6 +476,84 @@ export const ktkService = {
       }
     });
     return {byProduct,conflicts};
+  },
+};
+
+export const catalogService = {
+  async generate() {
+    requireRole("admin");
+    const products=await db.getAll("products");
+    const active=products.filter(p=>p.active!==false);
+    const items=[];
+    for (const p of active) {
+      let catalogId=p.catalogId;
+      if (!catalogId) {
+        catalogId=generateUUID();
+        await db.put("products",{...p,catalogId});
+      }
+      items.push({
+        catalogId, name:p.name, barcode:p.barcode||"", masterBarcode:p.masterBarcode||"",
+        price:p.price, costPrice:p.costPrice||0, minStock:p.minStock||5,
+        category:p.category||"Outro", unit:p.unit||"unid",
+      });
+    }
+    const store=(await db.get("settings","store"))||{};
+    const cat={
+      tipo:"ktkcat", versao:"1.0",
+      loja_id:store.id||null, loja_nome:store.name||"",
+      gerado_em:new Date().toISOString(),
+      produtos:items, hash:null,
+    };
+    try { cat.hash=await generateKtkcatHash(cat); }
+    catch(err) { cat.hash=null; cat.hash_error=err.message; }
+    return cat;
+  },
+
+  async apply(ktkcat) {
+    requireAuth();
+    if (!ktkcat || ktkcat.tipo!=="ktkcat" || !Array.isArray(ktkcat.produtos)) throw new Error("INVALID_FORMAT");
+    const hashResult=await validateKtkcatHash(ktkcat);
+    if (!hashResult.valid && !hashResult.legacy) throw new Error("INVALID_HASH");
+
+    const localProducts=await db.getAll("products");
+    const byCatalogId={};
+    localProducts.forEach(p=>{ if (p.catalogId) byCatalogId[p.catalogId]=p; });
+
+    let updated=0, created=0;
+    for (const item of ktkcat.produtos) {
+      const existing=byCatalogId[item.catalogId];
+      if (existing) {
+        await db.put("products",{
+          ...existing,
+          name:item.name, barcode:item.barcode, masterBarcode:item.masterBarcode,
+          price:item.price, costPrice:item.costPrice, minStock:item.minStock,
+          category:item.category, unit:item.unit,
+          catalogId:item.catalogId, updatedAt:new Date().toISOString(),
+        });
+        updated++;
+      } else {
+        await db.add("products",{
+          catalogId:item.catalogId, name:item.name, barcode:item.barcode||"",
+          masterBarcode:item.masterBarcode||"", price:item.price, costPrice:item.costPrice||0,
+          minStock:item.minStock||5, category:item.category||"Outro", unit:item.unit||"unid",
+          active:true, stock:0, warehouseStock:0, createdAt:new Date().toISOString(),
+        });
+        created++;
+      }
+    }
+
+    const incomingIds=new Set(ktkcat.produtos.map(i=>i.catalogId));
+    const discontinued=localProducts.filter(p=>p.catalogId && !incomingIds.has(p.catalogId));
+    const discontinuedWithStock=[];
+    for (const p of discontinued) {
+      const shopStock=await getStock(p.id,"shop");
+      const whStock=await getStock(p.id,"warehouse");
+      if (shopStock>0 || whStock>0) {
+        discontinuedWithStock.push({productId:p.id,productName:p.name,shopStock,whStock});
+      }
+    }
+
+    return {updated,created,discontinuedWithStock,legacy:hashResult.legacy};
   },
 };
 

@@ -1,51 +1,63 @@
+let _activeStream  = null;
+let _activeInterval = null;
+
+export function stopCamera() {
+  const overlay = document.getElementById("camera-overlay");
+  if (overlay) overlay.style.display = "none";
+  if (_activeInterval) { clearInterval(_activeInterval); _activeInterval = null; }
+  if (_activeStream) {
+    _activeStream.getTracks().forEach((t) => t.stop());
+    _activeStream = null;
+  }
+}
+
 export function initCamera(onDetected) {
+  // Garante que não há nenhuma sessão anterior presa antes de começar uma nova
+  stopCamera();
+
   const overlay = document.getElementById("camera-overlay");
   const video   = document.getElementById("camera-video");
   const btnClose = document.getElementById("btn-close-camera");
-  let stream    = null;
 
   overlay.style.display = "flex";
 
   navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
     .then((s) => {
-      stream       = s;
+      _activeStream   = s;
       video.srcObject = s;
       video.play();
       scanLoop();
     })
-    .catch(() => {
+    .catch((err) => {
       overlay.style.display = "none";
-      alert("Câmara não disponível. Use a pesquisa manual.");
+      if (err.name === "NotAllowedError") {
+        alert("Permissão da câmara foi negada. Vai a Definições do site no browser e permite o acesso à câmara para continuar.");
+      } else {
+        alert("Câmara não disponível. Use a pesquisa manual.");
+      }
     });
 
   function scanLoop() {
     if (!window.BarcodeDetector) {
       overlay.style.display = "none";
       alert("Este browser não suporta leitura de códigos. Use a pesquisa manual.");
-      stop(); return;
+      stopCamera(); return;
     }
     const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "qr_code", "code_128"] });
-    const interval = setInterval(async () => {
+    _activeInterval = setInterval(async () => {
       if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
       try {
         const codes = await detector.detect(video);
         if (codes.length > 0) {
-          clearInterval(interval);
-          stop();
+          stopCamera();
           onDetected(codes[0].rawValue);
         }
       } catch {}
     }, 300);
   }
 
-  function stop() {
-    overlay.style.display = "none";
-    if (stream) stream.getTracks().forEach((t) => t.stop());
-  }
-
-  btnClose.onclick = stop;
+  btnClose.onclick = stopCamera;
 }
-
 
 export function openCameraForInvite(onInvite) {
   initCamera(function(rawValue) {
