@@ -1,5 +1,5 @@
 const DB_NAME    = "kontaki_db";
-const DB_VERSION = 12;
+const DB_VERSION = 13;
 let _db = null;
 
 function openDB() {
@@ -31,6 +31,7 @@ function openDB() {
       ensure("expenses",         { keyPath:"id", autoIncrement:true }, [["date",false],["category",false]]);
       ensure("ktkImports",       { keyPath:"id", autoIncrement:true }, [["sessionUuid",false],["status",false],["importedAt",false]]);
       ensure("stockDecisions",   { keyPath:"id", autoIncrement:true }, [["productId",false],["decidedAt",false]]);
+      ensure("stockCorrections", { keyPath:"id", autoIncrement:true }, [["importId",false],["productId",false],["correctedAt",false]]);
     };
     req.onsuccess = () => { _db = req.result; resolve(_db); };
     req.onerror   = () => reject(req.error);

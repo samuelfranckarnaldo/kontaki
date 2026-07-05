@@ -355,8 +355,9 @@ export const ktkService = {
   },
 
   // Aplica um import pendente: cria sessão/movimentos/incidentes (não mexe em stock de produtos).
-  async confirmImport(importId) {
+  async confirmImport(importId, manualCorrections) {
     requireRole("admin");
+    manualCorrections = manualCorrections || {};
     const rec=await db.get("ktkImports",importId);
     if(!rec || rec.status!=="pending") throw new Error("Importação não encontrada ou já processada.");
     const ktk=rec.ktk;
@@ -388,6 +389,29 @@ export const ktkService = {
         createdAt:inc.date||new Date().toISOString(),
       });
     }
+
+    // Reconciliação real do stock: aplica o delta vendido (corrigido ou original).
+    const stockRows = Object.values(ktk.stock_esperado||{});
+    for (const row of stockRows) {
+      const hasCorrection = Object.prototype.hasOwnProperty.call(manualCorrections, row.productId);
+      const soldFinal = hasCorrection ? Number(manualCorrections[row.productId]) : Number(row.sold||0);
+      if (soldFinal !== 0) {
+        await addStockMovement({
+          productId: row.productId, productName: row.productName,
+          type: "import_turno", location: "shop", qty: -soldFinal,
+          reference: "ktk:"+ktk.id_sessao, note: "Importado do turno de "+ktk.funcionario,
+          sessionId, userId: ktk.funcionario_id, createdAt: new Date().toISOString(),
+        });
+      }
+      if (hasCorrection) {
+        await db.add("stockCorrections", {
+          importId, productId: row.productId, productName: row.productName,
+          originalValue: Number(row.sold||0), correctedValue: soldFinal,
+          correctedBy: user.id, correctedAt: new Date().toISOString(),
+        });
+      }
+    }
+
     await db.put("ktkImports",{...rec,status:"confirmed",confirmedAt:new Date().toISOString(),confirmedBy:user.id,sessionId});
     return {sessionId,incidentCount:(ktk.incidentes||[]).length};
   },
@@ -395,7 +419,7 @@ export const ktkService = {
   async rejectImport(importId,reason) {
     requireRole("admin");
     const rec=await db.get("ktkImports",importId);
-    if(!rec) throw new Error("Importação não encontrada.");
+    if(!rec || rec.status!=="pending") throw new Error("Importação não encontrada ou já processada.");
     await db.put("ktkImports",{...rec,status:"rejected",rejectedReason:reason||"",rejectedAt:new Date().toISOString(),rejectedBy:getUser().id});
   },
 

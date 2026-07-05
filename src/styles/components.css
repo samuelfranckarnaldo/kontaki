@@ -76,20 +76,41 @@
 /* ── TOAST ──────────────────────────────────────────────────────────────────── */
 #toasts {
   position: fixed; bottom: 76px; left: 16px; right: 16px;
-  z-index: 9000; display: flex; flex-direction: column; gap: 8px;
+  z-index: 9000; display: flex; flex-direction: column; gap: 10px;
   pointer-events: none;
 }
 .toast {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 16px; border-radius: var(--radius);
-  font-size: 13px; font-weight: 600; color: #fff;
-  box-shadow: var(--shadow); animation: slideUp .2s ease;
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 13px 13px 12px; border-radius: var(--radius-lg);
+  font-size: 13.5px; font-weight: 600; color: #fff;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(255,255,255,.09);
+  animation: toastIn .32s cubic-bezier(.22,1,.36,1);
   pointer-events: all;
 }
-.toast-success { background: #064e3b; }
-.toast-error   { background: #7f1d1d; }
-.toast-info    { background: #1e3a5f; }
-.toast i, .toast svg { width: 16px; height: 16px; flex-shrink: 0; }
+.toast-icon-badge {
+  width: 27px; height: 27px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; background: rgba(255,255,255,.16);
+}
+.toast-body { flex: 1; min-width: 0; line-height: 1.4; }
+.toast-close {
+  background: rgba(255,255,255,.12); border: none; color: rgba(255,255,255,.85);
+  cursor: pointer; width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  font-size: 15px; line-height: 1; padding: 0; transition: background .15s ease;
+}
+.toast-close:active { background: rgba(255,255,255,.26); }
+.toast-success { background: linear-gradient(135deg,#065f46,#064e3b); }
+.toast-error   { background: linear-gradient(135deg,#991b1b,#7f1d1d); }
+.toast-info    { background: linear-gradient(135deg,#1e40af,#1e3a5f); }
+.toast-warning { background: linear-gradient(135deg,#92400e,#78350f); }
+.toast i, .toast svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(14px) scale(.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 /* ── PILLS / TABS ───────────────────────────────────────────────────────────── */
 .pill-group { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
@@ -1595,6 +1616,22 @@
 .esc-import-section { margin-bottom: 20px; }
 .esc-import-btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px; border: 1.5px dashed #ddd6fe; border-radius: 12px; background: #faf5ff; cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 600; color: #7c3aed; width: 100%; }
 .esc-import-btn i, .esc-import-btn svg { width: 18px; height: 18px; }
+
+.esc-pending-list { background: var(--bg2); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); }
+.esc-pending-item { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 13px 14px; border: none; border-bottom: 1px solid var(--border2); background: var(--bg2); cursor: pointer; font-family: var(--font); text-align: left; }
+.esc-pending-item:last-child { border-bottom: none; }
+.esc-pending-item:active { background: var(--border2); }
+.esc-pending-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.esc-pending-meta { font-size: 11px; color: var(--text4); margin-top: 2px; }
+
+.esc-review-header { display: grid; grid-template-columns: 1fr 55px 55px 55px; padding: 8px 10px; background: var(--border2); border-radius: 8px 8px 0 0; font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; }
+.esc-review-row { display: grid; grid-template-columns: 1fr 55px 55px 55px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border2); gap: 4px; }
+.esc-review-name { font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.esc-review-received { font-size: 12px; color: var(--text3); text-align: center; }
+.esc-review-input { width: 100%; text-align: center; font-size: 13px; font-weight: 700; border: 1.5px solid var(--border); border-radius: 6px; padding: 4px 2px; font-family: var(--font); color: var(--text); }
+.esc-review-input:focus { border-color: var(--primary); outline: none; }
+.esc-review-expected { font-size: 13px; font-weight: 700; text-align: right; color: var(--primary); }
+.esc-review-row--edited { background: var(--primary-light); box-shadow: inset 3px 0 0 var(--primary); }
 
 /* ── LOJA SUBPAGE ───────────────────────────────────────────────────────────── */
 .loja-section-title {

@@ -35,11 +35,24 @@ export async function loadEscritorio() {
       '</div>';
     wrap.appendChild(summaryWrap);
 
-    var placeholder = document.createElement("div");
-    placeholder.className = "empty-state";
-    placeholder.innerHTML =
-      '<div class="empty-state-title">Revisão e confirmação — em construção</div>';
-    wrap.appendChild(placeholder);
+    var listWrap = document.createElement("div");
+    if (!pending.length) {
+      listWrap.className = "empty-state";
+      listWrap.innerHTML = '<div class="empty-state-title">Nenhum turno pendente</div>';
+    } else {
+      listWrap.className = "esc-pending-list";
+      listWrap.innerHTML = pending.map(function(p) {
+        var pktk = p.ktk;
+        return '<button class="esc-pending-item" onclick="window._abrirRevisaoKtk(' + p.id + ')">' +
+          '<div>' +
+          '<div class="esc-pending-name">' + (pktk.funcionario||"Desconhecido") + '</div>' +
+          '<div class="esc-pending-meta">' + fmtDate(p.importedAt) + '</div>' +
+          '</div>' +
+          '<span class="perfil-menu-chevron">›</span>' +
+          '</button>';
+      }).join("");
+    }
+    wrap.appendChild(listWrap);
   }
 
   refreshIcons(wrap);
@@ -185,6 +198,78 @@ window._confirmarImportKtk = async function() {
     else if (err.message==="INVALID_FORMAT") toast("Formato .ktk inválido.","error");
     else toast("Erro: "+err.message,"error");
     closeModal();
+  }
+};
+
+window._abrirRevisaoKtk = async function(importId) {
+  var rec = await db.get("ktkImports", importId);
+  if (!rec) { toast("Importação não encontrada.","error"); return; }
+  showRevisaoModal(rec);
+};
+
+function showRevisaoModal(rec) {
+  var ktk = rec.ktk;
+  var stockRows = Object.values(ktk.stock_esperado||{});
+
+  var rowsHtml = stockRows.map(function(r) {
+    return '<div class="esc-review-row" data-product-id="' + r.productId + '" data-received="' + r.received + '">' +
+      '<span class="esc-review-name">' + r.productName + '</span>' +
+      '<span class="esc-review-received">' + r.received + '</span>' +
+      '<input class="esc-review-input" type="number" value="' + r.sold + '" oninput="window._recalcEsperado(this)"/>' +
+      '<span class="esc-review-expected">' + r.expected + '</span>' +
+      '</div>';
+  }).join("");
+
+  openModal("Revisão — " + ktk.funcionario,
+    '<div style="max-height:65vh;overflow-y:auto">' +
+    '<div class="esc-review-header">' +
+    '<span>Produto</span><span>Recebeu</span><span>Vendeu</span><span>Esperado</span>' +
+    '</div>' +
+    rowsHtml +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:14px;border-top:1px solid #f4f4f5;padding-top:14px">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._rejeitarKtkPendente(' + rec.id + ')">Rejeitar</button>' +
+    '<button class="btn btn-primary btn-full" onclick="window._confirmarKtkPendente(' + rec.id + ')">' +
+    '<i data-lucide="check"></i> Confirmar</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+}
+
+window._recalcEsperado = function(input) {
+  var row = input.closest(".esc-review-row");
+  var received = Number(row.getAttribute("data-received"));
+  var sold = Number(input.value || 0);
+  row.querySelector(".esc-review-expected").textContent = received - sold;
+  row.classList.toggle("esc-review-row--edited", String(sold) !== input.defaultValue);
+};
+
+window._confirmarKtkPendente = async function(importId) {
+  var corrections = {};
+  document.querySelectorAll(".esc-review-row").forEach(function(row) {
+    var pid = Number(row.getAttribute("data-product-id"));
+    var input = row.querySelector(".esc-review-input");
+    var val = Number(input.value || 0);
+    if (String(val) !== input.defaultValue) corrections[pid] = val;
+  });
+  try {
+    await ktkService.confirmImport(importId, corrections);
+    toast("Turno confirmado.","success");
+    closeModal();
+    await loadEscritorio();
+  } catch(err) {
+    toast("Erro: "+err.message,"error");
+  }
+};
+
+window._rejeitarKtkPendente = async function(importId) {
+  if (!confirm("Rejeitar este turno? Esta ação não pode ser desfeita.")) return;
+  try {
+    await ktkService.rejectImport(importId, "Rejeitado manualmente no Escritório");
+    toast("Turno rejeitado.","info");
+    closeModal();
+    await loadEscritorio();
+  } catch(err) {
+    toast("Erro: "+err.message,"error");
   }
 };
 
