@@ -74,7 +74,7 @@
   -webkit-overflow-scrolling: touch;
 }
 .page.active { display: flex; animation: fadeIn .2s ease; }
-.page-inner  { padding: 0 16px 80px; flex: 1; }
+.page-inner  { padding: var(--space-4) 16px 80px; flex: 1; }
 
 /* ── BOTTOM NAV ─────────────────────────────────────────────────────────────── */
 .bottom-nav {

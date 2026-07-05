@@ -250,6 +250,10 @@ export function openProductForm(p = {}) {
   refreshIcons(el("modal-box"));
 }
 
+function categoryColor(cat) {
+  return {"Alimentacao":"#f97316","Bebidas":"#3b82f6","Higiene":"#ec4899","Limpeza":"#10b981","Outro":"#6b7280"}[cat] || "#6b7280";
+}
+
 function renderStats() {
   const active  = products.filter(p => p.active);
   const total   = active.length;
@@ -332,25 +336,27 @@ function renderList() {
     const qty = p.stock || 0;
     const arm = p.warehouseStock || 0;
     const min = p.minStock || 5;
-    const sc  = qty===0 ? "#dc2626" : qty<=min ? "#d97706" : "#16a34a";
-    const bg  = qty===0 ? "#fff5f5" : qty<=min ? "#fffbeb" : "#fff";
+    const badgeClass = qty===0 ? "produto-badge-zero" : qty<=min ? "produto-badge-low" : "";
     const tag = qty===0 ? "Esgotado" : qty<=min ? "Stock baixo" : "";
+    const cColor = categoryColor(p.category);
+    const initial = (p.name||"P").charAt(0).toUpperCase();
     html +=
-      `<div class="produto-item ${qty===0?"produto-item-zero":qty<=min?"produto-item-low":"produto-item-ok"}">` +
+      `<div class="produto-item ${qty===0?"produto-item-zero":qty<=min?"produto-item-low":""}">` +
+      `<div class="produto-avatar" style="background:${cColor}20;color:${cColor}">${initial}</div>` +
       `<div style="flex:1;min-width:0">` +
       `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">` +
       `<div class="produto-name">${p.name}</div>` +
-      (tag ? `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${qty===0?"#fee2e2":"#fef3c7"};color:${sc}">${tag}</span>` : "") +
+      (tag ? `<span class="produto-badge ${badgeClass}">${tag}</span>` : "") +
       `</div>` +
       `<div class="produto-meta">${p.barcode?p.barcode+" · ":""}${p.category}</div>` +
-      `<div style="display:flex;gap:10px;margin-top:3px;font-size:11px">` +
-      `<span class="produto-stock-ok">Loja: ${qty} ${p.unit}</span>` +
-      `<span class="produto-stock-arm">Arm: ${arm} ${p.unit}</span>` +
-      `<span class="produto-stock-total">Total: ${qty+arm} ${p.unit}</span>` +
+      `<div class="produto-stock-line">` +
+      `<span>Loja: ${qty}</span>` +
+      `<span>Arm: ${arm}</span>` +
+      `<span><strong>Total: ${qty+arm}</strong> ${p.unit}</span>` +
       `</div></div>` +
       `<div class="produto-right">` +
       `<div class="produto-label">Preco venda</div>` +
-      `<div style="font-size:14px;font-weight:700;color:#18181b">${fmt(p.price)}</div>` +
+      `<div class="produto-price">${fmt(p.price)}</div>` +
       `</div>` +
       `<button class="produto-menu-btn" onclick="window._openProdMenu(${p.id})">` +
       `<i data-lucide="more-vertical"></i>` +
@@ -367,7 +373,7 @@ window._openProdMenu = (id) => {
   const shopS = p.stock || 0;
   const whS   = p.warehouseStock || 0;
   const margin= p.costPrice ? Math.round(((p.price-p.costPrice)/p.price)*100) : null;
-  const cColor= {"Alimentacao":"#f97316","Bebidas":"#3b82f6","Higiene":"#ec4899","Limpeza":"#10b981","Outro":"#6b7280"}[p.category]||"#6b7280";
+  const cColor = categoryColor(p.category);
 
   openModal("",
     // Header do produto — nome, categoria e preco agrupados, sem duplicar o titulo
@@ -469,36 +475,48 @@ window._openTransfer = async (id) => {
   const shopStock = p.stock || 0;
   const whStock   = p.warehouseStock || 0;
   openModal("Transferir Stock — " + p.name,
-    "<div style='margin-bottom:14px'>" +
-    "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px'>" +
+    "<div style='margin-bottom:var(--space-4)'>" +
+    "<div style='display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-4)'>" +
     "<div class='stat-card' style='border-left:3px solid #5b21b6;text-align:center'>" +
-    "<div style='font-size:11px;color:#5b21b6;font-weight:700'>LOJA</div>" +
-    "<div style='font-size:20px;font-weight:700;color:#5b21b6'>" + shopStock + "</div>" +
-    "<div style='font-size:11px;color:#71717a'>" + p.unit + "</div></div>" +
+    "<div style='font-size:var(--text-xs);color:#5b21b6;font-weight:var(--weight-strong)'>LOJA</div>" +
+    "<div style='font-size:var(--text-lg);font-weight:var(--weight-strong);color:#5b21b6'>" + shopStock + "</div>" +
+    "<div style='font-size:var(--text-xs);color:#71717a'>" + p.unit + "</div></div>" +
     "<div class='stat-card' style='border-left:3px solid #d97706;text-align:center'>" +
-    "<div style='font-size:11px;color:#d97706;font-weight:700'>ARMAZÉM</div>" +
-    "<div style='font-size:20px;font-weight:700;color:#d97706'>" + whStock + "</div>" +
-    "<div style='font-size:11px;color:#71717a'>" + p.unit + "</div></div>" +
+    "<div style='font-size:var(--text-xs);color:#d97706;font-weight:var(--weight-strong)'>ARMAZÉM</div>" +
+    "<div style='font-size:var(--text-lg);font-weight:var(--weight-strong);color:#d97706'>" + whStock + "</div>" +
+    "<div style='font-size:var(--text-xs);color:#71717a'>" + p.unit + "</div></div>" +
     "</div>" +
-    "<div class='field' style='margin-bottom:12px'>" +
-    "<label>Direcção da transferência</label>" +
-    "<select id='tr-dir' style='width:100%;padding:10px;border:1.5px solid #e4e4e7;border-radius:8px;font-family:inherit;font-size:14px'>" +
-    "<option value='wh-to-shop'>Armazém → Loja</option>" +
-    "<option value='shop-to-wh'>Loja → Armazém</option>" +
-    "</select></div>" +
-    "<div class='field'><label>Quantidade</label>" +
+    "<div class='field' style='margin-bottom:var(--space-3)'>" +
+    "<label style='text-transform:none;font-weight:600;letter-spacing:0;font-size:12px;color:var(--text2)'>Direcção da transferência</label>" +
+    "<button type='button' id='tr-dir-btn' onclick='window._openTransferDirPicker()' " +
+    "style='width:100%;text-align:left;background:#fff;border:1px solid var(--border2);border-radius:10px;" +
+    "padding:12px;font-size:14px;color:#18181b;font-family:inherit;display:flex;justify-content:space-between;align-items:center;cursor:pointer'>" +
+    "<span id='tr-dir-display'>Armazém → Loja</span>" +
+    "<i data-lucide='chevron-down' style='width:16px;height:16px;color:var(--text3)'></i>" +
+    "</button>" +
+    "<input type='hidden' id='tr-dir-value' value='wh-to-shop'/>" +
+    "</div>" +
+    "<div class='field'><label style='text-transform:none;font-weight:600;letter-spacing:0;font-size:12px;color:var(--text2)'>Quantidade</label>" +
     "<input type='number' id='tr-qty' min='1' value='1' style='width:100%;padding:10px;border:1.5px solid #e4e4e7;border-radius:8px;font-family:inherit;font-size:14px;box-sizing:border-box'/>" +
     "</div></div>" +
-    "<div class='form-actions'>" +
-    "<button class='btn btn-ghost btn-full' onclick='window._closeModal()'>Cancelar</button>" +
+    "<div style='margin-top:var(--space-3);display:flex;flex-direction:column;gap:var(--space-1)'>" +
     "<button class='btn btn-primary btn-full' onclick='window._applyTransfer(" + id + ")'>Transferir</button>" +
+    "<button onclick='window._closeModal()' style='width:100%;padding:10px;background:none;border:none;color:var(--text3);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit'>Cancelar</button>" +
     "</div>");
   refreshIcons(el("modal-box"));
 };
 
+window._openTransferDirPicker = () => {
+  const current = el("tr-dir-value").value === "wh-to-shop" ? "Armazém → Loja" : "Loja → Armazém";
+  openPicker("Direcção da transferência", ["Armazém → Loja", "Loja → Armazém"], current, (val) => {
+    el("tr-dir-display").textContent = val;
+    el("tr-dir-value").value = val === "Armazém → Loja" ? "wh-to-shop" : "shop-to-wh";
+  });
+};
+
 window._applyTransfer = async (id) => {
   const qty = parseInt(el("tr-qty").value) || 0;
-  const dir = el("tr-dir") ? el("tr-dir").value : "wh-to-shop";
+  const dir = el("tr-dir-value") ? el("tr-dir-value").value : "wh-to-shop";
   if (qty <= 0) { toast("Quantidade inválida.", "error"); return; }
   const from = dir === "wh-to-shop" ? "warehouse" : "shop";
   const to   = dir === "wh-to-shop" ? "shop"      : "warehouse";
@@ -551,10 +569,12 @@ window._openAdjustProd = async (id) => {
       <label>Razão do ajuste</label>
       <input id="adj-reason" placeholder="Ex: Entrada de mercadoria, inventário..."/>
     </div>
-    <div class="form-actions">
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
+    <div style="margin-top:var(--space-3);display:flex;flex-direction:column;gap:var(--space-1)">
       <button class="btn btn-primary btn-full" onclick="window._applyAdjust(${id})">
         <i data-lucide="check"></i> Aplicar
+      </button>
+      <button onclick="window._closeModal()" style="width:100%;padding:10px;background:none;border:none;color:var(--text3);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+        Cancelar
       </button>
     </div>`);
   refreshIcons(el("modal-box"));
