@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
-import { openModal, closeModal } from "../modal.js";
+import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
 
 export async function loadFornecedores() {
@@ -192,17 +192,43 @@ function openFornecedorForm(s = {}) {
 
 window._openSupplierDetail = async (id) => {
   const s = await db.get("suppliers", id);
+  const allExpenses = await db.getAll("expenses");
+  const despesasLigadas = allExpenses
+    .filter(e => e.supplierId === id && !e.archived)
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
+  const totalDespesas = despesasLigadas.reduce((a,e) => a + (e.amount||0), 0);
+
+  const despesasHtml = despesasLigadas.length
+    ? `<div style="max-height:180px;overflow-y:auto;margin-top:4px">` +
+        despesasLigadas.slice(0,20).map(e =>
+          `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f4f4f5;font-size:12.5px">
+            <span style="color:#3f3f46">${e.description} <span style="color:#a1a1aa">· ${fmtDate(e.date)}</span></span>
+            <strong style="color:#3f3f46;flex-shrink:0;margin-left:8px">${fmt(e.amount)}</strong>
+          </div>`
+        ).join("") +
+      `</div>`
+    : `<div style="font-size:12.5px;color:#a1a1aa;padding:8px 0">Nenhuma despesa ligada a este fornecedor ainda.</div>`;
+
   openModal(s.name,
     `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
       ${s.phone   ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f4f4f5"><span style="color:#71717a;font-size:13px">Telefone</span><span style="font-weight:600">${s.phone}</span></div>` : ""}
       ${s.contact ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f4f4f5"><span style="color:#71717a;font-size:13px">Pessoa de Contacto</span><span style="font-weight:600">${s.contact}</span></div>` : ""}
       ${s.notes   ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f4f4f5"><span style="color:#71717a;font-size:13px">Notas</span><span style="font-weight:600">${s.notes}</span></div>` : ""}
     </div>
+    <div style="background:#fafafa;border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+        <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Despesas ligadas</span>
+        <strong style="font-size:15px;color:var(--primary)">${fmt(totalDespesas)}</strong>
+      </div>
+      ${despesasHtml}
+    </div>
     <div class="form-actions">
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>
-      <button class="btn btn-danger btn-full" onclick="window._deleteSupplier(${id})"><i data-lucide="trash-2"></i> Eliminar fornecedor</button>
-      <button class="btn btn-outline btn-full" onclick="window._editSupplier(${id})">
+      <button class="btn btn-primary btn-full" onclick="window._editSupplier(${id})">
         <i data-lucide="edit-3"></i> Editar
+      </button>
+      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>
+      <button onclick="window._deleteSupplier(${id})" style="width:100%;padding:10px;background:none;border:none;color:#dc2626;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+        <i data-lucide="trash-2" style="width:14px;height:14px"></i> Eliminar fornecedor
       </button>
     </div>`);
   refreshIcons(el("modal-box"));
@@ -398,16 +424,24 @@ window._deleteSupplier = async (id) => {
   const hasPurchases = purchases.some(function(p){ return p.supplierId === id; });
 
   if (hasPurchases) {
-    if (!confirm("Este fornecedor tem compras registadas e nao pode ser eliminado (preserva auditoria). Queres desactiva-lo? Deixa de aparecer na lista mas o historico fica guardado.")) return;
-    await window._deactivateSupplier(id);
+    confirmDialog(
+      "Este fornecedor tem compras registadas e não pode ser eliminado (preserva auditoria). Queres desactivá-lo? Deixa de aparecer na lista mas o histórico fica guardado.",
+      async function() { await window._deactivateSupplier(id); },
+      { title: "Desactivar fornecedor", confirmText: "Desactivar" }
+    );
     return;
   }
 
-  if (!confirm("Eliminar este fornecedor? Esta accao nao pode ser desfeita.")) return;
-  await db.delete("suppliers", id);
-  toast("Fornecedor eliminado.", "success");
-  closeModal();
-  renderFornecedores();
+  confirmDialog(
+    "Eliminar este fornecedor? Esta ação não pode ser desfeita.",
+    async function() {
+      await db.delete("suppliers", id);
+      toast("Fornecedor eliminado.", "success");
+      closeModal();
+      renderFornecedores();
+    },
+    { title: "Eliminar fornecedor", confirmText: "Eliminar", danger: true }
+  );
 };
 
 window._deactivateSupplier = async (id) => {
@@ -420,12 +454,17 @@ window._deactivateSupplier = async (id) => {
 };
 
 window._archivePurchase = async (purchaseId) => {
-  if (!confirm("Arquivar esta compra? Deixa de aparecer na lista, mas fica guardada para auditoria.")) return;
-  const p = await db.get("purchases", purchaseId);
-  if (!p) return;
-  await db.put("purchases", { ...p, archived: true, archivedAt: new Date().toISOString() });
-  toast("Compra arquivada.", "success");
-  renderFornecedores();
+  confirmDialog(
+    "Arquivar esta compra? Deixa de aparecer na lista, mas fica guardada para auditoria.",
+    async function() {
+      const p = await db.get("purchases", purchaseId);
+      if (!p) return;
+      await db.put("purchases", { ...p, archived: true, archivedAt: new Date().toISOString() });
+      toast("Compra arquivada.", "success");
+      renderFornecedores();
+    },
+    { title: "Arquivar compra", confirmText: "Arquivar" }
+  );
 };
 
 window._editCompra = async (purchaseId) => {
