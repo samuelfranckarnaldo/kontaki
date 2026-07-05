@@ -24,6 +24,7 @@ function fadeOutOverlay(overlay, cb) {
 }
 
 export async function showRoleSelect() {
+  window._showRoleSelect = showRoleSelect;
   stopCamera();
   ensureAnimStyle();
 
@@ -129,9 +130,6 @@ function showStaffInvite() {
       showStaffError(overlay, "Não foi possível abrir a câmara.");
     }
 
-    setTimeout(function() {
-      if (scanBtn) { scanBtn.innerHTML = originalHTML; scanBtn.disabled = false; refreshIcons(scanBtn); }
-    }, 1500);
   };
 
   window._handleStaffFileInput = function(input) {
@@ -178,6 +176,20 @@ function showStaffError(overlay, msg) {
     el.style.background = '#fef2f2';
     el.style.borderColor = '#fecaca';
     el.style.color = '#dc2626';
+  }
+
+  var scanBtn = overlay.querySelector('#btn-staff-scan');
+  if (scanBtn && scanBtn.disabled) {
+    scanBtn.innerHTML = '<i data-lucide="scan-line" style="width:18px;height:18px"></i> Ler QR code';
+    scanBtn.disabled = false;
+    refreshIcons(scanBtn);
+  }
+
+  var label = overlay.querySelector('#staff-import-label');
+  if (label) {
+    label.innerHTML = '<i data-lucide="upload" style="width:18px;height:18px;color:#71717a"></i> Importar ficheiro de convite' +
+      '<input type="file" accept=".json" style="display:none" onchange="window._handleStaffFileInput(this)"/>';
+    refreshIcons(label);
   }
 }
 

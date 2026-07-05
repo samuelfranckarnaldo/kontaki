@@ -76,7 +76,10 @@ function showSetup() {
 
   overlay.innerHTML = [
     // HEADER
-    '<div id="setup-header" style="padding:32px 24px 20px;text-align:center;flex-shrink:0;border-bottom:1px solid #f4f4f5">',
+    '<div id="setup-header" style="padding:32px 24px 20px;text-align:center;flex-shrink:0;border-bottom:1px solid #f4f4f5;position:relative">',
+      '<button id="setup-back-role" style="position:absolute;top:16px;left:16px;background:none;border:none;color:#a1a1aa;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">',
+        '<i data-lucide="arrow-left" style="width:15px;height:15px"></i> Voltar',
+      '</button>',
       '<div style="font-size:11px;font-weight:700;color:#a1a1aa;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Kontaki</div>',
       '<div style="font-size:21px;font-weight:800;margin-bottom:4px;letter-spacing:-.3px;color:#18181b">Vamos criar a tua loja</div>',
       '<div style="font-size:13px;color:#71717a;line-height:1.4;margin-bottom:16px">Leva menos de 2 minutos</div>',
@@ -199,6 +202,18 @@ function showSetup() {
 
   document.body.appendChild(overlay);
   refreshIcons(overlay);
+
+  var backBtn = document.getElementById("setup-back-role");
+  if (backBtn) {
+    backBtn.onclick = function() {
+      overlay.style.animation = "onbFadeOut .2s ease forwards";
+      setTimeout(function() {
+        overlay.remove();
+        if (window._showRoleSelect) window._showRoleSelect();
+        else window.location.reload();
+      }, 180);
+    };
+  }
 
   overlay.querySelectorAll('input[type=text],input[type=tel],input[type=email]').forEach(function(el) {
     el.addEventListener('focus', function() { this.style.borderColor = '#5b21b6'; this.style.boxShadow = '0 0 0 3px rgba(91,33,182,.08)'; });
