@@ -24,6 +24,14 @@ export default [
     body: "Cada turno fica ligado ao turno anterior (quem o abriu confirma o que o turno anterior deixou). Isto cria uma cadeia contínua: se houver uma diferença de dinheiro ou stock, dá para ver exactamente em que turno ela apareceu e quem era responsável nessa altura. Vê tudo em Histórico → Auditoria."
   },
   {
+    id: "turno-formula-caixa",
+    category: "Turnos",
+    categoryIcon: "clock",
+    title: "Como é calculado o \"dinheiro esperado\" no fecho",
+    keywords: ["dinheiro esperado", "fórmula caixa", "fundo inicial", "cálculo caixa", "despesas no fecho"],
+    body: "O dinheiro esperado na gaveta no fecho de turno é: fundo inicial (o que confirmaste na abertura) + vendas em dinheiro durante o turno − despesas pagas em dinheiro durante o turno. O modal de fecho mostra esta decomposição linha a linha, para nunca ser um número sem explicação."
+  },
+  {
     id: "turno-um-por-vez",
     category: "Turnos",
     categoryIcon: "clock",
