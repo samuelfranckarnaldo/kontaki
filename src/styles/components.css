@@ -2035,14 +2035,29 @@
   z-index: 2;
 }
 .hist-day-label:first-child { padding-top: 4px; }
+.hist-day-label--inset {
+  background: var(--bg2); padding: 12px 14px 10px; border-bottom: 1px solid var(--border2);
+  font-size: var(--text-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: .6px;
+  color: var(--text4); position: static;
+  display: flex; align-items: center; gap: 10px;
+}
+.hist-day-label--inset:first-child { padding-top: 14px; }
+.hist-day-label--inset::before,
+.hist-day-label--inset::after {
+  content: ""; flex: 1; height: 1px; background: var(--border2);
+}
 .hist-mov-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.hist-mov-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border2); }
+.hist-mov-item { display: flex; align-items: flex-start; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--border2); }
 .hist-mov-item:last-child { border-bottom: none; }
-.hist-mov-icon { width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px; font-weight: 800; }
-.hist-mov-name { font-size: 13px; font-weight: 600; color: var(--text); }
-.hist-mov-meta { font-size: 11px; color: var(--text3); margin-top: 1px; }
-.hist-mov-qty { font-size: 15px; font-weight: 800; }
-.hist-mov-range { font-size: 10px; color: var(--text4); }
+.hist-mov-icon { width: 40px; height: 40px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px; font-weight: 800; margin-top: 1px; }
+.hist-mov-name { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.25; display: flex; align-items: center; gap: 6px; }
+.hist-mov-name-icon { width: 15px; height: 15px; color: var(--text4); flex-shrink: 0; }
+.hist-mov-tag { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-top: 3px; }
+.hist-mov-meta { font-size: 11px; color: var(--text4); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+.hist-mov-meta--autor { margin-top: 1px; }
+.hist-mov-meta strong { color: var(--text3); font-weight: 600; }
+.hist-mov-qty { font-size: 17px; font-weight: 800; line-height: 1.2; }
+.hist-mov-range { font-size: 10.5px; color: var(--text4); margin-top: 3px; }
 .hist-timeline { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .hist-timeline-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border2); }
 .hist-timeline-item:last-child { border-bottom: none; }

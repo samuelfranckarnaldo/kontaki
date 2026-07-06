@@ -145,11 +145,12 @@ function dayLabel(dateStr) {
   return DIAS_SEMANA[d.getDay()] + ", " + d.getDate() + " de " + MESES[d.getMonth()];
 }
 
-function groupByDay(sales) {
+function groupByDay(items, dateField) {
+  dateField = dateField || "date";
   var groups = [];
   var byDate = {};
-  sales.forEach(function(s) {
-    var d = toLocalDateStr(s.date);
+  items.forEach(function(s) {
+    var d = toLocalDateStr(s[dateField]);
     if (!byDate[d]) {
       byDate[d] = [];
       groups.push(d);
@@ -469,28 +470,38 @@ async function loadStock(from, to) {
     return sign + (abs/1e12).toFixed(abs%1e12===0?0:1) + "T";
   }
 
+  function renderMovItem(m) {
+    var color = typeColors[m.type] || "#9ca3af";
+    var bg    = typeBg[m.type]    || "#f3f4f6";
+    var label = typeLabels[m.type] || m.type;
+    var sign  = m.qty > 0 ? "+" : "";
+    var autor = (m.userId != null && usersById[m.userId]) ? usersById[m.userId].name : "Desconhecido";
+    return '<div class="hist-mov-item">' +
+      '<div class="hist-mov-icon" style="background:' + bg + ';color:' + color + '" title="' + sign + m.qty + '">' + sign + abbrevQty(m.qty) + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+      '<div class="hist-mov-name"><i data-lucide="package" class="hist-mov-name-icon"></i>' + m.productName + '</div>' +
+      '<span class="hist-mov-tag" style="background:' + bg + ';color:' + color + '">' + label + '</span>' +
+      '<div class="hist-mov-meta">' + fmtDate(m.createdAt) + '</div>' +
+      '<div class="hist-mov-meta hist-mov-meta--autor"><strong>' + autor + '</strong></div>' +
+      '</div>' +
+      '<div style="text-align:right;flex-shrink:0">' +
+      '<div class="hist-mov-qty" style="color:' + color + '" title="' + sign + m.qty + '">' + sign + abbrevQty(m.qty) + '</div>' +
+      '<div class="hist-mov-range">' + (m.qtyBefore||0) + ' → ' + (m.qtyAfter||0) + '</div>' +
+      '</div></div>';
+  }
+
   function renderMovBlock(arr, title) {
     if (!arr.length) return '<div class="hist-section-label">' + title + '</div>' +
       '<div class="hist-empty" style="padding:24px"><div class="hist-empty-sub">Nenhum movimento no período</div></div>';
 
+    var capped = arr.slice(0,50);
+    var groups = groupByDay(capped, "createdAt");
+
     return '<div class="hist-section-label">' + title + ' (' + arr.length + ')</div>' +
       '<div class="hist-mov-card">' +
-      arr.slice(0,50).map(function(m) {
-        var color = typeColors[m.type] || "#9ca3af";
-        var bg    = typeBg[m.type]    || "#f3f4f6";
-        var label = typeLabels[m.type] || m.type;
-        var sign  = m.qty > 0 ? "+" : "";
-        var autor = (m.userId != null && usersById[m.userId]) ? usersById[m.userId].name : "Desconhecido";
-        return '<div class="hist-mov-item">' +
-          '<div class="hist-mov-icon" style="background:' + bg + ';color:' + color + '" title="' + sign + m.qty + '">' + sign + abbrevQty(m.qty) + '</div>' +
-          '<div style="flex:1">' +
-          '<div class="hist-mov-name">' + m.productName + '</div>' +
-          '<div class="hist-mov-meta">' + label + ' · ' + fmtDate(m.createdAt) + ' · <strong>' + autor + '</strong></div>' +
-          '</div>' +
-          '<div style="text-align:right">' +
-          '<div class="hist-mov-qty" style="color:' + color + '">' + sign + m.qty + '</div>' +
-          '<div class="hist-mov-range">' + (m.qtyBefore||0) + ' → ' + (m.qtyAfter||0) + '</div>' +
-          '</div></div>';
+      groups.map(function(g) {
+        return '<div class="hist-day-label hist-day-label--inset">' + dayLabel(g.date) + '</div>' +
+          g.sales.map(renderMovItem).join("");
       }).join("") +
       (arr.length>50 ? '<div style="padding:10px 14px;font-size:12px;color:var(--text4)">+' + (arr.length-50) + ' mais</div>' : '') +
       '</div>';
