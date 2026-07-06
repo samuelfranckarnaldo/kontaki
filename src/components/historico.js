@@ -18,6 +18,19 @@ function toLocalDateStr(iso) {
     String(d.getDate()).padStart(2,"0");
 }
 
+function getPreviousPeriod(from, to) {
+  var fromD = new Date(from + "T00:00:00");
+  var toD   = new Date(to + "T00:00:00");
+  var days  = Math.round((toD - fromD) / 86400000) + 1;
+
+  var prevTo = new Date(fromD);
+  prevTo.setDate(prevTo.getDate() - 1);
+  var prevFrom = new Date(prevTo);
+  prevFrom.setDate(prevFrom.getDate() - (days - 1));
+
+  return { from: toLocalDateStr(prevFrom.toISOString()), to: toLocalDateStr(prevTo.toISOString()) };
+}
+
 function getShortcutDates(sc) {
   var now = new Date();
   var y = now.getFullYear();
@@ -158,6 +171,19 @@ async function loadGeral(from, to) {
 
   var total     = filtered.reduce(function(a,s) { return a+((s.total||0)-(s.totalDevolvido||0)); }, 0);
   var nVendas   = filtered.length;
+
+  var prevPeriod = getPreviousPeriod(from, to);
+  var prevFiltered = sales.filter(function(s) {
+    var d = toLocalDateStr(s.date);
+    return d >= prevPeriod.from && d <= prevPeriod.to;
+  });
+  var prevTotal = prevFiltered.reduce(function(a,s) { return a+((s.total||0)-(s.totalDevolvido||0)); }, 0);
+  var variacao = null;
+  if (prevTotal > 0) {
+    variacao = ((total - prevTotal) / prevTotal) * 100;
+  } else if (total > 0) {
+    variacao = 100;
+  }
   var ticket    = nVendas > 0 ? total / nVendas : 0;
   var fiadoAb   = fiados.filter(function(f) { return f.status==="open"; })
                     .reduce(function(a,f) { return a+(f.amount||0); }, 0);
@@ -168,20 +194,29 @@ async function loadGeral(from, to) {
   var hero = el("historico-hero");
   if (hero) {
     hero.style.display = "block";
+    var badgeHtml = "";
+    if (variacao !== null) {
+      var isUp = variacao >= 0;
+      badgeHtml =
+        '<span class="hist-hero-trend ' + (isUp ? 'hist-hero-trend--up' : 'hist-hero-trend--down') + '">' +
+        (isUp ? '↑' : '↓') + ' ' + Math.abs(variacao).toFixed(0) + '%' +
+        '</span>';
+    }
+
     hero.innerHTML =
       '<div class="hist-hero-label">Total do período</div>' +
-      '<div class="hist-hero-val">' + fmt(total) + '</div>' +
-      '<div class="hist-hero-sub">' + nVendas + ' ' + (nVendas===1?"venda":"vendas") + ' · ticket médio ' + fmt(ticket) + '</div>';
+      '<div class="hist-hero-row"><div class="hist-hero-val">' + fmt(total) + '</div>' + badgeHtml + '</div>' +
+      '<div class="hist-hero-sub">' + nVendas + ' ' + (nVendas===1?"venda":"vendas") + ' · média por venda ' + fmt(ticket) + '</div>';
   }
 
   // KPIs
   var stats = el("historico-stats");
   if (stats) {
     stats.innerHTML =
-      kpi("Nº Vendas",     nVendas,         "var(--primary)",  "") +
-      kpi("Ticket Médio",  fmt(ticket),     "var(--info)",     "") +
-      kpi("Fiado Aberto",  fmt(fiadoAb),    "var(--warning)",  "") +
-      kpi("Devoluções",    fmt(devTotal),   devTotal>0?"var(--danger)":"var(--success)", incOpen+" incidente"+(incOpen===1?"":"s"));
+      kpi("Nº Vendas",     nVendas,         "var(--primary)",  "", null) +
+      kpi("Média por Venda",  fmt(ticket),     "var(--info)",     "", null) +
+      kpi("Fiado Aberto",  fmt(fiadoAb),    "var(--warning)",  "", fiadoAb>0?"hist-kpi--attention":null) +
+      kpi("Devoluções",    fmt(devTotal),   devTotal>0?"var(--danger)":"var(--success)", incOpen+" incidente"+(incOpen===1?"":"s"), devTotal>0?"hist-kpi--danger":null);
   }
 
   // Gráfico (Chart.js)
@@ -373,8 +408,8 @@ async function loadGeral(from, to) {
   refreshIcons(list);
 }
 
-function kpi(label, val, color, sub) {
-  return '<div class="hist-kpi">' +
+function kpi(label, val, color, sub, attentionClass) {
+  return '<div class="hist-kpi' + (attentionClass ? ' ' + attentionClass : '') + '">' +
     '<div class="hist-kpi-label">' + label + '</div>' +
     '<div class="hist-kpi-val" style="color:' + color + '">' + val + '</div>' +
     (sub ? '<div class="hist-kpi-sub">' + sub + '</div>' : '') +

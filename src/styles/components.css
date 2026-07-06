@@ -1976,13 +1976,22 @@
   background: linear-gradient(135deg, var(--primary), var(--primary-mid));
 }
 .hist-hero-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; opacity: .8; margin-bottom: 4px; }
-.hist-hero-val { font-size: 32px; font-weight: 800; line-height: 1; margin-bottom: 6px; }
+.hist-hero-val { font-size: 32px; font-weight: 800; line-height: 1; }
+.hist-hero-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.hist-hero-trend {
+  font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+  background: rgba(255,255,255,.18); white-space: nowrap;
+}
+.hist-hero-trend--up { color: #bbf7d0; }
+.hist-hero-trend--down { color: #fecaca; }
 .hist-hero-sub { font-size: 12px; opacity: .8; }
 .hist-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .hist-kpi {
   background: var(--bg2); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 4px;
 }
+.hist-kpi--attention { border-left: 3px solid var(--warning); }
+.hist-kpi--danger { border-left: 3px solid var(--danger); }
 .hist-kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text3); }
 .hist-kpi-val { font-size: 18px; font-weight: 800; color: var(--text); line-height: 1.1; }
 .hist-kpi-sub { font-size: 11px; color: var(--text4); }
