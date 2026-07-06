@@ -428,6 +428,11 @@ var typeColors = {
   adjustment:"var(--primary-mid)", session_open:"var(--text4)", session_close:"var(--text4)",
   incident:"var(--danger)", incident_resolved:"var(--success)"
 };
+var typeIcons = {
+  sale:"shopping-cart", purchase:"package-plus", transfer_in:"arrow-down-to-line", transfer_out:"arrow-up-from-line",
+  adjustment:"sliders-horizontal", session_open:"log-in", session_close:"log-out",
+  incident:"alert-triangle", incident_resolved:"check-circle"
+};
 var typeBg = {
   sale:"var(--danger-light)", purchase:"var(--success-light)", transfer_in:"var(--info-light)", transfer_out:"var(--warning-light)",
   adjustment:"var(--primary-light)", session_open:"var(--border2)", session_close:"var(--border2)",
@@ -477,7 +482,7 @@ async function loadStock(from, to) {
     var sign  = m.qty > 0 ? "+" : "";
     var autor = (m.userId != null && usersById[m.userId]) ? usersById[m.userId].name : "Desconhecido";
     return '<div class="hist-mov-item">' +
-      '<div class="hist-mov-icon" style="background:' + bg + ';color:' + color + '" title="' + sign + m.qty + '">' + sign + abbrevQty(m.qty) + '</div>' +
+      '<div class="hist-mov-icon" style="background:' + bg + ';color:' + color + '"><i data-lucide="' + (typeIcons[m.type]||"circle") + '" style="width:18px;height:18px"></i></div>' +
       '<div style="flex:1;min-width:0">' +
       '<div class="hist-mov-name"><i data-lucide="package" class="hist-mov-name-icon"></i>' + m.productName + '</div>' +
       '<span class="hist-mov-tag" style="background:' + bg + ';color:' + color + '">' + label + '</span>' +
