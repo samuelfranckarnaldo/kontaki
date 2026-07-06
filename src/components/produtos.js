@@ -24,7 +24,21 @@ function fmtKzClean(n) {
   return isWhole ? `${fmtNum(rounded)} Kz` : fmt(n);
 }
 
-const CATEGORY_OPTIONS = ["Alimentacao","Bebidas","Higiene","Limpeza","Outro"];
+const BASE_CATEGORIES = ["Alimentacao","Bebidas","Higiene","Limpeza"];
+const CUSTOM_CATEGORY_LABEL = "+ Nova categoria (escrever)";
+let customCategories = [];
+
+function getCategoryOptions() {
+  return [CUSTOM_CATEGORY_LABEL, ...customCategories, ...BASE_CATEGORIES, "Outro"];
+}
+
+window._maybeSaveCustomCategory = async (val) => {
+  if (!val) return;
+  const known = [...BASE_CATEGORIES, "Outro", ...customCategories].map(c => c.toLowerCase());
+  if (known.includes(val.toLowerCase())) return;
+  customCategories.push(val);
+  await db.put("settings", { key: "customCategories", value: customCategories });
+};
 
 function pickerButtonHTML(idPrefix, displayValue) {
   return `
@@ -48,16 +62,18 @@ function categorySelectHTML(idPrefix, currentValue) {
 
 const FIELD_PICKER_CONFIG = {
   unit: { title:"Escolher unidade", options:UNIT_OPTIONS, allowCustom:true, customLabel:"Outro (escrever)" },
-  category: { title:"Escolher categoria", options:CATEGORY_OPTIONS, allowCustom:false },
 };
 
 window._openFieldPicker = (idPrefix) => {
   const kind = idPrefix.includes("cat") ? "category" : "unit";
-  const cfg = FIELD_PICKER_CONFIG[kind];
+  const cfg = kind === "category"
+    ? { title:"Escolher categoria", options:getCategoryOptions(), allowCustom:true, customLabel:CUSTOM_CATEGORY_LABEL }
+    : FIELD_PICKER_CONFIG[kind];
   const current = el(idPrefix + "-value") ? el(idPrefix + "-value").value : cfg.options[0];
   openPicker(cfg.title, cfg.options, current, (val) => {
     el(idPrefix + "-display").textContent = val;
     el(idPrefix + "-value").value = val;
+    if (kind === "category") window._maybeSaveCustomCategory(val);
     if (idPrefix === "rc-punit") {
       var ql = el("rc-qty-label");
       if (ql) ql.textContent = "Quantidade comprada (em " + val + ")";
@@ -95,6 +111,8 @@ let viewMode = "loja";
 let filterMode = "all";
 
 export async function initProdutos() {
+  const savedCats = await db.get("settings", "customCategories");
+  customCategories = (savedCats && savedCats.value) ? savedCats.value : [];
   products = await db.getAll("products");
   el("produtos-search").oninput = () => { filterMode="all"; renderList(); };
   renderAlerts();
@@ -520,17 +538,35 @@ window._applyTransfer = async (id) => {
   if (qty <= 0) { toast("Quantidade inválida.", "error"); return; }
   const from = dir === "wh-to-shop" ? "warehouse" : "shop";
   const to   = dir === "wh-to-shop" ? "shop"      : "warehouse";
-  try {
-    const curFrom = await getStock(id, from);
-    if (qty > curFrom) { toast("Stock insuficiente em " + (from==="shop"?"loja":"armazém") + ": apenas " + curFrom + " disponíveis.", "error"); return; }
-    await addStockMovement({ productId:id, productName:"", type:"transfer_out", location:from, qty:-qty, reference:"transfer", note:from+" → "+to, sessionId:null });
-    await addStockMovement({ productId:id, productName:"", type:"transfer_in",  location:to,   qty:+qty, reference:"transfer", note:from+" → "+to, sessionId:null });
-    toast("Transferência realizada com sucesso.", "success");
-    closeModal();
-    await initProdutos();
-  } catch(err) {
-    toast("Erro: " + err.message, "error");
-  }
+
+  const p = await db.get("products", id);
+  if (!p) return;
+
+  const curFrom = await getStock(id, from);
+  if (qty > curFrom) { toast("Stock insuficiente em " + (from==="shop"?"loja":"armazém") + ": apenas " + curFrom + " disponíveis.", "error"); return; }
+
+  const doTransfer = async () => {
+    try {
+      await addStockMovement({ productId:id, productName:p.name, type:"transfer_out", location:from, qty:-qty, reference:"transfer", note:from+" → "+to, sessionId:null });
+      await addStockMovement({ productId:id, productName:p.name, type:"transfer_in",  location:to,   qty:+qty, reference:"transfer", note:from+" → "+to, sessionId:null });
+      toast("Transferência realizada com sucesso.", "success");
+      closeModal();
+      await initProdutos();
+    } catch(err) {
+      toast("Erro: " + err.message, "error");
+    }
+  };
+
+  const fromLabel = from === "shop" ? "Loja" : "Armazém";
+  const toLabel   = to   === "shop" ? "Loja" : "Armazém";
+  const unit = p.unit || "unid";
+
+  const recapHTML =
+    `<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:10px">Transferir ${qty} ${unit}?</div>` +
+    `<div style="font-size:13px;color:var(--text2);line-height:1.6">${fromLabel} → ${toLabel}</div>` +
+    `<div style="font-size:12px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border2);padding-top:8px">${fromLabel}: ${curFrom} → <strong style="color:var(--text)">${curFrom-qty}</strong> ${unit}</div>`;
+
+  confirmDialog(recapHTML, doTransfer, { title:"Confirmar transferência", confirmText:"Sim, transferir", icon:"arrow-right-left" });
 };
 
 
@@ -566,7 +602,7 @@ window._openAdjustProd = async (id) => {
       </div>
     </div>
     <div class="field" style="margin-bottom:16px">
-      <label>Razão do ajuste</label>
+      <label style="text-transform:none;font-weight:600;letter-spacing:0;font-size:12px;color:var(--text2)">Razão do ajuste *</label>
       <input id="adj-reason" placeholder="Ex: Entrada de mercadoria, inventário..."/>
     </div>
     <div style="margin-top:var(--space-3);display:flex;flex-direction:column;gap:var(--space-1)">
@@ -585,24 +621,49 @@ window._applyAdjust = async (id) => {
   const ns = Number(el("adj-stock").value);
   const nw = Number(el("adj-warehouse").value);
   if (isNaN(ns)||ns<0||isNaN(nw)||nw<0) { toast("Valores invalidos.","error"); return; }
-  const reason = (el("adj-reason") ? el("adj-reason").value : "")||"Ajuste manual";
+
+  const reason = (el("adj-reason") ? el("adj-reason").value.trim() : "");
+  if (!reason) {
+    toast("Indica a razão do ajuste antes de aplicar.","error");
+    if (el("adj-reason")) el("adj-reason").focus();
+    return;
+  }
 
   const curShop = await getStock(id, "shop");
   const curWh   = await getStock(id, "warehouse");
   const diffShop = ns - curShop;
   const diffWh   = nw - curWh;
 
-  if (diffShop !== 0) {
-    await addStockMovement({ productId:id, productName:p.name, type:"adjustment", location:"shop", qty:diffShop, reference:"adjust", note:reason, sessionId:null });
-  }
-  if (diffWh !== 0) {
-    await addStockMovement({ productId:id, productName:p.name, type:"adjustment", location:"warehouse", qty:diffWh, reference:"adjust", note:reason, sessionId:null });
+  if (diffShop === 0 && diffWh === 0) {
+    toast("Nenhuma alteração para aplicar.","error");
+    return;
   }
 
-  toast("Stock ajustado.","success");
-  closeModal();
-  products = await db.getAll("products");
-  renderStats(); renderList();
+  const doApply = async () => {
+    if (diffShop !== 0) {
+      await addStockMovement({ productId:id, productName:p.name, type:"adjustment", location:"shop", qty:diffShop, reference:"adjust", note:reason, sessionId:null });
+    }
+    if (diffWh !== 0) {
+      await addStockMovement({ productId:id, productName:p.name, type:"adjustment", location:"warehouse", qty:diffWh, reference:"adjust", note:reason, sessionId:null });
+    }
+
+    toast("Stock ajustado.","success");
+    closeModal();
+    products = await db.getAll("products");
+    renderStats(); renderList();
+  };
+
+  const unit = p.unit || "unid";
+  const lines = [];
+  if (diffShop !== 0) lines.push(`Loja: ${curShop} → <strong>${ns}</strong> ${unit} (${diffShop>0?"+":""}${diffShop})`);
+  if (diffWh   !== 0) lines.push(`Armazém: ${curWh} → <strong>${nw}</strong> ${unit} (${diffWh>0?"+":""}${diffWh})`);
+
+  const recapHTML =
+    `<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:10px">Confirmar ajuste de stock?</div>` +
+    `<div style="font-size:13px;color:var(--text2);line-height:1.8;margin-bottom:12px">${lines.join("<br/>")}</div>` +
+    `<div style="border-top:1px solid var(--border2);padding-top:10px;font-size:12px;color:var(--text3)">Motivo: <strong style="color:var(--text)">${reason}</strong></div>`;
+
+  confirmDialog(recapHTML, doApply, { title:"Confirmar ajuste", confirmText:"Sim, aplicar ajuste", icon:"refresh-cw" });
 };
 
 window._saveProduto = async (id) => {
