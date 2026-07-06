@@ -352,14 +352,14 @@ var typeLabels = {
   incident:"Incidente", incident_resolved:"Incidente resolvido"
 };
 var typeColors = {
-  sale:"#dc2626", purchase:"#16a34a", transfer_in:"#2563eb", transfer_out:"#d97706",
-  adjustment:"#7c3aed", session_open:"#9ca3af", session_close:"#9ca3af",
-  incident:"#dc2626", incident_resolved:"#16a34a"
+  sale:"var(--danger)", purchase:"var(--success)", transfer_in:"var(--info)", transfer_out:"var(--warning)",
+  adjustment:"var(--primary-mid)", session_open:"var(--text4)", session_close:"var(--text4)",
+  incident:"var(--danger)", incident_resolved:"var(--success)"
 };
 var typeBg = {
-  sale:"#fee2e2", purchase:"#dcfce7", transfer_in:"#dbeafe", transfer_out:"#fef3c7",
-  adjustment:"#ede9fe", session_open:"#f3f4f6", session_close:"#f3f4f6",
-  incident:"#fee2e2", incident_resolved:"#dcfce7"
+  sale:"var(--danger-light)", purchase:"var(--success-light)", transfer_in:"var(--info-light)", transfer_out:"var(--warning-light)",
+  adjustment:"var(--primary-light)", session_open:"var(--border2)", session_close:"var(--border2)",
+  incident:"var(--danger-light)", incident_resolved:"var(--success-light)"
 };
 
 async function loadStock(from, to) {
@@ -478,12 +478,11 @@ async function loadAuditoria(from, to) {
     (chain.length === 0
       ? '<div class="hist-empty" style="padding:24px"><div class="hist-empty-sub">Sem sessões registadas</div></div>'
       : chain.map(function(s) {
-          return '<div class="hist-timeline-item">' +
+          return '<div class="hist-timeline-item"' + (s.uuid ? ' title="ID: ' + s.uuid + '"' : '') + '>' +
             '<div class="hist-timeline-dot" style="background:' + dotColor(s) + '"></div>' +
             '<div class="hist-timeline-info">' +
             '<div class="hist-timeline-name">' + s.userName + '</div>' +
             '<div class="hist-timeline-date">' + fmtDate(s.openedAt) + (s.closedAt?" → "+fmtDate(s.closedAt):" (em curso)") + '</div>' +
-            (s.uuid ? '<div class="hist-timeline-uuid">' + s.uuid.slice(0,20) + '...</div>' : '') +
             '</div>' +
             '<span class="badge-status" style="background:' + badgeBg(s) + ';color:' + dotColor(s) + '">' + badgeLabel(s) + '</span>' +
             '</div>';
