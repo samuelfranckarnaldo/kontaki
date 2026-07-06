@@ -21,7 +21,7 @@ export async function loadEscritorio() {
     '<i data-lucide="upload"></i> Importar turno (.ktk)' +
     '</label>' +
     '<label class="esc-import-btn">' +
-    '<input type="file" accept=".ktkcat,application/json" style="display:none" onchange="window._handleKtkcatImport(this)"/>' +
+    '<input type="file" accept=".ktkcat,.json,application/json" style="display:none" onchange="window._handleKtkcatImport(this)"/>' +
     '<i data-lucide="package"></i> Importar catálogo (.ktkcat)' +
     '</label>';
   wrap.appendChild(importSection);
@@ -310,7 +310,7 @@ window._exportarCatalogo = async function() {
     var cat = await catalogService.generate();
     var catStr = JSON.stringify(cat, null, 2);
     var store = (await db.get("settings","store")) || {};
-    var fname = "catalogo_" + (store.name||"loja").replace(/\s+/g,"_") + "_" + new Date().toISOString().slice(0,10) + ".ktkcat";
+    var fname = "catalogo_" + (store.name||"loja").replace(/\s+/g,"_") + "_" + new Date().toISOString().slice(0,10) + ".json";
     await window._shareKtkFile(encodeURIComponent(fname), encodeURIComponent(catStr));
     toast("Catálogo gerado: " + cat.produtos.length + " produtos.","success");
   } catch(err) {

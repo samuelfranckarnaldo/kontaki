@@ -120,16 +120,24 @@ export async function initProdutos() {
   renderList();
 }
 
+function daysUntil(dateStr) {
+  if (!dateStr) return Infinity;
+  var diff = new Date(dateStr) - new Date();
+  return Math.ceil(diff / 86400000);
+}
+
 function renderAlerts() {
   var active   = products.filter(function(p){ return p.active; });
   var zero     = active.filter(function(p){ return (p.stock||0) === 0; });
   var low      = active.filter(function(p){ return (p.stock||0) > 0 && (p.stock||0) <= (p.minStock||5); });
+  var expiring = active.filter(function(p){ return p.expiryDate && daysUntil(p.expiryDate) <= 30 && daysUntil(p.expiryDate) >= 0; });
+  var expired  = active.filter(function(p){ return p.expiryDate && daysUntil(p.expiryDate) < 0; });
 
   // Remover alertas antigos
   var old = document.getElementById("produtos-alerts");
   if (old) old.remove();
 
-  if (!zero.length && !low.length) return;
+  if (!zero.length && !low.length && !expiring.length && !expired.length) return;
 
   var wrap = document.createElement("div");
   wrap.id = "produtos-alerts";
@@ -157,6 +165,30 @@ function renderAlerts() {
       ' · ' + low.slice(0,2).map(function(p){return p.name;}).join(", ") + (low.length>2?" e mais...":"") + '</span>' +
       '<i data-lucide="chevron-right" style="width:14px;height:14px;margin-left:auto;flex-shrink:0"></i>';
     wrap.appendChild(btn2);
+  }
+
+  if (expired.length) {
+    var btn3 = document.createElement("button");
+    btn3.className = "prod-alert-btn prod-alert-danger";
+    btn3.onclick = function() { window._filterProd("expired"); };
+    btn3.innerHTML =
+      '<i data-lucide="calendar-x" style="width:15px;height:15px;flex-shrink:0"></i>' +
+      '<span><strong>' + expired.length + ' produto' + (expired.length>1?"s":"") + ' vencido' + (expired.length>1?"s":"") + '</strong>' +
+      ' · ' + expired.slice(0,2).map(function(p){return p.name;}).join(", ") + (expired.length>2?" e mais...":"") + '</span>' +
+      '<i data-lucide="chevron-right" style="width:14px;height:14px;margin-left:auto;flex-shrink:0"></i>';
+    wrap.appendChild(btn3);
+  }
+
+  if (expiring.length) {
+    var btn4 = document.createElement("button");
+    btn4.className = "prod-alert-btn prod-alert-warning";
+    btn4.onclick = function() { window._filterProd("expiring"); };
+    btn4.innerHTML =
+      '<i data-lucide="calendar-clock" style="width:15px;height:15px;flex-shrink:0"></i>' +
+      '<span><strong>' + expiring.length + ' produto' + (expiring.length>1?"s":"") + ' a vencer em 30 dias</strong>' +
+      ' · ' + expiring.slice(0,2).map(function(p){return p.name;}).join(", ") + (expiring.length>2?" e mais...":"") + '</span>' +
+      '<i data-lucide="chevron-right" style="width:14px;height:14px;margin-left:auto;flex-shrink:0"></i>';
+    wrap.appendChild(btn4);
   }
 
   // Inserir antes dos stats
@@ -256,6 +288,24 @@ export function openProductForm(p = {}) {
         </div>
       </div>
 
+      <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+        <button type="button" id="pf-exp-toggle-btn" onclick="window._toggleExpConfigForm()" style="background:none;border:none;color:var(--primary);font-weight:var(--weight-strong);font-size:var(--text-xs);cursor:pointer;font-family:inherit;text-align:left;padding:0">
+          ${p.expiryDate ? "▼" : "▶"} Validade e lote (produtos perecíveis, medicamentos...)
+        </button>
+        <div id="pf-exp-config" style="display:${p.expiryDate?"flex":"none"};flex-direction:column;gap:var(--space-3)">
+          <div class="field-row">
+            <div class="field">
+              <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Data de validade</label>
+              <input type="date" id="pf-expiry" value="${p.expiryDate||""}"/>
+            </div>
+            <div class="field">
+              <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Lote (opcional)</label>
+              <input id="pf-batch" value="${p.batchNumber||""}" placeholder="Ex: L2026-04"/>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
     <div style="margin-top:var(--space-5);display:flex;flex-direction:column;gap:var(--space-1)">
       <button class="btn btn-primary btn-full" onclick="window._saveProduto(${p.id||0})">
@@ -329,6 +379,8 @@ function renderList() {
 
   if (filterMode === "low")  list = list.filter(p => (p.stock||0)>0 && (p.stock||0)<=(p.minStock||5));
   else if (filterMode === "zero") list = list.filter(p => (p.stock||0)===0);
+  else if (filterMode === "expired")  list = list.filter(p => p.expiryDate && daysUntil(p.expiryDate) < 0);
+  else if (filterMode === "expiring") list = list.filter(p => p.expiryDate && daysUntil(p.expiryDate) <= 30 && daysUntil(p.expiryDate) >= 0);
   else if (q) list = list.filter(p => p.name.toLowerCase().includes(q) || (p.barcode||"").includes(q));
 
   list.sort((a,b) => (a.stock||0) - (b.stock||0));
@@ -683,6 +735,8 @@ window._saveProduto = async (id) => {
     unit: window._readUnitValue("pf-unit"),
     purchaseUnit: (function(){ const v = window._readUnitValue("pf-punit"); return v==="Unidade" ? null : v; })(),
     conversionFactor:Number((el("pf-pfactor") ? el("pf-pfactor").value : "")||0)||null,
+    expiryDate:(el("pf-expiry") ? el("pf-expiry").value : "")||null,
+    batchNumber:(el("pf-batch") ? el("pf-batch").value.trim() : "")||null,
     active:true,
   };
 
@@ -735,6 +789,15 @@ window._toggleConvConfigForm = () => {
   const opening = box.style.display === "none";
   box.style.display = opening ? "flex" : "none";
   if (btn) btn.textContent = (opening ? "▼ " : "▶ ") + "Unidade de compra (grades, fardos, caixas...)";
+};
+
+window._toggleExpConfigForm = () => {
+  const box = el("pf-exp-config");
+  const btn = el("pf-exp-toggle-btn");
+  if (!box) return;
+  const opening = box.style.display === "none";
+  box.style.display = opening ? "flex" : "none";
+  if (btn) btn.textContent = (opening ? "▼ " : "▶ ") + "Validade e lote (produtos perecíveis, medicamentos...)";
 };
 
 window._openRegistarCompra = async (id) => {

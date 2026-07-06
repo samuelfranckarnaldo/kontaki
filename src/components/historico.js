@@ -8,6 +8,7 @@ import { openDevolucao, gerarRelatorioPDF } from "./extras.js";
 
 let activeTab = "geral";
 let activeShortcut = "hoje";
+let histChartInstance = null;
 
 function toLocalDateStr(iso) {
   if (!iso) return "";
@@ -98,12 +99,12 @@ async function loadData() {
 
 // ── GERAL ─────────────────────────────────────────────────────────────────────
 function payIcon(method) {
-  if (!method) return "💵";
+  if (!method) return "banknote";
   var m = method.toLowerCase();
-  if (m.includes("dinheiro") || m.includes("cash"))  return "💵";
-  if (m.includes("transfer") || m.includes("banco")) return "🏦";
-  if (m.includes("fiado") || m.includes("crédito"))  return "📋";
-  return "💳";
+  if (m.includes("dinheiro") || m.includes("cash"))  return "banknote";
+  if (m.includes("transfer") || m.includes("banco")) return "landmark";
+  if (m.includes("fiado") || m.includes("crédito"))  return "clipboard-list";
+  return "credit-card";
 }
 
 function payClass(method) {
@@ -153,7 +154,7 @@ async function loadGeral(from, to) {
       kpi("Devoluções",    fmt(devTotal),   devTotal>0?"var(--danger)":"var(--success)", incOpen+" incidente"+(incOpen===1?"":"s"));
   }
 
-  // Gráfico
+  // Gráfico (Chart.js)
   var chart = el("historico-chart");
   if (chart) {
     if (filtered.length > 0) {
@@ -163,22 +164,126 @@ async function loadGeral(from, to) {
         byDay[d] = (byDay[d]||0) + ((s.total||0)-(s.totalDevolvido||0));
       });
       var days = Object.keys(byDay).sort();
-      var maxV = Math.max.apply(null, Object.values(byDay).concat([1]));
+      var values = days.map(function(d) { return byDay[d]; });
+
       chart.style.display = "block";
       chart.innerHTML =
         '<div class="hist-chart-title">Vendas por dia</div>' +
-        '<div class="hist-chart-bars">' +
-        days.map(function(d) {
-          var pct = Math.max(4, Math.round((byDay[d]/maxV)*100));
-          return '<div class="hist-chart-col">' +
-            '<div class="hist-chart-bar" style="height:' + pct + '%"></div>' +
-            '<div class="hist-chart-day">' + d.slice(5) + '</div>' +
-            '</div>';
-        }).join("") +
-        '</div>';
+        '<div style="position:relative;height:140px"><canvas id="hist-chart-canvas"></canvas></div>';
+
+      renderSalesChart(days, values);
     } else {
       chart.style.display = "none";
+      if (histChartInstance) {
+        histChartInstance.destroy();
+        histChartInstance = null;
+      }
     }
+  }
+
+  function renderSalesChart(days, values) {
+    var canvas = el("hist-chart-canvas");
+    if (!canvas || typeof Chart === "undefined") return;
+
+    if (histChartInstance) {
+      histChartInstance.destroy();
+      histChartInstance = null;
+    }
+
+    var labels = days.map(function(d) { return d.slice(5).split("-").reverse().join("/"); });
+    var ctx = canvas.getContext("2d");
+
+    var maxV = Math.max.apply(null, values.concat([1]));
+    var suggestedMax = maxV * 1.25;
+
+    var gradient = ctx.createLinearGradient(0, 0, 0, 140);
+    gradient.addColorStop(0, "rgba(124,58,237,0.28)");
+    gradient.addColorStop(1, "rgba(124,58,237,0)");
+
+    var valueLabelPlugin = {
+      id: "histValueLabels",
+      afterDatasetsDraw: function(chart) {
+        var ctx2 = chart.ctx;
+        var meta = chart.getDatasetMeta(0);
+        var chartArea = chart.chartArea;
+        ctx2.save();
+        ctx2.font = "700 11px sans-serif";
+        ctx2.fillStyle = "#4c1d95";
+        meta.data.forEach(function(point, i) {
+          var v = chart.data.datasets[0].data[i];
+          var text = fmt(v);
+          var textWidth = ctx2.measureText(text).width;
+          var align = "center";
+          var x = point.x;
+
+          if (point.x - textWidth / 2 < chartArea.left) {
+            align = "left";
+            x = chartArea.left;
+          } else if (point.x + textWidth / 2 > chartArea.right) {
+            align = "right";
+            x = chartArea.right;
+          }
+
+          ctx2.textAlign = align;
+          ctx2.fillText(text, x, point.y - 12);
+        });
+        ctx2.restore();
+      }
+    };
+
+    histChartInstance = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          borderColor: "#5b21b6",
+          backgroundColor: gradient,
+          borderWidth: 2.5,
+          pointBackgroundColor: "#7c3aed",
+          pointBorderColor: "#fff",
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          tension: 0.3,
+          fill: true,
+        }]
+      },
+      plugins: [valueLabelPlugin],
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+          padding: { top: 22, right: 8, left: 4, bottom: 0 }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(ctx3) { return fmt(ctx3.parsed.y); }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 9 }, color: "#a1a1aa" }
+          },
+          y: {
+            display: true,
+            beginAtZero: true,
+            suggestedMax: suggestedMax,
+            grid: { color: "rgba(0,0,0,0.05)" },
+            ticks: {
+              font: { size: 9 },
+              color: "#a1a1aa",
+              maxTicksLimit: 4,
+              callback: function(v) { return fmt(v); }
+            }
+          }
+        }
+      }
+    });
   }
 
   // Acções
@@ -212,7 +317,7 @@ async function loadGeral(from, to) {
     var totalLiq = (s.total||0) - (s.totalDevolvido||0);
     var hasDev   = s.temDevolucao && (s.totalDevolvido||0) > 0;
     return '<div class="hist-sale-card" onclick="window._openSaleDetail(' + s.id + ')">' +
-      '<div class="hist-sale-avatar ' + payClass(s.payMethod) + '">' + payIcon(s.payMethod) + '</div>' +
+      '<div class="hist-sale-avatar ' + payClass(s.payMethod) + '"><i data-lucide="' + payIcon(s.payMethod) + '" style="width:18px;height:18px"></i></div>' +
       '<div class="hist-sale-info">' +
       '<div class="hist-sale-id">Venda #' + String(s.id).padStart(4,"0") +
       (hasDev ? ' <span class="hist-badge-dev">↩ Dev.</span>' : '') + '</div>' +
@@ -283,6 +388,16 @@ async function loadStock(from, to) {
   var list = el("historico-list");
   if (!list) return;
 
+  function abbrevQty(n) {
+    var abs = Math.abs(n);
+    var sign = n < 0 ? "-" : "";
+    if (abs < 1000) return sign + abs;
+    if (abs < 1e6)  return sign + (abs/1e3).toFixed(abs%1e3===0?0:1) + "K";
+    if (abs < 1e9)  return sign + (abs/1e6).toFixed(abs%1e6===0?0:1) + "M";
+    if (abs < 1e12) return sign + (abs/1e9).toFixed(abs%1e9===0?0:1) + "B";
+    return sign + (abs/1e12).toFixed(abs%1e12===0?0:1) + "T";
+  }
+
   function renderMovBlock(arr, title) {
     if (!arr.length) return '<div class="hist-section-label">' + title + '</div>' +
       '<div class="hist-empty" style="padding:24px"><div class="hist-empty-sub">Nenhum movimento no período</div></div>';
@@ -296,7 +411,7 @@ async function loadStock(from, to) {
         var sign  = m.qty > 0 ? "+" : "";
         var autor = (m.userId != null && usersById[m.userId]) ? usersById[m.userId].name : "Desconhecido";
         return '<div class="hist-mov-item">' +
-          '<div class="hist-mov-icon" style="background:' + bg + ';color:' + color + '">' + sign + m.qty + '</div>' +
+          '<div class="hist-mov-icon" style="background:' + bg + ';color:' + color + '" title="' + sign + m.qty + '">' + sign + abbrevQty(m.qty) + '</div>' +
           '<div style="flex:1">' +
           '<div class="hist-mov-name">' + m.productName + '</div>' +
           '<div class="hist-mov-meta">' + label + ' · ' + fmtDate(m.createdAt) + ' · <strong>' + autor + '</strong></div>' +

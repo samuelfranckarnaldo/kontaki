@@ -6,6 +6,22 @@ import { getUser } from "../auth.js";
 
 let fiadoFilter = "all";
 
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function isOverdue(e) {
+  if (e.status !== "open" || !e.dueDate) return false;
+  return new Date(e.dueDate) < startOfToday();
+}
+
+function waLink(phone, msg) {
+  const clean = (phone || "").replace(/\D/g, "");
+  return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
+}
+
 export async function initFiados() {
   el("fiados-search").oninput = renderList;
   document.querySelectorAll("#fiados-filter-pills .pill").forEach(btn => {
@@ -32,15 +48,20 @@ async function renderList() {
   const all   = await db.getAll("fiado");
   const open  = all.filter(f => f.status === "open");
   const total = open.reduce((a, f) => a + (f.amount || 0), 0);
+  const overdueTotal = open.filter(isOverdue).reduce((a, f) => a + (f.amount || 0), 0);
   const uniqueClients = [...new Set(open.map(f => f.clientName))].length;
   const paidCount = all.filter(f => f.status === "paid").length;
 
-  // Summary bar
   el("fiados-total-bar").innerHTML =
     `<div class="fiados-summary-card">
       <div class="fiados-summary-item">
         <div class="fiados-summary-label">Em aberto</div>
         <div class="fiados-summary-val" style="color:var(--warning)">${fmt(total)}</div>
+      </div>
+      <div class="fiados-summary-divider"></div>
+      <div class="fiados-summary-item">
+        <div class="fiados-summary-label">Atrasado</div>
+        <div class="fiados-summary-val" style="color:var(--danger)">${fmt(overdueTotal)}</div>
       </div>
       <div class="fiados-summary-divider"></div>
       <div class="fiados-summary-item" style="text-align:right">
@@ -49,7 +70,6 @@ async function renderList() {
       </div>
     </div>`;
 
-  // Arquivar pagos
   var clearBar = document.getElementById("fiados-clear-bar");
   if (!clearBar) {
     clearBar = document.createElement("div");
@@ -69,19 +89,18 @@ async function renderList() {
   const q = (val("fiados-search") || "").toLowerCase();
   const filtered = all.filter(f => {
     const ms = (f.clientName || "").toLowerCase().includes(q);
-    const mf = fiadoFilter === "all" || f.status === fiadoFilter ||
-               (fiadoFilter === "open" && f.status === "open") ||
-               (fiadoFilter === "paid" && f.status === "paid");
+    let mf = fiadoFilter === "all" || f.status === fiadoFilter;
+    if (fiadoFilter === "overdue") mf = isOverdue(f);
     return ms && mf;
   });
 
-  // Agrupar por cliente
   const grouped = {};
   filtered.forEach(f => {
     const k = f.clientName;
-    if (!grouped[k]) grouped[k] = { clientName: k, entries: [], totalOpen: 0 };
+    if (!grouped[k]) grouped[k] = { clientName: k, entries: [], totalOpen: 0, phone: "" };
     grouped[k].entries.push(f);
     if (f.status === "open") grouped[k].totalOpen += f.amount || 0;
+    if (f.phone) grouped[k].phone = f.phone;
   });
 
   const groups = Object.values(grouped).sort((a, b) => b.totalOpen - a.totalOpen);
@@ -103,18 +122,21 @@ async function renderList() {
     const openCount  = g.entries.filter(e => e.status === "open").length;
     const lastEntry  = [...g.entries].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
     const firstOpen  = g.entries.find(e => e.status === "open");
+    const groupOverdue = g.entries.some(isOverdue);
     const initial    = g.clientName.charAt(0).toUpperCase();
+
+    let avatarStyle;
+    if (isSaldado) avatarStyle = "background:var(--success-light);color:var(--success)";
+    else if (groupOverdue) avatarStyle = "background:var(--danger-light);color:var(--danger)";
+    else avatarStyle = "background:var(--primary-light);color:var(--primary)";
 
     const card = document.createElement("div");
     card.className = "fc";
     card.onclick = () => window._openFiadoCliente(encodeURIComponent(g.clientName));
 
     card.innerHTML =
-      // Header
       `<div class="fc-header">
-        <div class="fc-avatar" style="background:${isSaldado ? "var(--success-light);color:var(--success)" : "var(--primary-light);color:var(--primary)"}">
-          ${initial}
-        </div>
+        <div class="fc-avatar" style="${avatarStyle}">${initial}</div>
         <div class="fc-info">
           <div class="fc-name">${g.clientName}</div>
           <div class="fc-meta">
@@ -126,25 +148,36 @@ async function renderList() {
           ${isSaldado
             ? `<div class="fc-saldo"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Saldado</div>`
             : `<div class="fc-total">${fmt(g.totalOpen)}</div>
-               <div class="fc-open-count">${openCount} por pagar</div>`
+               <div class="fc-open-count">${openCount} por pagar</div>
+               ${groupOverdue ? `<div class="fc-badge-overdue">Atrasado</div>` : ""}`
           }
         </div>
       </div>` +
-      // Linha de acção rápida
       (!isSaldado && firstOpen
         ? `<div class="fc-action">
             <div>
               <div class="fc-action-val">${fmt(firstOpen.amount)}</div>
-              <div class="fc-action-date">${fmtDate(firstOpen.date)}${firstOpen.notes ? " · " + firstOpen.notes : ""}</div>
+              <div class="fc-action-date">
+                ${fmtDate(firstOpen.date)}${firstOpen.notes ? " · " + firstOpen.notes : ""}
+                ${firstOpen.dueDate ? ` · vence ${fmtDate(firstOpen.dueDate)}` : ""}
+              </div>
             </div>
-            ${openCount === 1
-              ? `<button class="fc-pay-btn" onclick="event.stopPropagation();window._openPayModal(${firstOpen.id})">
-                  <i data-lucide="check" style="width:13px;height:13px"></i> Pagar
-                </button>`
-              : `<button class="fc-detail-btn" onclick="event.stopPropagation();window._openFiadoCliente('${encodeURIComponent(g.clientName)}')">
-                  Ver ${openCount} →
-                </button>`
-            }
+            <div style="display:flex;gap:6px">
+              ${g.phone
+                ? `<button class="fc-wa-btn" onclick="event.stopPropagation();window.open('${waLink(g.phone, "Olá " + g.clientName + ", passando para lembrar do valor em aberto de " + fmt(g.totalOpen) + ". Obrigado!")}','_blank')">
+                    <i data-lucide="message-circle" style="width:13px;height:13px"></i>
+                   </button>`
+                : ""
+              }
+              ${openCount === 1
+                ? `<button class="fc-pay-btn" onclick="event.stopPropagation();window._openPayModal(${firstOpen.id})">
+                    <i data-lucide="check" style="width:13px;height:13px"></i> Pagar
+                   </button>`
+                : `<button class="fc-detail-btn" onclick="event.stopPropagation();window._openFiadoCliente('${encodeURIComponent(g.clientName)}')">
+                    Ver ${openCount} →
+                   </button>`
+              }
+            </div>
           </div>`
         : ""
       );
@@ -163,6 +196,7 @@ window._openFiadoCliente = async (encodedName) => {
   const totalOpen = entries.filter(f => f.status === "open")
     .reduce((a, f) => a + (f.amount || 0), 0);
   const encodedN = encodeURIComponent(name);
+  const phone = [...entries].reverse().find(e => e.phone)?.phone || "";
 
   openModal(name,
     `<div class="fc-modal-header ${totalOpen > 0 ? "fc-modal-open" : "fc-modal-saldo"}">
@@ -178,6 +212,11 @@ window._openFiadoCliente = async (encodedName) => {
       }
     </div>
 
+    ${phone ? `<button class="fc-wa-full-btn" onclick="window.open('${waLink(phone, "Olá " + name + ", passando para lembrar do valor em aberto de " + fmt(totalOpen) + ". Obrigado!")}','_blank')">
+        <i data-lucide="message-circle"></i> Enviar lembrete no WhatsApp
+       </button>` : ""
+    }
+
     <div class="fc-modal-entries">
       ${entries.map(e => `
         <div class="fc-modal-entry">
@@ -185,8 +224,12 @@ window._openFiadoCliente = async (encodedName) => {
             <div class="fc-modal-entry-val ${e.status === "open" ? "fc-val-open" : "fc-val-paid"}">
               ${fmt(e.amount)}
               ${e.status === "paid" ? `<span class="fc-paid-tag">✓ Pago</span>` : ""}
+              ${isOverdue(e) ? `<span class="fc-badge-overdue" style="margin-left:6px">Atrasado</span>` : ""}
             </div>
-            <div class="fc-modal-entry-date">${fmtDate(e.date)}${e.notes ? " · " + e.notes : ""}</div>
+            <div class="fc-modal-entry-date">
+              ${fmtDate(e.date)}${e.notes ? " · " + e.notes : ""}
+              ${e.dueDate ? " · vence " + fmtDate(e.dueDate) : ""}
+            </div>
           </div>
           ${e.status === "open"
             ? `<button class="btn btn-outline btn-sm" onclick="window._openPayModal(${e.id})">
@@ -227,6 +270,13 @@ async function openFiadoAdd(prefillName = "") {
   const { getSession } = await import("../auth.js");
   if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
 
+  let prefillPhone = "";
+  if (prefillName) {
+    const all = await db.getAll("fiado");
+    const found = [...all].reverse().find(f => f.clientName === prefillName && f.phone);
+    if (found) prefillPhone = found.phone;
+  }
+
   openModal("Registar Fiado",
     `<div style="display:flex;flex-direction:column;gap:14px">
       <div class="field">
@@ -236,6 +286,14 @@ async function openFiadoAdd(prefillName = "") {
       <div class="field">
         <label>Valor (Kz) *</label>
         <input type="number" id="fa-amt" placeholder="0" min="0"/>
+      </div>
+      <div class="field">
+        <label>Telefone (opcional)</label>
+        <input id="fa-phone" value="${prefillPhone}" placeholder="Ex: 923456789" autocomplete="off"/>
+      </div>
+      <div class="field">
+        <label>Vencimento (opcional)</label>
+        <input type="date" id="fa-duedate"/>
       </div>
       <div class="field">
         <label>Notas (opcional)</label>
@@ -259,6 +317,8 @@ window._saveFiado = async () => {
   if (!name || !amt) { toast("Nome e valor são obrigatórios.", "error"); return; }
   await db.add("fiado", {
     clientName: name, amount: amt,
+    phone: el("fa-phone").value.trim(),
+    dueDate: el("fa-duedate").value ? new Date(el("fa-duedate").value).toISOString() : null,
     notes: el("fa-notes").value.trim(),
     date: new Date().toISOString(),
     status: "open", userId: getUser().id,
@@ -280,10 +340,15 @@ window._openPayModal = async (id) => {
         <div class="fc-pay-modal-val">${fmt(e.amount)}</div>
       </div>
     </div>
-    <div class="field" style="margin-bottom:20px">
+    <div class="field" style="margin-bottom:10px">
       <label>Valor a pagar</label>
       <input type="number" id="pay-amt" value="${e.amount}" min="0"
         style="font-size:20px;font-weight:700;text-align:center;padding:14px"/>
+    </div>
+    <div class="fc-pay-quick-row">
+      <button class="fc-pay-quick-btn" onclick="window._setPayAmt(${e.amount},0.25)">25%</button>
+      <button class="fc-pay-quick-btn" onclick="window._setPayAmt(${e.amount},0.5)">50%</button>
+      <button class="fc-pay-quick-btn" onclick="window._setPayAmt(${e.amount},1)">Tudo</button>
     </div>
     <div class="form-actions">
       <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
@@ -292,6 +357,10 @@ window._openPayModal = async (id) => {
       </button>
     </div>`);
   refreshIcons(el("modal-box"));
+};
+
+window._setPayAmt = (full, pct) => {
+  el("pay-amt").value = Math.round(full * pct);
 };
 
 window._confirmPay = async (id, fullAmt) => {
