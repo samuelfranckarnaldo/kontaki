@@ -2002,10 +2002,10 @@
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; font-size: 18px;
 }
-.hist-sale-avatar--dinheiro { background: #dcfce7; }
-.hist-sale-avatar--transferencia { background: #dbeafe; }
-.hist-sale-avatar--fiado { background: #fef3c7; }
-.hist-sale-avatar--outros { background: #f3f4f6; }
+.hist-sale-avatar--dinheiro { background: var(--success-light); color: var(--success); }
+.hist-sale-avatar--transferencia { background: var(--info-light); color: var(--info); }
+.hist-sale-avatar--fiado { background: var(--warning-light); color: var(--warning); }
+.hist-sale-avatar--outros { background: var(--border2); color: var(--text3); }
 .hist-sale-info { flex: 1; min-width: 0; }
 .hist-sale-id { font-size: 14px; font-weight: 700; color: var(--text); }
 .hist-sale-meta { font-size: 11px; color: var(--text3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
