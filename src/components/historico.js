@@ -116,6 +116,36 @@ function payClass(method) {
   return "hist-sale-avatar--outros";
 }
 
+var DIAS_SEMANA = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
+var MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+
+function dayLabel(dateStr) {
+  var t = today();
+  var yest = new Date();
+  yest.setDate(yest.getDate() - 1);
+  var yestStr = toLocalDateStr(yest.toISOString());
+
+  if (dateStr === t) return "Hoje";
+  if (dateStr === yestStr) return "Ontem";
+
+  var d = new Date(dateStr + "T00:00:00");
+  return DIAS_SEMANA[d.getDay()] + ", " + d.getDate() + " de " + MESES[d.getMonth()];
+}
+
+function groupByDay(sales) {
+  var groups = [];
+  var byDate = {};
+  sales.forEach(function(s) {
+    var d = toLocalDateStr(s.date);
+    if (!byDate[d]) {
+      byDate[d] = [];
+      groups.push(d);
+    }
+    byDate[d].push(s);
+  });
+  return groups.map(function(d) { return { date: d, sales: byDate[d] }; });
+}
+
 async function loadGeral(from, to) {
   var sales    = await db.getAll("sales");
   var fiados   = await db.getAll("fiado");
@@ -313,7 +343,7 @@ async function loadGeral(from, to) {
     refreshIcons(list); return;
   }
 
-  list.innerHTML = filtered.map(function(s) {
+  function renderSaleCard(s) {
     var totalLiq = (s.total||0) - (s.totalDevolvido||0);
     var hasDev   = s.temDevolucao && (s.totalDevolvido||0) > 0;
     return '<div class="hist-sale-card" onclick="window._openSaleDetail(' + s.id + ')">' +
@@ -332,6 +362,12 @@ async function loadGeral(from, to) {
         : '<div class="hist-sale-total">' + fmt(s.total) + '</div>') +
       (s.discount>0 ? '<div style="font-size:10px;color:var(--danger)">-'+fmt(s.discount)+' desc.</div>' : '') +
       '</div></div>';
+  }
+
+  var groups = groupByDay(filtered);
+  list.innerHTML = groups.map(function(g) {
+    return '<div class="hist-day-label">' + dayLabel(g.date) + '</div>' +
+      g.sales.map(renderSaleCard).join("");
   }).join("");
 
   refreshIcons(list);
