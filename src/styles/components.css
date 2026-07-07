@@ -2096,6 +2096,7 @@
 .hist-mov-icon--sm { width: 28px; height: 28px; margin-top: 0; }
 .hist-timeline { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .hist-timeline-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border2); }
+.hist-timeline-item--adjustment { background: var(--primary-light); border-left: 3px solid var(--primary-mid); padding-left: 11px; }
 .hist-timeline-item:last-child { border-bottom: none; }
 .hist-timeline-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
 .hist-timeline-info { flex: 1; }

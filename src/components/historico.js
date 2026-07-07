@@ -685,21 +685,70 @@ async function loadAuditoria(from, to) {
     return "Fechado";
   }
 
+  var timelineEvents = [];
+
+  chain.forEach(function(s) {
+    timelineEvents.push({ eventDate: s.openedAt, kind: "session", data: s });
+  });
+  adjustments.forEach(function(m) {
+    timelineEvents.push({ eventDate: m.createdAt, kind: "adjustment", data: m });
+  });
+  periodIncidents.forEach(function(i) {
+    timelineEvents.push({ eventDate: i.createdAt, kind: "incident", data: i });
+  });
+
+  timelineEvents.sort(function(a,b) { return new Date(b.eventDate) - new Date(a.eventDate); });
+
+  function renderTimelineEvent(ev) {
+    if (ev.kind === "session") {
+      var s = ev.data;
+      return '<div class="hist-timeline-item"' + (s.uuid ? ' title="ID: ' + s.uuid + '"' : '') + '>' +
+        '<div class="hist-timeline-dot" style="background:' + dotColor(s) + '"></div>' +
+        '<div class="hist-timeline-info">' +
+        '<div class="hist-timeline-name">' + s.userName + '</div>' +
+        '<div class="hist-timeline-date">Sessão · ' + fmtDate(s.openedAt) + (s.closedAt?" → "+fmtDate(s.closedAt):" (em curso)") + '</div>' +
+        '</div>' +
+        '<span class="badge-status" style="background:' + badgeBg(s) + ';color:' + dotColor(s) + '">' + badgeLabel(s) + '</span>' +
+        '</div>';
+    }
+    if (ev.kind === "adjustment") {
+      var m = ev.data;
+      var autor = (m.userId != null && employeeIds[m.userId]) ? employeeIds[m.userId] : "Desconhecido";
+      var sign = m.qty > 0 ? "+" : "";
+      return '<div class="hist-timeline-item hist-timeline-item--adjustment">' +
+        '<div class="hist-timeline-dot" style="background:var(--primary-mid)"></div>' +
+        '<div class="hist-timeline-info">' +
+        '<div class="hist-timeline-name">Ajuste manual · ' + m.productName + '</div>' +
+        '<div class="hist-timeline-date">' + fmtDate(m.createdAt) + ' · <strong>' + autor + '</strong> · ' + (m.qtyBefore||0) + ' → ' + (m.qtyAfter||0) + '</div>' +
+        '</div>' +
+        '<span class="badge-status" style="background:var(--primary-light);color:var(--primary-mid)">' + sign + m.qty + '</span>' +
+        '</div>';
+    }
+    if (ev.kind === "incident") {
+      var i = ev.data;
+      return '<div class="hist-timeline-item">' +
+        '<div class="hist-timeline-dot" style="background:var(--danger)"></div>' +
+        '<div class="hist-timeline-info">' +
+        '<div class="hist-timeline-name" style="color:var(--danger)">Incidente · ' + i.productName + '</div>' +
+        '<div class="hist-timeline-date">' + fmtDate(i.createdAt) + '</div>' +
+        '</div>' +
+        '<div style="font-size:15px;font-weight:800;color:var(--danger)">' + (i.diff>0?"+":"") + i.diff + '</div>' +
+        '</div>';
+    }
+    return "";
+  }
+
+  var timelineGroups = groupByDay(timelineEvents, "eventDate");
+
   list.innerHTML =
     filterChipsHtml +
-    '<div class="hist-section-label">Cadeia de Responsabilidade</div>' +
+    '<div class="hist-section-label">Linha do Tempo</div>' +
     '<div class="hist-timeline">' +
-    (chain.length === 0
-      ? '<div class="hist-empty" style="padding:24px"><div class="hist-empty-sub">Sem sessões registadas</div></div>'
-      : chain.map(function(s) {
-          return '<div class="hist-timeline-item"' + (s.uuid ? ' title="ID: ' + s.uuid + '"' : '') + '>' +
-            '<div class="hist-timeline-dot" style="background:' + dotColor(s) + '"></div>' +
-            '<div class="hist-timeline-info">' +
-            '<div class="hist-timeline-name">' + s.userName + '</div>' +
-            '<div class="hist-timeline-date">' + fmtDate(s.openedAt) + (s.closedAt?" → "+fmtDate(s.closedAt):" (em curso)") + '</div>' +
-            '</div>' +
-            '<span class="badge-status" style="background:' + badgeBg(s) + ';color:' + dotColor(s) + '">' + badgeLabel(s) + '</span>' +
-            '</div>';
+    (timelineEvents.length === 0
+      ? '<div class="hist-empty" style="padding:24px"><div class="hist-empty-sub">Sem eventos no período</div></div>'
+      : timelineGroups.map(function(g) {
+          return '<div class="hist-day-label hist-day-label--inset">' + dayLabel(g.date) + '</div>' +
+            g.sales.map(renderTimelineEvent).join("");
         }).join("")
     ) +
     '</div>' +
