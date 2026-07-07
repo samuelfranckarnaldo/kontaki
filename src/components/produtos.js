@@ -115,7 +115,6 @@ export async function initProdutos() {
   customCategories = (savedCats && savedCats.value) ? savedCats.value : [];
   products = await db.getAll("products");
   el("produtos-search").oninput = () => { filterMode="all"; renderList(); };
-  renderAlerts();
   renderStats();
   renderList();
 }
@@ -124,79 +123,6 @@ function daysUntil(dateStr) {
   if (!dateStr) return Infinity;
   var diff = new Date(dateStr) - new Date();
   return Math.ceil(diff / 86400000);
-}
-
-function renderAlerts() {
-  var active   = products.filter(function(p){ return p.active; });
-  var zero     = active.filter(function(p){ return (p.stock||0) === 0; });
-  var low      = active.filter(function(p){ return (p.stock||0) > 0 && (p.stock||0) <= (p.minStock||5); });
-  var expiring = active.filter(function(p){ return p.expiryDate && daysUntil(p.expiryDate) <= 30 && daysUntil(p.expiryDate) >= 0; });
-  var expired  = active.filter(function(p){ return p.expiryDate && daysUntil(p.expiryDate) < 0; });
-
-  // Remover alertas antigos
-  var old = document.getElementById("produtos-alerts");
-  if (old) old.remove();
-
-  if (!zero.length && !low.length && !expiring.length && !expired.length) return;
-
-  var wrap = document.createElement("div");
-  wrap.id = "produtos-alerts";
-  wrap.style.cssText = "display:flex;flex-direction:column;gap:6px;margin-bottom:10px";
-
-  if (zero.length) {
-    var btn = document.createElement("button");
-    btn.className = "prod-alert-btn prod-alert-danger";
-    btn.onclick = function() { window._filterProd("zero"); };
-    btn.innerHTML =
-      '<i data-lucide="x-circle" style="width:15px;height:15px;flex-shrink:0"></i>' +
-      '<span><strong>' + zero.length + ' produto' + (zero.length>1?"s":"") + ' esgotado' + (zero.length>1?"s":"") + '</strong>' +
-      ' · ' + zero.slice(0,2).map(function(p){return p.name;}).join(", ") + (zero.length>2?" e mais...":"") + '</span>' +
-      '<i data-lucide="chevron-right" style="width:14px;height:14px;margin-left:auto;flex-shrink:0"></i>';
-    wrap.appendChild(btn);
-  }
-
-  if (low.length) {
-    var btn2 = document.createElement("button");
-    btn2.className = "prod-alert-btn prod-alert-warning";
-    btn2.onclick = function() { window._filterProd("low"); };
-    btn2.innerHTML =
-      '<i data-lucide="alert-triangle" style="width:15px;height:15px;flex-shrink:0"></i>' +
-      '<span><strong>' + low.length + ' produto' + (low.length>1?"s":"") + ' com stock baixo</strong>' +
-      ' · ' + low.slice(0,2).map(function(p){return p.name;}).join(", ") + (low.length>2?" e mais...":"") + '</span>' +
-      '<i data-lucide="chevron-right" style="width:14px;height:14px;margin-left:auto;flex-shrink:0"></i>';
-    wrap.appendChild(btn2);
-  }
-
-  if (expired.length) {
-    var btn3 = document.createElement("button");
-    btn3.className = "prod-alert-btn prod-alert-danger";
-    btn3.onclick = function() { window._filterProd("expired"); };
-    btn3.innerHTML =
-      '<i data-lucide="calendar-x" style="width:15px;height:15px;flex-shrink:0"></i>' +
-      '<span><strong>' + expired.length + ' produto' + (expired.length>1?"s":"") + ' vencido' + (expired.length>1?"s":"") + '</strong>' +
-      ' · ' + expired.slice(0,2).map(function(p){return p.name;}).join(", ") + (expired.length>2?" e mais...":"") + '</span>' +
-      '<i data-lucide="chevron-right" style="width:14px;height:14px;margin-left:auto;flex-shrink:0"></i>';
-    wrap.appendChild(btn3);
-  }
-
-  if (expiring.length) {
-    var btn4 = document.createElement("button");
-    btn4.className = "prod-alert-btn prod-alert-warning";
-    btn4.onclick = function() { window._filterProd("expiring"); };
-    btn4.innerHTML =
-      '<i data-lucide="calendar-clock" style="width:15px;height:15px;flex-shrink:0"></i>' +
-      '<span><strong>' + expiring.length + ' produto' + (expiring.length>1?"s":"") + ' a vencer em 30 dias</strong>' +
-      ' · ' + expiring.slice(0,2).map(function(p){return p.name;}).join(", ") + (expiring.length>2?" e mais...":"") + '</span>' +
-      '<i data-lucide="chevron-right" style="width:14px;height:14px;margin-left:auto;flex-shrink:0"></i>';
-    wrap.appendChild(btn4);
-  }
-
-  // Inserir antes dos stats
-  var stats = el("produtos-stats");
-  if (stats && stats.parentNode) {
-    stats.parentNode.insertBefore(wrap, stats);
-  }
-  refreshIcons(wrap);
 }
 
 export function openProductForm(p = {}) {

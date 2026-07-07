@@ -50,7 +50,6 @@ export async function initPerfil() {
   }
 
   renderMenu();
-  updateIncidentesBadge();
   setupSubpageButtons();
   renderPwaButton();
 }
@@ -74,35 +73,6 @@ function renderPwaButton() {
   refreshIcons(div);
 }
 
-
-async function updateIncidentesBadge() {
-  try {
-    var btn = document.getElementById("perfil-menu-incidentes");
-    if (!btn) return;
-    var incidents = await db.getAll("incidents");
-    var openCount = incidents.filter(function(i){ return i.status==="open"; }).length;
-    var iconWrap = btn.querySelector(".perfil-menu-icon");
-    var iconEl   = btn.querySelector("i[data-lucide]");
-    var existingBadge = btn.querySelector(".perfil-menu-badge");
-    if (existingBadge) existingBadge.remove();
-    if (openCount > 0) {
-      if (iconWrap) iconWrap.style.background = "#fee2e2";
-      if (iconEl) { iconEl.setAttribute("data-lucide","alert-octagon"); iconEl.style.color = "#dc2626"; }
-      if (iconWrap) {
-        iconWrap.style.position = "relative";
-        var badge = document.createElement("span");
-        badge.className = "perfil-menu-badge";
-        badge.textContent = openCount > 9 ? "9+" : String(openCount);
-        badge.style.cssText = "position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;font-size:10px;font-weight:800;line-height:1;padding:2px 5px;border-radius:20px;min-width:16px;text-align:center;box-shadow:0 0 0 2px #fff";
-        iconWrap.appendChild(badge);
-      }
-    } else {
-      if (iconWrap) iconWrap.style.background = "#fef3c7";
-      if (iconEl) { iconEl.setAttribute("data-lucide","alert-triangle"); iconEl.style.color = "#d97706"; }
-    }
-    refreshIcons(btn);
-  } catch(e) { console.error("updateIncidentesBadge:", e); }
-}
 
 function renderMenu() {
   const user = getUser();
@@ -517,7 +487,6 @@ async function loadIncidentes() {
         '</div>';
       }).join("");
   refreshIcons(el("inc-list"));
-  updateIncidentesBadge();
 }
 
 window._clearResolvedIncidents = async function() {

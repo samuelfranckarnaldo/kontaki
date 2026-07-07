@@ -350,3 +350,38 @@
   color: var(--text3);
   opacity: .8;
 }
+
+/* ── CENTRAL DE NOTIFICAÇÕES ──────────────────────────────────────────────── */
+.notif-group-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; margin-bottom: 10px;
+}
+.notif-item {
+  width: 100%; display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 14px 14px 12px; border: 1px solid var(--border2);
+  background: #fff; border-radius: 12px; margin-bottom: 8px;
+  cursor: pointer; font-family: inherit; position: relative; overflow: hidden;
+  opacity: 0; animation: notifItemIn .3s ease forwards;
+}
+.notif-item:active { background: var(--border2); }
+.notif-item-bar {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+}
+.notif-item-icon {
+  width: 34px; height: 34px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+@keyframes notifItemIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.notif-close-btn { transition: transform .1s ease, background .15s ease; }
+.notif-close-btn:active { transform: scale(.93); background: rgba(255,255,255,.28) !important; }
+
+.notif-badge-pulse { animation: notifBadgePulse .4s ease; }
+@keyframes notifBadgePulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}

@@ -2208,3 +2208,129 @@
   line-height: 1.5;
   margin: -8px 0 16px;
 }
+
+
+/* FIADOS - atraso, whatsapp, pagamento rapido */
+.fc-badge-overdue {
+  display: inline-block;
+  font-size: 10px; font-weight: 800;
+  color: var(--danger); background: var(--danger-light);
+  padding: 2px 7px; border-radius: 999px;
+  margin-top: 4px; letter-spacing: .2px;
+}
+
+.fc-wa-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; flex-shrink: 0;
+  background: #e7f9ee; color: #16a34a;
+  border: none; border-radius: 10px; cursor: pointer;
+  transition: all .15s;
+}
+.fc-wa-btn:active { transform: scale(.94); }
+
+.fc-wa-full-btn {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px; margin-bottom: 14px;
+  background: #e7f9ee; color: #16a34a;
+  border: 1px solid #bbf0d1; border-radius: 12px;
+  font-size: 13px; font-weight: 700; font-family: var(--font);
+  cursor: pointer; transition: all .15s;
+}
+.fc-wa-full-btn:active { transform: scale(.98); }
+.fc-wa-full-btn i, .fc-wa-full-btn svg { width: 16px; height: 16px; }
+
+.fc-pay-quick-row {
+  display: flex; gap: 8px; margin-bottom: 18px;
+}
+.fc-pay-quick-btn {
+  flex: 1; padding: 10px; background: var(--primary-light);
+  color: var(--primary); border: none; border-radius: 10px;
+  font-size: 13px; font-weight: 700; font-family: var(--font);
+  cursor: pointer; transition: all .15s;
+}
+.fc-pay-quick-btn:active { transform: scale(.95); background: var(--border2); }
+
+
+/* CARTAO CLIENTE v3 */
+.fc-body { padding: 0 16px 12px; }
+.fc-pending-row { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.fc-pending-val { font-size: 20px; font-weight: 800; color: var(--warning); }
+.fc-pending-label { font-size: 12px; color: var(--text3); font-weight: 600; }
+.fc-last-purchase { font-size: 11px; color: var(--text4); margin-top: 4px; }
+
+.fc-action-footer { display: flex; gap: 8px; padding: 0 16px 14px; }
+.fc-action-footer .fc-detail-btn { flex: 1; text-align: center; }
+
+.fc-receive-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 11px; background: var(--success); color: #fff;
+  border: none; border-radius: 10px; font-size: 13px; font-weight: 700;
+  font-family: var(--font); cursor: pointer;
+  box-shadow: 0 2px 8px rgba(22,163,74,.25); transition: all .15s;
+}
+.fc-receive-btn:active { transform: scale(.97); box-shadow: none; }
+
+.fiados-summary-v3 {
+  background: var(--bg2); border-radius: 14px;
+  padding: 16px; box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border2); margin-bottom: 4px;
+}
+.fiados-summary-main-val { font-size: 28px; font-weight: 800; color: var(--text); line-height: 1.1; }
+.fiados-summary-main-label { font-size: 12px; color: var(--text3); font-weight: 600; margin-top: 2px; }
+.fiados-summary-sub {
+  margin-top: 10px; font-size: 12px; color: var(--text3); font-weight: 600;
+  display: flex; align-items: center; gap: 6px;
+}
+.fiados-summary-dot { color: var(--text4); }
+
+.fiados-tip {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--primary-light); color: var(--primary);
+  border-radius: 14px; padding: 14px; margin-top: 4px;
+  font-size: 12px; line-height: 1.5; font-weight: 600;
+}
+.fiados-tip i, .fiados-tip svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+
+
+/* FIADOS v4 - hero + lista flat */
+.fiados-hero {
+  background: linear-gradient(135deg, var(--primary) 0%, #4c1d95 100%);
+  border-radius: 18px; padding: 18px 20px;
+  box-shadow: 0 8px 20px rgba(91,33,182,.25);
+  margin-bottom: 4px;
+}
+.fiados-hero-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,.75); text-transform: uppercase; letter-spacing: .6px; }
+.fiados-hero-val   { font-size: 30px; font-weight: 800; color: #fff; line-height: 1.15; margin-top: 2px; }
+.fiados-hero-sub   { font-size: 12px; color: rgba(255,255,255,.85); font-weight: 600; margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fiados-hero-hot   { color: #fecaca; font-weight: 800; }
+
+.fc-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 4px; border-bottom: 1px solid var(--border2);
+  cursor: pointer; transition: background .15s;
+}
+.fc-row:last-child { border-bottom: none; }
+.fc-row:active { background: var(--border2); }
+.fc-row-avatar {
+  width: 36px; height: 36px; border-radius: 10px;
+  font-size: 14px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.fc-row-info { flex: 1; min-width: 0; }
+.fc-row-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.fc-row-meta { font-size: 11px; color: var(--text4); margin-top: 2px; }
+.fc-row-right { text-align: right; flex-shrink: 0; }
+.fc-row-val { font-size: 14px; font-weight: 800; color: var(--warning); }
+.fc-row-val.overdue { color: var(--danger); }
+.fc-row-sub { font-size: 10px; color: var(--text4); margin-top: 1px; }
+.fc-row-action { font-size: 11px; font-weight: 700; color: var(--success); margin-top: 3px; }
+.fc-row-saldo { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--success); }
+
+.fiados-modal-tip {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 11px; color: var(--text3); font-weight: 600;
+  background: var(--bg); border-radius: 10px; padding: 10px 12px;
+  margin-bottom: 14px; line-height: 1.5;
+}
+.fiados-modal-tip i, .fiados-modal-tip svg { flex-shrink: 0; margin-top: 1px; color: var(--text4); }

@@ -6,7 +6,7 @@ import { initFiados }                      from "./components/fiados.js";
 import { initHistorico }                   from "./components/historico.js";
 import { initPerfil }                      from "./components/perfil.js";
 import { initCamera }                      from "./components/camera.js";
-import { initDarkMode, checkStockAlerts, checkBadges, startRealtimeSync } from "./components/extras.js";
+import { initDarkMode, checkBadges, startRealtimeSync } from "./components/extras.js";
 import { updateNotificationBadge } from "./notification-ui.js";
 import { loadDashboard }                    from "./components/dashboard.js";
 import { hasFeature, getLicense }          from "./license.js";
@@ -63,7 +63,6 @@ export var router = {
 
     initDarkMode();
     startRealtimeSync();
-    checkStockAlerts();
     checkBadges();
     updateNotificationBadge();
 

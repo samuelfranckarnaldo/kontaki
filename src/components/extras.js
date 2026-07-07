@@ -55,51 +55,7 @@ export async function checkBadges() {
       }
     }
     
-    var produtos = await db.getAll("products");
-    var low = produtos.filter(function(p){ return p.active && p.stock <= (p.minStock || 5); }).length;
-    var pb = document.getElementById("produtos-badge");
-    if (pb) {
-      if (low > 0) {
-        pb.textContent = low;
-        pb.style.display = "flex";
-        pb.style.background = "#d97706";
-        pb.style.animation = "none";
-      } else {
-        pb.style.display = "none";
-      }
-    }
   } catch(e) {}
-}
-
-export async function checkStockAlerts() {
-  var products = await db.getAll("products");
-  var low = products.filter(function(p) {
-    return p.active && p.stock <= (p.minStock || 5);
-  });
-
-  if (!low.length) return;
-
-  // Badge no ícone de produtos
-  var badge = document.getElementById("produtos-badge");
-  if (badge) {
-    badge.textContent = low.length;
-    badge.style.display = "flex";
-  }
-
-  // Toast discreto
-  if (low.length <= 3) {
-    low.forEach(function(p) {
-      setTimeout(function() {
-        toast("⚠ Stock baixo: " + p.name + " (" + p.stock + " " + (p.unit||"unid") + ")", "error");
-      }, 1000);
-    });
-  } else {
-    setTimeout(function() {
-      toast("⚠ " + low.length + " produtos com stock baixo — ver Gestão de Stock", "error");
-    }, 1000);
-  }
-
-  return low;
 }
 
 // ── DEVOLUÇÃO DE PRODUTOS ─────────────────────────────────────────────────────
@@ -363,7 +319,6 @@ export function startRealtimeSync() {
   if (_syncInterval) clearInterval(_syncInterval);
   _syncInterval = setInterval(function() {
     checkBadges();
-    checkStockAlerts();
   }, 15000); // a cada 15 segundos
 }
 
