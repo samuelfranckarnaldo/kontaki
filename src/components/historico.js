@@ -500,6 +500,48 @@ async function loadStock(from, to) {
       '</div></div>';
   }
 
+  function renderMovSubItem(m) {
+    var color = typeColors[m.type] || "#9ca3af";
+    var bg    = typeBg[m.type]    || "#f3f4f6";
+    var label = typeLabels[m.type] || m.type;
+    var sign  = m.qty > 0 ? "+" : "";
+    var autor = (m.userId != null && usersById[m.userId]) ? usersById[m.userId].name : "Desconhecido";
+    return '<div class="hist-mov-subitem">' +
+      '<div class="hist-mov-icon hist-mov-icon--sm" style="background:' + bg + ';color:' + color + '"><i data-lucide="' + (typeIcons[m.type]||"circle") + '" style="width:14px;height:14px"></i></div>' +
+      '<div style="flex:1;min-width:0">' +
+      '<span class="hist-mov-tag" style="background:' + bg + ';color:' + color + '">' + label + '</span>' +
+      '<div class="hist-mov-meta">' + fmtDate(m.createdAt) + ' · <strong>' + autor + '</strong></div>' +
+      '</div>' +
+      '<div style="text-align:right;flex-shrink:0">' +
+      '<div class="hist-mov-qty" style="color:' + color + '" title="' + sign + m.qty + '">' + sign + abbrevQty(m.qty) + '</div>' +
+      '<div class="hist-mov-range">' + (m.qtyBefore||0) + ' <i data-lucide="arrow-right" style="width:9px;height:9px;vertical-align:middle"></i> <strong>' + (m.qtyAfter||0) + '</strong></div>' +
+      '</div></div>';
+  }
+
+  function groupConsecutiveByProduct(items) {
+    var groups = [];
+    items.forEach(function(m) {
+      var last = groups[groups.length - 1];
+      if (last && last.productName === m.productName) {
+        last.items.push(m);
+      } else {
+        groups.push({ productName: m.productName, items: [m] });
+      }
+    });
+    return groups;
+  }
+
+  function renderProductGroup(g) {
+    if (g.items.length === 1) return renderMovItem(g.items[0]);
+    var header =
+      '<div class="hist-mov-group-header">' +
+      '<i data-lucide="package" class="hist-mov-name-icon"></i>' + g.productName +
+      '<span class="hist-mov-group-count">' + g.items.length + ' operações</span>' +
+      '</div>';
+    var subitems = g.items.map(renderMovSubItem).join("");
+    return '<div class="hist-mov-group">' + header + subitems + '</div>';
+  }
+
   function renderMovBlock(arr, title) {
     if (!arr.length) return '<div class="hist-section-label">' + title + '</div>' +
       '<div class="hist-empty" style="padding:24px"><div class="hist-empty-sub">Nenhum movimento no período</div></div>';
@@ -510,8 +552,9 @@ async function loadStock(from, to) {
     return '<div class="hist-section-label">' + title + ' (' + arr.length + ')</div>' +
       '<div class="hist-mov-card">' +
       groups.map(function(g) {
+        var productGroups = groupConsecutiveByProduct(g.sales);
         return '<div class="hist-day-label hist-day-label--inset">' + dayLabel(g.date) + '</div>' +
-          g.sales.map(renderMovItem).join("");
+          productGroups.map(renderProductGroup).join("");
       }).join("") +
       (arr.length>50 ? '<div style="padding:10px 14px;font-size:12px;color:var(--text4)">+' + (arr.length-50) + ' mais</div>' : '') +
       '</div>';
