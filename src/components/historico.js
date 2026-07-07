@@ -483,14 +483,19 @@ async function loadStock(from, to) {
   var list = el("historico-list");
   if (!list) return;
 
+  function fmtAbbrev(v) {
+    var s = v.toFixed(1);
+    return s.endsWith(".0") ? s.slice(0, -2) : s;
+  }
+
   function abbrevQty(n) {
     var abs = Math.abs(n);
     var sign = n < 0 ? "-" : "";
     if (abs < 1000) return sign + abs;
-    if (abs < 1e6)  return sign + (abs/1e3).toFixed(abs%1e3===0?0:1) + "K";
-    if (abs < 1e9)  return sign + (abs/1e6).toFixed(abs%1e6===0?0:1) + "M";
-    if (abs < 1e12) return sign + (abs/1e9).toFixed(abs%1e9===0?0:1) + "B";
-    return sign + (abs/1e12).toFixed(abs%1e12===0?0:1) + "T";
+    if (abs < 1e6)  return sign + fmtAbbrev(abs/1e3) + "K";
+    if (abs < 1e9)  return sign + fmtAbbrev(abs/1e6) + "M";
+    if (abs < 1e12) return sign + fmtAbbrev(abs/1e9) + "B";
+    return sign + fmtAbbrev(abs/1e12) + "T";
   }
 
   function renderMovItem(m) {
@@ -499,7 +504,7 @@ async function loadStock(from, to) {
     var label = typeLabels[m.type] || m.type;
     var sign  = m.qty > 0 ? "+" : "";
     var autor = (m.userId != null && usersById[m.userId]) ? usersById[m.userId].name : "Desconhecido";
-    return '<div class="hist-mov-item">' +
+    return '<div class="hist-mov-item" style="border-left:3px solid ' + color + '">' +
       '<div class="hist-mov-icon" style="background:' + bg + ';color:' + color + '"><i data-lucide="' + (typeIcons[m.type]||"circle") + '" style="width:18px;height:18px"></i></div>' +
       '<div style="flex:1;min-width:0">' +
       '<div class="hist-mov-name"><i data-lucide="package" class="hist-mov-name-icon"></i>' + m.productName + '</div>' +
