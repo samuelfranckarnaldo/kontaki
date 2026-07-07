@@ -25,9 +25,9 @@
   --radius:       12px;
   --radius-lg:    16px;
   --radius-xl:    20px;
-  --shadow-sm:    0 1px 3px rgba(0,0,0,.08);
-  --shadow:       0 4px 16px rgba(0,0,0,.10);
-  --shadow-lg:    0 8px 30px rgba(0,0,0,.15);
+  --shadow-sm:    0 1px 2px rgba(0,0,0,.05);
+  --shadow:       0 2px 10px rgba(0,0,0,.06);
+  --shadow-lg:    0 6px 20px rgba(0,0,0,.10);
   --font:         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --transition:   .15s ease;
 
@@ -51,6 +51,11 @@
   --weight-strong:   700;
 
   --text-on-primary: #ffffff;
+
+  --danger-muted:       #b3554f;
+  --danger-muted-light: #f7e9e8;
+  --warning-muted:       #a87438;
+  --warning-muted-light: #f5ece1;
 }
 
 html { font-size: 16px; -webkit-text-size-adjust: 100%; }

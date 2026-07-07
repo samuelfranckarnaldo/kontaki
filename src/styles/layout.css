@@ -16,7 +16,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 8px 14px;
   background: linear-gradient(135deg, #5b21b6, #7c3aed);
   flex-shrink: 0;
   position: sticky; top: 0; z-index: 50;

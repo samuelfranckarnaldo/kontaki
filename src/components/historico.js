@@ -10,6 +10,7 @@ let activeTab = "geral";
 let activeShortcut = "hoje";
 let histChartInstance = null;
 let auditUserFilter = "all";
+let periodOffset = 0;
 
 function toLocalDateStr(iso) {
   if (!iso) return "";
@@ -32,23 +33,71 @@ function getPreviousPeriod(from, to) {
   return { from: toLocalDateStr(prevFrom.toISOString()), to: toLocalDateStr(prevTo.toISOString()) };
 }
 
-function getShortcutDates(sc) {
-  var now = new Date();
-  var y = now.getFullYear();
-  var m = now.getMonth();
-  var d = now.getDate();
+function getShortcutDates(sc, offset) {
+  offset = offset || 0;
   var t = today();
-  if (sc === "hoje")   return { from: t, to: t };
+
+  if (sc === "hoje") {
+    var d0 = new Date();
+    d0.setDate(d0.getDate() + offset);
+    var s = toLocalDateStr(d0.toISOString());
+    return { from: s, to: s };
+  }
+
   if (sc === "semana") {
+    var now = new Date();
     var day = now.getDay();
-    var diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    var mon = new Date(now.setDate(diff));
-    return { from: toLocalDateStr(mon.toISOString()), to: today() };
+    var mondayThisWeek = new Date(now);
+    mondayThisWeek.setDate(now.getDate() - day + (day === 0 ? -6 : 1));
+    mondayThisWeek.setDate(mondayThisWeek.getDate() + offset * 7);
+    var sundayThisWeek = new Date(mondayThisWeek);
+    sundayThisWeek.setDate(mondayThisWeek.getDate() + 6);
+
+    var fromStr = toLocalDateStr(mondayThisWeek.toISOString());
+    var toStr   = offset === 0 ? t : toLocalDateStr(sundayThisWeek.toISOString());
+    return { from: fromStr, to: toStr };
+  }
+
+  if (sc === "mes") {
+    var base = new Date();
+    base.setDate(1);
+    base.setMonth(base.getMonth() + offset);
+    var y = base.getFullYear();
+    var m = base.getMonth();
+    var fromStr = y + "-" + String(m+1).padStart(2,"0") + "-01";
+    var toStr;
+    if (offset === 0) {
+      toStr = t;
+    } else {
+      var lastDay = new Date(y, m + 1, 0).getDate();
+      toStr = y + "-" + String(m+1).padStart(2,"0") + "-" + String(lastDay).padStart(2,"0");
+    }
+    return { from: fromStr, to: toStr };
+  }
+
+  return null;
+}
+
+function getPeriodLabel(sc, offset, dates) {
+  var MESES_FULL = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  if (sc === "hoje") {
+    if (offset === 0) return "Hoje";
+    if (offset === -1) return "Ontem";
+    var d = new Date(dates.from + "T00:00:00");
+    return d.getDate() + " de " + MESES_FULL[d.getMonth()];
+  }
+  if (sc === "semana") {
+    if (offset === 0) return "Esta semana";
+    var f = new Date(dates.from + "T00:00:00");
+    var tt = new Date(dates.to + "T00:00:00");
+    return f.getDate() + "/" + (f.getMonth()+1) + " – " + tt.getDate() + "/" + (tt.getMonth()+1);
   }
   if (sc === "mes") {
-    return { from: y+"-"+String(m+1).padStart(2,"0")+"-01", to: t };
+    var d2 = new Date(dates.from + "T00:00:00");
+    if (offset === 0) return MESES_FULL[d2.getMonth()] + " " + d2.getFullYear();
+    return MESES_FULL[d2.getMonth()] + " " + d2.getFullYear();
   }
-  return null;
+  return "";
 }
 
 export async function initHistorico() {
@@ -62,6 +111,7 @@ export async function initHistorico() {
 
 window._histShortcut = function(sc, btn) {
   activeShortcut = sc;
+  periodOffset = 0;
   document.querySelectorAll(".hist-shortcut").forEach(function(b) {
     b.classList.remove("active");
   });
@@ -76,12 +126,36 @@ window._histShortcut = function(sc, btn) {
   }
 };
 
+window._histNavPeriod = function(dir) {
+  periodOffset += dir;
+  if (periodOffset > 0) periodOffset = 0;
+  applyShortcut(activeShortcut);
+};
+
 function applyShortcut(sc) {
-  var dates = getShortcutDates(sc);
+  var dates = getShortcutDates(sc, periodOffset);
   if (!dates) return;
   setVal("hist-from", dates.from);
   setVal("hist-to",   dates.to);
+  renderPeriodNav(sc, dates);
   loadData();
+}
+
+function renderPeriodNav(sc, dates) {
+  var nav = el("hist-period-nav");
+  if (!nav) return;
+  if (sc === "custom") {
+    nav.style.display = "none";
+    return;
+  }
+  nav.style.display = "flex";
+  var label = getPeriodLabel(sc, periodOffset, dates);
+  var nextDisabled = periodOffset >= 0;
+  nav.innerHTML =
+    '<button class="hist-nav-arrow" onclick="window._histNavPeriod(-1)"><i data-lucide="chevron-left"></i></button>' +
+    '<span class="hist-nav-label">' + label + '</span>' +
+    '<button class="hist-nav-arrow" onclick="window._histNavPeriod(1)"' + (nextDisabled ? ' disabled' : '') + '><i data-lucide="chevron-right"></i></button>';
+  refreshIcons(nav);
 }
 
 function renderTabs() {
@@ -217,8 +291,8 @@ async function loadGeral(from, to) {
     stats.innerHTML =
       kpi("Nº Vendas",     nVendas,         "var(--primary)",  "", null) +
       kpi("Média por Venda",  fmt(ticket),     "var(--info)",     "", null) +
-      kpi("Fiado Aberto",  fmt(fiadoAb),    "var(--warning)",  "", fiadoAb>0?"hist-kpi--attention":null) +
-      kpi("Devoluções",    fmt(devTotal),   devTotal>0?"var(--danger)":"var(--success)", incOpen+" incidente"+(incOpen===1?"":"s"), devTotal>0?"hist-kpi--danger":null);
+      kpi("Fiado Aberto",  fmt(fiadoAb),    "var(--warning-muted)",  "", fiadoAb>0?"hist-kpi--attention":null) +
+      kpi("Devoluções",    fmt(devTotal),   devTotal>0?"var(--danger-muted)":"var(--success)", incOpen+" incidente"+(incOpen===1?"":"s"), devTotal>0?"hist-kpi--danger":null);
   }
 
   // Gráfico (Chart.js)
@@ -411,9 +485,11 @@ async function loadGeral(from, to) {
 }
 
 function kpi(label, val, color, sub, attentionClass) {
+  var len = String(val).length;
+  var sizeClass = len > 13 ? " hist-kpi-val--xs" : (len > 9 ? " hist-kpi-val--sm" : "");
   return '<div class="hist-kpi' + (attentionClass ? ' ' + attentionClass : '') + '">' +
     '<div class="hist-kpi-label">' + label + '</div>' +
-    '<div class="hist-kpi-val" style="color:' + color + '">' + val + '</div>' +
+    '<div class="hist-kpi-val' + sizeClass + '" style="color:' + color + '">' + val + '</div>' +
     (sub ? '<div class="hist-kpi-sub">' + sub + '</div>' : '') +
     '</div>';
 }
