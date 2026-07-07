@@ -445,7 +445,6 @@ async function loadStock(from, to) {
   var chart = el("historico-chart");
   var actions = el("hist-actions");
   if (hero)    hero.style.display  = "none";
-  if (stats)   stats.innerHTML     = "";
   if (chart)   chart.style.display = "none";
   if (actions) actions.style.display = "none";
 
@@ -463,6 +462,20 @@ async function loadStock(from, to) {
     var isSessionType = m.type === "session_open" || m.type === "session_close";
     return !(isSessionType && (m.qty === 0 || !m.qty));
   });
+
+  if (stats) {
+    var totalOps = filtered.length;
+    var totalIn  = filtered.filter(function(m){ return m.qty > 0; }).reduce(function(a,m){ return a + m.qty; }, 0);
+    var totalOut = filtered.filter(function(m){ return m.qty < 0; }).reduce(function(a,m){ return a + Math.abs(m.qty); }, 0);
+    var uniqueProducts = {};
+    filtered.forEach(function(m){ uniqueProducts[m.productName] = true; });
+    var nProducts = Object.keys(uniqueProducts).length;
+    stats.innerHTML =
+      kpi("Operações", totalOps, "var(--primary)", "", null) +
+      kpi("Entradas", "+" + abbrevQty(totalIn), "var(--success)", "unidades", null) +
+      kpi("Saídas", "-" + abbrevQty(totalOut), "var(--danger)", "unidades", null) +
+      kpi("Produtos", nProducts, "var(--info)", nProducts===1?"movimentado":"movimentados", null);
+  }
 
   var local    = filtered.filter(function(m) { return m.imported !== true; });
   var imported = filtered.filter(function(m) { return m.imported === true; });
@@ -506,7 +519,7 @@ async function loadStock(from, to) {
     var label = typeLabels[m.type] || m.type;
     var sign  = m.qty > 0 ? "+" : "";
     var autor = (m.userId != null && usersById[m.userId]) ? usersById[m.userId].name : "Desconhecido";
-    return '<div class="hist-mov-subitem">' +
+    return '<div class="hist-mov-subitem" style="border-left-color:' + color + '">' +
       '<div class="hist-mov-icon hist-mov-icon--sm" style="background:' + bg + ';color:' + color + '"><i data-lucide="' + (typeIcons[m.type]||"circle") + '" style="width:14px;height:14px"></i></div>' +
       '<div style="flex:1;min-width:0">' +
       '<span class="hist-mov-tag" style="background:' + bg + ';color:' + color + '">' + label + '</span>' +

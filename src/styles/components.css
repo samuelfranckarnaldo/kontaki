@@ -2067,7 +2067,7 @@
 .hist-mov-group-header {
   display: flex; align-items: center; gap: 6px;
   padding: 10px 14px 4px; font-size: 13px; font-weight: 700; color: var(--text);
-  background: var(--border2);
+  background: var(--bg2);
 }
 .hist-mov-group-count {
   margin-left: auto; font-size: 10px; font-weight: 600; color: var(--text4);
@@ -2075,10 +2075,9 @@
 }
 .hist-mov-subitem {
   display: flex; align-items: flex-start; gap: 10px;
-  padding: 9px 14px 9px 28px; border-bottom: 1px solid var(--border2);
-  background: var(--border2);
+  padding: 8px 14px 8px 24px;
+  background: var(--bg2); border-left: 3px solid var(--border);
 }
-.hist-mov-subitem:last-child { border-bottom: none; }
 .hist-mov-icon--sm { width: 28px; height: 28px; margin-top: 0; }
 .hist-timeline { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .hist-timeline-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border2); }
