@@ -21,6 +21,9 @@
   flex-shrink: 0;
   position: sticky; top: 0; z-index: 50;
   box-shadow: 0 2px 12px rgba(91,33,182,.2);
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
 }
 .topbar-title {
   font-size: 18px;

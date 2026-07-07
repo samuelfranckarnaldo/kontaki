@@ -14,6 +14,7 @@ import { generateInvite } from "../invite.js";
 import { getUser, logout, changePasswordAuth, createUser } from "../auth.js";
 import { getLicense, loadLicense, activateLicense, PLANS, showUpgradeBanner } from "../license.js";
 import { gerarRelatorioPDF } from "./extras.js";
+import { addStockMovement, getStock } from "../services.js";
 
 export async function initPerfil() {
   const user  = getUser();
@@ -190,7 +191,7 @@ function renderMenu() {
 function setupSubpageButtons() {
   ["stock","incidentes","equipa","loja","senha","dashboard","clientes",
    "despesas","contabilidade","assinatura","contactos","configuracoes",
-   "seguranca","turno","fornecedores","escritorio","sobre","ajuda"].forEach(function(name) {
+   "seguranca","turno","fornecedores","escritorio","sobre","ajuda","notificacoes"].forEach(function(name) {
     var btn = document.getElementById("btn-back-" + name);
     if (btn) btn.onclick = function() { window._perfilBack(); };
   });
@@ -254,10 +255,11 @@ window._perfilNav = async (page) => {
   if (page === "senha")        loadSenhaPage();
   if (page === "sobre")        loadSobre();
   if (page === "escritorio")   await loadEscritorioPage();
+  if (page === "notificacoes") await loadNotificacoesPage();
 };
 
 function showSubpage(name) {
-  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","clientes","despesas","assinatura","contactos","escritorio","sobre","ajuda"];
+  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","clientes","despesas","assinatura","contactos","escritorio","sobre","ajuda","notificacoes"];
   subpages.forEach(s => {
     const node = el("subpage-" + s);
     if (node) node.style.display = "none";
@@ -554,9 +556,22 @@ window._confirmResolveInc = async function(id) {
     status: "resolved", resolvedAt: new Date().toISOString(), resolvedBy: getUser().id, resolvedNote: note
   }));
   if (i.productId != null) {
-    const p = await db.get("products", i.productId);
     const novoStock = (i.countedStock != null) ? i.countedStock : i.found;
-    if (p && novoStock != null) await db.put("products", Object.assign({}, p, { stock: novoStock, physicalStock: novoStock }));
+    if (novoStock != null) {
+      const p = await db.get("products", i.productId);
+      if (p) {
+        const actual = await getStock(i.productId, "shop");
+        const delta = novoStock - actual;
+        if (delta !== 0) {
+          await addStockMovement({
+            productId: i.productId, productName: p.name,
+            type: "incident_resolution", location: "shop", qty: delta,
+            reference: "incident#" + id, note: note,
+            userId: getUser().id, createdAt: new Date().toISOString(),
+          });
+        }
+      }
+    }
   }
   closeModal();
   toast("Incidente resolvido.", "success");
@@ -1558,6 +1573,89 @@ window._showLicencaEula = function() {
     '<p><strong>7. Lei Aplicável.</strong> Este EULA rege-se pelas leis da República de Angola.</p>' +
     '</div>';
   openModal("Licença de Utilização", text + '<button class="btn btn-ghost btn-full" style="margin-top:14px" onclick="window._closeModal()">Fechar</button>');
+};
+
+async function loadNotificacoesPage() {
+  const mod = await import("../notification-ui.js");
+  const notifMod = await import("../notifications.js");
+  const state = await notifMod.buildNotificationState();
+  window._notificationsCache = state.alerts;
+
+  const container = el("notificacoes-content");
+  if (!container) return;
+
+  if (!state.alerts.length) {
+    container.innerHTML =
+      '<div class="empty-state">' +
+      '<i data-lucide="bell-off" style="width:36px;height:36px;color:#a1a1aa;margin-bottom:10px"></i>' +
+      '<div class="empty-state-title">Sem notificações</div>' +
+      '<div class="empty-state-sub">Tudo em ordem por agora.</div>' +
+      '</div>';
+    refreshIcons(container);
+    await notifMod.markNotificationsSeen();
+    mod.updateNotificationBadge();
+    return;
+  }
+
+  function sevStyle(sev) {
+    if (sev === "danger")  return { bg: "var(--danger-light)",  color: "var(--danger)",  icon: "alert-circle" };
+    if (sev === "warning") return { bg: "var(--warning-light)", color: "var(--warning)", icon: "alert-triangle" };
+    return { bg: "var(--info-light)", color: "var(--info)", icon: "info" };
+  }
+
+  function renderItem(n) {
+    var s = sevStyle(n.severity);
+    return (
+      '<button onclick="window._handleNotificationActionFromPage(\'' + n.id + '\')" ' +
+      'style="width:100%;display:flex;align-items:flex-start;gap:12px;padding:14px;' +
+      'background:#fff;border-radius:12px;margin-bottom:8px;cursor:pointer;text-align:left;' +
+      'font-family:inherit;border:1px solid var(--border2)">' +
+        '<div style="width:34px;height:34px;border-radius:10px;background:' + s.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+          '<i data-lucide="' + s.icon + '" style="width:17px;height:17px;color:' + s.color + '"></i>' +
+        '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:13.5px;font-weight:700;color:var(--text)">' + n.title + '</div>' +
+          (n.description ? '<div style="font-size:12px;color:var(--text3);margin-top:3px">' + n.description + '</div>' : '') +
+        '</div>' +
+        '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text4);flex-shrink:0;margin-top:8px"></i>' +
+      '</button>'
+    );
+  }
+
+  var byType = { product: [], cash: [], system: [] };
+  state.alerts.forEach(function(n){ (byType[n.type] || byType.system).push(n); });
+
+  var html = '';
+  if (byType.product.length) {
+    html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Produtos</div>';
+    html += byType.product.map(renderItem).join("");
+  }
+  if (byType.cash.length) {
+    html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 6px">Caixa</div>';
+    html += byType.cash.map(renderItem).join("");
+  }
+  if (byType.system.length) {
+    html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 6px">Sistema</div>';
+    html += byType.system.map(renderItem).join("");
+  }
+  container.innerHTML = html;
+  refreshIcons(container);
+
+  await notifMod.markNotificationsSeen();
+  mod.updateNotificationBadge();
+}
+
+window._handleNotificationActionFromPage = function(id) {
+  var n = (window._notificationsCache || []).find(function(x){ return x.id === id; });
+  if (!n || !n.action) return;
+  if (n.action.page === "perfil" && n.action.subpage) {
+    window._perfilNav(n.action.subpage);
+    return;
+  }
+  if (window.router) window.router.go(n.action.page);
+  setTimeout(function() {
+    if (n.action.filter && window._filterProd) window._filterProd(n.action.filter);
+  }, 150);
 };
 
 async function loadEscritorioPage() {

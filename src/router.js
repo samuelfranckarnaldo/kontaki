@@ -7,6 +7,7 @@ import { initHistorico }                   from "./components/historico.js";
 import { initPerfil }                      from "./components/perfil.js";
 import { initCamera }                      from "./components/camera.js";
 import { initDarkMode, checkStockAlerts, checkBadges, startRealtimeSync } from "./components/extras.js";
+import { updateNotificationBadge } from "./notification-ui.js";
 import { loadDashboard }                    from "./components/dashboard.js";
 import { hasFeature, getLicense }          from "./license.js";
 
@@ -64,6 +65,7 @@ export var router = {
     startRealtimeSync();
     checkStockAlerts();
     checkBadges();
+    updateNotificationBadge();
 
     // Quick mode só se tiver feature
     if (hasFeature("venda_rapida")) {
@@ -132,6 +134,7 @@ export var router = {
 
     PAGES[pageId].init();
     checkBadges();
+    updateNotificationBadge();
     var pgEl = el("pg-" + pageId);
     if (pgEl) refreshIcons(pgEl);
   },
