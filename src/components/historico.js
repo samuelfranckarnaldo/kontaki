@@ -9,6 +9,7 @@ import { openDevolucao, gerarRelatorioPDF } from "./extras.js";
 let activeTab = "geral";
 let activeShortcut = "hoje";
 let histChartInstance = null;
+let auditUserFilter = "all";
 
 function toLocalDateStr(iso) {
   if (!iso) return "";
@@ -583,18 +584,68 @@ async function loadStock(from, to) {
 }
 
 // ── AUDITORIA ─────────────────────────────────────────────────────────────────
+window._auditFilterUser = function(uid) {
+  auditUserFilter = uid;
+  loadAuditoria(val("hist-from"), val("hist-to"));
+};
+
 async function loadAuditoria(from, to) {
   var hero    = el("historico-hero");
   var stats   = el("historico-stats");
   var chart   = el("historico-chart");
   var actions = el("hist-actions");
   if (hero)    hero.style.display    = "none";
-  if (stats)   stats.innerHTML       = "";
   if (chart)   chart.style.display   = "none";
   if (actions) actions.style.display = "none";
 
   var sessions  = await db.getAll("sessions");
   var incidents = await db.getAll("incidents");
+  var movements = await db.getAll("stockMovements");
+  var sales     = await db.getAll("sales");
+  var users     = await db.getAll("users");
+
+  var periodMovs = movements.filter(function(m) {
+    var d = toLocalDateStr(m.createdAt);
+    return d >= from && d <= to;
+  });
+  var periodSales = sales.filter(function(s) {
+    var d = toLocalDateStr(s.date);
+    return d >= from && d <= to;
+  });
+  var periodIncidents = incidents.filter(function(i) {
+    var d = toLocalDateStr(i.createdAt);
+    return d >= from && d <= to;
+  });
+  var adjustments = periodMovs.filter(function(m) { return m.type === "adjustment"; });
+
+  var employeeIds = {};
+  sessions.forEach(function(s){ if (s.userId != null) employeeIds[s.userId] = s.userName; });
+  periodMovs.forEach(function(m){ if (m.userId != null && users.find(function(u){return u.id===m.userId;})) employeeIds[m.userId] = (users.find(function(u){return u.id===m.userId;})||{}).name; });
+
+  function matchesFilter(userId) {
+    return auditUserFilter === "all" || String(userId) === String(auditUserFilter);
+  }
+
+  if (auditUserFilter !== "all") {
+    adjustments      = adjustments.filter(function(m){ return matchesFilter(m.userId); });
+    periodSales      = periodSales.filter(function(s){ return matchesFilter(s.userId); });
+    periodIncidents  = periodIncidents.filter(function(i){ return matchesFilter(i.userId); });
+  }
+
+  var periodSessions = sessions.filter(function(s) {
+    if (s.isImported) return false;
+    var d = toLocalDateStr(s.openedAt);
+    return d >= from && d <= to;
+  }).filter(function(s){ return matchesFilter(s.userId); });
+
+  if (stats) {
+    var salesTotal = periodSales.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); }, 0);
+    stats.innerHTML =
+      kpi("Vendas", periodSales.length, "var(--primary)", fmt(salesTotal), null) +
+      kpi("Ajustes", adjustments.length, "var(--primary-mid)", "stock", adjustments.length>0?"hist-kpi--attention":null) +
+      kpi("Incidentes", periodIncidents.length, periodIncidents.length>0?"var(--danger)":"var(--success)", "", periodIncidents.length>0?"hist-kpi--danger":null) +
+      kpi("Sessões", periodSessions.length, "var(--info)", "", null);
+  }
 
   var importedSessions = sessions.filter(function(s) { return s.isImported; });
   var openIncidents    = incidents.filter(function(i) { return i.status==="open"; });
@@ -603,11 +654,20 @@ async function loadAuditoria(from, to) {
     if (s.isImported) return false;
     if (s.uuid && seenUuids.has(s.uuid)) return false;
     if (s.uuid) seenUuids.add(s.uuid);
+    if (!matchesFilter(s.userId)) return false;
     return true;
   }).sort(function(a,b) { return a.id - b.id; });
 
   var list = el("historico-list");
   if (!list) return;
+
+  var filterChipsHtml =
+    '<div class="hist-audit-filters">' +
+    '<button class="hist-audit-chip' + (auditUserFilter==="all"?" active":"") + '" onclick="window._auditFilterUser(\'all\')">Todos</button>' +
+    Object.keys(employeeIds).map(function(uid) {
+      return '<button class="hist-audit-chip' + (String(auditUserFilter)===String(uid)?" active":"") + '" onclick="window._auditFilterUser(\'' + uid + '\')">' + (employeeIds[uid]||"?") + '</button>';
+    }).join("") +
+    '</div>';
 
   function dotColor(s) {
     if (s.status==="open")    return "var(--success)";
@@ -626,6 +686,7 @@ async function loadAuditoria(from, to) {
   }
 
   list.innerHTML =
+    filterChipsHtml +
     '<div class="hist-section-label">Cadeia de Responsabilidade</div>' +
     '<div class="hist-timeline">' +
     (chain.length === 0

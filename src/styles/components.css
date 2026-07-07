@@ -1951,6 +1951,21 @@
 }
 .hist-shortcut.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .hist-date-inputs { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+
+.hist-audit-filters {
+  display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch; margin-bottom: 4px;
+}
+.hist-audit-filters::-webkit-scrollbar { display: none; }
+.hist-audit-chip {
+  flex-shrink: 0; padding: 7px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg2); font-size: 12.5px; font-weight: 600;
+  color: var(--text3); cursor: pointer; font-family: var(--font);
+  white-space: nowrap; transition: var(--transition);
+}
+.hist-audit-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .hist-date-field { flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .hist-date-label { font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .5px; }
 .hist-date-input {
