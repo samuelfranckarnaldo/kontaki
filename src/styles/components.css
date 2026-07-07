@@ -2059,6 +2059,8 @@
 .hist-mov-meta strong { color: var(--text3); font-weight: 600; }
 .hist-mov-qty { font-size: 17px; font-weight: 800; line-height: 1.2; }
 .hist-mov-range { font-size: 10.5px; color: var(--text4); margin-top: 3px; }
+.hist-mov-range-label { text-transform: uppercase; letter-spacing: .3px; font-size: 9px; }
+.hist-mov-range strong { color: var(--text2); font-weight: 700; }
 .hist-timeline { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .hist-timeline-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border2); }
 .hist-timeline-item:last-child { border-bottom: none; }

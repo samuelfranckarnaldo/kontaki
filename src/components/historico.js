@@ -421,22 +421,22 @@ function kpi(label, val, color, sub, attentionClass) {
 var typeLabels = {
   sale:"Venda", purchase:"Compra", transfer_in:"Entrada", transfer_out:"Saída",
   adjustment:"Ajuste", session_open:"Sessão", session_close:"Sessão",
-  incident:"Incidente", incident_resolved:"Incidente resolvido"
+  incident:"Incidente", incident_resolved:"Incidente resolvido", incident_resolution:"Incidente resolvido"
 };
 var typeColors = {
   sale:"var(--danger)", purchase:"var(--success)", transfer_in:"var(--info)", transfer_out:"var(--warning)",
   adjustment:"var(--primary-mid)", session_open:"var(--text4)", session_close:"var(--text4)",
-  incident:"var(--danger)", incident_resolved:"var(--success)"
+  incident:"var(--danger)", incident_resolved:"var(--success)", incident_resolution:"var(--success)"
 };
 var typeIcons = {
   sale:"shopping-cart", purchase:"package-plus", transfer_in:"arrow-down-to-line", transfer_out:"arrow-up-from-line",
   adjustment:"sliders-horizontal", session_open:"log-in", session_close:"log-out",
-  incident:"alert-triangle", incident_resolved:"check-circle"
+  incident:"alert-triangle", incident_resolved:"check-circle", incident_resolution:"check-circle"
 };
 var typeBg = {
   sale:"var(--danger-light)", purchase:"var(--success-light)", transfer_in:"var(--info-light)", transfer_out:"var(--warning-light)",
   adjustment:"var(--primary-light)", session_open:"var(--border2)", session_close:"var(--border2)",
-  incident:"var(--danger-light)", incident_resolved:"var(--success-light)"
+  incident:"var(--danger-light)", incident_resolved:"var(--success-light)", incident_resolution:"var(--success-light)"
 };
 
 async function loadStock(from, to) {
@@ -457,6 +457,11 @@ async function loadStock(from, to) {
   var filtered  = movements.filter(function(m) {
     var d = toLocalDateStr(m.createdAt);
     return d >= from && d <= to;
+  });
+
+  filtered = filtered.filter(function(m) {
+    var isSessionType = m.type === "session_open" || m.type === "session_close";
+    return !(isSessionType && (m.qty === 0 || !m.qty));
   });
 
   var local    = filtered.filter(function(m) { return m.imported !== true; });
@@ -491,7 +496,7 @@ async function loadStock(from, to) {
       '</div>' +
       '<div style="text-align:right;flex-shrink:0">' +
       '<div class="hist-mov-qty" style="color:' + color + '" title="' + sign + m.qty + '">' + sign + abbrevQty(m.qty) + '</div>' +
-      '<div class="hist-mov-range">' + (m.qtyBefore||0) + ' → ' + (m.qtyAfter||0) + '</div>' +
+      '<div class="hist-mov-range"><span class="hist-mov-range-label">Stock</span> ' + (m.qtyBefore||0) + ' <i data-lucide="arrow-right" style="width:9px;height:9px;vertical-align:middle"></i> <strong>' + (m.qtyAfter||0) + '</strong></div>' +
       '</div></div>';
   }
 
