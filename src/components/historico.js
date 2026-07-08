@@ -431,9 +431,10 @@ async function loadGeral(from, to) {
     var badgeHtml = "";
     if (variacao !== null) {
       var isUp = variacao >= 0;
+      var displayPct = Math.min(Math.abs(variacao), 100).toFixed(0);
       badgeHtml =
         '<span class="hist-hero-trend ' + (isUp ? 'hist-hero-trend--up' : 'hist-hero-trend--down') + '">' +
-        (isUp ? '↑' : '↓') + ' ' + Math.abs(variacao).toFixed(0) + '%' +
+        (isUp ? '↑' : '↓') + ' ' + displayPct + '%' +
         '</span>';
     }
 
@@ -457,9 +458,11 @@ async function loadGeral(from, to) {
     }
 
     var startVal = heroLastValue === null ? total : heroLastValue;
+    var cornerBadge = badgeHtml.replace('class="hist-hero-trend', 'class="hist-hero-trend hist-hero-trend--corner');
     hero.innerHTML =
+      cornerBadge +
       '<div class="hist-hero-label">Total do período</div>' +
-      '<div class="hist-hero-row"><div class="hist-hero-val" id="hist-hero-val-num">' + fmt(startVal) + '</div>' + badgeHtml + '</div>' +
+      '<div class="hist-hero-row"><div class="hist-hero-val" id="hist-hero-val-num">' + fmt(startVal) + '</div></div>' +
       (contextPhrase ? '<div class="hist-hero-context">' + contextPhrase + '</div>' : '') +
       '<div class="hist-hero-sub">' + nVendas + ' ' + (nVendas===1?"venda":"vendas") + ' · média por venda ' + fmt(ticket) + '</div>';
 
