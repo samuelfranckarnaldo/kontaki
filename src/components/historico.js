@@ -97,33 +97,75 @@ function getPeriodLabel(sc, offset, dates) {
     if (offset === 0) return MESES_FULL[d2.getMonth()] + " " + d2.getFullYear();
     return MESES_FULL[d2.getMonth()] + " " + d2.getFullYear();
   }
+  if (sc === "custom" && dates) {
+    var f = new Date(dates.from + "T00:00:00");
+    var t = new Date(dates.to + "T00:00:00");
+    return f.getDate() + "/" + (f.getMonth()+1) + " – " + t.getDate() + "/" + (t.getMonth()+1);
+  }
   return "";
 }
 
 export async function initHistorico() {
   setVal("hist-from", today());
   setVal("hist-to",   today());
-  el("btn-hist-filter").onclick = loadData;
 
   renderTabs();
   applyShortcut("hoje");
 }
 
-window._histShortcut = function(sc, btn) {
+window._openPeriodPicker = function() {
+  var options = [
+    { id:"hoje",   label:"Hoje" },
+    { id:"semana", label:"Esta semana" },
+    { id:"mes",    label:"Este mês" },
+    { id:"custom", label:"Personalizado" },
+  ];
+  var body =
+    '<div class="hist-picker-options">' +
+    options.map(function(o) {
+      var active = activeShortcut === o.id;
+      return '<button class="hist-picker-option' + (active?' active':'') + '" data-sc="' + o.id + '" onclick="window._pickShortcut(this)">' + o.label + '</button>';
+    }).join("") +
+    '</div>' +
+    '<div id="hist-picker-custom" style="display:' + (activeShortcut==="custom" ? "block" : "none") + ';margin-top:14px">' +
+      '<div class="hist-date-inputs" style="display:flex">' +
+        '<div class="hist-date-field"><span class="hist-date-label">De</span><input type="date" id="hist-picker-from" class="hist-date-input" value="' + val("hist-from") + '"/></div>' +
+        '<div class="hist-date-sep">→</div>' +
+        '<div class="hist-date-field"><span class="hist-date-label">Até</span><input type="date" id="hist-picker-to" class="hist-date-input" value="' + val("hist-to") + '"/></div>' +
+      '</div>' +
+      '<button class="btn btn-primary btn-full" style="margin-top:12px" onclick="window._applyCustomPeriod()">Aplicar</button>' +
+    '</div>';
+  openModal("Período", body);
+};
+
+window._pickShortcut = function(btn) {
+  var sc = btn.getAttribute("data-sc");
+  document.querySelectorAll(".hist-picker-option").forEach(function(b) { b.classList.remove("active"); });
+  btn.classList.add("active");
+
+  if (sc === "custom") {
+    activeShortcut = "custom";
+    var custom = el("hist-picker-custom");
+    if (custom) custom.style.display = "block";
+    return;
+  }
+
   activeShortcut = sc;
   periodOffset = 0;
-  document.querySelectorAll(".hist-shortcut").forEach(function(b) {
-    b.classList.remove("active");
-  });
-  if (btn) btn.classList.add("active");
+  applyShortcut(sc);
+  closeModal();
+};
 
-  var dateInputs = el("hist-date-inputs");
-  if (sc === "custom") {
-    if (dateInputs) dateInputs.style.display = "flex";
-  } else {
-    if (dateInputs) dateInputs.style.display = "none";
-    applyShortcut(sc);
-  }
+window._applyCustomPeriod = function() {
+  var f = val("hist-picker-from");
+  var t = val("hist-picker-to");
+  if (!f || !t) return;
+  activeShortcut = "custom";
+  setVal("hist-from", f);
+  setVal("hist-to",   t);
+  updatePeriodTrigger("custom", 0, { from: f, to: t });
+  closeModal();
+  loadData();
 };
 
 window._histNavPeriod = function(dir) {
@@ -137,25 +179,21 @@ function applyShortcut(sc) {
   if (!dates) return;
   setVal("hist-from", dates.from);
   setVal("hist-to",   dates.to);
-  renderPeriodNav(sc, dates);
+  updatePeriodTrigger(sc, periodOffset, dates);
   loadData();
 }
 
-function renderPeriodNav(sc, dates) {
-  var nav = el("hist-period-nav");
-  if (!nav) return;
-  if (sc === "custom") {
-    nav.style.display = "none";
-    return;
+function updatePeriodTrigger(sc, offset, dates) {
+  var labelEl = el("hist-period-trigger-label");
+  var prevBtn = el("hist-nav-prev");
+  var nextBtn = el("hist-nav-next");
+  if (labelEl) labelEl.textContent = getPeriodLabel(sc, offset, dates);
+  var isCustom = sc === "custom";
+  if (prevBtn) prevBtn.style.visibility = isCustom ? "hidden" : "visible";
+  if (nextBtn) {
+    nextBtn.style.visibility = isCustom ? "hidden" : "visible";
+    nextBtn.disabled = offset >= 0;
   }
-  nav.style.display = "flex";
-  var label = getPeriodLabel(sc, periodOffset, dates);
-  var nextDisabled = periodOffset >= 0;
-  nav.innerHTML =
-    '<button class="hist-nav-arrow" onclick="window._histNavPeriod(-1)"><i data-lucide="chevron-left"></i></button>' +
-    '<span class="hist-nav-label">' + label + '</span>' +
-    '<button class="hist-nav-arrow" onclick="window._histNavPeriod(1)"' + (nextDisabled ? ' disabled' : '') + '><i data-lucide="chevron-right"></i></button>';
-  refreshIcons(nav);
 }
 
 function renderTabs() {

@@ -2,7 +2,8 @@ import { el, refreshIcons }                from "./utils.js";
 import { initQuickMode }               from "./components/quickmode.js";
 import { initVender }                      from "./components/vender.js";
 import { initProdutos, openProductForm }   from "./components/produtos.js";
-import { initFiados }                      from "./components/fiados.js";
+import "./components/fiados.js";
+import { initClientesTab }                 from "./components/clientes.js";
 import { initHistorico }                   from "./components/historico.js";
 import { initPerfil }                      from "./components/perfil.js";
 import { initCamera }                      from "./components/camera.js";
@@ -14,17 +15,16 @@ import { hasFeature, getLicense }          from "./license.js";
 var PAGES = {
   vender:    { init: initVender    },
   produtos:  { init: initProdutos  },
-  fiados:    { init: initFiados    },
+  fiados:    { init: initClientesTab },
   historico: { init: initHistorico },
   perfil:    { init: initPerfil    },
 };
 
 var TITLES = {
   vender: "Kontaki", produtos: "Produtos",
-  fiados: "Fiados",  historico: "Histórico", perfil: "Perfil",
+  fiados: "Clientes", historico: "Histórico", perfil: "Perfil",
 };
 
-// Mapa de features por página/botão
 var FEATURE_MAP = {
   historico: "historico",
   dashboard: "dashboard",
@@ -53,7 +53,6 @@ export var router = {
     refreshIcons(el("bottom-nav"));
     refreshIcons(el("topbar"));
 
-    // Botão dashboard
     window._openDashboard = function() {
       if (!hasFeature("dashboard")) { bloqueado("dashboard"); return; }
       var existing = document.getElementById("dashboard-overlay");
@@ -66,7 +65,6 @@ export var router = {
     checkBadges();
     updateNotificationBadge();
 
-    // Quick mode só se tiver feature
     if (hasFeature("venda_rapida")) {
       initQuickMode();
     }
@@ -77,7 +75,6 @@ export var router = {
   go: function(pageId) {
     if (!PAGES[pageId]) return;
 
-    // Verificar acesso à página
     if (pageId === "historico" && !hasFeature("historico")) {
       bloqueado("historico");
       return;
@@ -127,7 +124,7 @@ export var router = {
     if (pageId === "fiados") {
       if (addBtn) {
         addBtn.style.display = "flex";
-        addBtn.onclick = function() { if (window._openFiadoAdd) window._openFiadoAdd(); };
+        addBtn.onclick = function() { if (window._openClienteForm) window._openClienteForm(); };
       }
     }
 

@@ -4,163 +4,20 @@ import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { getUser } from "../auth.js";
 
-let fiadoFilter = "all";
-
-const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
-                "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-
-function fmtMonthYear(iso) {
-  const d = new Date(iso);
-  return MONTHS[d.getMonth()] + " de " + d.getFullYear();
-}
-
 function startOfToday() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
-function isOverdue(e) {
+export function isOverdue(e) {
   if (e.status !== "open" || !e.dueDate) return false;
   return new Date(e.dueDate) < startOfToday();
 }
 
-function waLink(phone, msg) {
+export function waLink(phone, msg) {
   const clean = (phone || "").replace(/\D/g, "");
   return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
-}
-
-export async function initFiados() {
-  el("fiados-search").oninput = renderList;
-  document.querySelectorAll("#fiados-filter-pills .pill").forEach(btn => {
-    btn.addEventListener("click", () => {
-      fiadoFilter = btn.dataset.filter;
-      document.querySelectorAll("#fiados-filter-pills .pill").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      renderList();
-    });
-  });
-  window._openFiadoAdd = openFiadoAdd;
-  window._clearPaidFiados = async function() {
-    if (!confirm("Arquivar todos os fiados pagos?")) return;
-    var all = await db.getAll("fiado");
-    var paid = all.filter(f => f.status === "paid");
-    for (var i = 0; i < paid.length; i++) await db.delete("fiado", paid[i].id);
-    toast(paid.length + " fiado(s) arquivados.", "success");
-    await renderList();
-  };
-  await renderList();
-}
-
-async function renderList() {
-  const all   = await db.getAll("fiado");
-  const open  = all.filter(f => f.status === "open");
-  const total = open.reduce((a, f) => a + (f.amount || 0), 0);
-  const overdueTotal = open.filter(isOverdue).reduce((a, f) => a + (f.amount || 0), 0);
-  const uniqueClients = [...new Set(open.map(f => f.clientName))].length;
-  const paidCount = all.filter(f => f.status === "paid").length;
-
-  el("fiados-total-bar").innerHTML =
-    `<div class="fiados-hero">
-      <div class="fiados-hero-label">A receber</div>
-      <div class="fiados-hero-val">${fmt(total)}</div>
-      <div class="fiados-hero-sub">
-        <span>${uniqueClients} ${uniqueClients === 1 ? "cliente devendo" : "clientes devendo"}</span>
-        ${overdueTotal > 0
-          ? `<span>·</span><span class="fiados-hero-hot">${fmt(overdueTotal)} atrasados</span>`
-          : ""
-        }
-      </div>
-    </div>`;
-
-  var clearBar = document.getElementById("fiados-clear-bar");
-  if (!clearBar) {
-    clearBar = document.createElement("div");
-    clearBar.id = "fiados-clear-bar";
-    var totalBar = el("fiados-total-bar");
-    if (totalBar && totalBar.parentNode)
-      totalBar.parentNode.insertBefore(clearBar, totalBar.nextSibling);
-  }
-  clearBar.innerHTML = paidCount > 0
-    ? `<button onclick="window._clearPaidFiados()" class="fiados-archive-btn">
-        <i data-lucide="archive" style="width:13px;height:13px"></i>
-        Arquivar ${paidCount} pago${paidCount > 1 ? "s" : ""}
-       </button>`
-    : "";
-  refreshIcons(clearBar);
-
-  const q = (val("fiados-search") || "").toLowerCase();
-  const filtered = all.filter(f => {
-    const ms = (f.clientName || "").toLowerCase().includes(q);
-    let mf = fiadoFilter === "all" || f.status === fiadoFilter;
-    if (fiadoFilter === "overdue") mf = isOverdue(f);
-    return ms && mf;
-  });
-
-  const grouped = {};
-  filtered.forEach(f => {
-    const k = f.clientName;
-    if (!grouped[k]) grouped[k] = { clientName: k, entries: [], totalOpen: 0, phone: "" };
-    grouped[k].entries.push(f);
-    if (f.status === "open") grouped[k].totalOpen += f.amount || 0;
-    if (f.phone) grouped[k].phone = f.phone;
-  });
-
-  const groups = Object.values(grouped).sort((a, b) => b.totalOpen - a.totalOpen);
-  const listEl = el("fiados-list");
-  listEl.innerHTML = "";
-
-  if (!groups.length) {
-    listEl.innerHTML =
-      `<div class="empty-state">
-        <i data-lucide="wallet"></i>
-        <div class="empty-state-title">Nenhum fiado</div>
-        <div class="empty-state-sub">Os fiados registados aparecem aqui.</div>
-      </div>`;
-    refreshIcons(listEl); return;
-  }
-
-  groups.forEach(g => {
-    const isSaldado  = g.totalOpen === 0;
-    const openCount  = g.entries.filter(e => e.status === "open").length;
-    const sortedByDate = [...g.entries].sort((a, b) => new Date(a.date) - new Date(b.date));
-    const firstEntry = sortedByDate[0];
-    const lastEntry  = sortedByDate[sortedByDate.length - 1];
-    const firstOpen  = g.entries.find(e => e.status === "open");
-    const groupOverdue = g.entries.some(isOverdue);
-    const initial    = g.clientName.charAt(0).toUpperCase();
-
-    let avatarStyle;
-    if (isSaldado) avatarStyle = "background:var(--success-light);color:var(--success)";
-    else if (groupOverdue) avatarStyle = "background:var(--danger-light);color:var(--danger)";
-    else avatarStyle = "background:var(--primary-light);color:var(--primary)";
-
-    const row = document.createElement("div");
-    row.className = "fc-row";
-    row.onclick = () => window._openFiadoCliente(encodeURIComponent(g.clientName));
-
-    row.innerHTML =
-      `<div class="fc-row-avatar" style="${avatarStyle}">${initial}</div>
-       <div class="fc-row-info">
-         <div class="fc-row-name">${g.clientName}</div>
-         <div class="fc-row-meta">Última compra: ${fmtDate(lastEntry.date)}</div>
-       </div>
-       <div class="fc-row-right">
-         ${isSaldado
-           ? `<div class="fc-row-saldo"><i data-lucide="check-circle" style="width:13px;height:13px"></i> Saldado</div>`
-           : `<div class="fc-row-val ${groupOverdue ? "overdue" : ""}">${fmt(g.totalOpen)}</div>
-              <div class="fc-row-sub">${groupOverdue ? "Atrasado" : "Pendente"}</div>
-              ${openCount === 1
-                ? `<div class="fc-row-action" onclick="event.stopPropagation();window._openPayModal(${firstOpen.id})">Receber →</div>`
-                : `<div class="fc-row-action">${openCount} por pagar →</div>`
-              }`
-         }
-       </div>`;
-
-    listEl.appendChild(row);
-  });
-
-  refreshIcons(listEl);
 }
 
 window._openFiadoCliente = async (encodedName) => {
@@ -180,23 +37,16 @@ window._openFiadoCliente = async (encodedName) => {
         <div class="fc-modal-total">${fmt(totalOpen)}</div>
       </div>
       ${totalOpen > 0
-        ? `<button class="btn btn-success btn-sm" onclick="window._pagarTudo('${encodedN}')">
+        ? `<button class="btn btn-success btn-sm" onclick="window._confirmReceiveAll('${encodedN}',${totalOpen})">
              <i data-lucide="check-check"></i> Receber tudo
            </button>`
         : `<div style="font-size:28px;color:var(--success)">✓</div>`
       }
     </div>
 
-    ${phone
-      ? `<button class="fc-wa-full-btn" onclick="window.open('${waLink(phone, "Olá " + name + ", passando para lembrar do valor em aberto de " + fmt(totalOpen) + ". Obrigado!")}','_blank')">
-          <i data-lucide="message-circle"></i> Enviar lembrete no WhatsApp
-         </button>`
-      : (totalOpen > 0
-          ? `<div class="fiados-modal-tip">
-               <i data-lucide="lightbulb" style="width:14px;height:14px"></i>
-               Adiciona o telefone deste cliente para poderes enviar lembretes.
-             </div>`
-          : "")
+    ${phone ? `<button class="fc-wa-full-btn" onclick="window.open('${waLink(phone, "Olá " + name + ", passando para lembrar do valor em aberto de " + fmt(totalOpen) + ". Obrigado!")}','_blank')">
+        <i data-lucide="message-circle"></i> Enviar lembrete no WhatsApp
+       </button>` : ""
     }
 
     <div class="fc-modal-entries">
@@ -214,9 +64,14 @@ window._openFiadoCliente = async (encodedName) => {
             </div>
           </div>
           ${e.status === "open"
-            ? `<button class="btn btn-outline btn-sm" onclick="window._openPayModal(${e.id})">
-                <i data-lucide="check"></i> Receber
-               </button>`
+            ? `<div style="display:flex;gap:6px;flex-shrink:0">
+                 <button class="fc-icon-btn" onclick="window._openEditFiado(${e.id})" title="Editar">
+                   <i data-lucide="pencil" style="width:14px;height:14px"></i>
+                 </button>
+                 <button class="btn btn-outline btn-sm" onclick="window._openPayModal(${e.id})">
+                   <i data-lucide="check"></i> Receber
+                 </button>
+               </div>`
             : `<div class="fc-paid-icon"><i data-lucide="check-circle" style="width:18px;height:18px;color:var(--success)"></i></div>`
           }
         </div>`).join("")}
@@ -231,6 +86,24 @@ window._openFiadoCliente = async (encodedName) => {
   refreshIcons(el("modal-box"));
 };
 
+// ── Diálogo de confirmação M3 (Receber tudo) ─────────────────────────────────
+window._confirmReceiveAll = (encodedName, total) => {
+  const name = decodeURIComponent(encodedName);
+  openModal("",
+    `<div class="m3-confirm">
+      <div class="m3-confirm-icon"><i data-lucide="banknote"></i></div>
+      <div class="m3-confirm-title">Receber ${fmt(total)}?</div>
+      <div class="m3-confirm-body">
+        Vais marcar toda a dívida de <b>${name}</b> como paga. Esta ação não pode ser desfeita.
+      </div>
+      <div class="m3-confirm-actions">
+        <button class="m3-btn-text" onclick="window._closeModal()">Cancelar</button>
+        <button class="m3-btn-filled" onclick="window._pagarTudo('${encodedName}')">Confirmar</button>
+      </div>
+    </div>`);
+  refreshIcons(el("modal-box"));
+};
+
 window._pagarTudo = async (encodedName) => {
   const { getSession } = await import("../auth.js");
   if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
@@ -240,23 +113,24 @@ window._pagarTudo = async (encodedName) => {
   for (const e of entries)
     await db.put("fiado", { ...e, status: "paid", paidAt: new Date().toISOString() });
   toast("Todos os fiados de " + name + " recebidos.", "success");
-  closeModal(); renderList();
+  closeModal();
+  if (window._refreshClientesTab) window._refreshClientesTab();
 };
 
 window._addFiadoCliente = (encodedName) => {
   closeModal();
-  openFiadoAdd(decodeURIComponent(encodedName));
+  window._openFiadoAdd(decodeURIComponent(encodedName));
 };
 
-async function openFiadoAdd(prefillName = "") {
+async function openFiadoAdd(prefillName = "", prefillPhone = "") {
   const { getSession } = await import("../auth.js");
   if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
 
-  let prefillPhone = "";
-  if (prefillName) {
+  let phoneVal = prefillPhone;
+  if (!phoneVal && prefillName) {
     const all = await db.getAll("fiado");
     const found = [...all].reverse().find(f => f.clientName === prefillName && f.phone);
-    if (found) prefillPhone = found.phone;
+    if (found) phoneVal = found.phone;
   }
 
   openModal("Registar Fiado",
@@ -271,7 +145,7 @@ async function openFiadoAdd(prefillName = "") {
       </div>
       <div class="field">
         <label>Telefone (opcional)</label>
-        <input id="fa-phone" value="${prefillPhone}" placeholder="Ex: 923456789" autocomplete="off"/>
+        <input id="fa-phone" value="${phoneVal}" placeholder="Ex: 923456789" autocomplete="off"/>
       </div>
       <div class="field">
         <label>Vencimento (opcional)</label>
@@ -290,6 +164,7 @@ async function openFiadoAdd(prefillName = "") {
     </div>`);
   refreshIcons(el("modal-box"));
 }
+window._openFiadoAdd = openFiadoAdd;
 
 window._saveFiado = async () => {
   const { getSession } = await import("../auth.js");
@@ -306,7 +181,60 @@ window._saveFiado = async () => {
     status: "open", userId: getUser().id,
   });
   toast("Fiado registado.", "success");
-  closeModal(); renderList();
+  closeModal();
+  if (window._refreshClientesTab) window._refreshClientesTab();
+};
+
+// ── Editar Fiado ──────────────────────────────────────────────────────────────
+window._openEditFiado = async (id) => {
+  const e = await db.get("fiado", id);
+  if (!e) return;
+  const dueVal = e.dueDate ? new Date(e.dueDate).toISOString().slice(0,10) : "";
+
+  openModal("Editar Fiado",
+    `<div style="display:flex;flex-direction:column;gap:14px">
+      <div class="field">
+        <label>Valor (Kz) *</label>
+        <input type="number" id="ef-amt" value="${e.amount}" min="0"/>
+      </div>
+      <div class="field">
+        <label>Vencimento</label>
+        <input type="date" id="ef-duedate" value="${dueVal}"/>
+      </div>
+      <div class="field">
+        <label>Notas</label>
+        <input id="ef-notes" value="${e.notes || ""}" placeholder="Ex: Compra de arroz..."/>
+      </div>
+    </div>
+    <div class="m3-edit-hint">
+      <i data-lucide="info" style="width:13px;height:13px"></i>
+      Alterações a este fiado ficam registadas na hora abaixo.
+    </div>
+    <div class="form-actions" style="margin-top:14px">
+      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
+      <button class="btn btn-primary btn-full" onclick="window._saveEditFiado(${id})">
+        <i data-lucide="save"></i> Guardar alterações
+      </button>
+    </div>`);
+  refreshIcons(el("modal-box"));
+};
+
+window._saveEditFiado = async (id) => {
+  const e = await db.get("fiado", id);
+  if (!e) return;
+  const amt = Number(el("ef-amt").value);
+  if (isNaN(amt) || amt <= 0) { toast("Valor inválido.", "error"); return; }
+  const dueRaw = el("ef-duedate").value;
+  await db.put("fiado", {
+    ...e,
+    amount: amt,
+    dueDate: dueRaw ? new Date(dueRaw).toISOString() : null,
+    notes: el("ef-notes").value.trim(),
+    editedAt: new Date().toISOString(),
+  });
+  toast("Fiado atualizado.", "success");
+  closeModal();
+  if (window._refreshClientesTab) window._refreshClientesTab();
 };
 
 window._openPayModal = async (id) => {
@@ -362,7 +290,8 @@ window._confirmPay = async (id, fullAmt) => {
     await db.put("fiado", { ...e, status: "paid", paidAt: new Date().toISOString() });
   }
   toast("Pagamento registado.", "success");
-  closeModal(); renderList();
+  closeModal();
+  if (window._refreshClientesTab) window._refreshClientesTab();
 };
 
 window._closeModal = closeModal;

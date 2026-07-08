@@ -1,6 +1,5 @@
 import { loadDashboard }      from "./dashboard.js";
 import { loadConfiguracoes }  from "./configuracoes.js";
-import { loadClientes }       from "./clientes.js";
 import { loadDespesas }       from "./despesas.js";
 import { loadSeguranca }   from "./seguranca.js";
 import { loadTurno } from "./turno.js";
@@ -81,7 +80,6 @@ function renderMenu() {
     // ── Operações diárias ──
     { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno",         group: "Operações"  },
     { label: "Despesas",          sub: "Renda, salários e outros custos",icon: "receipt",        color: "#fee2e2", iconColor: "#dc2626", page: "despesas",      group: "Operações"  },
-    { label: "Clientes",          sub: "Fichas e histórico de compras",  icon: "users",          color: "#dbeafe", iconColor: "#2563eb", page: "clientes",      group: "Operações"  },
     // ── Gestão ──
     { label: "Escritório",        sub: "Importar e confirmar turnos",    icon: "archive",        color: "#ede9fe", iconColor: "#5b21b6", page: "escritorio",    group: "Gestão"     },
     { label: "Contabilidade",     sub: "Receitas, lucros e despesas",    icon: "bar-chart-2",    color: "#dcfce7", iconColor: "#16a34a", page: "contabilidade", group: "Gestão"     },
@@ -97,7 +95,6 @@ function renderMenu() {
 
   const caixaItems = [
     { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno",         group: "Operações"  },
-    { label: "Clientes",          sub: "Fichas e histórico de compras",  icon: "users",          color: "#dbeafe", iconColor: "#2563eb", page: "clientes",      group: "Operações"  },
     { label: "Escritório",        sub: "Importar ficheiros de turno",    icon: "archive",        color: "#ede9fe", iconColor: "#5b21b6", page: "escritorio",    group: "Operações"  },
     { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "#fee2e2", iconColor: "#dc2626", page: "seguranca",     group: "Operações"  },
   ];
@@ -159,8 +156,7 @@ function renderMenu() {
 }
 
 function setupSubpageButtons() {
-  ["stock","incidentes","equipa","loja","senha","dashboard","clientes",
-   "despesas","contabilidade","assinatura","contactos","configuracoes",
+  ["stock","incidentes","equipa","loja","senha","dashboard","despesas","contabilidade","assinatura","contactos","configuracoes",
    "seguranca","turno","fornecedores","escritorio","sobre","ajuda","notificacoes"].forEach(function(name) {
     var btn = document.getElementById("btn-back-" + name);
     if (btn) btn.onclick = function() { window._perfilBack(); };
@@ -220,7 +216,6 @@ window._perfilNav = async (page) => {
   if (page === "seguranca")    await loadSegurancaPage();
   if (page === "turno")        await loadTurnoPage();
   if (page === "fornecedores") await loadFornecedoresPage();
-  if (page === "clientes")     await loadClientesPage();
   if (page === "despesas")     await loadDespesasPage();
   if (page === "senha")        loadSenhaPage();
   if (page === "sobre")        loadSobre();
@@ -229,7 +224,7 @@ window._perfilNav = async (page) => {
 };
 
 function showSubpage(name) {
-  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","clientes","despesas","assinatura","contactos","escritorio","sobre","ajuda","notificacoes"];
+  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","despesas","assinatura","contactos","escritorio","sobre","ajuda","notificacoes"];
   subpages.forEach(s => {
     const node = el("subpage-" + s);
     if (node) node.style.display = "none";
@@ -1385,13 +1380,6 @@ window._gerarRelatorioFuncionario = async function() {
   setTimeout(function(){ win.print(); }, 400);
 };
 
-
-async function loadClientesPage() {
-  var btn = document.getElementById("btn-back-clientes");
-  if (btn) btn.onclick = function() { showSubpage(null); };
-  window._showSubpage = showSubpage;
-  await loadClientes();
-}
 
 async function loadDespesasPage() {
   var btn = document.getElementById("btn-back-despesas");

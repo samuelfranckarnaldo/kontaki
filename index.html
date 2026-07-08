@@ -188,8 +188,8 @@ document.addEventListener("DOMContentLoaded", function() {
         </div>
         <div class="pill-group" id="fiados-filter-pills" style="margin-top:12px">
           <button class="pill active" data-filter="all">Todos</button>
-          <button class="pill" data-filter="open">Em aberto</button>
-          <button class="pill" data-filter="paid">Pagos</button>
+          <button class="pill" data-filter="debt">Com dívida</button>
+          <button class="pill" data-filter="clean">Em dia</button>
         </div>
         <div id="fiados-total-bar" style="font-size:13px;color:#71717a;margin-top:8px"></div>
         <div class="list-card" id="fiados-list"></div>
@@ -199,28 +199,15 @@ document.addEventListener("DOMContentLoaded", function() {
     <!-- HISTÓRICO -->
     <div class="page" id="pg-historico">
 
-      <div class="hist-filter-bar">
-        <div class="hist-date-shortcuts">
-          <button class="hist-shortcut active" id="hist-sc-hoje" onclick="window._histShortcut('hoje',this)">Hoje</button>
-          <button class="hist-shortcut" id="hist-sc-semana" onclick="window._histShortcut('semana',this)">Semana</button>
-          <button class="hist-shortcut" id="hist-sc-mes" onclick="window._histShortcut('mes',this)">Mês</button>
-          <button class="hist-shortcut" id="hist-sc-custom" onclick="window._histShortcut('custom',this)">Personalizado</button>
-        </div>
-        <div id="hist-period-nav" class="hist-period-nav" style="display:none"></div>
-        <div class="hist-date-inputs" id="hist-date-inputs" style="display:none">
-          <div class="hist-date-field">
-            <span class="hist-date-label">De</span>
-            <input type="date" id="hist-from" class="hist-date-input"/>
-          </div>
-          <div class="hist-date-sep">→</div>
-          <div class="hist-date-field">
-            <span class="hist-date-label">Até</span>
-            <input type="date" id="hist-to" class="hist-date-input"/>
-          </div>
-          <button class="btn btn-primary btn-sm" id="btn-hist-filter">
-            <i data-lucide="search"></i>
-          </button>
-        </div>
+      <div class="hist-filter-bar hist-filter-bar--compact">
+        <button class="hist-nav-arrow" id="hist-nav-prev" onclick="window._histNavPeriod(-1)"><i data-lucide="chevron-left"></i></button>
+        <button class="hist-period-trigger" id="hist-period-trigger" onclick="window._openPeriodPicker()">
+          <span id="hist-period-trigger-label">Hoje</span>
+          <i data-lucide="chevron-down" style="width:14px;height:14px"></i>
+        </button>
+        <button class="hist-nav-arrow" id="hist-nav-next" onclick="window._histNavPeriod(1)"><i data-lucide="chevron-right"></i></button>
+        <input type="hidden" id="hist-from"/>
+        <input type="hidden" id="hist-to"/>
       </div>
 
       <div class="hist-tabs" id="historico-tabs"></div>
@@ -568,8 +555,8 @@ document.addEventListener("DOMContentLoaded", function() {
       <span id="produtos-badge" class="nav-badge" style="display:none"></span>
     </button>
     <button class="nav-item" data-page="fiados">
-      <i data-lucide="wallet"></i>
-      <span class="nav-label">Fiados</span>
+      <i data-lucide="users"></i>
+      <span class="nav-label">Clientes</span>
       <span id="fiados-badge" class="nav-badge" style="display:none"></span>
     </button>
     <button class="nav-item" data-page="historico">

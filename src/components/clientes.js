@@ -1,236 +1,282 @@
-import { db }            from "../db.js";
+import { db } from "../db.js";
 import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
-import { toast }         from "../toast.js";
+import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
+import "./fiados.js";
+import { isOverdue } from "./fiados.js";
 
-export async function loadClientes() {
-  var btn = document.getElementById("btn-back-clientes");
-  if (btn) btn.onclick = function() { window._perfilBack(); };
-  await renderClientes();
-}
+let clienteFilter = "all";
 
-async function renderClientes() {
-  var wrap = document.getElementById("clientes-content");
-  if (!wrap) return;
+export async function initClientesTab() {
+  const search = el("fiados-search");
+  if (search) { search.placeholder = "Pesquisar cliente..."; search.oninput = renderClientesTab; }
 
-  var results = await Promise.all([
-    db.getAll("clients"), db.getAll("sales"), db.getAll("fiado"),
-  ]);
-  var clients = results[0];
-  var sales   = results[1];
-  var fiados  = results[2];
-
-  clients.sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
-
-  // Pesquisa
-  var searchId = "clientes-search-input";
-  var searchVal = (document.getElementById(searchId)||{}).value || "";
-
-  wrap.innerHTML = "";
-
-  // Barra de pesquisa + botão
-  var topBar = document.createElement("div");
-  topBar.style.cssText = "display:flex;gap:8px;margin-bottom:14px";
-  topBar.innerHTML =
-    '<div class="search-wrap" style="flex:1">' +
-    '<i data-lucide="search" class="search-icon"></i>' +
-    '<input id="' + searchId + '" placeholder="Pesquisar cliente..." value="' + searchVal + '" ' +
-    'style="padding-left:36px" oninput="window._filterClientes(this.value)"/>' +
-    '</div>' +
-    '<button onclick="window._openClienteForm()" class="btn btn-primary btn-sm">' +
-    '<i data-lucide="user-plus"></i> Novo' +
-    '</button>';
-  wrap.appendChild(topBar);
-  refreshIcons(topBar);
-
-  var filtered = clients.filter(function(c) {
-    return !searchVal || (c.name||"").toLowerCase().includes(searchVal.toLowerCase()) ||
-           (c.phone||"").includes(searchVal);
+  document.querySelectorAll("#fiados-filter-pills .pill").forEach(btn => {
+    btn.addEventListener("click", () => {
+      clienteFilter = btn.dataset.filter;
+      document.querySelectorAll("#fiados-filter-pills .pill").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderClientesTab();
+    });
   });
 
-  // Stats
-  var statsEl = document.createElement("div");
-  statsEl.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px";
-  var totalFiadoAberto = fiados.filter(function(f){ return f.status==="open"; })
-    .reduce(function(a,f){ return a+(f.amount||0); },0);
-  statsEl.innerHTML =
-    '<div class="stat-card">' +
-    '<div class="stat-label">Total clientes</div>' +
-    '<div class="stat-val" style="color:var(--primary)">' + clients.length + '</div>' +
-    '</div>' +
-    '<div class="stat-card">' +
-    '<div class="stat-label">Fiado em aberto</div>' +
-    '<div class="stat-val" style="color:var(--warning)">' + fmt(totalFiadoAberto) + '</div>' +
-    '</div>';
-  wrap.appendChild(statsEl);
+  window._openClienteForm = openClienteForm;
+  window._refreshClientesTab = renderClientesTab;
+  await renderClientesTab();
+}
 
-  if (filtered.length === 0) {
-    var empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.innerHTML =
-      '<i data-lucide="users"></i>' +
-      '<div class="empty-state-title">' + (clients.length === 0 ? "Nenhum cliente" : "Sem resultados") + '</div>' +
-      '<div class="empty-state-sub">' +
-      (clients.length === 0
-        ? "Os clientes são criados automaticamente ao vender ou registar fiado."
-        : "Tenta pesquisar por outro nome ou telefone.") +
-      '</div>';
-    wrap.appendChild(empty);
-    refreshIcons(wrap);
+async function renderClientesTab() {
+  const [clients, sales, fiados] = await Promise.all([
+    db.getAll("clients"), db.getAll("sales"), db.getAll("fiado"),
+  ]);
+
+  const q = (el("fiados-search") ? el("fiados-search").value : "").toLowerCase();
+
+  const enriched = clients.map(c => {
+    const myFiados = fiados.filter(f =>
+      f.clientId === c.id || (f.clientName || "").toLowerCase() === (c.name || "").toLowerCase());
+    const mySales = sales.filter(s =>
+      s.clientId === c.id || (s.clientName || "").toLowerCase() === (c.name || "").toLowerCase());
+    const open = myFiados.filter(f => f.status === "open");
+    const totalOpen = open.reduce((a, f) => a + (f.amount || 0), 0);
+    const overdue = open.some(isOverdue);
+    return { client: c, myFiados, mySales, totalOpen, overdue };
+  });
+
+  const totalReceber = enriched.reduce((a, e) => a + e.totalOpen, 0);
+  const clientesComDivida = enriched.filter(e => e.totalOpen > 0).length;
+
+  el("fiados-total-bar").innerHTML =
+    `<div class="fiados-hero">
+      <div class="fiados-hero-label">A receber</div>
+      <div class="fiados-hero-val">${fmt(totalReceber)}</div>
+      <div class="fiados-hero-sub">
+        <span>${clients.length} ${clients.length === 1 ? "cliente" : "clientes"}</span>
+        ${clientesComDivida > 0
+          ? `<span>·</span><span class="fiados-hero-hot">${clientesComDivida} com dívida</span>`
+          : ""
+        }
+      </div>
+    </div>`;
+
+  let filtered = enriched.filter(e => (e.client.name || "").toLowerCase().includes(q));
+  if (clienteFilter === "debt")  filtered = filtered.filter(e => e.totalOpen > 0);
+  if (clienteFilter === "clean") filtered = filtered.filter(e => e.totalOpen === 0);
+  filtered.sort((a, b) => b.totalOpen - a.totalOpen || (a.client.name||"").localeCompare(b.client.name||""));
+
+  const listEl = el("fiados-list");
+  listEl.innerHTML = "";
+
+  if (!filtered.length) {
+    listEl.innerHTML =
+      `<div class="empty-state">
+        <i data-lucide="users"></i>
+        <div class="empty-state-title">${clients.length === 0 ? "Nenhum cliente" : "Sem resultados"}</div>
+        <div class="empty-state-sub">${clients.length === 0
+          ? "Toca em + para adicionar o teu primeiro cliente."
+          : "Tenta pesquisar por outro nome."}</div>
+      </div>`;
+    refreshIcons(listEl);
     return;
   }
 
-  var listEl = document.createElement("div");
-  listEl.className = "list-card";
+  filtered.forEach(({ client: c, mySales, totalOpen, overdue }) => {
+    const isSaldado = totalOpen === 0;
+    let avatarStyle;
+    if (mySales.length === 0 && totalOpen === 0) avatarStyle = "background:var(--primary-light);color:var(--primary)";
+    else if (overdue) avatarStyle = "background:var(--danger-light);color:var(--danger)";
+    else if (isSaldado) avatarStyle = "background:var(--success-light);color:var(--success)";
+    else avatarStyle = "background:var(--primary-light);color:var(--primary)";
 
-  filtered.forEach(function(c) {
-    var mySales     = sales.filter(function(s){ return s.clientId===c.id || (s.clientName||"").toLowerCase()===c.name.toLowerCase(); });
-    var myFiados    = fiados.filter(function(f){ return f.clientId===c.id || (f.clientName||"").toLowerCase()===c.name.toLowerCase(); });
-    var totalGasto  = mySales.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
-    var fiadoAberto = myFiados.filter(function(f){ return f.status==="open"; }).reduce(function(a,f){ return a+(f.amount||0); },0);
-
-    var row = document.createElement("div");
-    row.style.cssText = "display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--border2);cursor:pointer;transition:background .15s";
-    row.onmouseenter = function(){ this.style.background = "var(--border2)"; };
-    row.onmouseleave = function(){ this.style.background = ""; };
-    row.onclick = function(){ window._openClienteDetail(c.id); };
+    const row = document.createElement("div");
+    row.className = "fc-row";
+    row.onclick = () => window._openClienteDetail(c.id);
 
     row.innerHTML =
-      '<div style="width:40px;height:40px;border-radius:12px;background:var(--primary-light);' +
-      'color:var(--primary);font-size:16px;font-weight:800;display:flex;align-items:center;' +
-      'justify-content:center;flex-shrink:0">' + c.name.charAt(0).toUpperCase() + '</div>' +
-      '<div style="flex:1;min-width:0">' +
-      '<div style="font-size:14px;font-weight:700;color:var(--text)">' + c.name + '</div>' +
-      '<div style="font-size:11px;color:var(--text4);margin-top:2px">' +
-      (c.phone || "sem telefone") + ' · ' + mySales.length + ' ' + (mySales.length===1?"compra":"compras") +
-      '</div>' +
-      '</div>' +
-      '<div style="text-align:right;flex-shrink:0">' +
-      '<div style="font-size:14px;font-weight:700;color:var(--primary)">' + fmt(totalGasto) + '</div>' +
-      (fiadoAberto > 0
-        ? '<div style="font-size:10px;color:var(--warning);font-weight:700;margin-top:2px">Fiado: ' + fmt(fiadoAberto) + '</div>'
-        : '') +
-      '</div>' +
-      '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text4);flex-shrink:0"></i>';
+      `<div class="fc-row-avatar" style="${avatarStyle}">${(c.name||"?").charAt(0).toUpperCase()}</div>
+       <div class="fc-row-info">
+         <div class="fc-row-name">${c.name}</div>
+         <div class="fc-row-meta">${c.phone || "sem telefone"} · ${mySales.length} ${mySales.length === 1 ? "compra" : "compras"}</div>
+       </div>
+       <div class="fc-row-right">
+         ${totalOpen > 0
+           ? `<div class="fc-row-val ${overdue ? "overdue" : ""}">${fmt(totalOpen)}</div>
+              <div class="fc-row-sub">${overdue ? "Atrasado" : "Pendente"}</div>`
+           : `<div class="fc-row-saldo"><i data-lucide="check-circle" style="width:13px;height:13px"></i> Em dia</div>`
+         }
+       </div>`;
 
     listEl.appendChild(row);
   });
 
-  wrap.appendChild(listEl);
-  refreshIcons(wrap);
+  refreshIcons(listEl);
 }
 
-window._filterClientes = function(q) {
-  renderClientes();
-};
-
-window._openClienteForm = function(c) {
+function openClienteForm(c) {
   c = c || {};
   openModal(c.id ? "Editar Cliente" : "Novo Cliente",
-    '<div style="display:flex;flex-direction:column;gap:12px">' +
-    '<div class="field"><label>Nome *</label>' +
-    '<input id="cl-name" value="' + (c.name||"") + '" placeholder="Ex: Maria Silva" autocomplete="off"/></div>' +
-    '<div class="field"><label>Telefone</label>' +
-    '<input id="cl-phone" value="' + (c.phone||"") + '" type="tel" placeholder="923 000 000"/></div>' +
-    '<div class="field"><label>Endereço</label>' +
-    '<input id="cl-addr" value="' + (c.address||"") + '" placeholder="Bairro, rua..."/></div>' +
-    '<div class="field"><label>Notas</label>' +
-    '<input id="cl-notes" value="' + (c.notes||"") + '" placeholder="Informações adicionais..."/></div>' +
-    '</div>' +
-    '<div class="form-actions" style="margin-top:16px">' +
-    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
-    '<button class="btn btn-primary btn-full" onclick="window._saveCliente(' + (c.id||0) + ')">' +
-    '<i data-lucide="save"></i> Guardar</button>' +
-    '</div>');
+    `<div style="display:flex;flex-direction:column;gap:12px">
+      <div class="field"><label>Nome *</label>
+        <input id="cl-name" value="${c.name||""}" placeholder="Ex: Maria Silva" autocomplete="off"/></div>
+      <div class="field"><label>Telefone</label>
+        <input id="cl-phone" value="${c.phone||""}" type="tel" placeholder="923 000 000"/></div>
+      <div class="field"><label>Endereço</label>
+        <input id="cl-addr" value="${c.address||""}" placeholder="Bairro, rua..."/></div>
+      <div class="field"><label>Notas</label>
+        <input id="cl-notes" value="${c.notes||""}" placeholder="Informações adicionais..."/></div>
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
+      <button class="btn btn-primary btn-full" onclick="window._saveCliente(${c.id||0})">
+        <i data-lucide="save"></i> Guardar</button>
+    </div>`);
   refreshIcons(el("modal-box"));
-};
+}
 
-window._saveCliente = async function(id) {
-  var name = (el("cl-name")||{}).value || "";
-  name = name.trim();
+window._saveCliente = async (id) => {
+  const name = (el("cl-name")?.value || "").trim();
   if (!name) { toast("O nome é obrigatório.", "error"); return; }
-  var data = {
-    name:    name,
-    phone:   ((el("cl-phone")||{}).value||"").trim(),
-    address: ((el("cl-addr")||{}).value||"").trim(),
-    notes:   ((el("cl-notes")||{}).value||"").trim(),
+  const data = {
+    name,
+    phone:   (el("cl-phone")?.value  || "").trim(),
+    address: (el("cl-addr")?.value   || "").trim(),
+    notes:   (el("cl-notes")?.value  || "").trim(),
   };
   if (id) {
-    var ex = await db.get("clients", id);
-    await db.put("clients", Object.assign({}, ex, data));
+    const ex = await db.get("clients", id);
+    await db.put("clients", { ...ex, ...data });
     toast("Cliente actualizado.", "success");
   } else {
-    await db.add("clients", Object.assign({}, data, { createdAt: new Date().toISOString() }));
+    await db.add("clients", { ...data, createdAt: new Date().toISOString() });
     toast("Cliente adicionado.", "success");
   }
   closeModal();
-  await renderClientes();
+  await renderClientesTab();
 };
 
-window._openClienteDetail = async function(id) {
-  var c = await db.get("clients", id);
+function renderComprasPanel(mySales) {
+  if (!mySales.length) {
+    return `<div style="text-align:center;color:var(--text4);font-size:13px;padding:24px">Sem compras registadas</div>`;
+  }
+  return mySales.slice(0, 30).map(s => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border2)">
+      <div>
+        <div style="font-size:13px;font-weight:600">Compra</div>
+        <div style="font-size:11px;color:var(--text4)">${fmtDate(s.date)} · ${(s.items||[]).length} item(s) · ${s.payMethod||""}</div>
+      </div>
+      <div style="font-size:14px;font-weight:700;color:var(--primary)">${fmt(s.total)}</div>
+    </div>`).join("");
+}
+
+function renderFiadosPanel(myFiados, clientName) {
+  const open = myFiados.filter(f => f.status === "open");
+  const totalOpen = open.reduce((a, f) => a + (f.amount || 0), 0);
+  const sorted = [...myFiados].sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  const actions =
+    (totalOpen > 0
+      ? `<button class="btn btn-success btn-full btn-sm" style="margin-bottom:8px" onclick="window._confirmReceiveAll('${encodeURIComponent(clientName)}',${totalOpen})">
+           <i data-lucide="check-check"></i> Receber tudo (${fmt(totalOpen)})
+         </button>`
+      : ""
+    ) +
+    `<button class="btn btn-outline btn-full btn-sm" style="margin-bottom:14px" onclick="window._closeModal();window._openFiadoAdd('${clientName.replace(/'/g,"\\'")}')">
+       <i data-lucide="plus"></i> Registar novo fiado
+     </button>`;
+
+  const list = !sorted.length
+    ? `<div style="text-align:center;color:var(--text4);font-size:13px;padding:24px">Sem fiados registados</div>`
+    : sorted.slice(0, 30).map(f => {
+        const overdue = isOverdue(f);
+        const color = f.status === "paid" ? "var(--success)" : (overdue ? "var(--danger)" : "var(--warning)");
+        const label = f.status === "paid" ? "Pagamento recebido" : "Fiado";
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border2)">
+          <div>
+            <div style="font-size:13px;font-weight:600">${label}${overdue ? ' <span class="fc-badge-overdue">Atrasado</span>' : ""}</div>
+            <div style="font-size:11px;color:var(--text4)">${fmtDate(f.date)}${f.notes ? " · " + f.notes : ""}${f.dueDate ? " · vence " + fmtDate(f.dueDate) : ""}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="font-size:14px;font-weight:700;color:${color}">${fmt(f.amount)}</div>
+            ${f.status === "open" ? `
+              <button class="fc-icon-btn" onclick="window._openEditFiado(${f.id})" title="Editar">
+                <i data-lucide="pencil" style="width:13px;height:13px"></i>
+              </button>
+              <button class="btn btn-outline btn-sm" style="padding:6px 10px" onclick="window._openPayModal(${f.id})">Receber</button>
+            ` : ""}
+          </div>
+        </div>`;
+      }).join("");
+
+  return actions + `<div style="border:1px solid var(--border2);border-radius:12px;overflow:hidden">${list}</div>`;
+}
+
+window._switchClienteTab = (tab) => {
+  document.querySelectorAll(".fc-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  const compras = document.getElementById("fc-tab-panel-compras");
+  const fiadosP = document.getElementById("fc-tab-panel-fiados");
+  if (compras) compras.style.display = tab === "compras" ? "block" : "none";
+  if (fiadosP) fiadosP.style.display = tab === "fiados" ? "block" : "none";
+};
+
+window._openClienteDetail = async (id) => {
+  const c = await db.get("clients", id);
   if (!c) return;
 
-  var results = await Promise.all([db.getAll("sales"), db.getAll("fiado")]);
-  var sales  = results[0];
-  var fiados = results[1];
-
-  var mySales     = sales.filter(function(s){ return s.clientId===c.id || (s.clientName||"").toLowerCase()===c.name.toLowerCase(); }).reverse();
-  var myFiados    = fiados.filter(function(f){ return f.clientId===c.id || (f.clientName||"").toLowerCase()===c.name.toLowerCase(); });
-  var totalGasto  = mySales.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
-  var fiadoAberto = myFiados.filter(function(f){ return f.status==="open"; }).reduce(function(a,f){ return a+(f.amount||0); },0);
-  var nCompras    = mySales.length;
+  const [sales, fiados] = await Promise.all([db.getAll("sales"), db.getAll("fiado")]);
+  const mySales  = sales.filter(s => s.clientId === c.id || (s.clientName||"").toLowerCase() === c.name.toLowerCase())
+                        .sort((a,b) => new Date(b.date) - new Date(a.date));
+  const myFiados = fiados.filter(f => f.clientId === c.id || (f.clientName||"").toLowerCase() === c.name.toLowerCase());
+  const openFiados = myFiados.filter(f => f.status === "open");
+  const totalGasto  = mySales.reduce((a,s) => a + ((s.total||0) - (s.totalDevolvido||0)), 0);
+  const fiadoAberto = openFiados.reduce((a,f) => a + (f.amount||0), 0);
 
   openModal(c.name,
-    // Header do cliente
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">' +
-    '<div style="width:52px;height:52px;border-radius:16px;background:var(--primary-light);' +
-    'color:var(--primary);font-size:22px;font-weight:800;display:flex;align-items:center;' +
-    'justify-content:center;flex-shrink:0">' + c.name.charAt(0).toUpperCase() + '</div>' +
-    '<div>' +
-    '<div style="font-size:17px;font-weight:700">' + c.name + '</div>' +
-    (c.phone ? '<div style="font-size:12px;color:var(--text3);margin-top:2px">' + c.phone + '</div>' : '') +
-    (c.address ? '<div style="font-size:12px;color:var(--text3)">' + c.address + '</div>' : '') +
-    '</div></div>' +
+    `<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="width:52px;height:52px;border-radius:16px;background:var(--primary-light);color:var(--primary);
+        font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        ${c.name.charAt(0).toUpperCase()}
+      </div>
+      <div>
+        <div style="font-size:17px;font-weight:700">${c.name}</div>
+        ${c.phone ? `<div style="font-size:12px;color:var(--text3);margin-top:2px">${c.phone}</div>` : ""}
+        ${c.address ? `<div style="font-size:12px;color:var(--text3)">${c.address}</div>` : ""}
+      </div>
+    </div>
 
-    // Stats
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">' +
-    '<div class="stat-card" style="text-align:center">' +
-    '<div class="stat-label">Compras</div>' +
-    '<div class="stat-val" style="color:var(--primary);font-size:20px">' + nCompras + '</div>' +
-    '</div>' +
-    '<div class="stat-card" style="text-align:center">' +
-    '<div class="stat-label">Total gasto</div>' +
-    '<div class="stat-val" style="color:var(--success);font-size:14px">' + fmt(totalGasto) + '</div>' +
-    '</div>' +
-    '<div class="stat-card" style="text-align:center">' +
-    '<div class="stat-label">Fiado</div>' +
-    '<div class="stat-val" style="color:' + (fiadoAberto>0?"var(--warning)":"var(--success)") + ';font-size:14px">' + fmt(fiadoAberto) + '</div>' +
-    '</div>' +
-    '</div>' +
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+      <div class="stat-card" style="text-align:center">
+        <div class="stat-label">Compras</div>
+        <div class="stat-val" style="color:var(--primary);font-size:20px">${mySales.length}</div>
+      </div>
+      <div class="stat-card" style="text-align:center">
+        <div class="stat-label">Total gasto</div>
+        <div class="stat-val" style="color:var(--success);font-size:14px">${fmt(totalGasto)}</div>
+      </div>
+      <div class="stat-card" style="text-align:center">
+        <div class="stat-label">Fiado</div>
+        <div class="stat-val" style="color:${fiadoAberto>0?"var(--warning)":"var(--success)"};font-size:14px">${fmt(fiadoAberto)}</div>
+      </div>
+    </div>
 
-    // Histórico
-    '<div style="font-size:11px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Últimas compras</div>' +
-    '<div style="max-height:220px;overflow-y:auto;border:1px solid var(--border2);border-radius:12px;margin-bottom:16px">' +
-    (mySales.length === 0
-      ? '<div style="text-align:center;color:var(--text4);font-size:13px;padding:20px">Sem compras registadas</div>'
-      : mySales.slice(0,20).map(function(s){
-          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border2)">' +
-            '<div>' +
-            '<div style="font-size:13px;font-weight:600">' + fmtDate(s.date) + '</div>' +
-            '<div style="font-size:11px;color:var(--text4)">' + (s.payMethod||"") + ' · ' + (s.items||[]).length + ' item(s)</div>' +
-            '</div>' +
-            '<div style="font-size:14px;font-weight:700;color:var(--primary)">' + fmt(s.total) + '</div>' +
-            '</div>';
-        }).join("")
-    ) +
-    '</div>' +
+    <div class="fc-tabbar">
+      <button class="fc-tab active" data-tab="compras" onclick="window._switchClienteTab('compras')">Compras</button>
+      <button class="fc-tab" data-tab="fiados" onclick="window._switchClienteTab('fiados')">
+        Fiados${fiadoAberto > 0 ? `<span class="fc-tab-dot"></span>` : ""}
+      </button>
+    </div>
 
-    '<div class="form-actions">' +
-    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>' +
-    '<button class="btn btn-primary btn-full" onclick="window._openClienteForm(' + JSON.stringify(c).replace(/"/g,"&quot;") + ')">' +
-    '<i data-lucide="edit-3"></i> Editar</button>' +
-    '</div>');
+    <div id="fc-tab-panel-compras" class="fc-tab-panel" style="display:block">
+      ${renderComprasPanel(mySales)}
+    </div>
+    <div id="fc-tab-panel-fiados" class="fc-tab-panel" style="display:none">
+      ${renderFiadosPanel(myFiados, c.name)}
+    </div>
+
+    <div class="form-actions" style="margin-top:16px">
+      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>
+      <button class="btn btn-primary btn-full" onclick="window._openClienteForm(${JSON.stringify(c).replace(/"/g,"&quot;")})">
+        <i data-lucide="edit-3"></i> Editar</button>
+    </div>`);
   refreshIcons(el("modal-box"));
 };
 
