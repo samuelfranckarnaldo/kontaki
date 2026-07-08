@@ -113,6 +113,8 @@ export async function initHistorico() {
   applyShortcut("hoje");
 }
 
+var calState = { viewYear:0, viewMonth:0, selFrom:null, selTo:null };
+
 window._openPeriodPicker = function() {
   var options = [
     { id:"hoje",   label:"Hoje" },
@@ -128,14 +130,18 @@ window._openPeriodPicker = function() {
     }).join("") +
     '</div>' +
     '<div id="hist-picker-custom" style="display:' + (activeShortcut==="custom" ? "block" : "none") + ';margin-top:14px">' +
-      '<div class="hist-date-inputs" style="display:flex">' +
-        '<div class="hist-date-field"><span class="hist-date-label">De</span><input type="date" id="hist-picker-from" class="hist-date-input" value="' + val("hist-from") + '"/></div>' +
-        '<div class="hist-date-sep">→</div>' +
-        '<div class="hist-date-field"><span class="hist-date-label">Até</span><input type="date" id="hist-picker-to" class="hist-date-input" value="' + val("hist-to") + '"/></div>' +
-      '</div>' +
-      '<button class="btn btn-primary btn-full" style="margin-top:12px" onclick="window._applyCustomPeriod()">Aplicar</button>' +
+      '<div id="hist-calendar"></div>' +
+      '<button class="btn btn-primary btn-full" id="hist-picker-apply" style="margin-top:12px" disabled onclick="window._applyCustomPeriod()">Aplicar</button>' +
     '</div>';
   openModal("Período", body);
+
+  var startRef = val("hist-from") ? new Date(val("hist-from") + "T00:00:00") : new Date();
+  calState.viewYear  = startRef.getFullYear();
+  calState.viewMonth = startRef.getMonth();
+  calState.selFrom = val("hist-from") || null;
+  calState.selTo   = val("hist-to") || null;
+
+  if (activeShortcut === "custom") renderCalendar();
 };
 
 window._pickShortcut = function(btn) {
@@ -147,6 +153,7 @@ window._pickShortcut = function(btn) {
     activeShortcut = "custom";
     var custom = el("hist-picker-custom");
     if (custom) custom.style.display = "block";
+    renderCalendar();
     return;
   }
 
@@ -157,15 +164,93 @@ window._pickShortcut = function(btn) {
 };
 
 window._applyCustomPeriod = function() {
-  var f = val("hist-picker-from");
-  var t = val("hist-picker-to");
-  if (!f || !t) return;
+  if (!calState.selFrom || !calState.selTo) return;
   activeShortcut = "custom";
-  setVal("hist-from", f);
-  setVal("hist-to",   t);
-  updatePeriodTrigger("custom", 0, { from: f, to: t });
+  setVal("hist-from", calState.selFrom);
+  setVal("hist-to",   calState.selTo);
+  updatePeriodTrigger("custom", 0, { from: calState.selFrom, to: calState.selTo });
   closeModal();
   loadData();
+};
+
+var CAL_DIAS = ["D","S","T","Q","Q","S","S"];
+var CAL_MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+function fmtCalShort(dateStr) {
+  if (!dateStr) return "--";
+  var d = new Date(dateStr + "T00:00:00");
+  return String(d.getDate()).padStart(2,"0") + "/" + String(d.getMonth()+1).padStart(2,"0");
+}
+
+function renderCalendar(dir) {
+  var wrap = el("hist-calendar");
+  if (!wrap) return;
+
+  var y = calState.viewYear, m = calState.viewMonth;
+  var firstDay = new Date(y, m, 1).getDay();
+  var daysInMonth = new Date(y, m + 1, 0).getDate();
+  var todayStr = today();
+
+  var cells = "";
+  for (var i = 0; i < firstDay; i++) cells += '<div class="cal-cell cal-cell--empty"></div>';
+  for (var d = 1; d <= daysInMonth; d++) {
+    var dateStr = y + "-" + String(m+1).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+    var cls = "cal-cell";
+    var isSingle = calState.selFrom && calState.selTo && calState.selFrom === calState.selTo && dateStr === calState.selFrom;
+    if (dateStr === todayStr) cls += " cal-cell--today";
+    if (isSingle) {
+      cls += " cal-cell--single";
+    } else {
+      if (calState.selFrom && dateStr === calState.selFrom) cls += " cal-cell--start";
+      if (calState.selTo && dateStr === calState.selTo) cls += " cal-cell--end";
+      if (calState.selFrom && calState.selTo && dateStr > calState.selFrom && dateStr < calState.selTo) cls += " cal-cell--inrange";
+    }
+    if (dateStr > todayStr) cls += " cal-cell--future";
+    cells += '<button class="' + cls + '" onclick="window._calPick(\'' + dateStr + '\')"' + (dateStr > todayStr ? ' disabled' : '') + '>' + d + '</button>';
+  }
+
+  var statusText;
+  if (!calState.selFrom) {
+    statusText = 'Toca numa data de início';
+  } else if (!calState.selTo) {
+    statusText = '<strong>' + fmtCalShort(calState.selFrom) + '</strong> → toca na data final';
+  } else {
+    statusText = '<strong>' + fmtCalShort(calState.selFrom) + '</strong> → <strong>' + fmtCalShort(calState.selTo) + '</strong>';
+  }
+
+  wrap.innerHTML =
+    '<div class="cal-status">' + statusText + '</div>' +
+    '<div class="cal-header">' +
+      '<button class="hist-nav-arrow" onclick="window._calNavMonth(-1)"><i data-lucide="chevron-left"></i></button>' +
+      '<span class="cal-title">' + CAL_MESES[m] + ' ' + y + '</span>' +
+      '<button class="hist-nav-arrow" onclick="window._calNavMonth(1)"><i data-lucide="chevron-right"></i></button>' +
+    '</div>' +
+    '<div class="cal-grid cal-grid--weekdays">' + CAL_DIAS.map(function(d0){return '<div class="cal-weekday">'+d0+'</div>';}).join("") + '</div>' +
+    '<div class="cal-grid ' + (dir === 1 ? "cal-grid--slide-left" : dir === -1 ? "cal-grid--slide-right" : "cal-grid--anim") + '">' + cells + '</div>';
+
+  refreshIcons(wrap);
+}
+
+window._calNavMonth = function(dir) {
+  calState.viewMonth += dir;
+  if (calState.viewMonth > 11) { calState.viewMonth = 0; calState.viewYear++; }
+  if (calState.viewMonth < 0)  { calState.viewMonth = 11; calState.viewYear--; }
+  renderCalendar(dir);
+};
+
+window._calPick = function(dateStr) {
+  if (!calState.selFrom || (calState.selFrom && calState.selTo) || dateStr < calState.selFrom) {
+    calState.selFrom = dateStr;
+    calState.selTo = null;
+  } else if (dateStr === calState.selFrom) {
+    calState.selFrom = dateStr;
+    calState.selTo = dateStr;
+  } else {
+    calState.selTo = dateStr;
+  }
+  var applyBtn = el("hist-picker-apply");
+  if (applyBtn) applyBtn.disabled = !(calState.selFrom && calState.selTo);
+  renderCalendar();
 };
 
 window._histNavPeriod = function(dir) {

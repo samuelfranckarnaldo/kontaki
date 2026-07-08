@@ -22,6 +22,8 @@
 .btn-ghost   { background: var(--border2); color: var(--text2); border: 1.5px solid var(--border); }
 .btn-outline { background: transparent; color: var(--primary); border: 1.5px solid var(--primary); }
 .btn-full    { width: 100%; }
+.btn:disabled { opacity: .45; box-shadow: none; pointer-events: none; }
+.btn { transition: opacity .25s ease, background .25s ease, box-shadow .25s ease, transform .1s ease; }
 .btn-sm      { padding: 7px 12px; font-size: 12px; border-radius: var(--radius-sm); }
 .btn-lg      { padding: 14px 20px; font-size: 15px; }
 
@@ -1989,6 +1991,62 @@
   text-align: left; cursor: pointer; font-family: var(--font); transition: var(--transition);
 }
 .hist-picker-option.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.cal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.cal-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.cal-grid--weekdays { margin-bottom: 4px; }
+.cal-weekday {
+  text-align: center; font-size: 11px; font-weight: 700;
+  color: var(--text4); padding: 4px 0;
+}
+.cal-cell {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  border: none; background: none; border-radius: 50%;
+  font-size: 13px; font-weight: 600; color: var(--text2);
+  cursor: pointer; font-family: var(--font); transition: var(--transition);
+}
+.cal-cell--empty { cursor: default; }
+.cal-cell--future { color: var(--text4); opacity: .35; cursor: default; pointer-events: none; }
+.cal-cell--today { color: var(--primary); font-weight: 800; box-shadow: inset 0 0 0 1.5px var(--primary); }
+.cal-cell--inrange { background: var(--primary-light); border-radius: 0; color: var(--primary); }
+.cal-cell--start, .cal-cell--end {
+  background: var(--primary); color: #fff; font-weight: 700;
+}
+.cal-cell--start:not(.cal-cell--end) { border-radius: 50% 0 0 50%; }
+.cal-cell--end:not(.cal-cell--start) { border-radius: 0 50% 50% 0; }
+.cal-cell--single { background: var(--primary); color: #fff; font-weight: 700; border-radius: 50%; }
+.cal-cell { transition: background .15s ease, color .15s ease, transform .1s ease, box-shadow .15s ease; }
+.cal-cell:active:not(:disabled) { transform: scale(.88); }
+
+.cal-status {
+  text-align: center; font-size: 13px; color: var(--text3);
+  margin-bottom: 12px; padding: 8px; background: var(--border2); border-radius: var(--radius-sm);
+}
+.cal-status strong { color: var(--primary); font-weight: 700; }
+
+.cal-grid--anim { animation: calFadeIn .18s ease; }
+@keyframes calFadeIn {
+  from { opacity: 0; transform: translateX(6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.cal-grid--slide-left { animation: calSlideLeft .22s cubic-bezier(.25,.8,.35,1); }
+@keyframes calSlideLeft {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.cal-grid--slide-right { animation: calSlideRight .22s cubic-bezier(.25,.8,.35,1); }
+@keyframes calSlideRight {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.cal-header .hist-nav-arrow:active { transform: scale(.85); }
 .hist-nav-label {
   font-size: 13px; font-weight: 600; color: var(--text2);
   min-width: 130px; text-align: center;
