@@ -1,0 +1,950 @@
+================================================================================
+                         KONTAKI - DOCUMENTAÇÃO COMPLETA
+            Sistema de Gestão de Negócios Offline-First para Pequenas Lojas
+================================================================================
+
+Versão: 2.0
+Última Atualização: 25 de Junho de 2026
+Desenvolvido por: Introxeer Technology, Lda.
+Âmbito: República de Angola e PALOP
+
+
+================================================================================
+1. VISÃO GERAL E FILOSOFIA DO PRODUTO
+================================================================================
+
+O Kontaki é uma aplicação web progressiva (PWA) de gestão de negócios projetada
+especificamente para pequenas lojas, mercearias, supermercados e negócios de
+varejo em contextos onde a conectividade à Internet é intermitente ou cara.
+
+FILOSOFIA PRINCIPAL: Offline-First
+- Os dados são armazenados primeiramente no dispositivo (IndexedDB)
+- A sincronização com servidor é opcional e não é necessária para funcionamento
+- O app funciona completamente offline sem perda de funcionalidades essenciais
+- A sincronização é apenas para backup e segurança
+
+PÚBLICO-ALVO:
+- Proprietários de pequenas lojas
+- Mercearias e vendedores de varejo
+- Negócios com múltiplos funcionários
+- Usuários com conexão de Internet instável
+
+
+================================================================================
+2. DESIGN E ARQUITETURA
+================================================================================
+
+ARQUITETURA TÉCNICA:
+├── Frontend (SPA - Single Page Application)
+│   └── HTML5 / CSS3 / JavaScript Vanilla
+│
+├── Storage Local
+│   └── IndexedDB (persistência offline)
+│
+├── Service Worker (sw.js)
+│   └── Cache-first strategy para assets
+│   └── Funciona offline completamente
+│
+├── Backend Opcional
+│   └── Apenas para backup remoto
+│   └── Sincronização encriptada
+│
+└── Mobile-First Design
+    └── Responsivo para todos os tamanhos
+    └── Touch-friendly UI/UX
+
+
+STACK TECNOLÓGICO:
+- Linguagem: JavaScript (ES6+)
+- Framework Front-end: Vanilla JS (sem frameworks pesados)
+- Storage: IndexedDB + LocalStorage
+- Service Worker: Offline-first caching
+- Estilos: CSS3 com suporte a dark mode
+- Ícones: Lucide Icons
+- Gráficos: Chart.js (para dashboards)
+- Impressão: jsPDF para relatórios em PDF
+- QR Code: Suporte nativo para verificação de produtos
+
+
+PADRÃO DE DESIGN: Flat Design Moderno
+- Paleta de cores: Roxo (#5b21b6) como cor primária
+- Interface limpa e intuitiva
+- Modo claro/escuro nativo
+- Responsividade total
+- Navegação por tabs + submenu
+- Feedback visual imediato
+
+
+================================================================================
+3. FUNCIONALIDADES PRINCIPAIS DO APLICATIVO
+================================================================================
+
+3.1 - MÓDULO DE VENDAS (Vender)
+────────────────────────────────────────────────────────────────────────────
+Funcionalidade central: Processamento de vendas rápido e eficiente
+
+CARACTERÍSTICAS:
+✓ Pesquisa em tempo real de produtos
+✓ Barcode scanner (leitura de códigos de barras via câmara)
+✓ Carrinho de compras com visualização em tempo real
+✓ Cálculo automático de totais
+✓ Suporte a múltiplos métodos de pagamento:
+  - Dinheiro
+  - Transferência bancária
+  - Multicaixa
+  - Fiados (crédito para clientes regulares)
+✓ Aplicação de descontos (percentual ou fixo)
+✓ Cálculo automático de troco
+✓ Recibos digitais com QR code de verificação
+✓ Histórico de produtos recentes
+✓ Salvamento automático do carrinho
+✓ Modo turno (rastreamento por vendedor/caixa)
+
+
+3.2 - MÓDULO DE PRODUTOS
+────────────────────────────────────────────────────────────────────────────
+Gestão completa de inventário
+
+CARACTERÍSTICAS:
+✓ Cadastro de produtos com:
+  - Nome e descrição
+  - Código de barras único
+  - Categoria
+  - Preço de venda
+  - Preço de custo
+  - Stock atual
+  - Stock mínimo (alerta)
+✓ Busca avançada por nome ou código
+✓ Filtro por categorias
+✓ Estatísticas de stock:
+  - Stock baixo (produtos com quantidade crítica)
+  - Stock zerado
+✓ Ativação/desativação de produtos
+✓ Histórico de movimentações
+✓ Edição em lote
+✓ Sincronização de stock em tempo real
+
+
+3.3 - MÓDULO DE FIADOS (Clientes em Crédito)
+────────────────────────────────────────────────────────────────────────────
+Gestão de vendas a crédito
+
+CARACTERÍSTICAS:
+✓ Registro de clientes fiados com:
+  - Nome
+  - Telefone
+  - Endereço
+  - Limite de crédito
+✓ Controle de dívidas:
+  - Montante devido
+  - Data do empréstimo
+  - Status (aberto/pago)
+✓ Filtros de visualização:
+  - Todos os clientes
+  - Apenas os com dívida
+  - Em dia (pagos)
+✓ Histórico de transações por cliente
+✓ Relatórios de fiados vencidos
+✓ Recordação de pagamentos pendentes
+✓ Cálculo automático de juros (configurável)
+
+
+3.4 - MÓDULO DE HISTÓRICO
+────────────────────────────────────────────────────────────────────────────
+Análise detalhada de vendas e desempenho
+
+CARACTERÍSTICAS:
+✓ Visualização por período:
+  - Hoje
+  - Semana
+  - Mês
+  - Período customizado
+✓ Estatísticas agregadas:
+  - Total de vendas
+  - Número de transações
+  - Ticket médio
+  - Produto mais vendido
+  - Categoria mais lucrativa
+✓ Gráficos de evolução:
+  - Gráfico de linhas (7 dias)
+  - Comparativo período anterior
+✓ Relatório detalhado de cada venda com:
+  - Items vendidos
+  - Cliente (se aplicável)
+  - Método de pagamento
+  - Data/hora exata
+  - Vendedor/operador
+✓ Exportação em CSV (para Excel)
+✓ Exportação em PDF (relatório mensal)
+✓ Filtros por:
+  - Data
+  - Vendedor
+  - Método de pagamento
+
+
+3.5 - MÓDULO DE PERFIL E CONFIGURAÇÕES
+────────────────────────────────────────────────────────────────────────────
+Gestão de usuário e preferências do sistema
+
+SUBMODULOS:
+
+3.5.1 DADOS DA LOJA
+─────────────────
+✓ Informação básica:
+  - Nome da loja
+  - Telefone
+  - Email
+  - Logo (upload de imagem)
+✓ Localização:
+  - Endereço
+  - Província (lista de 18 províncias de Angola)
+✓ Informação fiscal:
+  - NIF (Número de Identificação Fiscal)
+  - IVA (%)
+✓ Aparece nos recibos impressos
+
+
+3.5.2 GESTÃO DE STOCK
+────────────────────
+✓ Listagem completa de produtos
+✓ Modo Inventário (contagem física de stock)
+✓ Entrada/saída manual de stock
+✓ Movimentações rastreadas
+✓ Reconciliação com vendas
+✓ Alertas de stock baixo
+
+
+3.5.3 INCIDENTES
+────────────────
+✓ Registo de problemas operacionais:
+  - Dano em produtos
+  - Roubo/falta
+  - Produto expirado
+  - Devolução do cliente
+✓ Categorização automática
+✓ Rastreamento por operador
+✓ Impacto contabilizado em perdas
+✓ Arquivo de incidentes resolvidos
+
+
+3.5.4 EQUIPA E UTILIZADORES
+──────────────────────────────
+✓ Gestão de múltiplos utilizadores:
+  - Admin (controle total)
+  - Operador (vendas apenas)
+  - Gerente (vendas + relatórios)
+  - Convidado (acesso limitado)
+✓ PIN de acesso de 4 dígitos por utilizador
+✓ Rastreamento de quem fez cada venda
+✓ Convite de novos dispositivos
+✓ Bloqueio/desbloqueio de utilizadores
+
+
+3.5.5 CLIENTES
+───────────────
+✓ Base de dados de clientes
+✓ Informações de contato
+✓ Histórico de compras
+✓ Valor total gasto
+✓ Segmentação por volume de compra
+✓ Exportação de lista de clientes
+
+
+3.5.6 DESPESAS
+───────────────
+✓ Registo de custos operacionais:
+  - Aluguel
+  - Salários
+  - Utilidades
+  - Transportes
+  - Manutenção
+  - Outros
+✓ Categorização automática
+✓ Data e descrição
+✓ Impacto direto no lucro mensal
+✓ Relatórios por período
+
+
+3.5.7 CONTABILIDADE
+──────────────────
+✓ Dashboard contabilístico:
+  - Receita (mês/ano)
+  - COGS (Custo dos Produtos Vendidos)
+  - Lucro Bruto
+  - Lucro Líquido
+  - Margem de Lucro
+✓ Análise de fiados:
+  - Fiados em aberto
+  - Fiados pagos
+  - Inadimplência
+✓ Análise de devoluções
+✓ Relatórios mensais/anuais
+✓ Arquivamento de períodos (para histórico)
+
+
+3.5.8 FORNECEDORES E COMPRAS
+─────────────────────────────
+✓ Registo de fornecedores:
+  - Dados de contato
+  - Condições de pagamento
+  - Histórico de compras
+✓ Rastreamento de compras:
+  - Data
+  - Produtos
+  - Quantidade
+  - Custo
+  - Fornecedor
+✓ Entrada automática de stock
+✓ Histórico de preços fornecedor
+✓ Alertas de compras vencidas
+
+
+3.5.9 TURNO DO OPERADOR
+─────────────────────────
+✓ Abertura/encerramento de turno
+✓ Saldo inicial de caixa
+✓ Saldo final registado
+✓ Resumo de vendas do turno
+✓ Diferenças de caixa detectadas
+✓ Histórico completo do operador
+✓ Bloqueio de caixa em turnos abertos
+
+
+3.5.10 SEGURANÇA E AUTENTICAÇÃO
+────────────────────────────────
+✓ PIN de acesso de 4 dígitos
+✓ Encriptação SHA-256
+✓ Tentativas limitadas de login
+✓ Bloqueio após falhas repetidas
+✓ Sessão com timeout automático
+✓ Logout seguro
+
+
+3.5.11 ASSINATURA E PLANOS
+──────────────────────────
+✓ Exibição do plano atual
+✓ Funcionalidades bloqueadas por plano:
+  - Histórico (planos pagos)
+  - Dashboard (planos pagos)
+  - Modo Caixa Rápida (premium)
+  - QR scanner (premium)
+✓ Informações de upgrade
+✓ Data de expiração
+
+
+3.5.12 ESCRITÓRIO
+──────────────────
+✓ Acesso remoto a dados
+✓ Sincronização de backup
+✓ Importação/exportação de dados
+✓ Configuração de sincronização
+✓ Último backup realizado
+
+
+3.5.13 CONTACTOS
+─────────────────
+✓ Informações de contato da Introxeer
+✓ Links para suporte
+✓ Links para social media
+✓ Chat direto (WhatsApp)
+
+
+3.5.14 AJUDA E FAQ
+───────────────────
+✓ Base de conhecimento interativa
+✓ Busca em ajuda
+✓ Guias por funcionalidade:
+  - Como abrir turno
+  - Como vender
+  - Como gerir stock
+  - Como registar incidentes
+  - Como usar fiados
+  - Como gerar relatórios
+✓ Resolução de problemas comuns
+✓ Vídeo-tutoriais (quando disponível)
+
+
+3.5.15 SOBRE
+─────────────
+✓ Versão do aplicativo
+✓ Desenvolvedor (Introxeer Technology)
+✓ Licença
+✓ Data da última atualização
+✓ Changelog/Histórico de versões
+
+
+3.5.16 NOTIFICAÇÕES
+──────────────────
+✓ Centro de notificações unificado
+✓ Alertas por:
+  - Stock baixo
+  - Fiados vencidos
+  - Turnos abertos
+  - Incidentes pendentes
+  - Atualizações disponíveis
+✓ Badge com contagem de notificações
+✓ Marcação como lido
+✓ Histórico de notificações
+
+
+3.5.17 DARK MODE
+────────────────
+✓ Tema claro/escuro automático
+✓ Economia de bateria em modo escuro
+✓ Sincronização com preferência do sistema
+✓ Alternância manual
+
+
+3.5.18 CONFIGURAÇÕES AVANÇADAS
+──────────────────────────────
+✓ Resetar dados locais completamente
+✓ Importar/exportar backup
+✓ Sincronização automática
+✓ Limpeza de histórico por período
+✓ Logs de atividade (debug)
+✓ Modo de manutenção
+✓ Preferências de impressão
+
+
+3.6 - MÓDULO DASHBOARD
+────────────────────────────────────────────────────────────────────────────
+Visão geral instantânea da saúde do negócio
+
+CARACTERÍSTICAS:
+✓ Saudação personalizada (Bom dia / Boa tarde / Boa noite)
+✓ Métricas principais:
+  - Vendas hoje
+  - Vendas este mês
+  - Fiados abertos
+  - Despesas mês
+  - Stock baixo/zerado
+✓ Gráfico de 7 dias (evolução diária)
+✓ Alertas visuais:
+  - Turnos abertos
+  - Stock crítico
+  - Fiados vencidos
+✓ Acesso rápido a tarefas mais comuns
+✓ Atualização em tempo real
+
+
+================================================================================
+4. FUNCIONALIDADES DO USUÁRIO (O que você pode fazer)
+================================================================================
+
+4.1 VENDEDOR/OPERADOR
+─────────────────────
+✓ Realizar vendas
+✓ Consultar preços
+✓ Verificar stock
+✓ Processar pagamentos
+✓ Emitir recibos
+✓ Registar incidentes
+✓ Abrir/encerrar turno
+✓ Consultar saldo de fiados
+
+
+4.2 GERENTE
+───────────
+✓ Tudo do vendedor +
+✓ Ver relatórios de vendas
+✓ Gerir clientes fiados
+✓ Registar despesas
+✓ Ver contabilidade básica
+✓ Gestão parcial de stock
+✓ Visualizar desempenho
+
+
+4.3 PROPRIETÁRIO/ADMIN
+──────────────────────
+✓ Tudo do gerente +
+✓ Configurar loja
+✓ Gerir utilizadores
+✓ Acesso total a relatórios
+✓ Gestão completa de stock
+✓ Configurações fiscais
+✓ Análise detalhada de lucros
+✓ Gestão de fornecedores
+✓ Sincronização de backup
+✓ Importar/exportar dados
+
+
+================================================================================
+5. SEGURANÇA - ESTRUTURA COMPLETA
+================================================================================
+
+5.1 AUTENTICAÇÃO E ACESSO
+─────────────────────────────────────────────────────────────────────────────
+
+MECANISMO DE LOGIN:
+1. Seleção de utilizador (múltiplos perfis)
+2. PIN de 4 dígitos
+
+ARMAZENAMENTO SEGURO:
+✓ PIN encriptado com SHA-256
+✓ Não armazenado em plaintext
+✓ Hash com salt aleatório
+✓ Comparação segura na autenticação
+
+PROTEÇÃO CONTRA FORÇA BRUTA:
+✓ Limite de 5 tentativas de login
+✓ Bloqueio de 15 minutos após limite
+✓ Rastreamento de tentativas falhadas
+✓ Alertas de atividade suspeita
+
+SESSÃO:
+✓ Timeout automático (15 minutos de inatividade)
+✓ Indicador visual de sessão ativa
+✓ Logout automático ao sair do dispositivo
+
+
+5.2 PROTEÇÃO DE DADOS
+─────────────────────────────────────────────────────────────────────────────
+
+ARMAZENAMENTO LOCAL:
+✓ IndexedDB isolado por origem
+✓ Não accessible de outras aplicações
+✓ Encriptação de dados sensíveis
+✓ Proteção contra acesso não autorizado
+
+DADOS EM TRÂNSITO:
+✓ HTTPS obrigatório para sincronização
+✓ Certificados TLS/SSL
+✓ Verificação de integridade com HMAC-SHA256
+✓ Sem dados sensíveis em URLs
+
+BACKUP REMOTO (OPCIONAL):
+✓ Consentimento expresso obrigatório
+✓ Encriptação ponta-a-ponta
+✓ Dados encriptados com chave do utilizador
+✓ Sincronização apenas com autorização
+✓ Servidor não acessa dados brutos
+
+
+5.3 ISOLAMENTO DE DADOS
+─────────────────────────────────────────────────────────────────────────────
+
+POR UTILIZADOR:
+✓ Cada utilizador tem PIN/conta separada
+✓ Sem cross-contamination de dados
+✓ Rastreamento individual de ações
+
+POR NEGÓCIO:
+✓ Dados de uma loja isolados de outras
+✓ Sincronização separada
+✓ Backup independente
+
+POR SESSÃO:
+✓ Dados temporários em memória
+✓ Limpeza ao encerrar
+✓ Sem rastreamento de dados antigos
+
+
+5.4 AUDITORIA E RASTREAMENTO
+─────────────────────────────────────────────────────────────────────────────
+
+LOGGING DETALHADO:
+✓ Quem: Identificação do utilizador
+✓ O quê: Ação realizada
+✓ Quando: Timestamp exato
+✓ Onde: Origem da ação
+✓ Alterações: Antes/depois de mudanças
+
+EVENTOS RASTREADOS:
+✓ Login/logout
+✓ Cada venda
+✓ Edições de preços
+✓ Ajustes de stock
+✓ Registos de despesas
+✓ Gestão de utilizadores
+✓ Alterações de configuração
+✓ Backup e sincronização
+
+RETENÇÃO DE LOGS:
+✓ Arquivamento automático
+✓ Retenção por 12 meses (configurável)
+✓ Não pode ser apagado (integridade)
+
+
+5.5 PROTEÇÃO CONTRA FRAUDE
+─────────────────────────────────────────────────────────────────────────────
+
+VERIFICAÇÃO DE INTEGRIDADE:
+✓ Hash de cada transação
+✓ Verificação de sequência
+✓ Detecção de duplicatas
+✓ Validação de valores
+
+ALERTAS AUTOMÁTICOS:
+✓ Desconto anormalmente alto
+✓ Devolução inexplicável
+✓ Múltiplas devoluções do mesmo item
+✓ Variação de preço anormal
+✓ Acesso fora do horário
+
+APROVAÇÕES REQUERIDAS:
+✓ Descontos acima de limite
+✓ Devoluções acima de montante
+✓ Alterações de preço
+✓ Apagamento de transações
+
+
+5.6 CONFORMIDADE REGULATÓRIA
+─────────────────────────────────────────────────────────────────────────────
+
+LEI ANGOLANA:
+✓ Lei n.º 7/17 - Proteção de Dados Pessoais
+✓ Decreto-Lei n.º 2/17 - Direitos de Autor
+✓ Lei n.º 3/92 - Propriedade Industrial
+✓ Código do IVA (Lei n.º 7/19)
+✓ Código do Imposto Industrial (Lei n.º 19/14)
+
+DIREITOS DO UTILIZADOR:
+✓ Acesso aos dados (artigo 13.º Lei 7/17)
+✓ Retificação de dados (artigo 14.º)
+✓ Apagamento/direito ao esquecimento (artigo 15.º)
+✓ Portabilidade de dados (artigo 19.º)
+✓ Oposição ao tratamento (artigo 20.º)
+
+RESPONSABILIDADES:
+✓ DPO nomeado: dpo@introxeer.co.ao
+✓ Política de Privacidade disponível
+✓ Termos de Uso claros
+✓ Consentimento obtido e documentado
+
+
+5.7 SEGURANÇA FISCAL
+─────────────────────────────────────────────────────────────────────────────
+
+IMPORTANTE:
+⚠️ Os recibos do Kontaki são documentos de GESTÃO INTERNA
+⚠️ NÃO possuem validade fiscal perante a AGT (Administração Geral Tributária)
+
+RESPONSABILIDADE DO UTILIZADOR:
+✓ Emitir facturas oficiais conforme Lei n.º 7/19 (Código do IVA)
+✓ Cumprir com Lei n.º 19/14 (Código do Imposto Industrial)
+✓ Manter registos de IVA regularmente
+✓ Pagar impostos no prazo
+
+PROTECÇÃO DO KONTAKI:
+✓ A Introxeer não será responsabilizada por sanções fiscais
+✓ Não garantimos conformidade fiscal
+✓ Usuário é responsável pela legalidade
+
+
+5.8 ENCRIPTAÇÃO
+─────────────────────────────────────────────────────────────────────────────
+
+ALGORITMOS UTILIZADOS:
+✓ SHA-256 para hashes (PIN, senhas)
+✓ HMAC-SHA256 para verificação de integridade
+✓ AES-256 para backups (opcional)
+✓ TLS/SSL 1.2+ para comunicação
+
+CHAVES:
+✓ Geradas aleatoriamente
+✓ Armazenadas de forma segura
+✓ Nunca em plaintext
+✓ Rotação periódica recomendada
+
+
+5.9 CONFORMIDADE E CERTIFICAÇÕES
+─────────────────────────────────────────────────────────────────────────────
+
+STANDARDS:
+✓ Compatível com RGPD (EU) - Regulamento 2016/679
+✓ Lei de Proteção de Dados de Angola
+✓ Acordos TRIPS (Propriedade Intelectual)
+✓ Convenção de Berna (Direitos de Autor)
+
+
+================================================================================
+6. OFFLINE-FIRST: COMO FUNCIONA
+================================================================================
+
+6.1 ARMAZENAMENTO LOCAL
+─────────────────────────────────────────────────────────────────────────────
+
+INDEXEDDB:
+- Base de dados local no navegador
+- Capacidade: ~50MB por aplicação (pode pedir mais)
+- Estrutura:
+  ├── products (catálogo)
+  ├── sales (vendas realizadas)
+  ├── saleItems (itens de cada venda)
+  ├── fiado (clientes em crédito)
+  ├── stockMovements (histórico de movimento)
+  ├── expenses (despesas)
+  ├── users (utilizadores)
+  ├── settings (configurações)
+  ├── accountingArchive (períodos anteriores)
+  └── logs (auditoria)
+
+LOCALSTORAGE:
+- Dados adicionais:
+  ├── Carrinho temporário
+  ├── Preferências de UI
+  ├── Last sync timestamp
+  └── Dark mode preference
+
+
+6.2 FUNCIONAMENTO SEM INTERNET
+─────────────────────────────────────────────────────────────────────────────
+
+OPERAÇÕES COMPLETAMENTE OFFLINE:
+✓ Realizar vendas
+✓ Pesquisar produtos
+✓ Consultar stock
+✓ Ver histórico
+✓ Registar despesas
+✓ Gerir clientes fiados
+✓ Imprimir recibos
+✓ Gerar relatórios locais
+✓ Ver dados contabilísticos
+
+SERVICE WORKER:
+- Cache-first strategy para assets
+- Todos os arquivos em cache
+- Sem requisições de rede necessárias
+- Atualização automática quando online
+
+
+6.3 SINCRONIZAÇÃO COM BACKUP
+─────────────────────────────────────────────────────────────────────────────
+
+INÍCIO:
+- Manual: Clique em "Sincronizar"
+- Automático: A cada 30 minutos (se online)
+- Ao abrir/fechar turno
+
+PROCESSO:
+1. Detectar mudanças locais
+2. Encriptar dados
+3. Enviar para servidor
+4. Receber confirmação
+5. Atualizar timestamp de sync
+6. Notificar sucesso
+
+COLISÕES:
+- Última escrita vence
+- Versioning automático
+- Sem perda de dados
+
+
+6.4 RECUPERAÇÃO DE DADOS
+─────────────────────────────────────────────────────────────────────────────
+
+CENÁRIO: Perda local de dados
+
+SOLUÇÃO:
+1. App detecta IndexedDB vazio/corrompido
+2. Oferece restauração de backup
+3. Restauração completa de dados
+4. Confirmação de integridade
+5. Resumo de dados restaurados
+
+PROTEÇÃO:
+✓ Backup automático a cada sincronização
+✓ Múltiplas versões mantidas
+✓ Recuperação de até 30 dias
+
+
+================================================================================
+7. PERFORMANCE E OTIMIZAÇÕES
+================================================================================
+
+CARREGAMENTO RÁPIDO:
+✓ PWA com instalação rápida
+✓ Cache de assets
+✓ Lazy loading de componentes
+✓ Compressão de imagens
+✓ Minificação de JavaScript/CSS
+
+CONSUMO DE MEMÓRIA:
+✓ Sem frameworks pesados
+✓ Vanilla JavaScript otimizado
+✓ Cleanup automático
+✓ Limite de dados em memória
+
+BATERIA:
+✓ Modo escuro para economia
+✓ Seleção eficiente de DOM
+✓ Sem animações desnecessárias
+✓ Transições suaves
+
+
+================================================================================
+8. COMPATIBILIDADE E REQUISITOS
+================================================================================
+
+NAVEGADORES SUPORTADOS:
+✓ Chrome/Edge (88+)
+✓ Firefox (87+)
+✓ Safari iOS (15+)
+✓ Samsung Internet (14+)
+✓ Opera (74+)
+
+REQUISITOS MÍNIMOS:
+- RAM: 2GB
+- Espaço: 50MB
+- Conexão: Nenhuma (funciona offline)
+- Câmara: Opcional (para barcode scanner)
+
+INSTALAÇÃO:
+- Web: Acesso via navegador
+- PWA: Instalar como app nativo
+- Funciona em Desktop, Tablet, Smartphone
+
+
+================================================================================
+9. MODELOS DE PREÇO E FUNCIONALIDADES POR PLANO
+================================================================================
+
+PLANO GRATUITO (FREE):
+✓ Vendas ilimitadas
+✓ Gestão de stock básica
+✓ Clientes fiados
+✓ Recibos digitais
+✓ Um utilizador
+✗ Histórico bloqueado
+✗ Dashboard bloqueado
+✗ QR Scanner bloqueado
+✗ Modo Caixa Rápida bloqueado
+
+PLANO PROFISSIONAL (PRO):
+✓ Tudo do Free +
+✓ Histórico de vendas
+✓ Dashboard completo
+✓ QR Scanner
+✓ Até 5 utilizadores
+✓ Relatórios avançados
+✓ Backup automático
+✓ Suporte por email
+
+PLANO EMPRESARIAL (BUSINESS):
+✓ Tudo do Pro +
+✓ Fornecedores e compras
+✓ Modo Caixa Rápida
+✓ Até 20 utilizadores
+✓ API de integração
+✓ Escritório remoto
+✓ Sincronização em tempo real
+✓ Suporte prioritário
+
+
+================================================================================
+10. CONTATO E SUPORTE
+================================================================================
+
+EMPRESA:
+Introxeer Technology, Lda.
+Luanda, Angola
+
+CANAIS DE CONTATO:
+- Email: info@introxeer.co.ao
+- WhatsApp: +244 900 000 000
+- DPO (Privacy): dpo@introxeer.co.ao
+- Suporte: support@introxeer.co.ao
+
+DOCUMENTAÇÃO:
+- Termos de Uso: termos.html
+- Política de Privacidade: privacidade.html
+- FAQ e Ajuda: Dentro da aplicação
+
+
+================================================================================
+11. CONFORMIDADE LEGAL
+================================================================================
+
+PROPRIEDADE INTELECTUAL:
+✓ © 2026 Introxeer Technology, Lda.
+✓ Todos os direitos reservados
+✓ Código-fonte proprietário
+✓ Marcas registadas: Kontaki, Introxeer, Xee, Cloxeer, Topikos, Faroscoop
+
+TERMOS DE USO:
+✓ Aceitação obrigatória
+✓ Uso pessoal não-comercial
+✓ Não permitido: cópia, modificação, engenharia reversa
+✓ Violações resultam em rescisão de licença
+
+RESPONSABILIDADE:
+✓ Fornecida "TAL COMO ESTÁ" (AS IS)
+✓ Sem garantias de funcionamento ininterrupto
+✓ Usuário responsável por seus dados
+✓ Limite de indemnização: valor pago ou 50.000 Kz
+
+DISPUTA:
+✓ Negociação amigável (60 dias)
+✓ Arbitragem (Lei n.º 16/03)
+✓ Centro de Arbitragem de Angola
+✓ Renúncia a ações judiciais
+
+
+================================================================================
+12. ROADMAP E FUTURO
+================================================================================
+
+VERSÃO 2.0 ATUAL:
+✓ Vendas offline-first
+✓ Gestão completa de stock
+✓ Contabilidade básica
+✓ Fiados e crédito
+✓ Dashboard
+✓ Múltiplos utilizadores
+✓ Backup opcional
+
+PRÓXIMAS VERSÕES:
+→ v2.1: Integração com Multicaixa (gateway pagamento)
+→ v2.2: App mobile nativa (React Native)
+→ v2.3: API REST para integrações
+→ v2.4: IA para previsão de vendas
+→ v3.0: Plataforma SaaS completa
+
+
+================================================================================
+13. DICAS E BOAS PRÁTICAS
+================================================================================
+
+PARA MELHOR DESEMPENHO:
+1. Sincronize backup regularmente
+2. Limpe histórico antigo mensalmente
+3. Atualize a aplicação quando disponível
+4. Use modo escuro para economia de bateria
+5. Realize inventário mensal
+
+PARA SEGURANÇA:
+1. Use PIN único e forte
+2. Não compartilhe PIN
+3. Faça logout ao sair
+4. Guarde backup em local seguro
+5. Revise auditoria regularmente
+
+PARA PRECISÃO CONTABILÍSTICA:
+1. Registre despesas no dia
+2. Reporte fiados vencidos
+3. Reconcilie caixa diariamente
+4. Arquive períodos mensalmente
+5. Mantenha NIF atualizado
+
+
+================================================================================
+14. CONCLUSÃO
+================================================================================
+
+O Kontaki é uma solução completa, segura e moderna para pequenos negócios
+em Angola e PALOP. Com foco em offline-first e privacidade, permite que
+proprietários de lojas gerenciem todo o seu negócio com confiança, sem
+depender de internet ou custos de infraestrutura.
+
+Desenvolvido com os mais altos padrões de segurança, criptografia e
+conformidade regulatória, o Kontaki protege seus dados enquanto fornece
+as ferramentas essenciais para crescer seu negócio.
+
+VERSÃO: 2.0
+ÚLTIMA ATUALIZAÇÃO: 25 de Junho de 2026
+DESENVOLVEDOR: Introxeer Technology, Lda.
+JURISDIÇÃO: Angola e PALOP
+
+================================================================================
+FIM DA DOCUMENTAÇÃO COMPLETA
+================================================================================
