@@ -445,7 +445,7 @@ async function loadGeral(from, to) {
   var stats = el("historico-stats");
   if (stats) {
     stats.innerHTML =
-      kpi("Nº Vendas",     nVendas,         "var(--primary)",  "", null) +
+      kpi("Nº Vendas",     nVendas,         "var(--text)",  "", null) +
       kpi("Média por Venda",  fmt(ticket),     "var(--info)",     "", null) +
       kpi("Fiado Aberto",  fmt(fiadoAb),    "var(--warning-muted)",  "", fiadoAb>0?"hist-kpi--attention":null) +
       kpi("Devoluções",    fmt(devTotal),   devTotal>0?"var(--danger-muted)":"var(--success)", incOpen+" incidente"+(incOpen===1?"":"s"), devTotal>0?"hist-kpi--danger":null);
@@ -704,7 +704,7 @@ async function loadStock(from, to) {
     filtered.forEach(function(m){ uniqueProducts[m.productName] = true; });
     var nProducts = Object.keys(uniqueProducts).length;
     stats.innerHTML =
-      kpi("Operações", totalOps, "var(--primary)", "", null) +
+      kpi("Operações", totalOps, "var(--text)", "", null) +
       kpi("Entradas", "+" + abbrevQty(totalIn), "var(--success)", "unidades", null) +
       kpi("Saídas", "-" + abbrevQty(totalOut), "var(--danger)", "unidades", null) +
       kpi("Produtos", nProducts, "var(--info)", nProducts===1?"movimentado":"movimentados", null);
@@ -873,7 +873,7 @@ async function loadAuditoria(from, to) {
   if (stats) {
     var salesTotal = periodSales.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); }, 0);
     stats.innerHTML =
-      kpi("Vendas", periodSales.length, "var(--primary)", fmt(salesTotal), null) +
+      kpi("Vendas", periodSales.length, "var(--text)", fmt(salesTotal), null) +
       kpi("Ajustes", adjustments.length, "var(--primary-mid)", "stock", adjustments.length>0?"hist-kpi--attention":null) +
       kpi("Incidentes", periodIncidents.length, periodIncidents.length>0?"var(--danger)":"var(--success)", "", periodIncidents.length>0?"hist-kpi--danger":null) +
       kpi("Sessões", periodSessions.length, "var(--info)", "", null);
