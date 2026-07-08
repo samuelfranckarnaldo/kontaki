@@ -182,19 +182,37 @@ document.addEventListener("DOMContentLoaded", function() {
     <!-- FIADOS -->
     <div class="page" id="pg-fiados">
       <div class="page-inner">
-        <div class="search-wrap">
-          <i data-lucide="search" class="search-icon"></i>
-          <input id="fiados-search" placeholder="Pesquisar cliente..."/>
+        <div class="ct-tabbar" id="ct-tabbar">
+          <button class="ct-tab active" data-tab="geral">Visão Geral</button>
+          <button class="ct-tab" data-tab="clientes">Clientes</button>
+          <button class="ct-tab" data-tab="fiados">Fiados</button>
         </div>
-        <div class="pill-group" id="fiados-filter-pills" style="margin-top:12px">
-          <button class="pill active" data-filter="all">Todos</button>
-          <button class="pill" data-filter="debt">Com dívida</button>
-          <button class="pill" data-filter="clean">Em dia</button>
+
+        <div id="ct-panel-geral" class="ct-panel" style="display:block"></div>
+
+        <div id="ct-panel-clientes" class="ct-panel" style="display:none">
+          <div class="search-wrap">
+            <i data-lucide="search" class="search-icon"></i>
+            <input id="clientes-search" placeholder="Pesquisar cliente..."/>
+          </div>
+          <div class="list-card" id="clientes-list" style="margin-top:12px"></div>
         </div>
-        <div id="fiados-total-bar" style="font-size:13px;color:#71717a;margin-top:8px"></div>
-        <div class="list-card" id="fiados-list"></div>
+
+        <div id="ct-panel-fiados" class="ct-panel" style="display:none">
+          <div class="search-wrap">
+            <i data-lucide="search" class="search-icon"></i>
+            <input id="fiados-search" placeholder="Pesquisar cliente..."/>
+          </div>
+          <div class="pill-group" id="fiados-filter-pills" style="margin-top:12px">
+            <button class="pill active" data-filter="all">Todos</button>
+            <button class="pill" data-filter="debt">Com dívida</button>
+            <button class="pill" data-filter="clean">Em dia</button>
+          </div>
+          <div id="fiados-total-bar" style="margin-top:8px"></div>
+          <div class="list-card" id="fiados-list" style="margin-top:8px"></div>
+        </div>
       </div>
-    </div>
+        </div>
 
     <!-- HISTÓRICO -->
     <div class="page" id="pg-historico">

@@ -232,6 +232,32 @@ export function openProductForm(p = {}) {
         </div>
       </div>
 
+      <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+        <button type="button" id="pf-more-toggle-btn" onclick="window._toggleMoreConfigForm()" style="background:none;border:none;color:var(--primary);font-weight:var(--weight-strong);font-size:var(--text-xs);cursor:pointer;font-family:inherit;text-align:left;padding:0">
+          ${(p.sku || p.imageData) ? "▼" : "▶"} Mais opções (SKU, imagem...)
+        </button>
+        <div id="pf-more-config" style="display:${(p.sku || p.imageData)?"flex":"none"};flex-direction:column;gap:var(--space-3)">
+          <div class="field">
+            <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">SKU / código interno</label>
+            <input id="pf-sku" value="${p.sku||""}" placeholder="Ex: ARR-1KG-001" autocomplete="off"/>
+          </div>
+          <div class="field">
+            <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Imagem do produto</label>
+            <div style="display:flex;align-items:center;gap:var(--space-3)">
+              <div id="pf-img-preview" style="width:56px;height:56px;border-radius:var(--radius-sm);background:var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;background-image:${p.imageData?`url(${p.imageData})`:"none"};background-size:cover;background-position:center">
+                ${!p.imageData ? '<i data-lucide="image" style="width:20px;height:20px;color:var(--text4)"></i>' : ""}
+              </div>
+              <input type="file" id="pf-img-input" accept="image/*" style="display:none" onchange="window._handleProductImage(event)"/>
+              <button type="button" onclick="document.getElementById('pf-img-input').click()" class="btn btn-ghost" style="font-size:var(--text-sm)">
+                ${p.imageData ? "Trocar imagem" : "Escolher imagem"}
+              </button>
+              ${p.imageData ? '<button type="button" onclick="window._removeProductImage()" style="background:none;border:none;color:var(--danger);font-size:var(--text-xs);cursor:pointer;font-family:inherit">Remover</button>' : ""}
+            </div>
+            <input type="hidden" id="pf-img-data" value="${p.imageData||""}"/>
+          </div>
+        </div>
+      </div>
+
     </div>
     <div style="margin-top:var(--space-5);display:flex;flex-direction:column;gap:var(--space-1)">
       <button class="btn btn-primary btn-full" onclick="window._saveProduto(${p.id||0})">
@@ -243,6 +269,58 @@ export function openProductForm(p = {}) {
     </div>`);
   refreshIcons(el("modal-box"));
 }
+
+window._toggleMoreConfigForm = () => {
+  const box = el("pf-more-config");
+  const btn = el("pf-more-toggle-btn");
+  if (!box) return;
+  const opening = box.style.display === "none";
+  box.style.display = opening ? "flex" : "none";
+  if (btn) btn.textContent = (opening ? "▼ " : "▶ ") + "Mais opções (SKU, imagem...)";
+};
+
+function resizeImageToBase64(file, maxSize, callback) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      let w = img.width, h = img.height;
+      if (w > h && w > maxSize) { h = Math.round(h * maxSize / w); w = maxSize; }
+      else if (h > maxSize) { w = Math.round(w * maxSize / h); h = maxSize; }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL("image/jpeg", 0.75));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+window._handleProductImage = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  resizeImageToBase64(file, 200, function(dataUrl) {
+    const preview = el("pf-img-preview");
+    const hidden = el("pf-img-data");
+    if (preview) {
+      preview.style.backgroundImage = `url(${dataUrl})`;
+      preview.innerHTML = "";
+    }
+    if (hidden) hidden.value = dataUrl;
+  });
+};
+
+window._removeProductImage = () => {
+  const preview = el("pf-img-preview");
+  const hidden = el("pf-img-data");
+  if (preview) {
+    preview.style.backgroundImage = "none";
+    preview.innerHTML = '<i data-lucide="image" style="width:20px;height:20px;color:var(--text4)"></i>';
+    refreshIcons(preview);
+  }
+  if (hidden) hidden.value = "";
+};
 
 function categoryColor(cat) {
   return {"Alimentacao":"#f97316","Bebidas":"#3b82f6","Higiene":"#ec4899","Limpeza":"#10b981","Outro":"#6b7280"}[cat] || "#6b7280";
@@ -267,16 +345,15 @@ function renderStats() {
     _statCard({ label:"Produtos", value:total, sub:"activos", color:"var(--primary)", icon:"package", filter:"all", clickable:true }) +
     _statCard({ label:"Stock baixo", value:low, sub:"a repor", color:"var(--warning)", icon:"alert-triangle", filter:"low", clickable:low>0 }) +
     _statCard({ label:"Esgotados", value:zero, sub:"sem stock", color:"var(--danger)", icon:"x-circle", filter:"zero", clickable:zero>0 }) +
-    // Linha 2 — 2 cards de stock
-    `<div class="prod-stat-wide">` +
-    `<div class="prod-stat-wide-row">` +
-    `<div><div class="prod-stat-wide-label">Loja</div><div class="prod-stat-wide-val">${lojaQty.toLocaleString("pt-AO")} <span>un</span></div><div class="prod-stat-wide-sub">${fmt(lojaVal)}</div></div>` +
-    `<div style="text-align:right"><div class="prod-stat-wide-label">Armazém</div><div class="prod-stat-wide-val" style="color:var(--info)">${armQty.toLocaleString("pt-AO")} <span>un</span></div><div class="prod-stat-wide-sub">${fmt(armVal)}</div></div>` +
+    // Linha 2 — card hero (mesmo padrao visual do Historico: valor grande + contexto)
+    `<div class="hist-hero" style="grid-column:span 3;margin-top:8px">` +
+    `<div class="hist-hero-label">Valor total em stock</div>` +
+    `<div class="hist-hero-val">${fmt(lojaVal+armVal)}</div>` +
+    `<div class="hist-hero-sub" style="margin-top:10px;display:flex;gap:18px">` +
+      `<span><strong>${lojaQty.toLocaleString("pt-AO")}</strong> un na loja</span>` +
+      `<span><strong>${armQty.toLocaleString("pt-AO")}</strong> un no armazém</span>` +
     `</div>` +
-    `<div class="prod-stat-total-row">` +
-    `<span class="prod-stat-total-label">Total combinado</span>` +
-    `<span class="prod-stat-total-val">${(lojaQty+armQty).toLocaleString("pt-AO")} un · ${fmt(lojaVal+armVal)}</span>` +
-    `</div></div>`;
+    `</div>`;
 
   refreshIcons(s);
 }
@@ -336,9 +413,12 @@ function renderList() {
     const tag = qty===0 ? "Esgotado" : qty<=min ? "Stock baixo" : "";
     const cColor = categoryColor(p.category);
     const initial = (p.name||"P").charAt(0).toUpperCase();
+    const avatarHTML = p.imageData
+      ? `<div class="produto-avatar" style="background-image:url(${p.imageData});background-size:cover;background-position:center"></div>`
+      : `<div class="produto-avatar" style="background:${cColor}20;color:${cColor}">${initial}</div>`;
     html +=
       `<div class="produto-item ${qty===0?"produto-item-zero":qty<=min?"produto-item-low":""}">` +
-      `<div class="produto-avatar" style="background:${cColor}20;color:${cColor}">${initial}</div>` +
+      avatarHTML +
       `<div style="flex:1;min-width:0">` +
       `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">` +
       `<div class="produto-name">${p.name}</div>` +
@@ -346,11 +426,11 @@ function renderList() {
       `</div>` +
       `<div class="produto-meta">${p.barcode?p.barcode+" · ":""}${p.category}</div>` +
       `<div class="produto-stock-line">` +
-      `<span>${qty} · ${arm} · <strong>${qty+arm} ${p.unit}</strong></span>` +
-      `</div></div>` +
-      `<div class="produto-right">` +
-      `<div class="produto-label">Preco venda</div>` +
-      `<div class="produto-price">${fmt(p.price)}</div>` +
+      `<span><span class="produto-stock-label">Loja</span> ${qty}</span>` +
+      `<span><span class="produto-stock-label">Arm.</span> ${arm}</span>` +
+      `<span><strong>${qty+arm} ${p.unit}</strong></span>` +
+      `</div>` +
+      `<div class="produto-price" style="margin-top:4px">${fmt(p.price)}</div>` +
       `</div>` +
       `<button class="produto-menu-btn" onclick="window._openProdMenu(${p.id})">` +
       `<i data-lucide="more-vertical"></i>` +
@@ -661,6 +741,8 @@ window._saveProduto = async (id) => {
     conversionFactor:Number((el("pf-pfactor") ? el("pf-pfactor").value : "")||0)||null,
     expiryDate:(el("pf-expiry") ? el("pf-expiry").value : "")||null,
     batchNumber:(el("pf-batch") ? el("pf-batch").value.trim() : "")||null,
+    sku:(el("pf-sku") ? el("pf-sku").value.trim() : "")||null,
+    imageData:(el("pf-img-data") ? el("pf-img-data").value : "")||null,
     active:true,
   };
 
