@@ -1,0 +1,50 @@
+2fa0aa2 fix: reduz uso excessivo do roxo forte nos KPIs neutros (Nº Vendas, Operações, Vendas), reservando a cor de marca para elementos de destaque real
+5d679bc feat: adiciona skeleton loading com shimmer ao trocar de aba/período no Histórico
+af977e1 feat: calendário visual customizado no seletor de período (substitui input date nativo), com status de seleção, animações direcionais e transições suaves
+22619d5 feat: barra de filtro compactada numa linha, painel modal para seleção de período
+cb40d30 feat: navegação entre períodos (anterior/próximo), cores terracota/âmbar suaves nos KPIs de atenção, fonte responsiva para valores grandes
+90b39bc feat: unifica timeline de Auditoria (sessões, ajustes, incidentes) com destaque visual para ajustes manuais
+6aa217f feat: sistema global de notificacoes (sino + central)
+374e4a5 feat: adiciona filtro por funcionário e resumo de KPIs na aba Auditoria
+3895d8c fix: aplica borda colorida também nos cards individuais (consistência com grupos), corrige formatação decimal do abbrevQty
+496b406 feat: resumo de KPIs no topo do Stock, borda colorida por tipo de operação nos grupos, remove linhas divisórias
+b48ca60 feat: agrupa operações consecutivas do mesmo produto no Stock, reduzindo repetição visual
+2a2d91d fix: corrige mapeamento de 'incident_resolution', esconde movimentos de sessão sem variação de estoque, melhora formato Antes/Depois no Stock
+906e5ab fix: corrige linha fantasma persistente em todas as telas
+0d48828 feat: ícones específicos por tipo de operação no badge, elimina redundância do número duplicado
+4a3eb94 feat: polimento visual do Stock (ícone de produto, timeline nos separadores, altura reduzida, quebra de nome corrigida)
+f72e483 feat: destaque visual em cards de atenção, renomeia 'Ticket Médio' para 'Média por Venda'
+1f12aa5 fix: adiciona cor de ícone por forma de pagamento e aplica tokens do design system
+72c47ba feat: agrupa vendas por dia no histórico (Hoje/Ontem/data) com cabeçalho sticky
+bd3bc93 fix: remove UUID visível da auditoria, mantém acessível via tooltip
+ab0bee0 fix: corrige gráfico de vendas (migração para Chart.js) e abrevia quantidades grandes no Stock
+e5217d5 feat(produtos): categorias customizaveis + confirmacao obrigatoria em ajustes e transferencias
+fcd508e refactor(produtos): correcao de bug de margem + consolidacao de design tokens
+5d8b126 feat: convite QR/ficheiro com feedback de carregamento e navegação melhorada
+012e2ef feat(produtos): Registar Compra com conversao de unidades + refinamento de UI
+2c0e04c feat: reconciliação de stock no confirmImport (correção manual auditada), UI de revisão/confirmar/rejeitar no Escritório, destaque visual de linhas alteradas
+512c5f8 docs: documenta despesas (contabilidade, método pagamento, fornecedor, arquivar, mês, CSV, recorrentes) e fórmula de caixa na Ajuda
+cfa5cbe feat: CSV de despesas, ligação a fornecedor com resumo bidireccional, despesas recorrentes com sugestão mensal
+bc3840b feat: Fornecedores profissional — select customizado, saldo em aberto, arquivamento
+a8bc877 feat: método de pagamento e arquivamento em despesas, navegação por mês, corrige fórmula de caixa no fecho (inclui fundo inicial e despesas em dinheiro), animações suaves
+4072b1a fix: corrige cores vermelhas residuais em Despesas (hero, barra de categoria, ícone do histórico)
+01d5e62 feat: move import .ktk para Escritório, acesso caixa (staging only), corrige texto pós-move
+c52d78c feat: redesign de Despesas (paleta consistente, toggle de contabilidade, picker de categorias, mais 8 categorias, corrige bloqueio de turno escondido)
+7b458d0 feat: página de Ajuda com busca por título/corpo/palavras-chave, conteúdo em ficheiros separados por tópico
+e6e10db feat: redesign visual da página Incidentes (filtros, cartões, botão tonal) e arquivamento em vez de eliminação
+d8fc3b5 feat: mostra utilizador responsável em cada movimento de stock no Histórico
+362e862 feat: confirmação de stock e fundo de caixa na abertura do turno, ligada ao turno anterior via prevSessionUuid
+c6fc993 feat: câmara de verificação, título dinâmico, redesign do recibo
+742b11d fix: título da topbar, câmara de verificação, lucro do dashboard
+185df70 fix: reconciliação de caixa no fecho, corrige duplicação de turnos no login, bloqueia fiado/devolução sem turno aberto
+480b6cd feat: redesenha perfil com agrupamento por seções e chip de plano
+3cd06d3 feat: adiciona seleção de role (Caixa/Admin) ao convidar operador via QR
+e9152e2 feat: redesign completo do login, onboarding e setup
+cf781b8 feat: equipa, PIN e bloqueio de turno
+51587c4 feat: restrições de features por plano implementadas
+bf898ef fix: máscara código activação 8 caracteres
+dc9fd90 feat: license.js alinhado com Console, planos actualizados
+2ac5276 feat: redesign histórico completo + fixes perfil
+24edbe4 feat: redesign dados da loja + fix logo upload/remove
+3a51a19 feat: dados da loja completos + logo no login
+0fdfeff feat: dados da loja completos (logo, IVA, email, provincia, NIF), fix navegacao perfil, clientes e despesas funcionais, fix botoes voltar subpaginas, fiados redesign, produtos alertas stock, dashboard sheet, carrinho persistente, badges tempo real

@@ -435,9 +435,29 @@ async function loadGeral(from, to) {
         '</span>';
     }
 
+    var phraseTemplates = {
+      hoje:   { muitoAcima:"Muito acima de ontem",        melhor:"Melhor que ontem",        igual:"Igual a ontem",        abaixo:"Abaixo de ontem",        bemAbaixo:"Bem abaixo de ontem" },
+      semana: { muitoAcima:"Muito acima da semana passada", melhor:"Melhor que a semana passada", igual:"Igual à semana passada", abaixo:"Abaixo da semana passada", bemAbaixo:"Bem abaixo da semana passada" },
+      mes:    { muitoAcima:"Muito acima do mês passado",   melhor:"Melhor que o mês passado",   igual:"Igual ao mês passado",   abaixo:"Abaixo do mês passado",   bemAbaixo:"Bem abaixo do mês passado" },
+      custom: { muitoAcima:"Muito acima do período anterior", melhor:"Melhor que o período anterior", igual:"Igual ao período anterior", abaixo:"Abaixo do período anterior", bemAbaixo:"Bem abaixo do período anterior" }
+    };
+    var tpl = phraseTemplates[activeShortcut] || phraseTemplates.custom;
+
+    var contextPhrase = "";
+    if (nVendas === 0) {
+      contextPhrase = "Sem vendas neste período";
+    } else if (variacao !== null) {
+      if (variacao > 20)        contextPhrase = tpl.muitoAcima;
+      else if (variacao > 2)    contextPhrase = tpl.melhor;
+      else if (variacao >= -2)  contextPhrase = tpl.igual;
+      else if (variacao >= -20) contextPhrase = tpl.abaixo;
+      else                       contextPhrase = tpl.bemAbaixo;
+    }
+
     hero.innerHTML =
       '<div class="hist-hero-label">Total do período</div>' +
       '<div class="hist-hero-row"><div class="hist-hero-val">' + fmt(total) + '</div>' + badgeHtml + '</div>' +
+      (contextPhrase ? '<div class="hist-hero-context">' + contextPhrase + '</div>' : '') +
       '<div class="hist-hero-sub">' + nVendas + ' ' + (nVendas===1?"venda":"vendas") + ' · média por venda ' + fmt(ticket) + '</div>';
   }
 
@@ -446,7 +466,7 @@ async function loadGeral(from, to) {
   if (stats) {
     stats.innerHTML =
       kpi("Nº Vendas",     nVendas,         "var(--text)",  "", null) +
-      kpi("Média por Venda",  fmt(ticket),     "var(--info)",     "", null) +
+      kpi("Média por Venda",  fmt(ticket),     "var(--text)",     "", null) +
       kpi("Fiado Aberto",  fmt(fiadoAb),    "var(--warning-muted)",  "", fiadoAb>0?"hist-kpi--attention":null) +
       kpi("Devoluções",    fmt(devTotal),   devTotal>0?"var(--danger-muted)":"var(--success)", incOpen+" incidente"+(incOpen===1?"":"s"), devTotal>0?"hist-kpi--danger":null);
   }
@@ -478,6 +498,17 @@ async function loadGeral(from, to) {
     }
   }
 
+  function fmtChartVal(n) {
+    var abs = Math.abs(n);
+    var sign = n < 0 ? "-" : "";
+    if (abs < 1000) return sign + abs.toLocaleString("pt-AO") + " Kz";
+    var s;
+    if (abs < 1e6)  s = (abs/1e3).toFixed(abs%1e3===0?0:1) + "K";
+    else if (abs < 1e9) s = (abs/1e6).toFixed(abs%1e6===0?0:1) + "M";
+    else s = (abs/1e9).toFixed(abs%1e9===0?0:1) + "B";
+    return sign + s + " Kz";
+  }
+
   function renderSalesChart(days, values) {
     var canvas = el("hist-chart-canvas");
     if (!canvas || typeof Chart === "undefined") return;
@@ -491,7 +522,7 @@ async function loadGeral(from, to) {
     var ctx = canvas.getContext("2d");
 
     var maxV = Math.max.apply(null, values.concat([1]));
-    var suggestedMax = maxV * 1.25;
+    var suggestedMax = maxV * 1.35;
 
     var gradient = ctx.createLinearGradient(0, 0, 0, 140);
     gradient.addColorStop(0, "rgba(124,58,237,0.28)");
@@ -508,7 +539,7 @@ async function loadGeral(from, to) {
         ctx2.fillStyle = "#4c1d95";
         meta.data.forEach(function(point, i) {
           var v = chart.data.datasets[0].data[i];
-          var text = fmt(v);
+          var text = fmtChartVal(v);
           var textWidth = ctx2.measureText(text).width;
           var align = "center";
           var x = point.x;
@@ -522,7 +553,7 @@ async function loadGeral(from, to) {
           }
 
           ctx2.textAlign = align;
-          ctx2.fillText(text, x, point.y - 12);
+          ctx2.fillText(text, x, point.y - 18);
         });
         ctx2.restore();
       }
@@ -551,7 +582,7 @@ async function loadGeral(from, to) {
         responsive: true,
         maintainAspectRatio: false,
         layout: {
-          padding: { top: 22, right: 8, left: 4, bottom: 0 }
+          padding: { top: 30, right: 8, left: 4, bottom: 0 }
         },
         plugins: {
           legend: { display: false },
@@ -575,7 +606,7 @@ async function loadGeral(from, to) {
               font: { size: 9 },
               color: "#a1a1aa",
               maxTicksLimit: 4,
-              callback: function(v) { return fmt(v); }
+              callback: function(v) { return fmtChartVal(v); }
             }
           }
         }
@@ -876,7 +907,7 @@ async function loadAuditoria(from, to) {
       kpi("Vendas", periodSales.length, "var(--text)", fmt(salesTotal), null) +
       kpi("Ajustes", adjustments.length, "var(--primary-mid)", "stock", adjustments.length>0?"hist-kpi--attention":null) +
       kpi("Incidentes", periodIncidents.length, periodIncidents.length>0?"var(--danger)":"var(--success)", "", periodIncidents.length>0?"hist-kpi--danger":null) +
-      kpi("Sessões", periodSessions.length, "var(--info)", "", null);
+      kpi("Sessões", periodSessions.length, "var(--text)", "", null);
   }
 
   var importedSessions = sessions.filter(function(s) { return s.isImported; });

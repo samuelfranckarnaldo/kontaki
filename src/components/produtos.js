@@ -346,9 +346,7 @@ function renderList() {
       `</div>` +
       `<div class="produto-meta">${p.barcode?p.barcode+" · ":""}${p.category}</div>` +
       `<div class="produto-stock-line">` +
-      `<span>Loja: ${qty}</span>` +
-      `<span>Arm: ${arm}</span>` +
-      `<span><strong>Total: ${qty+arm}</strong> ${p.unit}</span>` +
+      `<span>${qty} · ${arm} · <strong>${qty+arm} ${p.unit}</strong></span>` +
       `</div></div>` +
       `<div class="produto-right">` +
       `<div class="produto-label">Preco venda</div>` +

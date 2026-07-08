@@ -339,11 +339,11 @@
 }
 .produto-name  { font-size: var(--text-base); font-weight: var(--weight-strong); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .produto-meta  { font-size: var(--text-xs); color: var(--text3); margin-top: 3px; }
-.produto-stock-line { display: flex; gap: var(--space-2); margin-top: 3px; font-size: var(--text-xs); color: var(--text3); }
+.produto-stock-line { display: flex; gap: var(--space-2); margin-top: 3px; font-size: var(--text-xs); color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .produto-stock-line strong { color: var(--text); font-weight: var(--weight-strong); }
-.produto-right { text-align: right; flex-shrink: 0; margin-left: auto; }
+.produto-right { text-align: right; flex-shrink: 0; margin-left: auto; max-width: 108px; }
 .produto-label { font-size: 9px; color: var(--text4); text-transform: uppercase; letter-spacing: .3px; }
-.produto-price { font-size: var(--text-lg); font-weight: var(--weight-strong); color: var(--primary); }
+.produto-price { font-size: var(--text-lg); font-weight: var(--weight-strong); color: var(--primary); white-space: normal; line-height: 1.2; word-break: break-word; }
 
 .produto-badge {
   display: inline-flex; align-items: center; gap: 4px;
@@ -2127,6 +2127,7 @@
 .hist-hero-trend--up { color: #bbf7d0; }
 .hist-hero-trend--down { color: #fecaca; }
 .hist-hero-sub { font-size: 12px; opacity: .8; }
+.hist-hero-context { font-size: 13px; font-weight: 600; opacity: .92; margin-bottom: 4px; }
 .hist-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .hist-kpi {
   background: var(--bg2); border: 1px solid var(--border);
