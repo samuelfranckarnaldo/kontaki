@@ -23,6 +23,26 @@
 .btn-outline { background: transparent; color: var(--primary); border: 1.5px solid var(--primary); }
 .btn-full    { width: 100%; }
 .btn:disabled { opacity: .45; box-shadow: none; pointer-events: none; }
+
+.hist-skel { pointer-events: none; }
+.skel-line, .skel-circle {
+  background: linear-gradient(90deg, var(--border2) 25%, var(--border) 37%, var(--border2) 63%);
+  background-size: 400% 100%;
+  animation: skelShimmer 1.4s ease infinite;
+  border-radius: 6px;
+}
+@keyframes skelShimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.skel-line--label { width: 60px; height: 10px; margin-bottom: 8px; }
+.skel-line--val   { width: 44px; height: 16px; }
+.skel-line--hero  { width: 140px; height: 26px; margin-top: 8px; }
+.skel-line--title { width: 70%; height: 13px; margin-bottom: 6px; }
+.skel-line--sub   { width: 45%; height: 10px; }
+.skel-line--price { width: 54px; height: 14px; }
+.skel-circle { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; margin-right: 12px; }
+.hist-hero-skel { padding: 4px 0; }
 .btn { transition: opacity .25s ease, background .25s ease, box-shadow .25s ease, transform .1s ease; }
 .btn-sm      { padding: 7px 12px; font-size: 12px; border-radius: var(--radius-sm); }
 .btn-lg      { padding: 14px 20px; font-size: 15px; }

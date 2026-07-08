@@ -300,9 +300,42 @@ window._histTab = async function(tab) {
   await loadData();
 };
 
+function skeletonKpi() {
+  return '<div class="hist-kpi hist-skel"><div class="skel-line skel-line--label"></div><div class="skel-line skel-line--val"></div></div>';
+}
+function skeletonCard() {
+  return '<div class="hist-sale-card hist-skel">' +
+    '<div class="skel-circle"></div>' +
+    '<div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div>' +
+    '<div class="skel-line skel-line--price"></div>' +
+    '</div>';
+}
+function renderHistSkeleton(tab) {
+  var stats = el("historico-stats");
+  var hero  = el("historico-hero");
+  var chart = el("historico-chart");
+  var list  = el("historico-list");
+
+  if (tab === "geral" && hero) {
+    hero.style.display = "block";
+    hero.innerHTML = '<div class="hist-skel hist-hero-skel"><div class="skel-line skel-line--label" style="background:rgba(255,255,255,.3)"></div><div class="skel-line skel-line--hero" style="background:rgba(255,255,255,.35)"></div></div>';
+  }
+  if (chart) chart.style.display = "none";
+  if (stats) stats.innerHTML = skeletonKpi() + skeletonKpi() + skeletonKpi() + skeletonKpi();
+  if (list)  list.innerHTML  = skeletonCard() + skeletonCard() + skeletonCard();
+}
+
+function minDelay(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
+}
+
 async function loadData() {
   var from = val("hist-from");
   var to   = val("hist-to");
+  renderHistSkeleton(activeTab);
+
+  await minDelay(280);
+
   if (activeTab === "geral")     await loadGeral(from, to);
   if (activeTab === "stock")     await loadStock(from, to);
   if (activeTab === "auditoria") await loadAuditoria(from, to);
