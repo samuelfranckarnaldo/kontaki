@@ -388,7 +388,23 @@ function renderList() {
 
   list.sort((a,b) => (a.stock||0) - (b.stock||0));
 
-  const filterLabel = filterMode==="low" ? "Stock Baixo" : filterMode==="zero" ? "Esgotados" : "";
+  const FILTER_LABELS = { low:"Stock Baixo", zero:"Esgotados", expired:"Vencidos", expiring:"A Vencer" };
+  const filterLabel = FILTER_LABELS[filterMode] || "";
+
+  const chipsWrap = el("produtos-filter-chips");
+  if (chipsWrap) {
+    const chips = [
+      { key:"all", label:"Todos" },
+      { key:"low", label:"Stock baixo" },
+      { key:"zero", label:"Esgotados" },
+      { key:"expiring", label:"A vencer" },
+      { key:"expired", label:"Vencidos" },
+    ];
+    chipsWrap.innerHTML = chips.map(function(c) {
+      const active = filterMode === c.key;
+      return `<button class="produto-filter-chip${active?" produto-filter-chip--active":""}" onclick="window._filterProd('${c.key}')">${c.label}</button>`;
+    }).join("");
+  }
 
   el("produtos-list").innerHTML = "";
 

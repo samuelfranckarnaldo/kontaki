@@ -11,6 +11,7 @@ let activeShortcut = "hoje";
 let histChartInstance = null;
 let auditUserFilter = "all";
 let periodOffset = 0;
+let heroLastValue = 0;
 
 function toLocalDateStr(iso) {
   if (!iso) return "";
@@ -108,6 +109,7 @@ function getPeriodLabel(sc, offset, dates) {
 export async function initHistorico() {
   setVal("hist-from", today());
   setVal("hist-to",   today());
+  heroLastValue = 0;
 
   renderTabs();
   applyShortcut("hoje");
@@ -454,11 +456,17 @@ async function loadGeral(from, to) {
       else                       contextPhrase = tpl.bemAbaixo;
     }
 
+    var startVal = heroLastValue === null ? total : heroLastValue;
     hero.innerHTML =
       '<div class="hist-hero-label">Total do período</div>' +
-      '<div class="hist-hero-row"><div class="hist-hero-val">' + fmt(total) + '</div>' + badgeHtml + '</div>' +
+      '<div class="hist-hero-row"><div class="hist-hero-val" id="hist-hero-val-num">' + fmt(startVal) + '</div>' + badgeHtml + '</div>' +
       (contextPhrase ? '<div class="hist-hero-context">' + contextPhrase + '</div>' : '') +
       '<div class="hist-hero-sub">' + nVendas + ' ' + (nVendas===1?"venda":"vendas") + ' · média por venda ' + fmt(ticket) + '</div>';
+
+    if (heroLastValue !== null && heroLastValue !== total) {
+      animateHeroValue(heroLastValue, total);
+    }
+    heroLastValue = total;
   }
 
   // KPIs
@@ -669,6 +677,25 @@ async function loadGeral(from, to) {
   }).join("");
 
   refreshIcons(list);
+}
+
+function animateHeroValue(from, to) {
+  var el2 = document.getElementById("hist-hero-val-num");
+  if (!el2) return;
+  var duration = 1300;
+  var startTime = null;
+
+  function step(ts) {
+    if (!startTime) startTime = ts;
+    var progress = Math.min((ts - startTime) / duration, 1);
+    var eased = 1 - Math.pow(1 - progress, 3);
+    var current = from + (to - from) * eased;
+    var liveEl = document.getElementById("hist-hero-val-num");
+    if (!liveEl) return;
+    liveEl.textContent = fmt(current);
+    if (progress < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
 }
 
 function kpi(label, val, color, sub, attentionClass) {
