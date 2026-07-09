@@ -252,21 +252,26 @@ document.addEventListener("DOMContentLoaded", function() {
 
     <!-- PERFIL -->
     <div class="page" id="pg-perfil">
-      <div id="perfil-header" style="position:relative;background:#fff;padding:44px 16px 14px;border-bottom:1px solid #f4f4f5">
-        <div id="perfil-time-left" style="position:absolute;top:12px;left:16px;font-size:11px;font-weight:700;color:#374151;display:none;align-items:center;gap:5px">
-          <span id="perfil-time-dot" style="width:6px;height:6px;border-radius:50%;background:#5b21b6;flex-shrink:0"></span>
-        </div>
-        <button id="perfil-crown-btn" style="position:absolute;top:10px;right:16px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:4px">
-          <i data-lucide="crown" style="width:18px;height:18px;color:#d97706"></i>
-        </button>
-        <div class="perfil-header" style="padding:0;background:none">
+      <div id="perfil-header" style="background:#f9fafb;padding:16px;display:flex;flex-direction:column;gap:10px">
+        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px">
           <div class="perfil-avatar" id="perfil-avatar"></div>
-          <div>
-            <div class="perfil-name" id="perfil-name"></div>
-            <div class="perfil-role" id="perfil-role"></div>
-            <div class="perfil-plan-chip" id="perfil-plan-chip"></div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div class="perfil-name" id="perfil-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+              <span id="perfil-plan-badge" style="flex-shrink:0;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:#f5f3ff;color:#5b21b6"></span>
+            </div>
+            <div id="perfil-subline" style="font-size:12px;color:#71717a;margin-top:2px"></div>
           </div>
         </div>
+        <button id="perfil-crown-btn" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+          <span style="font-size:12.5px;font-weight:600;color:#374151">Assinatura</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span id="perfil-time-left" style="font-size:12px;font-weight:700;color:#71717a;display:flex;align-items:center;gap:5px">
+              <span id="perfil-time-dot" style="width:6px;height:6px;border-radius:50%;background:#5b21b6;flex-shrink:0"></span>
+            </span>
+            <i data-lucide="chevron-right" style="width:15px;height:15px;color:#c4c4c8;flex-shrink:0"></i>
+          </span>
+        </button>
       </div>
       <div id="perfil-menu"></div>
 

@@ -341,25 +341,29 @@ function renderStats() {
   s.style.gap = "8px";
 
   s.innerHTML =
-    // Linha 1 — 3 cards de alerta
-    _statCard({ label:"Produtos", value:total, sub:"activos", color:"var(--primary)", icon:"package", filter:"all", clickable:true }) +
-    _statCard({ label:"Stock baixo", value:low, sub:"a repor", color:"var(--warning)", icon:"alert-triangle", filter:"low", clickable:low>0 }) +
-    _statCard({ label:"Esgotados", value:zero, sub:"sem stock", color:"var(--danger)", icon:"x-circle", filter:"zero", clickable:zero>0 }) +
-    // Linha 2 — card hero (mesmo padrao visual do Historico: valor grande + contexto)
-    `<div class="hist-hero" style="grid-column:span 3;margin-top:8px">` +
+    // Linha 1 — card hero (mesmo padrao visual do Historico: valor grande + contexto)
+    `<div class="hist-hero" style="grid-column:span 3">` +
     `<div class="hist-hero-label">Valor total em stock</div>` +
     `<div class="hist-hero-val">${fmt(lojaVal+armVal)}</div>` +
     `<div class="hist-hero-sub" style="margin-top:10px;display:flex;gap:18px">` +
       `<span><strong>${lojaQty.toLocaleString("pt-AO")}</strong> un na loja</span>` +
       `<span><strong>${armQty.toLocaleString("pt-AO")}</strong> un no armazém</span>` +
     `</div>` +
+    `</div>` +
+    // Linha 2 — 3 cards de alerta
+    `<div style="grid-column:span 3;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">` +
+    _statCard({ label:"Produtos", value:total, sub:"activos", color:"var(--primary)", icon:"package", filter:"all", clickable:true }) +
+    _statCard({ label:"Stock baixo", value:low, sub:"a repor", color:"var(--warning)", icon:"alert-triangle", filter:"low", clickable:low>0, isAlert:true }) +
+    _statCard({ label:"Esgotados", value:zero, sub:"sem stock", color:"var(--danger)", icon:"x-circle", filter:"zero", clickable:zero>0, isAlert:true }) +
     `</div>`;
 
   refreshIcons(s);
 }
 
-function _statCard({label, value, sub, color, icon, filter, clickable}) {
-  return `<div class="prod-stat-card${clickable?" prod-stat-clickable":""}" ${clickable?`onclick="window._filterProd('${filter}')"`:""}>`+
+function _statCard({label, value, sub, color, icon, filter, clickable, isAlert}) {
+  const active = isAlert && value > 0;
+  const style = active ? `border-color:${color};background:${color}0d` : "";
+  return `<div class="prod-stat-card${clickable?" prod-stat-clickable":""}" style="${style}" ${clickable?`onclick="window._filterProd('${filter}')"`:""}>`+
     `<div class="prod-stat-icon" style="background:${color}20;color:${color}"><i data-lucide="${icon}"></i></div>`+
     `<div class="prod-stat-val2" style="color:${color}">${value}</div>`+
     `<div class="prod-stat-label2">${label}</div>`+
@@ -400,10 +404,12 @@ function renderList() {
       { key:"expiring", label:"A vencer" },
       { key:"expired", label:"Vencidos" },
     ];
-    chipsWrap.innerHTML = chips.map(function(c) {
-      const active = filterMode === c.key;
-      return `<button class="produto-filter-chip${active?" produto-filter-chip--active":""}" onclick="window._filterProd('${c.key}')">${c.label}</button>`;
-    }).join("");
+    chipsWrap.innerHTML = '<div class="produto-filter-chips-wrap" style="display:inline-flex">' +
+      chips.map(function(c) {
+        const active = filterMode === c.key;
+        return `<button class="produto-filter-chip${active?" produto-filter-chip--active":""}" onclick="window._filterProd('${c.key}')">${c.label}</button>`;
+      }).join("") +
+    '</div>';
   }
 
   el("produtos-list").innerHTML = "";
