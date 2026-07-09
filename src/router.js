@@ -124,7 +124,7 @@ export var router = {
     if (pageId === "fiados") {
       if (addBtn) {
         addBtn.style.display = "flex";
-        addBtn.onclick = function() { if (window._openClienteForm) window._openClienteForm(); };
+        addBtn.onclick = function() { if (window._ctTopbarAdd) window._ctTopbarAdd(); };
       }
     }
 

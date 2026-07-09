@@ -27,10 +27,17 @@ export async function initPerfil() {
   if (roleEl) roleEl.textContent = user.role === "admin" ? "Administrador" : "Operador de Caixa";
 
   var chipEl = el("perfil-plan-chip");
+  var lic = getLicense();
   if (chipEl) {
-    var lic = getLicense();
     var planInfo = PLANS[lic.plan] || PLANS.basic;
     chipEl.textContent = planInfo.name + (store.name ? " · " + store.name : "");
+  }
+
+  startLicenseCountdown(lic);
+
+  var crownBtn = el("perfil-crown-btn");
+  if (crownBtn) {
+    crownBtn.onclick = function() { window._perfilNav("assinatura"); };
   }
 
   if (avatarEl) {
@@ -1624,4 +1631,61 @@ function loadSenhaPage() {
   if (!wrap) return;
   var btn = document.getElementById("btn-back-senha");
   if (btn) btn.onclick = function() { window._perfilBack(); };
+}
+
+var _countdownInterval = null;
+
+function startLicenseCountdown(lic) {
+  var timeLeftEl = el("perfil-time-left");
+  if (!timeLeftEl) return;
+
+  if (_countdownInterval) { clearInterval(_countdownInterval); _countdownInterval = null; }
+
+  if (lic.status === "expired" || (lic.daysLeft != null && lic.daysLeft <= 0 && lic.expiresAt)) {
+    timeLeftEl.style.display = "flex";
+    timeLeftEl.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#dc2626;flex-shrink:0"></span> Expirado';
+    return;
+  }
+
+  if (!lic.expiresAt || lic.daysLeft === 999) {
+    timeLeftEl.style.display = "flex";
+    timeLeftEl.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#16a34a;flex-shrink:0"></span> Licença activa';
+    return;
+  }
+
+  var expiresAtMs = new Date(lic.expiresAt).getTime();
+
+  function render() {
+    var now = Date.now();
+    var diff = expiresAtMs - now;
+
+    if (diff <= 0) {
+      timeLeftEl.style.display = "flex";
+      timeLeftEl.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#dc2626;flex-shrink:0"></span> Expirado';
+      if (_countdownInterval) { clearInterval(_countdownInterval); _countdownInterval = null; }
+      return;
+    }
+
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+
+    var dotColor = d <= 7 ? "#d97706" : "#16a34a";
+    var text;
+    if (d > 0) {
+      text = d + "d " + h + "h restantes";
+    } else if (h > 0) {
+      text = h + "h " + m + "m restantes";
+      dotColor = "#dc2626";
+    } else {
+      text = m + "m restantes";
+      dotColor = "#dc2626";
+    }
+
+    timeLeftEl.style.display = "flex";
+    timeLeftEl.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:' + dotColor + ';flex-shrink:0"></span> ' + text;
+  }
+
+  render();
+  _countdownInterval = setInterval(render, 60000);
 }

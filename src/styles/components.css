@@ -1390,11 +1390,13 @@
 
 /* ── PERFIL — CHIP DE PLANO ────────────────────────────────────────────────── */
 .perfil-plan-chip {
-  margin-top: 10px;
-  padding: 5px 12px;
+  margin-top: 6px;
+  padding: 3px 10px;
   border-radius: 999px;
   background: rgba(91,33,182,.08);
   color: var(--primary);
+  font-size: 10.5px;
+  display: inline-block;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: .2px;
@@ -1844,25 +1846,25 @@
 /* ── PERFIL HEADER REDESIGN ─────────────────────────────────────────────────── */
 .perfil-header {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  padding: 28px 20px 20px;
+  gap: 14px;
+  padding: 18px 60px 18px 20px;
   background: linear-gradient(160deg, #f5f3ff 0%, #ede9fe 100%);
-  text-align: center;
+  text-align: left;
 }
 .perfil-avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
   background: linear-gradient(135deg, var(--primary), var(--primary-mid));
   color: #fff;
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 12px;
-  box-shadow: 0 8px 24px rgba(91,33,182,.25);
+  box-shadow: 0 6px 16px rgba(91,33,182,.25);
   flex-shrink: 0;
 }
 .perfil-avatar--logo {
@@ -1878,17 +1880,17 @@
   border-radius: 14px;
 }
 .perfil-name {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--text);
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 .perfil-role {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--primary);
   background: var(--primary-light);
-  padding: 3px 12px;
+  padding: 2px 9px;
   border-radius: 20px;
 }
 
@@ -2629,4 +2631,96 @@
 .produto-filter-chip:active { transform: scale(.96); }
 .produto-filter-chip--active {
   background: var(--primary); border-color: var(--primary); color: #fff; font-weight: var(--weight-strong);
+}
+
+
+/* ANULAR FIADO + DIAS ATRASO */
+.fc-val-cancelled { color: var(--text4); text-decoration: line-through; }
+.fc-cancelled-tag {
+  font-size: 10px; color: var(--text4); margin-left: 6px; font-weight: 700;
+  background: var(--border2); padding: 1px 6px; border-radius: 999px;
+}
+.fc-icon-btn-danger { background: var(--danger-light); color: var(--danger); }
+.fc-icon-btn-danger:active { background: #fecaca; }
+
+.m3-confirm-icon-danger { background: var(--danger-light); color: var(--danger); }
+.m3-btn-filled-danger {
+  background: var(--danger); box-shadow: 0 2px 8px rgba(220,38,38,.3);
+}
+
+
+/* FIADO ENTRY PREMIUM REDESIGN */
+.fiado-entries-list {
+  border: 1px solid var(--border2); border-radius: 14px;
+  overflow: hidden; background: var(--bg2);
+}
+.fiado-entry {
+  position: relative;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 13px 14px 13px 17px;
+  border-bottom: 1px solid var(--border2);
+}
+.fiado-entry:last-child { border-bottom: none; }
+.fiado-entry::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--border2);
+}
+.fiado-entry[data-status="open"]::before      { background: var(--warning); }
+.fiado-entry[data-status="overdue"]::before   { background: var(--danger); }
+.fiado-entry[data-status="paid"]::before      { background: var(--success); }
+.fiado-entry[data-status="cancelled"]::before { background: var(--text4); }
+.fiado-entry[data-status="cancelled"]         { opacity: .65; }
+
+.fiado-entry-top {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+}
+.fiado-entry-title-wrap { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; row-gap: 4px; }
+.fiado-entry-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.fiado-entry-amount {
+  font-size: 16px; font-weight: 800; letter-spacing: -.01em;
+  white-space: nowrap; flex-shrink: 0;
+}
+
+.fiado-entry-meta { font-size: 11.5px; color: var(--text4); line-height: 1.5; }
+
+.fiado-entry-bottom {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 2px;
+}
+
+.fiado-overdue-chip {
+  font-size: 10px; font-weight: 800; color: var(--danger); background: var(--danger-light);
+  padding: 2px 8px; border-radius: 999px; letter-spacing: .1px; white-space: nowrap;
+}
+
+.fiado-kebab-btn {
+  width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border2);
+  background: var(--bg); color: var(--text3); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .15s; flex-shrink: 0;
+}
+.fiado-kebab-btn:active { background: var(--border2); transform: scale(.94); }
+
+.fiado-receive-pill {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 18px; height: 36px;
+  background: var(--success); color: #fff; border: none; border-radius: 999px;
+  font-size: 13px; font-weight: 700; font-family: var(--font); cursor: pointer;
+  box-shadow: 0 2px 10px rgba(22,163,74,.28); transition: all .15s;
+}
+.fiado-receive-pill:active { transform: scale(.96); box-shadow: none; }
+
+.fiado-entry-actions-sheet { display: flex; flex-direction: column; gap: 2px; }
+.fiado-action-row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 14px 10px; background: none; border: none; border-radius: 12px;
+  font-size: 14px; font-weight: 600; color: var(--text); font-family: var(--font);
+  cursor: pointer; text-align: left; transition: background .15s;
+}
+.fiado-action-row:active { background: var(--border2); }
+.fiado-action-row.danger { color: var(--danger); }
+.fiado-action-row i, .fiado-action-row svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* Numeros tabulares (alinhamento tipo extrato financeiro) */
+.stat-val, .fc-row-val, .fiados-hero-val, .fc-pending-val, .ct-inline-val,
+.fiado-entry-amount, .fc-modal-total, .fc-pay-modal-val, .fc-action-val {
+  font-variant-numeric: tabular-nums;
 }

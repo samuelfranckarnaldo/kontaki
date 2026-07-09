@@ -61,6 +61,31 @@ async function renderConfiguracoes() {
       : "") +
     '</div>';
 
+  // Inventário
+  const policy = store.stockIncidentPolicy || "block";
+  wrap.innerHTML +=
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;margin-top:8px">Inventário</div>' +
+    '<div class="vender-card" style="margin-bottom:14px">' +
+    '<div style="font-size:13px;color:#71717a;margin-bottom:12px;line-height:1.5">Define o que acontece quando alguém tenta vender um produto com um incidente de stock em aberto.</div>' +
+    '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;border:1.5px solid ' + (policy==="block"?"#5b21b6":"#e4e4e7") + ';border-radius:10px;margin-bottom:8px;cursor:pointer;background:' + (policy==="block"?"#faf5ff":"#fff") + '">' +
+    '<input type="radio" name="inc-policy" value="block" ' + (policy==="block"?"checked":"") + ' onchange="window._setIncidentPolicy(\'block\')" style="margin-top:2px"/>' +
+    '<div><div style="font-size:14px;font-weight:700;color:#18181b">🔒 Bloquear vendas (recomendado)</div>' +
+    '<div style="font-size:12px;color:#71717a;margin-top:2px">Produtos com incidente em aberto não podem ser vendidos até o incidente ser resolvido.</div></div>' +
+    '</label>' +
+    '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;border:1.5px solid ' + (policy==="allow_with_auth"?"#5b21b6":"#e4e4e7") + ';border-radius:10px;cursor:pointer;background:' + (policy==="allow_with_auth"?"#faf5ff":"#fff") + '">' +
+    '<input type="radio" name="inc-policy" value="allow_with_auth" ' + (policy==="allow_with_auth"?"checked":"") + ' onchange="window._setIncidentPolicy(\'allow_with_auth\')" style="margin-top:2px"/>' +
+    '<div><div style="font-size:14px;font-weight:700;color:#18181b">⚠️ Permitir com autorização</div>' +
+    '<div style="font-size:12px;color:#71717a;margin-top:2px">A venda é permitida após confirmação com PIN de administrador. A decisão fica registada na auditoria.</div></div>' +
+    '</label>' +
+    '</div>';
+
+  // Diagnóstico temporário (remover depois de confirmar incidentOverride)
+  wrap.innerHTML +=
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;margin-top:8px">Diagnóstico</div>' +
+    '<div class="vender-card" style="margin-bottom:14px">' +
+    '<button onclick="window._debugStockMovements()" style="width:100%;padding:12px;background:#f4f4f5;color:#18181b;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Ver últimos 5 movimentos de stock (bruto)</button>' +
+    '</div>';
+
   // Limpeza de histórico
   wrap.innerHTML +=
     '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;margin-top:8px">Limpar histórico de vendas</div>' +
@@ -87,6 +112,23 @@ window._saveConfiguracoes = async () => {
     currency: el("cfg-currency").value.trim() || "Kz",
   });
   toast("Configurações guardadas.", "success");
+};
+
+window._setIncidentPolicy = async (policy) => {
+  const store = (await db.get("settings","store")) || {};
+  await db.put("settings", { ...store, key:"store", stockIncidentPolicy: policy });
+  toast("Política de inventário actualizada.", "success");
+  await renderConfiguracoes();
+};
+
+window._debugStockMovements = async () => {
+  const moves = await db.getAll("stockMovements");
+  const last5 = moves.slice(-5).reverse();
+  const json = JSON.stringify(last5, null, 2).replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  openModal("Últimos 5 movimentos (bruto)",
+    '<pre style="font-size:11px;white-space:pre-wrap;word-break:break-all;background:#f4f4f5;padding:10px;border-radius:8px;max-height:55vh;overflow-y:auto">' + json + '</pre>' +
+    '<button class="btn btn-ghost btn-full" style="margin-top:10px" onclick="window._closeModal()">Fechar</button>');
+  refreshIcons(el("modal-box"));
 };
 
 window._exportBackup = async () => {

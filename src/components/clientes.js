@@ -3,7 +3,7 @@ import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import "./fiados.js";
-import { isOverdue } from "./fiados.js";
+import { isOverdue, daysOverdue } from "./fiados.js";
 
 let fiadosFilter = "all";
 
@@ -13,12 +13,25 @@ export async function initClientesTab() {
   });
   window._openClienteForm = openClienteForm;
   window._refreshClientesTab = () => switchCtTab(getActiveTab());
+  window._ctTopbarAdd = ctTopbarAdd;
   switchCtTab("geral");
 }
 
 function getActiveTab() {
   const active = document.querySelector("#ct-tabbar .ct-tab.active");
   return active ? active.dataset.tab : "geral";
+}
+
+function ctTopbarAdd() {
+  const tab = getActiveTab();
+  if (tab === "clientes") { window._openClienteForm(); return; }
+  if (tab === "fiados")   { window._openFiadoAdd(); return; }
+}
+
+function updateTopbarAddVisibility(tab) {
+  const addBtn = document.getElementById("btn-topbar-add");
+  if (!addBtn) return;
+  addBtn.style.display = tab === "geral" ? "none" : "flex";
 }
 
 function switchCtTab(tab) {
@@ -30,6 +43,7 @@ function switchCtTab(tab) {
   if (tab === "geral")    renderGeral();
   if (tab === "clientes") renderClientesList();
   if (tab === "fiados")   renderFiadosList();
+  updateTopbarAddVisibility(tab);
 }
 window._switchCtTab = switchCtTab;
 
@@ -42,8 +56,9 @@ async function renderGeral() {
       (f.clientName || "").toLowerCase() === (c.name || "").toLowerCase());
     const open = myFiados.filter(f => f.status === "open");
     const totalOpen = open.reduce((a, f) => a + (f.amount || 0), 0);
-    const overdue = open.some(isOverdue);
-    return { client: c, totalOpen, overdue };
+    const overdueEntries = open.filter(isOverdue);
+    const maxDays = overdueEntries.reduce((m, e) => Math.max(m, daysOverdue(e)), 0);
+    return { client: c, totalOpen, overdue: overdueEntries.length > 0, maxDays };
   });
 
   const totalReceber = enriched.reduce((a, e) => a + e.totalOpen, 0);
@@ -84,14 +99,14 @@ async function renderGeral() {
           <div class="empty-state-title">Nenhuma dívida em aberto</div>
         </div>`
       : `<div class="list-card">
-          ${top3.map(({ client: c, totalOpen, overdue }) => `
+          ${top3.map(({ client: c, totalOpen, overdue, maxDays }) => `
             <div class="ct-devedor-row" onclick="window._openClienteProfile(${c.id})">
               <div class="fc-row-avatar" style="background:${overdue ? "var(--danger-light);color:var(--danger)" : "var(--warning-light);color:var(--warning)"}">
                 ${(c.name||"?").charAt(0).toUpperCase()}
               </div>
               <div class="fc-row-info">
                 <div class="fc-row-name">${c.name}</div>
-                ${overdue ? `<div class="fc-badge-overdue">Atrasado</div>` : ""}
+                ${overdue ? `<span class="fc-badge-overdue">Atrasado há ${maxDays} ${maxDays===1?"dia":"dias"}</span>` : ""}
               </div>
               <div class="fc-row-val ${overdue ? "overdue" : ""}">${fmt(totalOpen)}</div>
             </div>`).join("")}
@@ -133,8 +148,11 @@ async function renderClientesList() {
   filtered.forEach(c => {
     const mySales  = sales.filter(s => s.clientId===c.id || (s.clientName||"").toLowerCase()===c.name.toLowerCase());
     const myFiados = fiados.filter(f => f.clientId===c.id || (f.clientName||"").toLowerCase()===c.name.toLowerCase());
-    const fiadoAberto = myFiados.filter(f => f.status==="open").reduce((a,f) => a+(f.amount||0), 0);
-    const overdue = myFiados.filter(f => f.status==="open").some(isOverdue);
+    const openEntries = myFiados.filter(f => f.status==="open");
+    const fiadoAberto = openEntries.reduce((a,f) => a+(f.amount||0), 0);
+    const overdueEntries = openEntries.filter(isOverdue);
+    const overdue = overdueEntries.length > 0;
+    const maxDays = overdueEntries.reduce((m,e) => Math.max(m, daysOverdue(e)), 0);
 
     const row = document.createElement("div");
     row.className = "fc-row";
@@ -149,7 +167,7 @@ async function renderClientesList() {
       </div>
       <div class="fc-row-right">
         ${fiadoAberto > 0
-          ? `<div class="fc-row-val ${overdue?"overdue":""}">${fmt(fiadoAberto)}</div><div class="fc-row-sub">${overdue?"Atrasado":"Pendente"}</div>`
+          ? `<div class="fc-row-val ${overdue?"overdue":""}">${fmt(fiadoAberto)}</div><div class="fc-row-sub">${overdue?"Atrasado há "+maxDays+"d":"Pendente"}</div>`
           : `<div class="fc-row-saldo"><i data-lucide="check-circle" style="width:13px;height:13px"></i> Em dia</div>`
         }
       </div>`;
@@ -189,21 +207,19 @@ window._saveCliente = async (id) => {
     address: (el("cl-addr")?.value   || "").trim(),
     notes:   (el("cl-notes")?.value  || "").trim(),
   };
-  let savedId = id;
   if (id) {
     const ex = await db.get("clients", id);
     await db.put("clients", { ...ex, ...data });
     toast("Cliente actualizado.", "success");
   } else {
-    savedId = await db.add("clients", { ...data, createdAt: new Date().toISOString() });
+    await db.add("clients", { ...data, createdAt: new Date().toISOString() });
     toast("Cliente adicionado.", "success");
   }
   closeModal();
-  const active = getActiveTab();
   if (document.getElementById("cliente-profile-overlay") && id) {
     window._openClienteProfile(id);
   } else {
-    switchCtTab(active);
+    switchCtTab(getActiveTab());
   }
 };
 
@@ -270,9 +286,12 @@ async function renderFiadosList() {
 
   groups.forEach(g => {
     const isSaldado = g.totalOpen === 0;
-    const openCount = g.entries.filter(e => e.status === "open").length;
-    const firstOpen = g.entries.find(e => e.status === "open");
-    const groupOverdue = g.entries.some(isOverdue);
+    const openEntries = g.entries.filter(e => e.status === "open");
+    const openCount = openEntries.length;
+    const firstOpen = openEntries[0];
+    const overdueEntries = openEntries.filter(isOverdue);
+    const groupOverdue = overdueEntries.length > 0;
+    const maxDays = overdueEntries.reduce((m,e) => Math.max(m, daysOverdue(e)), 0);
     const matchClient = clients.find(c => (c.name||"").toLowerCase() === g.clientName.toLowerCase());
 
     let avatarStyle;
@@ -291,7 +310,7 @@ async function renderFiadosList() {
       `<div class="fc-row-avatar" style="${avatarStyle}">${g.clientName.charAt(0).toUpperCase()}</div>
        <div class="fc-row-info">
          <div class="fc-row-name">${g.clientName}${!matchClient ? ' <span class="ct-nocliente-tag">sem ficha</span>' : ""}</div>
-         <div class="fc-row-meta">${g.entries.length} ${g.entries.length===1?"entrada":"entradas"}</div>
+         <div class="fc-row-meta">${g.entries.length} ${g.entries.length===1?"entrada":"entradas"}${groupOverdue ? " · atrasado há " + maxDays + "d" : ""}</div>
        </div>
        <div class="fc-row-right">
          ${isSaldado
@@ -322,6 +341,7 @@ function renderComprasPanel(mySales) {
     </div>`).join("");
 }
 
+// ── PAINEL DE FIADOS — redesign premium (barra de status + bottom sheet) ─────
 function renderFiadosPanel(myFiados, clientName) {
   const open = myFiados.filter(f => f.status === "open");
   const totalOpen = open.reduce((a, f) => a + (f.amount || 0), 0);
@@ -337,31 +357,61 @@ function renderFiadosPanel(myFiados, clientName) {
        <i data-lucide="plus"></i> Registar novo fiado
      </button>`;
 
-  const list = !sorted.length
-    ? `<div style="text-align:center;color:var(--text4);font-size:13px;padding:24px">Sem fiados registados</div>`
-    : sorted.slice(0,30).map(f => {
-        const overdue = isOverdue(f);
-        const color = f.status === "paid" ? "var(--success)" : (overdue ? "var(--danger)" : "var(--warning)");
-        const label = f.status === "paid" ? "Pagamento recebido" : "Fiado";
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border2)">
-          <div>
-            <div style="font-size:13px;font-weight:600">${label}${overdue ? ' <span class="fc-badge-overdue">Atrasado</span>' : ""}</div>
-            <div style="font-size:11px;color:var(--text4)">${fmtDate(f.date)}${f.notes ? " · " + f.notes : ""}${f.dueDate ? " · vence " + fmtDate(f.dueDate) : ""}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <div style="font-size:14px;font-weight:700;color:${color}">${fmt(f.amount)}</div>
-            ${f.status === "open" ? `
-              <button class="fc-icon-btn" onclick="window._openEditFiado(${f.id})" title="Editar">
-                <i data-lucide="pencil" style="width:13px;height:13px"></i>
-              </button>
-              <button class="btn btn-outline btn-sm" style="padding:6px 10px" onclick="window._openPayModal(${f.id})">Receber</button>
-            ` : ""}
-          </div>
-        </div>`;
-      }).join("");
+  if (!sorted.length) {
+    return actions + `<div style="text-align:center;color:var(--text4);font-size:13px;padding:24px">Sem fiados registados</div>`;
+  }
 
-  return actions + `<div style="border:1px solid var(--border2);border-radius:12px;overflow:hidden">${list}</div>`;
+  const rows = sorted.slice(0,30).map(f => {
+    const cancelled = f.status === "cancelled";
+    const paid = f.status === "paid";
+    const overdue = !paid && !cancelled && isOverdue(f);
+    const statusAttr = paid ? "paid" : cancelled ? "cancelled" : overdue ? "overdue" : "open";
+    const amountColor = paid ? "var(--success)" : cancelled ? "var(--text4)" : overdue ? "var(--danger)" : "var(--warning)";
+    const title = paid ? "Pagamento recebido" : cancelled ? "Fiado anulado" : "Fiado";
+    const days = overdue ? daysOverdue(f) : 0;
+
+    const metaParts = [fmtDate(f.date)];
+    if (f.notes) metaParts.push(f.notes);
+    if (f.dueDate && f.status === "open") metaParts.push("vence " + fmtDate(f.dueDate));
+    if (cancelled && f.cancelReason) metaParts.push("Motivo: " + f.cancelReason);
+
+    return `<div class="fiado-entry" data-status="${statusAttr}">
+      <div class="fiado-entry-top">
+        <div class="fiado-entry-title-wrap">
+          <span class="fiado-entry-title">${title}</span>
+          ${overdue ? `<span class="fiado-overdue-chip">Atrasado há ${days} ${days===1?"dia":"dias"}</span>` : ""}
+        </div>
+        <span class="fiado-entry-amount" style="color:${amountColor};${cancelled?"text-decoration:line-through":""}">${fmt(f.amount)}</span>
+      </div>
+      <div class="fiado-entry-meta">${metaParts.join(" · ")}</div>
+      ${f.status === "open" ? `
+        <div class="fiado-entry-bottom">
+          <button class="fiado-kebab-btn" onclick="window._openFiadoActions(${f.id})">
+            <i data-lucide="more-vertical" style="width:16px;height:16px"></i>
+          </button>
+          <button class="fiado-receive-pill" onclick="window._openPayModal(${f.id})">
+            <i data-lucide="check" style="width:14px;height:14px"></i> Receber
+          </button>
+        </div>` : ""
+      }
+    </div>`;
+  }).join("");
+
+  return actions + `<div class="fiado-entries-list">${rows}</div>`;
 }
+
+window._openFiadoActions = (id) => {
+  openModal("",
+    `<div class="fiado-entry-actions-sheet">
+      <button class="fiado-action-row" onclick="window._closeModal();window._openEditFiado(${id})">
+        <i data-lucide="pencil"></i> Editar fiado
+      </button>
+      <button class="fiado-action-row danger" onclick="window._closeModal();window._openCancelFiado(${id})">
+        <i data-lucide="ban"></i> Anular fiado
+      </button>
+    </div>`);
+  refreshIcons(el("modal-box"));
+};
 
 function switchProfileTab(tab) {
   document.querySelectorAll("#cliente-profile-overlay .fc-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));

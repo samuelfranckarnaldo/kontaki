@@ -15,6 +15,18 @@ export function isOverdue(e) {
   return new Date(e.dueDate) < startOfToday();
 }
 
+export function daysOverdue(e) {
+  if (!isOverdue(e)) return 0;
+  const diff = startOfToday() - new Date(new Date(e.dueDate).setHours(0,0,0,0));
+  return Math.max(1, Math.round(diff / 86400000));
+}
+
+export function overdueBadge(e) {
+  if (!isOverdue(e)) return "";
+  const d = daysOverdue(e);
+  return `<span class="fc-badge-overdue">Atrasado há ${d} ${d === 1 ? "dia" : "dias"}</span>`;
+}
+
 export function waLink(phone, msg) {
   const clean = (phone || "").replace(/\D/g, "");
   return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
@@ -53,14 +65,16 @@ window._openFiadoCliente = async (encodedName) => {
       ${entries.map(e => `
         <div class="fc-modal-entry">
           <div class="fc-modal-entry-left">
-            <div class="fc-modal-entry-val ${e.status === "open" ? "fc-val-open" : "fc-val-paid"}">
+            <div class="fc-modal-entry-val ${e.status === "open" ? "fc-val-open" : (e.status === "cancelled" ? "fc-val-cancelled" : "fc-val-paid")}">
               ${fmt(e.amount)}
               ${e.status === "paid" ? `<span class="fc-paid-tag">✓ Pago</span>` : ""}
-              ${isOverdue(e) ? `<span class="fc-badge-overdue" style="margin-left:6px">Atrasado</span>` : ""}
+              ${e.status === "cancelled" ? `<span class="fc-cancelled-tag">Anulado</span>` : ""}
+              ${overdueBadge(e)}
             </div>
             <div class="fc-modal-entry-date">
               ${fmtDate(e.date)}${e.notes ? " · " + e.notes : ""}
               ${e.dueDate ? " · vence " + fmtDate(e.dueDate) : ""}
+              ${e.status === "cancelled" && e.cancelReason ? " · Motivo: " + e.cancelReason : ""}
             </div>
           </div>
           ${e.status === "open"
@@ -68,11 +82,17 @@ window._openFiadoCliente = async (encodedName) => {
                  <button class="fc-icon-btn" onclick="window._openEditFiado(${e.id})" title="Editar">
                    <i data-lucide="pencil" style="width:14px;height:14px"></i>
                  </button>
+                 <button class="fc-icon-btn fc-icon-btn-danger" onclick="window._openCancelFiado(${e.id})" title="Anular">
+                   <i data-lucide="x" style="width:14px;height:14px"></i>
+                 </button>
                  <button class="btn btn-outline btn-sm" onclick="window._openPayModal(${e.id})">
                    <i data-lucide="check"></i> Receber
                  </button>
                </div>`
-            : `<div class="fc-paid-icon"><i data-lucide="check-circle" style="width:18px;height:18px;color:var(--success)"></i></div>`
+            : (e.status === "paid"
+                ? `<div class="fc-paid-icon"><i data-lucide="check-circle" style="width:18px;height:18px;color:var(--success)"></i></div>`
+                : `<div class="fc-paid-icon"><i data-lucide="x-circle" style="width:18px;height:18px;color:var(--text4)"></i></div>`
+              )
           }
         </div>`).join("")}
     </div>
@@ -86,7 +106,6 @@ window._openFiadoCliente = async (encodedName) => {
   refreshIcons(el("modal-box"));
 };
 
-// ── Diálogo de confirmação M3 (Receber tudo) ─────────────────────────────────
 window._confirmReceiveAll = (encodedName, total) => {
   const name = decodeURIComponent(encodedName);
   openModal("",
@@ -233,6 +252,45 @@ window._saveEditFiado = async (id) => {
     editedAt: new Date().toISOString(),
   });
   toast("Fiado atualizado.", "success");
+  closeModal();
+  if (window._refreshClientesTab) window._refreshClientesTab();
+};
+
+// ── Anular Fiado (motivo obrigatório) ──────────────────────────────────────────
+window._openCancelFiado = async (id) => {
+  const e = await db.get("fiado", id);
+  if (!e) return;
+
+  openModal("",
+    `<div class="m3-confirm">
+      <div class="m3-confirm-icon m3-confirm-icon-danger"><i data-lucide="ban"></i></div>
+      <div class="m3-confirm-title">Anular fiado de ${fmt(e.amount)}?</div>
+      <div class="m3-confirm-body">
+        Esta ação remove o valor da dívida de <b>${e.clientName}</b>. O motivo é obrigatório e fica guardado no histórico.
+      </div>
+      <div class="field" style="width:100%;text-align:left;margin-bottom:16px">
+        <label>Motivo *</label>
+        <input id="cf-reason" placeholder="Ex: Venda cancelada, erro ao registar..." autocomplete="off"/>
+      </div>
+      <div class="m3-confirm-actions">
+        <button class="m3-btn-text" onclick="window._closeModal()">Voltar</button>
+        <button class="m3-btn-filled m3-btn-filled-danger" onclick="window._confirmCancelFiado(${id})">Anular fiado</button>
+      </div>
+    </div>`);
+  refreshIcons(el("modal-box"));
+};
+
+window._confirmCancelFiado = async (id) => {
+  const reason = (el("cf-reason")?.value || "").trim();
+  if (!reason) { toast("O motivo é obrigatório.", "error"); return; }
+  const e = await db.get("fiado", id);
+  if (!e) return;
+  await db.put("fiado", {
+    ...e, status: "cancelled",
+    cancelReason: reason,
+    cancelledAt: new Date().toISOString(),
+  });
+  toast("Fiado anulado.", "success");
   closeModal();
   if (window._refreshClientesTab) window._refreshClientesTab();
 };

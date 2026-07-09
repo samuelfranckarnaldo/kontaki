@@ -1,5 +1,6 @@
 import { db } from "./db.js";
 import { getUser } from "./auth.js";
+import { verifyPassword } from "./crypto.js";
 
 export function generateUUID() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -129,7 +130,7 @@ export async function addStockMovement(data) {
   const user=requireAuth();
   const current=await getStock(data.productId, data.location||"shop");
   const after=current+data.qty;
-  const id=await db.add("stockMovements",{
+  const record={
     productId:Number(data.productId), productName:data.productName||"",
     type:data.type, location:data.location||"shop",
     qty:data.qty, qtyBefore:current, qtyAfter:after,
@@ -138,7 +139,14 @@ export async function addStockMovement(data) {
     sessionId:data.sessionId!==undefined?data.sessionId:(user.sessionId||null),
     imported:false,
     createdAt:data.createdAt||new Date().toISOString(),
-  });
+  };
+  if (data.incidentOverride) {
+    record.incidentOverride = true;
+    record.incidentId = data.incidentId;
+    record.authorizedBy = data.authorizedBy;
+    record.authorizedAt = data.authorizedAt || new Date().toISOString();
+  }
+  const id=await db.add("stockMovements",record);
   const product=await db.get("products",Number(data.productId));
   if(product) {
     const shop=await getStock(data.productId,"shop");
@@ -146,6 +154,27 @@ export async function addStockMovement(data) {
     await db.put("products",{...product,stock:shop,warehouseStock:wh,updatedAt:new Date().toISOString()});
   }
   return id;
+}
+
+export async function getOpenIncidentForProduct(productId) {
+  const incidents=await db.getAll("incidents");
+  return incidents.find(i=>i.productId===Number(productId) && i.status==="open") || null;
+}
+
+export async function getStockIncidentPolicy() {
+  const store=(await db.get("settings","store"))||{};
+  return store.stockIncidentPolicy || "block";
+}
+
+export async function verifyAdminPin(pin) {
+  const users=await db.getAll("users");
+  const admins=users.filter(u=>u.role==="admin" && u.active!==false);
+  if (!admins.length) return {ok:false,reason:"no_admin"};
+  for (const admin of admins) {
+    const valid=await verifyPassword(pin, admin.passwordHash);
+    if (valid) return {ok:true,admin};
+  }
+  return {ok:false,reason:"invalid"};
 }
 
 export const productService = {

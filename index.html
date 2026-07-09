@@ -249,11 +249,21 @@ document.addEventListener("DOMContentLoaded", function() {
 
     <!-- PERFIL -->
     <div class="page" id="pg-perfil">
-      <div class="perfil-header" id="perfil-header">
-        <div class="perfil-avatar" id="perfil-avatar"></div>
-        <div class="perfil-name" id="perfil-name"></div>
-        <div class="perfil-role" id="perfil-role"></div>
-        <div class="perfil-plan-chip" id="perfil-plan-chip"></div>
+      <div id="perfil-header" style="position:relative;background:#fff;padding:44px 16px 14px;border-bottom:1px solid #f4f4f5">
+        <div id="perfil-time-left" style="position:absolute;top:12px;left:16px;font-size:11px;font-weight:700;color:#374151;display:none;align-items:center;gap:5px">
+          <span id="perfil-time-dot" style="width:6px;height:6px;border-radius:50%;background:#5b21b6;flex-shrink:0"></span>
+        </div>
+        <button id="perfil-crown-btn" style="position:absolute;top:10px;right:16px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:4px">
+          <i data-lucide="crown" style="width:18px;height:18px;color:#d97706"></i>
+        </button>
+        <div class="perfil-header" style="padding:0;background:none">
+          <div class="perfil-avatar" id="perfil-avatar"></div>
+          <div>
+            <div class="perfil-name" id="perfil-name"></div>
+            <div class="perfil-role" id="perfil-role"></div>
+            <div class="perfil-plan-chip" id="perfil-plan-chip"></div>
+          </div>
+        </div>
       </div>
       <div id="perfil-menu"></div>
 

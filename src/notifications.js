@@ -82,7 +82,7 @@ export async function getCashAlerts() {
     id: "cash-incidents", type: "cash", category: "incident", severity: "danger",
     title: open.length + " incidente" + (open.length>1?"s":"") + " de caixa/stock",
     description: "Requer revisão de um administrador",
-    action: { page:"perfil", subpage:"escritorio" },
+    action: { page:"perfil", subpage:"incidentes" },
     createdAt: latestTimestamp(open, "createdAt"),
     actionable: true,
   }];

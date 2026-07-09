@@ -4,7 +4,7 @@ import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { getUser } from "../auth.js";
 import { initCamera } from "./camera.js";
-import { addStockMovement, getStock } from "../services.js";
+import { addStockMovement, getStock, getOpenIncidentForProduct, getStockIncidentPolicy, verifyAdminPin } from "../services.js";
 import { gerarReciboPDF, partilharReciboPDF, printReciboHTML } from "./recibo-pdf.js";
 import { printRecibo } from "../print.js";
 
@@ -257,12 +257,31 @@ window._addProd = (id) => {
 // ── CARRINHO ──────────────────────────────────────────────────────────────────
 function addToCart(p) {
   if (p.stock <= 0) { toast("Produto sem stock.", "error"); return; }
+  handleAddToCart(p);
+}
+
+async function handleAddToCart(p) {
+  const incident = await getOpenIncidentForProduct(p.id);
+  if (!incident) { pushToCart(p, null); return; }
+
+  const policy = await getStockIncidentPolicy();
+  if (policy === "block") {
+    showIncidentBlockedModal(p, incident);
+    return;
+  }
+  showIncidentAuthModal(p, incident, function(admin) {
+    pushToCart(p, { incidentId: incident.id, authorizedBy: admin.id, authorizedAt: new Date().toISOString() });
+  });
+}
+
+function pushToCart(p, incidentAuth) {
   const ex = cart.find(i => i.id === p.id);
   if (ex) {
     if (ex.qty >= p.stock) { toast("Stock insuficiente.", "error"); return; }
     ex.qty++;
+    if (incidentAuth) ex.incidentAuth = incidentAuth;
   } else {
-    cart.push({ id:p.id, name:p.name, price:p.price, stock:p.stock, unit:p.unit, qty:1 });
+    cart.push({ id:p.id, name:p.name, price:p.price, stock:p.stock, unit:p.unit, qty:1, incidentAuth: incidentAuth||null });
   }
   var results = el("search-results");
   if (results) results.style.display = "none";
@@ -272,6 +291,74 @@ function addToCart(p) {
   renderCart();
   renderSummary();
 }
+
+function showIncidentBlockedModal(p, incident) {
+  openModal("Venda bloqueada",
+    '<div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:16px">' +
+    'O produto <strong>' + p.name + '</strong> tem um incidente de inventário em aberto (esperado ' + incident.expected + ', encontrado ' + incident.found + ').' +
+    '</div>' +
+    '<div style="font-size:12px;color:var(--text4);margin-bottom:16px">Política actual: <strong>Bloquear vendas durante incidentes de stock.</strong></div>' +
+    '<div style="display:flex;flex-direction:column;gap:8px">' +
+    '<button class="btn btn-primary btn-full" onclick="window._goToIncidentes()">Resolver incidente</button>' +
+    '<button class="btn btn-ghost btn-full" onclick="window._goToConfigInventario()">Abrir Configurações</button>' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+}
+
+window._goToIncidentes = function() {
+  closeModal();
+  if (window.router) window.router.go("perfil");
+  setTimeout(function() { if (window._perfilNav) window._perfilNav("incidentes"); }, 60);
+};
+
+window._goToConfigInventario = function() {
+  closeModal();
+  if (window.router) window.router.go("perfil");
+  setTimeout(function() { if (window._perfilNav) window._perfilNav("configuracoes"); }, 60);
+};
+
+function showIncidentAuthModal(p, incident, onSuccess) {
+  openModal("Autorização necessária",
+    '<div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:16px">' +
+    'O produto <strong>' + p.name + '</strong> tem um incidente de inventário em aberto. É necessário o PIN de um administrador para continuar.' +
+    '</div>' +
+    '<div class="field" style="margin-bottom:14px">' +
+    '<label>PIN do administrador</label>' +
+    '<input type="password" inputmode="numeric" maxlength="6" id="inc-auth-pin" placeholder="••••••" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:18px;text-align:center;letter-spacing:6px;font-family:inherit"/>' +
+    '</div>' +
+    '<div id="inc-auth-err" style="display:none;color:var(--danger);font-size:12px;margin-bottom:10px"></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+    '<button class="btn btn-primary btn-full" onclick="window._submitIncidentAuth()">Confirmar</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+  window._pendingIncidentAuthCallback = onSuccess;
+}
+
+window._submitIncidentAuth = async function() {
+  var pinEl = document.getElementById("inc-auth-pin");
+  var pin = pinEl ? pinEl.value : "";
+  var errEl = document.getElementById("inc-auth-err");
+  if (!pin || pin.length < 4) {
+    if (errEl) { errEl.style.display = "block"; errEl.textContent = "Introduz o PIN."; }
+    return;
+  }
+  var result = await verifyAdminPin(pin);
+  if (!result.ok) {
+    if (errEl) {
+      errEl.style.display = "block";
+      errEl.textContent = result.reason === "no_admin"
+        ? "Não existe nenhum administrador configurado para autorizar esta operação."
+        : "PIN incorrecto.";
+    }
+    return;
+  }
+  closeModal();
+  var cb = window._pendingIncidentAuthCallback;
+  window._pendingIncidentAuthCallback = null;
+  if (cb) cb(result.admin);
+};
 
 window._changeQty = (id, delta) => {
   const item = cart.find(i => i.id === Number(id));
@@ -843,11 +930,18 @@ window._confirmarVenda = async () => {
 
     // StockMovements — fonte de verdade
     for (const item of cart) {
-      await addStockMovement({
+      const movData = {
         productId:item.id, productName:item.name,
         type:"sale", location:"shop", qty:-item.qty,
         reference:`sale#${sid}`, note:`Venda #${sid}`,
-      });
+      };
+      if (item.incidentAuth) {
+        movData.incidentOverride = true;
+        movData.incidentId = item.incidentAuth.incidentId;
+        movData.authorizedBy = item.incidentAuth.authorizedBy;
+        movData.authorizedAt = item.incidentAuth.authorizedAt;
+      }
+      await addStockMovement(movData);
     }
 
     // Fiado

@@ -13,6 +13,48 @@ let auditUserFilter = "all";
 let periodOffset = 0;
 let heroLastValue = 0;
 
+function fmtChartVal(n) {
+  var abs = Math.abs(n);
+  var sign = n < 0 ? "-" : "";
+  if (abs < 1000) return sign + abs.toLocaleString("pt-AO") + " Kz";
+  var s;
+  if (abs < 1e6)  s = (abs/1e3).toFixed(abs%1e3===0?0:1) + "K";
+  else if (abs < 1e9) s = (abs/1e6).toFixed(abs%1e6===0?0:1) + "M";
+  else s = (abs/1e9).toFixed(abs%1e9===0?0:1) + "B";
+  return sign + s + " Kz";
+}
+
+var histChartValueLabelPlugin = {
+  id: "histValueLabels",
+  afterDatasetsDraw: function(chart) {
+    var ctx2 = chart.ctx;
+    var meta = chart.getDatasetMeta(0);
+    var chartArea = chart.chartArea;
+    ctx2.save();
+    ctx2.font = "700 11px sans-serif";
+    ctx2.fillStyle = "#4c1d95";
+    meta.data.forEach(function(point, i) {
+      var v = chart.data.datasets[0].data[i];
+      var text = fmtChartVal(v);
+      var textWidth = ctx2.measureText(text).width;
+      var align = "center";
+      var x = point.x;
+
+      if (point.x - textWidth / 2 < chartArea.left) {
+        align = "left";
+        x = chartArea.left;
+      } else if (point.x + textWidth / 2 > chartArea.right) {
+        align = "right";
+        x = chartArea.right;
+      }
+
+      ctx2.textAlign = align;
+      ctx2.fillText(text, x, point.y - 18);
+    });
+    ctx2.restore();
+  }
+};
+
 function toLocalDateStr(iso) {
   if (!iso) return "";
   var d = new Date(iso);
@@ -297,6 +339,10 @@ function renderTabs() {
 }
 
 window._histTab = async function(tab) {
+  if (activeTab === "geral" && tab !== "geral" && histChartInstance) {
+    histChartInstance.destroy();
+    histChartInstance = null;
+  }
   activeTab = tab;
   renderTabs();
   await loadData();
@@ -495,9 +541,11 @@ async function loadGeral(from, to) {
       var values = days.map(function(d) { return byDay[d]; });
 
       chart.style.display = "block";
-      chart.innerHTML =
-        '<div class="hist-chart-title">Vendas por dia</div>' +
-        '<div style="position:relative;height:140px"><canvas id="hist-chart-canvas"></canvas></div>';
+      if (!document.getElementById("hist-chart-canvas")) {
+        chart.innerHTML =
+          '<div class="hist-chart-title">Vendas por dia</div>' +
+          '<div style="position:relative;height:140px"><canvas id="hist-chart-canvas"></canvas></div>';
+      }
 
       renderSalesChart(days, values);
     } else {
@@ -509,66 +557,26 @@ async function loadGeral(from, to) {
     }
   }
 
-  function fmtChartVal(n) {
-    var abs = Math.abs(n);
-    var sign = n < 0 ? "-" : "";
-    if (abs < 1000) return sign + abs.toLocaleString("pt-AO") + " Kz";
-    var s;
-    if (abs < 1e6)  s = (abs/1e3).toFixed(abs%1e3===0?0:1) + "K";
-    else if (abs < 1e9) s = (abs/1e6).toFixed(abs%1e6===0?0:1) + "M";
-    else s = (abs/1e9).toFixed(abs%1e9===0?0:1) + "B";
-    return sign + s + " Kz";
-  }
-
   function renderSalesChart(days, values) {
     var canvas = el("hist-chart-canvas");
     if (!canvas || typeof Chart === "undefined") return;
 
-    if (histChartInstance) {
-      histChartInstance.destroy();
-      histChartInstance = null;
-    }
-
     var labels = days.map(function(d) { return d.slice(5).split("-").reverse().join("/"); });
-    var ctx = canvas.getContext("2d");
-
     var maxV = Math.max.apply(null, values.concat([1]));
     var suggestedMax = maxV * 1.35;
 
+    if (histChartInstance) {
+      histChartInstance.data.labels = labels;
+      histChartInstance.data.datasets[0].data = values;
+      histChartInstance.options.scales.y.suggestedMax = suggestedMax;
+      histChartInstance.update();
+      return;
+    }
+
+    var ctx = canvas.getContext("2d");
     var gradient = ctx.createLinearGradient(0, 0, 0, 140);
     gradient.addColorStop(0, "rgba(124,58,237,0.28)");
     gradient.addColorStop(1, "rgba(124,58,237,0)");
-
-    var valueLabelPlugin = {
-      id: "histValueLabels",
-      afterDatasetsDraw: function(chart) {
-        var ctx2 = chart.ctx;
-        var meta = chart.getDatasetMeta(0);
-        var chartArea = chart.chartArea;
-        ctx2.save();
-        ctx2.font = "700 11px sans-serif";
-        ctx2.fillStyle = "#4c1d95";
-        meta.data.forEach(function(point, i) {
-          var v = chart.data.datasets[0].data[i];
-          var text = fmtChartVal(v);
-          var textWidth = ctx2.measureText(text).width;
-          var align = "center";
-          var x = point.x;
-
-          if (point.x - textWidth / 2 < chartArea.left) {
-            align = "left";
-            x = chartArea.left;
-          } else if (point.x + textWidth / 2 > chartArea.right) {
-            align = "right";
-            x = chartArea.right;
-          }
-
-          ctx2.textAlign = align;
-          ctx2.fillText(text, x, point.y - 18);
-        });
-        ctx2.restore();
-      }
-    };
 
     histChartInstance = new Chart(ctx, {
       type: "line",
@@ -588,10 +596,11 @@ async function loadGeral(from, to) {
           fill: true,
         }]
       },
-      plugins: [valueLabelPlugin],
+      plugins: [histChartValueLabelPlugin],
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: { duration: 500, easing: "easeOutQuart" },
         layout: {
           padding: { top: 30, right: 8, left: 4, bottom: 0 }
         },
