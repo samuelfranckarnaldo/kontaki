@@ -52,7 +52,7 @@ var histChartValueLabelPlugin = {
       }
 
       ctx2.textAlign = align;
-      ctx2.fillText(text, x, point.y - 18);
+      ctx2.fillText(text, x, point.y - 24);
     });
     ctx2.restore();
   }
@@ -594,7 +594,7 @@ async function loadGeral(from, to) {
       if (!document.getElementById("hist-chart-canvas")) {
         chart.innerHTML =
           '<div class="hist-chart-title">Vendas por dia</div>' +
-          '<div style="position:relative;height:140px"><canvas id="hist-chart-canvas"></canvas></div>';
+          '<div style="position:relative;height:165px"><canvas id="hist-chart-canvas"></canvas></div>';
       }
 
       renderSalesChart(days, values);
@@ -652,7 +652,7 @@ async function loadGeral(from, to) {
         maintainAspectRatio: false,
         animation: { duration: 500, easing: "easeOutQuart" },
         layout: {
-          padding: { top: 30, right: 8, left: 4, bottom: 0 }
+          padding: { top: 38, right: 10, left: 4, bottom: 0 }
         },
         plugins: {
           legend: { display: false },
@@ -665,7 +665,19 @@ async function loadGeral(from, to) {
         scales: {
           x: {
             grid: { display: false },
-            ticks: { font: { size: 9 }, color: "#a1a1aa" }
+            ticks: {
+              font: { size: 9 }, color: "#a1a1aa",
+              autoSkip: false,
+              callback: function(val, index) {
+                var total = this.chart.data.labels.length;
+                if (total <= 8) return this.getLabelForValue(val);
+
+                var maxTicks = 5;
+                var step = Math.max(1, Math.round((total - 1) / (maxTicks - 1)));
+                var isMarker = (index === 0) || (index === total - 1) || (index % step === 0 && index < total - 1);
+                return isMarker ? this.getLabelForValue(val) : "";
+              }
+            }
           },
           y: {
             display: true,
