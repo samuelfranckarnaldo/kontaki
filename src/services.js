@@ -126,6 +126,54 @@ export async function rebuildStock(productId, location) {
   return getStock(productId, location);
 }
 
+export const purchaseService = {
+  // Motor unico de "registar compra": aplica conversao de unidade,
+  // grava no historico de stock (stockMovements) e, opcionalmente,
+  // no registo de compras/fornecedor (purchases).
+  async register({ productId, qty, unitCost, location, supplierId, supplierName,
+                    paymentStatus, amountPaid, notes, userId }) {
+    const product = await db.get("products", productId);
+    if (!product) throw new Error("Produto não encontrado.");
+
+    const factor = (product.conversionFactor && product.conversionFactor > 0) ? product.conversionFactor : 1;
+    const rawTotal = qty * factor;
+    const totalUnits = Math.floor(rawTotal);
+    const costPerUnit = totalUnits > 0 ? (qty * unitCost) / totalUnits : unitCost;
+    const totalCost = qty * unitCost;
+    const dest = location || "warehouse";
+
+    const purchaseUnitLabel = product.purchaseUnit || product.unit || "unid";
+    const note = supplierName
+      ? `Compra de ${supplierName}: ${qty} ${purchaseUnitLabel} x ${unitCost}`
+      : `Compra: ${qty} ${purchaseUnitLabel} x ${unitCost}`;
+
+    await addStockMovement({
+      productId, productName: product.name, type: "purchase", location: dest,
+      qty: totalUnits, reference: "purchase", note, userId,
+    });
+
+    const updatedProduct = await db.get("products", productId);
+    if (updatedProduct) {
+      await db.put("products", { ...updatedProduct, costPrice: costPerUnit, updatedAt: new Date().toISOString() });
+    }
+
+    let purchaseId = null;
+    if (supplierId) {
+      purchaseId = await db.add("purchases", {
+        supplierId, supplierName: supplierName || "",
+        items: [{ productId, productName: product.name, qty, unitCost, totalUnits }],
+        total: totalCost, dest,
+        paymentStatus: paymentStatus || "paid",
+        amountPaid: amountPaid != null ? amountPaid : totalCost,
+        notes: notes || "",
+        userId, date: new Date().toISOString(),
+      });
+    }
+
+    return { totalUnits, costPerUnit, totalCost, purchaseId };
+  },
+};
+
 export async function addStockMovement(data) {
   const user=requireAuth();
   const current=await getStock(data.productId, data.location||"shop");

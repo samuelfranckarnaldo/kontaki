@@ -388,28 +388,14 @@ window._saveCompra = async () => {
   if (!qty || !cost) { toast("Quantidade e preço são obrigatórios.", "error"); return; }
   if (amountPaid > total) { toast("O valor pago não pode ser maior que o total.", "error"); return; }
 
-  const product = await db.get("products", prodId);
-  const supplier= await db.get("suppliers", suppId);
+  const supplier = await db.get("suppliers", suppId);
+  const { purchaseService } = await import("../services.js");
 
-  // Actualiza stock
-  if (dest === "warehouse") {
-    await db.put("products", { ...product, warehouseStock: (product.warehouseStock||0) + qty, costPrice: cost });
-  } else {
-    await db.put("products", { ...product, stock: (product.stock||0) + qty, costPrice: cost });
-  }
-
-  // Regista compra
-  await db.add("purchases", {
-    supplierId:   suppId,
-    supplierName: supplier.name,
-    items: [{ productId: prodId, productName: product.name, qty, unitCost: cost }],
-    total,
-    dest,
+  await purchaseService.register({
+    productId: prodId, qty, unitCost: cost, location: dest,
+    supplierId: suppId, supplierName: supplier.name,
     paymentStatus: amountPaid >= total ? "paid" : (amountPaid > 0 ? "partial" : "pending"),
-    amountPaid,
-    notes:   el("cp-notes").value,
-    userId:  getUser().id,
-    date:    new Date().toISOString(),
+    amountPaid, notes: el("cp-notes").value, userId: getUser().id,
   });
 
   toast("Compra registada. Stock actualizado.", "success");

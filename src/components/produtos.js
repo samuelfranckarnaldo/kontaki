@@ -997,22 +997,26 @@ window._confirmCompra = async (id) => {
   const costPerUnit = totalUnits>0 ? (qty*price)/totalUnits : 0;
 
   const doConfirm = async () => {
-    await addStockMovement({
-      productId:id, productName:p.name, type:"purchase", location:dest,
-      qty: totalUnits,
-      reference:"purchase",
-      note: `Compra: ${qty} ${punitInput||p.purchaseUnit||p.unit||"unid"} x ${fmt(price)}`,
-      sessionId:null,
-    });
-
+    // Se a unidade de compra/fator foi configurada inline, grava no produto
+    // ANTES de chamar o servico central, para ele usar o valor certo.
     const updateData = {};
     if (punitInput) updateData.purchaseUnit = punitInput;
     if (pfactorInput>0) updateData.conversionFactor = pfactorInput;
-    if (updateCost && costPerUnit>0) updateData.costPrice = costPerUnit;
-
     if (Object.keys(updateData).length) {
       const ex = await db.get("products", id);
       await db.put("products", { ...ex, ...updateData, updatedAt:new Date().toISOString() });
+    }
+
+    const { purchaseService } = await import("../services.js");
+    await purchaseService.register({
+      productId: id, qty, unitCost: price, location: dest,
+    });
+
+    if (!updateCost) {
+      // O servico ja actualiza costPrice por padrao; se o utilizador
+      // desmarcou "Atualizar preco de custo", reverte para o valor anterior.
+      const before = await db.get("products", id);
+      if (before) await db.put("products", { ...before, costPrice: p.costPrice||0 });
     }
 
     toast("Compra registada.","success");
