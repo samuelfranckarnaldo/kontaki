@@ -668,6 +668,8 @@ async function loadGeral(from, to) {
             ticks: {
               font: { size: 9 }, color: "#a1a1aa",
               autoSkip: false,
+              maxRotation: 0,
+              minRotation: 0,
               callback: function(val, index) {
                 var total = this.chart.data.labels.length;
                 if (total <= 8) return this.getLabelForValue(val);
