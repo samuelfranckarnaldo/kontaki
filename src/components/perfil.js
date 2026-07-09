@@ -21,16 +21,21 @@ export async function initPerfil() {
 
   var avatarEl = el("perfil-avatar");
   var nameEl   = el("perfil-name");
-  var roleEl   = el("perfil-role");
 
   if (nameEl) nameEl.textContent = user.name;
-  if (roleEl) roleEl.textContent = user.role === "admin" ? "Administrador" : "Operador de Caixa";
 
-  var chipEl = el("perfil-plan-chip");
   var lic = getLicense();
-  if (chipEl) {
-    var planInfo = PLANS[lic.plan] || PLANS.basic;
-    chipEl.textContent = planInfo.name + (store.name ? " · " + store.name : "");
+  var planInfo = PLANS[lic.plan] || PLANS.basic;
+
+  var badgeEl = el("perfil-plan-badge");
+  if (badgeEl) badgeEl.textContent = planInfo.name;
+
+  var sublineEl = el("perfil-subline");
+  if (sublineEl) {
+    var roleLabel = user.role === "admin" ? "Administrador" : "Operador de Caixa";
+    var parts = [roleLabel];
+    if (store.name) parts.push(store.name);
+    sublineEl.textContent = parts.join(" · ");
   }
 
   startLicenseCountdown(lic);

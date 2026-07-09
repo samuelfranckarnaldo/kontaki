@@ -99,7 +99,7 @@
 /* ── TOAST ──────────────────────────────────────────────────────────────────── */
 #toasts {
   position: fixed; bottom: 76px; left: 16px; right: 16px;
-  z-index: 9000; display: flex; flex-direction: column; gap: 10px;
+  z-index: 9999; display: flex; flex-direction: column; gap: 10px;
   pointer-events: none;
 }
 .toast {
@@ -2138,6 +2138,12 @@
 .hist-hero-trend--down { color: #fecaca; }
 .hist-hero-sub { font-size: 12px; opacity: .8; }
 .hist-hero-context { font-size: 13px; font-weight: 600; opacity: .92; margin-bottom: 4px; }
+.hist-hero-record {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 700; color: #fde68a;
+  margin-bottom: 4px;
+}
+.hist-hero-record i, .hist-hero-record svg { width: 15px; height: 15px; }
 .hist-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .hist-kpi {
   background: var(--bg2); border: 1px solid var(--border);
@@ -2785,4 +2791,14 @@
 .search-wrap:focus-within .search-icon {
   color: var(--primary);
   transition: color .2s ease;
+}
+
+
+/* FADE DE TROCA DE ABA */
+.ct-fade-panel {
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+.ct-fade-panel.ct-fade-in {
+  opacity: 1;
 }

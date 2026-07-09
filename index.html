@@ -189,9 +189,9 @@ document.addEventListener("DOMContentLoaded", function() {
           <button class="ct-tab" data-tab="fiados">Fiados</button>
         </div>
 
-        <div id="ct-panel-geral" class="ct-panel" style="display:block"></div>
+        <div id="ct-panel-geral" class="ct-panel ct-fade-panel" style="display:block"></div>
 
-        <div id="ct-panel-clientes" class="ct-panel" style="display:none">
+        <div id="ct-panel-clientes" class="ct-panel ct-fade-panel" style="display:none">
           <div class="search-wrap">
             <i data-lucide="search" class="search-icon"></i>
             <input id="clientes-search" placeholder="Pesquisar cliente..."/>
@@ -199,7 +199,7 @@ document.addEventListener("DOMContentLoaded", function() {
           <div class="list-card" id="clientes-list" style="margin-top:12px"></div>
         </div>
 
-        <div id="ct-panel-fiados" class="ct-panel" style="display:none">
+        <div id="ct-panel-fiados" class="ct-panel ct-fade-panel" style="display:none">
           <div class="search-wrap">
             <i data-lucide="search" class="search-icon"></i>
             <input id="fiados-search" placeholder="Pesquisar cliente..."/>
@@ -263,15 +263,12 @@ document.addEventListener("DOMContentLoaded", function() {
             <div id="perfil-subline" style="font-size:12px;color:#71717a;margin-top:2px"></div>
           </div>
         </div>
-        <button id="perfil-crown-btn" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
-          <span style="font-size:12.5px;font-weight:600;color:#374151">Assinatura</span>
-          <span style="display:flex;align-items:center;gap:8px">
-            <span id="perfil-time-left" style="font-size:12px;font-weight:700;color:#71717a;display:flex;align-items:center;gap:5px">
-              <span id="perfil-time-dot" style="width:6px;height:6px;border-radius:50%;background:#5b21b6;flex-shrink:0"></span>
-            </span>
-            <i data-lucide="chevron-right" style="width:15px;height:15px;color:#c4c4c8;flex-shrink:0"></i>
-          </span>
-        </button>
+        <div id="perfil-upgrade-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px">
+          <div id="perfil-upgrade-title" style="font-size:13.5px;font-weight:700;color:#18181b;margin-bottom:3px"></div>
+          <div id="perfil-upgrade-sub" style="font-size:12px;color:#71717a;line-height:1.4;margin-bottom:12px"></div>
+          <button id="perfil-crown-btn" style="width:100%;padding:9px;background:#f5f3ff;color:#5b21b6;border:none;border-radius:10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">
+          </button>
+        </div>
       </div>
       <div id="perfil-menu"></div>
 

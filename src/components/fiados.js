@@ -32,6 +32,20 @@ export function waLink(phone, msg) {
   return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
 }
 
+function groupThousands(digits) {
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+window._liveFormatAmount = (input) => {
+  const raw = input.value.replace(/\D/g, "");
+  input.value = raw ? groupThousands(raw) : "";
+};
+
+function parseAmountInput(id) {
+  const raw = (el(id)?.value || "").replace(/\s/g, "");
+  return Number(raw);
+}
+
 window._openFiadoCliente = async (encodedName) => {
   const name    = decodeURIComponent(encodedName);
   const all     = await db.getAll("fiado");
@@ -129,8 +143,10 @@ window._pagarTudo = async (encodedName) => {
   const name    = decodeURIComponent(encodedName);
   const all     = await db.getAll("fiado");
   const entries = all.filter(f => f.clientName === name && f.status === "open");
-  for (const e of entries)
-    await db.put("fiado", { ...e, status: "paid", paidAt: new Date().toISOString() });
+  for (const e of entries) {
+    const wasLate = isOverdue(e);
+    await db.put("fiado", { ...e, status: "paid", paidAt: new Date().toISOString(), paidLate: wasLate });
+  }
   toast("Todos os fiados de " + name + " recebidos.", "success");
   closeModal();
   if (window._refreshClientesTab) window._refreshClientesTab();
@@ -160,7 +176,7 @@ async function openFiadoAdd(prefillName = "", prefillPhone = "") {
       </div>
       <div class="field">
         <label>Valor (Kz) *</label>
-        <input type="number" id="fa-amt" placeholder="0" min="0"/>
+        <input type="text" inputmode="numeric" id="fa-amt" placeholder="0" oninput="window._liveFormatAmount(this)"/>
       </div>
       <div class="field">
         <label>Telefone (opcional)</label>
@@ -189,7 +205,7 @@ window._saveFiado = async () => {
   const { getSession } = await import("../auth.js");
   if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
   const name = el("fa-name").value.trim();
-  const amt  = Number(el("fa-amt").value);
+  const amt  = parseAmountInput("fa-amt");
   if (!name || !amt) { toast("Nome e valor são obrigatórios.", "error"); return; }
   await db.add("fiado", {
     clientName: name, amount: amt,
@@ -209,12 +225,13 @@ window._openEditFiado = async (id) => {
   const e = await db.get("fiado", id);
   if (!e) return;
   const dueVal = e.dueDate ? new Date(e.dueDate).toISOString().slice(0,10) : "";
+  const efFormatted = groupThousands(String(e.amount));
 
   openModal("Editar Fiado",
     `<div style="display:flex;flex-direction:column;gap:14px">
       <div class="field">
         <label>Valor (Kz) *</label>
-        <input type="number" id="ef-amt" value="${e.amount}" min="0"/>
+        <input type="text" inputmode="numeric" id="ef-amt" value="${efFormatted}" oninput="window._liveFormatAmount(this)"/>
       </div>
       <div class="field">
         <label>Vencimento</label>
@@ -241,7 +258,7 @@ window._openEditFiado = async (id) => {
 window._saveEditFiado = async (id) => {
   const e = await db.get("fiado", id);
   if (!e) return;
-  const amt = Number(el("ef-amt").value);
+  const amt = parseAmountInput("ef-amt");
   if (isNaN(amt) || amt <= 0) { toast("Valor inválido.", "error"); return; }
   const dueRaw = el("ef-duedate").value;
   await db.put("fiado", {
@@ -297,6 +314,7 @@ window._confirmCancelFiado = async (id) => {
 
 window._openPayModal = async (id) => {
   const e = await db.get("fiado", id);
+  const initFormatted = groupThousands(String(e.amount));
   openModal("Receber Pagamento",
     `<div class="fc-pay-modal-header">
       <div>
@@ -310,7 +328,7 @@ window._openPayModal = async (id) => {
     </div>
     <div class="field" style="margin-bottom:10px">
       <label>Valor a receber</label>
-      <input type="number" id="pay-amt" value="${e.amount}" min="0"
+      <input type="text" inputmode="numeric" id="pay-amt" value="${initFormatted}" oninput="window._liveFormatAmount(this)"
         style="font-size:20px;font-weight:700;text-align:center;padding:14px"/>
     </div>
     <div class="fc-pay-quick-row">
@@ -328,24 +346,25 @@ window._openPayModal = async (id) => {
 };
 
 window._setPayAmt = (full, pct) => {
-  el("pay-amt").value = Math.round(full * pct);
+  el("pay-amt").value = groupThousands(String(Math.round(full * pct)));
 };
 
 window._confirmPay = async (id, fullAmt) => {
   const { getSession } = await import("../auth.js");
   if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
   const e   = await db.get("fiado", id);
-  const amt = Number(el("pay-amt").value);
+  const amt = parseAmountInput("pay-amt");
   if (isNaN(amt) || amt <= 0 || amt > e.amount) { toast("Valor inválido.", "error"); return; }
+  const wasLate = isOverdue(e);
   if (amt < e.amount) {
     await db.put("fiado", { ...e, amount: e.amount - amt });
     await db.add("fiado", {
       clientName: e.clientName, amount: amt,
       notes: "Pagamento parcial", date: new Date().toISOString(),
-      status: "paid", userId: getUser().id,
+      status: "paid", paidLate: wasLate, userId: getUser().id,
     });
   } else {
-    await db.put("fiado", { ...e, status: "paid", paidAt: new Date().toISOString() });
+    await db.put("fiado", { ...e, status: "paid", paidAt: new Date().toISOString(), paidLate: wasLate });
   }
   toast("Pagamento registado.", "success");
   closeModal();

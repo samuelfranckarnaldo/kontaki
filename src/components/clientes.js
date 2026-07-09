@@ -3,9 +3,23 @@ import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import "./fiados.js";
-import { isOverdue, daysOverdue } from "./fiados.js";
+import { isOverdue, daysOverdue, waLink } from "./fiados.js";
 
 let fiadosFilter = "all";
+
+const CT_MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+                    "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+function formatMonthYear(iso) {
+  const d = new Date(iso);
+  return CT_MONTHS[d.getMonth()] + " de " + d.getFullYear();
+}
+
+function formatPhone(phone) {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length === 9) return digits.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3");
+  return phone;
+}
 
 export async function initClientesTab() {
   document.querySelectorAll("#ct-tabbar .ct-tab").forEach(btn => {
@@ -34,11 +48,24 @@ function updateTopbarAddVisibility(tab) {
   addBtn.style.display = tab === "geral" ? "none" : "flex";
 }
 
+function fadeSwitch(showEl, hideEls) {
+  hideEls.forEach(e => { if (e) { e.style.display = "none"; e.classList.remove("ct-fade-in"); } });
+  if (showEl) {
+    showEl.style.display = "block";
+    showEl.classList.remove("ct-fade-in");
+    void showEl.offsetWidth;
+    requestAnimationFrame(() => showEl.classList.add("ct-fade-in"));
+  }
+}
+
 function switchCtTab(tab) {
   document.querySelectorAll("#ct-tabbar .ct-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-  document.getElementById("ct-panel-geral").style.display    = tab === "geral"    ? "block" : "none";
-  document.getElementById("ct-panel-clientes").style.display = tab === "clientes" ? "block" : "none";
-  document.getElementById("ct-panel-fiados").style.display   = tab === "fiados"   ? "block" : "none";
+  const panels = {
+    geral:    document.getElementById("ct-panel-geral"),
+    clientes: document.getElementById("ct-panel-clientes"),
+    fiados:   document.getElementById("ct-panel-fiados"),
+  };
+  fadeSwitch(panels[tab], Object.keys(panels).filter(k => k !== tab).map(k => panels[k]));
 
   if (tab === "geral")    renderGeral();
   if (tab === "clientes") renderClientesList();
@@ -46,6 +73,32 @@ function switchCtTab(tab) {
   updateTopbarAddVisibility(tab);
 }
 window._switchCtTab = switchCtTab;
+
+// ── Risco do cliente (baseado só no atraso atual, sem inventar dados) ─────────
+function computeRisk(myFiados) {
+  const openEntries = myFiados.filter(f => f.status === "open");
+  const overdueEntries = openEntries.filter(isOverdue);
+  const paidEntries = myFiados.filter(f => f.status === "paid");
+  const trackedPaid = paidEntries.filter(f => typeof f.paidLate === "boolean");
+  const lateHistory = trackedPaid.filter(f => f.paidLate);
+  const lateRate = trackedPaid.length ? lateHistory.length / trackedPaid.length : 0;
+
+  if (overdueEntries.length) {
+    const maxDays = overdueEntries.reduce((m, e) => Math.max(m, daysOverdue(e)), 0);
+    if (maxDays >= 7) return { icon: "alert-octagon", label: "Em atraso", color: "var(--danger)", bg: "var(--danger-light)" };
+    return { icon: "alert-triangle", label: "Atenção", color: "var(--warning)", bg: "var(--warning-light)" };
+  }
+  if (trackedPaid.length === 0) {
+    return { icon: "check-circle", label: "Bom pagador", color: "var(--success)", bg: "var(--success-light)" };
+  }
+  if (lateRate === 0) {
+    return { icon: "award", label: "Excelente", color: "var(--success)", bg: "var(--success-light)" };
+  }
+  if (lateRate < 0.34) {
+    return { icon: "check-circle", label: "Bom pagador", color: "var(--success)", bg: "var(--success-light)" };
+  }
+  return { icon: "alert-triangle", label: "Atenção", color: "var(--warning)", bg: "var(--warning-light)" };
+}
 
 // ── VISÃO GERAL ───────────────────────────────────────────────────────────────
 async function renderGeral() {
@@ -68,6 +121,18 @@ async function renderGeral() {
   const top3 = [...enriched].filter(e => e.totalOpen > 0)
     .sort((a, b) => b.totalOpen - a.totalOpen).slice(0, 3);
 
+  const now = new Date();
+  const recebidoMes = fiados.filter(f => f.status === "paid").filter(f => {
+    const d = new Date(f.paidAt || f.date);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).reduce((a, f) => a + (f.amount || 0), 0);
+
+  const totalPaidAll = fiados.filter(f => f.status === "paid").reduce((a, f) => a + (f.amount || 0), 0);
+  const totalOpenAll = fiados.filter(f => f.status === "open").reduce((a, f) => a + (f.amount || 0), 0);
+  const taxaCobranca = (totalPaidAll + totalOpenAll) > 0
+    ? Math.round((totalPaidAll / (totalPaidAll + totalOpenAll)) * 100)
+    : 100;
+
   const panel = el("ct-panel-geral");
   panel.innerHTML =
     `<div class="fiados-hero">
@@ -89,6 +154,15 @@ async function renderGeral() {
       <div class="ct-stat-card ct-stat-primary">
         <div class="stat-label">Total clientes</div>
         <div class="stat-val" style="color:var(--primary)">${clients.length}</div>
+      </div>
+      <div class="ct-stat-card ct-stat-success">
+        <div class="stat-label">Recebido este mês</div>
+        <div class="stat-val" style="color:var(--success);font-size:16px">${fmt(recebidoMes)}</div>
+      </div>
+      <div class="ct-stat-card ct-stat-primary">
+        <div class="stat-label">Taxa de cobrança</div>
+        <div class="stat-val" style="color:var(--primary)">${taxaCobranca}%</div>
+        <div class="ct-stat-sub">desde sempre</div>
       </div>
     </div>
 
@@ -153,6 +227,7 @@ async function renderClientesList() {
     const overdueEntries = openEntries.filter(isOverdue);
     const overdue = overdueEntries.length > 0;
     const maxDays = overdueEntries.reduce((m,e) => Math.max(m, daysOverdue(e)), 0);
+    const risk = computeRisk(myFiados);
 
     const row = document.createElement("div");
     row.className = "fc-row";
@@ -163,19 +238,46 @@ async function renderClientesList() {
       </div>
       <div class="fc-row-info">
         <div class="fc-row-name">${c.name}</div>
-        <div class="fc-row-meta">${c.phone || "sem telefone"} · ${mySales.length} ${mySales.length===1?"compra":"compras"}</div>
+        <div class="fc-row-meta">${c.phone ? formatPhone(c.phone) : "sem telefone"} · ${mySales.length === 0 ? "Cliente novo" : mySales.length + " " + (mySales.length===1?"compra":"compras")}</div>
+        <span class="fc-risk-chip" style="color:${risk.color};background:${risk.bg}"><i data-lucide="${risk.icon}"></i>${risk.label}</span>
       </div>
       <div class="fc-row-right">
         ${fiadoAberto > 0
           ? `<div class="fc-row-val ${overdue?"overdue":""}">${fmt(fiadoAberto)}</div><div class="fc-row-sub">${overdue?"Atrasado há "+maxDays+"d":"Pendente"}</div>`
           : `<div class="fc-row-saldo"><i data-lucide="check-circle" style="width:13px;height:13px"></i> Em dia</div>`
         }
-      </div>`;
+      </div>
+      <button class="fc-row-kebab" onclick="event.stopPropagation();window._openClienteActions(${c.id})">
+        <i data-lucide="more-vertical" style="width:16px;height:16px"></i>
+      </button>`;
     listEl.appendChild(row);
   });
 
   refreshIcons(listEl);
 }
+
+window._openClienteActions = async (id) => {
+  const c = await db.get("clients", id);
+  if (!c) return;
+  const phone = (c.phone || "").trim();
+
+  openModal("",
+    `<div class="fiado-entry-actions-sheet">
+      ${phone ? `
+        <button class="fiado-action-row" onclick="window._closeModal();window.location.href='tel:${phone.replace(/\s+/g,"")}'">
+          <i data-lucide="phone"></i> Ligar
+        </button>
+        <button class="fiado-action-row" onclick="window._closeModal();window.open('${waLink(phone, "Olá " + c.name + ", tudo bem?")}','_blank')">
+          <i data-lucide="message-circle"></i> WhatsApp
+        </button>` : `
+        <div style="padding:8px 10px 14px;font-size:12px;color:var(--text4)">Este cliente não tem telefone registado.</div>`
+      }
+      <button class="fiado-action-row" onclick="window._closeModal();window._openClienteProfile(${id})">
+        <i data-lucide="user"></i> Ver ficha completa
+      </button>
+    </div>`);
+  refreshIcons(el("modal-box"));
+};
 
 function openClienteForm(c) {
   c = c || {};
@@ -341,7 +443,6 @@ function renderComprasPanel(mySales) {
     </div>`).join("");
 }
 
-// ── PAINEL DE FIADOS — redesign premium (barra de status + bottom sheet) ─────
 function renderFiadosPanel(myFiados, clientName) {
   const open = myFiados.filter(f => f.status === "open");
   const totalOpen = open.reduce((a, f) => a + (f.amount || 0), 0);
@@ -415,8 +516,9 @@ window._openFiadoActions = (id) => {
 
 function switchProfileTab(tab) {
   document.querySelectorAll("#cliente-profile-overlay .fc-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-  document.getElementById("cp-panel-compras").style.display = tab === "compras" ? "block" : "none";
-  document.getElementById("cp-panel-fiados").style.display  = tab === "fiados"  ? "block" : "none";
+  const compras = document.getElementById("cp-panel-compras");
+  const fiadosP = document.getElementById("cp-panel-fiados");
+  fadeSwitch(tab === "compras" ? compras : fiadosP, [tab === "compras" ? fiadosP : compras]);
 }
 window._switchProfileTab = switchProfileTab;
 
@@ -438,6 +540,9 @@ window._openClienteProfile = async (id) => {
   const openFiados = myFiados.filter(f => f.status === "open");
   const totalGasto  = mySales.reduce((a,s) => a + ((s.total||0) - (s.totalDevolvido||0)), 0);
   const fiadoAberto = openFiados.reduce((a,f) => a + (f.amount||0), 0);
+  const paidFiados = myFiados.filter(f => f.status === "paid");
+  const trackedPaidFiados = paidFiados.filter(f => typeof f.paidLate === "boolean");
+  const onTimeCount = trackedPaidFiados.filter(f => !f.paidLate).length;
 
   let ov = document.getElementById("cliente-profile-overlay");
   if (!ov) {
@@ -466,8 +571,10 @@ window._openClienteProfile = async (id) => {
         </div>
         <div>
           <div style="font-size:19px;font-weight:700">${c.name}</div>
-          ${c.phone ? `<div style="font-size:13px;color:var(--text3);margin-top:2px">${c.phone}</div>` : ""}
+          ${c.phone ? `<div style="font-size:13px;color:var(--text3);margin-top:2px">${formatPhone(c.phone)}</div>` : ""}
           ${c.address ? `<div style="font-size:12px;color:var(--text3)">${c.address}</div>` : ""}
+          ${c.createdAt ? `<div style="font-size:11px;color:var(--text4);margin-top:2px">Cliente desde ${formatMonthYear(c.createdAt)}</div>` : ""}
+          ${trackedPaidFiados.length > 0 ? `<div style="font-size:11px;color:var(--text4);margin-top:2px">${onTimeCount} de ${trackedPaidFiados.length} pagamentos no prazo</div>` : ""}
         </div>
       </div>
 
@@ -493,14 +600,18 @@ window._openClienteProfile = async (id) => {
         </button>
       </div>
 
-      <div id="cp-panel-compras" class="fc-tab-panel" style="display:block;max-height:none">
+      <div id="cp-panel-compras" class="fc-tab-panel ct-fade-panel" style="display:block;max-height:none">
         ${renderComprasPanel(mySales)}
       </div>
-      <div id="cp-panel-fiados" class="fc-tab-panel" style="display:none;max-height:none">
+      <div id="cp-panel-fiados" class="fc-tab-panel ct-fade-panel" style="display:none;max-height:none">
         ${renderFiadosPanel(myFiados, c.name)}
       </div>
     </div>`;
   refreshIcons(ov);
+  requestAnimationFrame(() => {
+    const initPanel = document.getElementById("cp-panel-compras");
+    if (initPanel) initPanel.classList.add("ct-fade-in");
+  });
 };
 
 window._closeModal = closeModal;

@@ -66,6 +66,18 @@ function toLocalDateStr(iso) {
     String(d.getDate()).padStart(2,"0");
 }
 
+function getMultiplePeriodsHistory(from, to, count) {
+  var periods = [];
+  var curFrom = from, curTo = to;
+  for (var i = 0; i < count; i++) {
+    var prev = getPreviousPeriod(curFrom, curTo);
+    periods.push(prev);
+    curFrom = prev.from;
+    curTo = prev.to;
+  }
+  return periods;
+}
+
 function getPreviousPeriod(from, to) {
   var fromD = new Date(from + "T00:00:00");
   var toD   = new Date(to + "T00:00:00");
@@ -520,6 +532,34 @@ async function loadGeral(from, to) {
   var devTotal  = filtered.reduce(function(a,s) { return a+(s.totalDevolvido||0); }, 0);
   var incOpen   = incidents.filter(function(i) { return i.status==="open"; }).length;
 
+  // Insights ricos: recorde de período e devoluções anómalas
+  var historyPeriods = getMultiplePeriodsHistory(from, to, 6);
+  var historyTotals = historyPeriods.map(function(p) {
+    var pSales = sales.filter(function(s) {
+      var d = toLocalDateStr(s.date);
+      return d >= p.from && d <= p.to;
+    });
+    return pSales.reduce(function(a,s) { return a+((s.total||0)-(s.totalDevolvido||0)); }, 0);
+  });
+  var maxHistoryTotal = historyTotals.length ? Math.max.apply(null, historyTotals) : 0;
+  var isRecord = total > 0 && total > maxHistoryTotal && historyTotals.some(function(t){return t>0;});
+
+  var historyDevRatios = historyPeriods.map(function(p, idx) {
+    var pSales = sales.filter(function(s) {
+      var d = toLocalDateStr(s.date);
+      return d >= p.from && d <= p.to;
+    });
+    var pTotal = pSales.reduce(function(a,s) { return a+((s.total||0)-(s.totalDevolvido||0))+(s.totalDevolvido||0); }, 0);
+    var pDev   = pSales.reduce(function(a,s) { return a+(s.totalDevolvido||0); }, 0);
+    return pTotal > 0 ? pDev / pTotal : 0;
+  }).filter(function(r) { return r > 0; });
+  var avgDevRatio = historyDevRatios.length ? (historyDevRatios.reduce(function(a,r){return a+r;},0) / historyDevRatios.length) : 0;
+  var curGrossTotal = total + devTotal;
+  var curDevRatio = curGrossTotal > 0 ? devTotal / curGrossTotal : 0;
+  var devAnomaly = devTotal > 0 && avgDevRatio > 0 && curDevRatio > avgDevRatio * 1.8;
+
+  var fiadoAlert = fiadoAb > 0 && total > 0 && (fiadoAb / total) > 0.3;
+
   // Hero
   var hero = el("historico-hero");
   if (hero) {
@@ -542,6 +582,14 @@ async function loadGeral(from, to) {
     };
     var tpl = phraseTemplates[activeShortcut] || phraseTemplates.custom;
 
+    var recordLabels = {
+      hoje:   "Melhor dia dos últimos 6 dias!",
+      semana: "Melhor semana das últimas 6 semanas!",
+      mes:    "Melhor mês dos últimos 6 meses!",
+      custom: "Melhor período dos últimos 6 registados!"
+    };
+    var recordLabel = isRecord ? (recordLabels[activeShortcut] || recordLabels.custom) : "";
+
     var contextPhrase = "";
     if (nVendas === 0) {
       contextPhrase = "Sem vendas neste período";
@@ -555,12 +603,15 @@ async function loadGeral(from, to) {
 
     var startVal = heroLastValue === null ? total : heroLastValue;
     var cornerBadge = badgeHtml.replace('class="hist-hero-trend', 'class="hist-hero-trend hist-hero-trend--corner');
+    var recordHtml = recordLabel ? '<div class="hist-hero-record"><i data-lucide="award"></i>' + recordLabel + '</div>' : '';
     hero.innerHTML =
       cornerBadge +
       '<div class="hist-hero-label">Total do período</div>' +
       '<div class="hist-hero-row"><div class="hist-hero-val" id="hist-hero-val-num">' + fmt(startVal) + '</div></div>' +
+      recordHtml +
       (contextPhrase ? '<div class="hist-hero-context">' + contextPhrase + '</div>' : '') +
       '<div class="hist-hero-sub">' + nVendas + ' ' + (nVendas===1?"venda":"vendas") + ' · média por venda ' + fmt(ticket) + '</div>';
+    refreshIcons(hero);
 
     if (heroLastValue !== null && heroLastValue !== total) {
       animateHeroValue(heroLastValue, total);
@@ -574,8 +625,8 @@ async function loadGeral(from, to) {
     stats.innerHTML =
       kpi("Nº Vendas",     nVendas,         "var(--text)",  "", null) +
       kpi("Média por Venda",  fmt(ticket),     "var(--text)",     "", null) +
-      kpi("Fiado Aberto",  fmt(fiadoAb),    "var(--warning-muted)",  "", fiadoAb>0?"hist-kpi--attention":null) +
-      kpi("Devoluções",    fmt(devTotal),   devTotal>0?"var(--danger-muted)":"var(--success)", incOpen+" incidente"+(incOpen===1?"":"s"), devTotal>0?"hist-kpi--danger":null);
+      kpi("Fiado Aberto",  fmt(fiadoAb),    "var(--warning-muted)",  fiadoAlert?"Valor alto":"", fiadoAb>0?"hist-kpi--attention":null) +
+      kpi("Devoluções",    fmt(devTotal),   devTotal>0?"var(--danger-muted)":"var(--success)", devAnomaly?"Acima do habitual":(incOpen+" incidente"+(incOpen===1?"":"s")), devTotal>0?"hist-kpi--danger":null);
   }
 
   // Gráfico (Chart.js)

@@ -284,9 +284,19 @@ window._confirmarKtkPendente = async function(importId) {
     if (String(val) !== input.defaultValue) corrections[pid] = val;
   });
   try {
-    await ktkService.confirmImport(importId, corrections);
-    toast("Turno confirmado.","success");
+    var result = await ktkService.confirmImport(importId, corrections);
     closeModal();
+    if (result.incidentCount > 0) {
+      openModal("Turno confirmado",
+        '<div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:16px">Este turno gerou ' + result.incidentCount + ' incidente(s) de stock, que ficam em aberto para revisão.</div>' +
+        '<div style="display:flex;flex-direction:column;gap:8px">' +
+        '<button class="btn btn-primary btn-full" onclick="window._closeModal();window._perfilNav(\'incidentes\')">Ver incidentes</button>' +
+        '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>' +
+        '</div>');
+      refreshIcons(el("modal-box"));
+    } else {
+      toast("Turno confirmado.","success");
+    }
     await loadEscritorio();
   } catch(err) {
     toast("Erro: "+err.message,"error");
