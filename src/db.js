@@ -1,5 +1,5 @@
 const DB_NAME    = "kontaki_db";
-const DB_VERSION = 13;
+const DB_VERSION = 14; // v14: adiciona store "loginAttempts" para lockout de PIN
 let _db = null;
 
 function openDB() {
@@ -32,7 +32,7 @@ function openDB() {
       ensure("ktkImports",       { keyPath:"id", autoIncrement:true }, [["sessionUuid",false],["status",false],["importedAt",false]]);
       ensure("stockDecisions",   { keyPath:"id", autoIncrement:true }, [["productId",false],["decidedAt",false]]);
       ensure("stockCorrections", { keyPath:"id", autoIncrement:true }, [["importId",false],["productId",false],["correctedAt",false]]);
-      ensure("stockCorrections", { keyPath:"id", autoIncrement:true }, [["importId",false],["productId",false],["correctedAt",false]]);
+      ensure("loginAttempts",    { keyPath:"userId" });
     };
     req.onsuccess = () => { _db = req.result; resolve(_db); };
     req.onerror   = () => reject(req.error);
@@ -57,7 +57,6 @@ export const db = {
 };
 
 export async function seed() {
-  // Gera chave HMAC se nao existir
   const sk = await db.get("settings","storeKey");
   if (!sk) {
     const bytes = new Uint8Array(32);

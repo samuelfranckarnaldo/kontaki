@@ -11,6 +11,48 @@ export function getUser()    { return currentUser; }
 export function getSession() { return currentSession; }
 export function _setSession(s) { currentSession = s; if (currentUser) currentUser.sessionId = s ? s.id : null; }
 
+// ── LOCKOUT DE TENTATIVAS ──────────────────────────────────────────────
+// Persistido em IndexedDB (store "loginAttempts"), não em memória, para
+// que um reload da página não reponha o contador a zero. Progressivo:
+// não penaliza um erro de dedo isolado, mas torna brute force impraticável.
+const LOCKOUT_STEPS = [
+  { after: 5,  lockMs: 30 * 1000 },        // 5ª falha  -> 30s
+  { after: 10, lockMs: 5  * 60 * 1000 },   // 10ª falha -> 5min
+  { after: 15, lockMs: 30 * 60 * 1000 },   // 15ª falha -> 30min
+];
+
+async function _getLoginAttempts(userId) {
+  const rec = await db.get("loginAttempts", userId);
+  return rec || { userId, count: 0, lockedUntil: null };
+}
+
+async function _registerFailedAttempt(userId) {
+  const rec = await _getLoginAttempts(userId);
+  rec.count = (rec.count || 0) + 1;
+
+  const now = Date.now();
+  let step = null;
+  for (const s of LOCKOUT_STEPS) { if (rec.count >= s.after) step = s; }
+  if (step) rec.lockedUntil = now + step.lockMs;
+
+  await db.put("loginAttempts", rec);
+  return rec;
+}
+
+async function _clearLoginAttempts(userId) {
+  await db.delete("loginAttempts", userId).catch(() => {});
+}
+
+function _formatLockMessage(lockedUntil) {
+  const ms = lockedUntil - Date.now();
+  const totalSec = Math.max(1, Math.ceil(ms / 1000));
+  if (totalSec >= 60) {
+    const min = Math.ceil(totalSec / 60);
+    return "Demasiadas tentativas. Tenta novamente em " + min + " min.";
+  }
+  return "Demasiadas tentativas. Tenta novamente em " + totalSec + "s.";
+}
+
 function ensurePinCardStyle() {
   if (document.getElementById("login-pin-card-style")) return;
   var styleTag = document.createElement("style");
@@ -163,6 +205,14 @@ async function _selectUserHandler(userId) {
   const errEl = document.getElementById("login-err");
   if (errEl) errEl.classList.remove("show");
 
+  // Se este utilizador já estiver bloqueado de uma sessão anterior, mostra logo.
+  const attempts = await _getLoginAttempts(_selectedUser.id);
+  if (attempts.lockedUntil && attempts.lockedUntil > Date.now()) {
+    const errMsg = document.getElementById("login-err-msg");
+    if (errMsg) errMsg.textContent = _formatLockMessage(attempts.lockedUntil);
+    if (errEl) errEl.classList.add("show");
+  }
+
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -216,13 +266,31 @@ async function _verifyPin() {
   if (!_selectedUser) return;
 
   try {
+    // 1) Verifica lockout ANTES de gastar tempo a calcular o PBKDF2.
+    const attempts = await _getLoginAttempts(_selectedUser.id);
+    if (attempts.lockedUntil && attempts.lockedUntil > Date.now()) {
+      const errEl = document.getElementById("login-err");
+      const errMsg = document.getElementById("login-err-msg");
+      if (errMsg) errMsg.textContent = _formatLockMessage(attempts.lockedUntil);
+      if (errEl) errEl.classList.add("show");
+      _pinBuffer = "";
+      _updatePinDots();
+      return;
+    }
+
     const valid = await verifyPassword(_pinBuffer, _selectedUser.passwordHash);
 
     if (!valid) {
+      const rec = await _registerFailedAttempt(_selectedUser.id);
+
       const errEl = document.getElementById("login-err");
       const errMsg = document.getElementById("login-err-msg");
       if (errEl) errEl.classList.add("show");
-      if (errMsg) errMsg.textContent = "PIN incorrecto";
+      if (errMsg) {
+        errMsg.textContent = (rec.lockedUntil && rec.lockedUntil > Date.now())
+          ? _formatLockMessage(rec.lockedUntil)
+          : "PIN incorrecto";
+      }
 
       const dotsContainer = document.getElementById("pin-dots");
       if (dotsContainer) {
@@ -234,20 +302,20 @@ async function _verifyPin() {
       _pinBuffer = "";
       _updatePinDots();
 
-      setTimeout(() => { if (errEl) errEl.classList.remove("show"); }, 2000);
+      setTimeout(() => { if (errEl) errEl.classList.remove("show"); }, 2500);
       return;
     }
+
+    // Login bem-sucedido: limpa qualquer histórico de falhas deste utilizador.
+    await _clearLoginAttempts(_selectedUser.id);
 
     currentUser = _selectedUser;
     currentSession = null;
     currentUser.sessionId = null;
 
-    // Login só autentica. Não cria turno — abrir turno é sempre acção manual em "Meu Turno".
-    // Se já houver um turno aberto (legítimo, com uuid), reconecta a ele.
     try {
       const sessions = await db.getAll("sessions");
 
-      // Migração: fecha sessões antigas criadas pelo próprio login (formato legado, sem uuid)
       const legacyOpen = sessions.filter(s => s.status === "open" && s.userId === currentUser.id && !s.uuid);
       for (const ls of legacyOpen) {
         await db.put("sessions", Object.assign({}, ls, {
@@ -363,6 +431,7 @@ export async function changePasswordAuth(currentPassword, newPassword) {
   const newHash = await hashPassword(newPassword);
   currentUser.passwordHash = newHash;
   await db.put("users", currentUser);
+  await _clearLoginAttempts(currentUser.id).catch(() => {});
 }
 
 export async function createUser(name, username, password, role) {

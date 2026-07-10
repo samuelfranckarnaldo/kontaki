@@ -1204,13 +1204,17 @@ async function loadAuditoria(from, to) {
   function renderTimelineEvent(ev) {
     if (ev.kind === "session") {
       var s = ev.data;
-      return '<div class="hist-timeline-item"' + (s.uuid ? ' title="ID: ' + s.uuid + '"' : '') + '>' +
+      var clickable = !!s.closedAt;
+      return '<div class="hist-timeline-item' + (clickable?' hist-timeline-item--clickable':'') + '"' +
+        (s.uuid ? ' title="ID: ' + s.uuid + '"' : '') +
+        (clickable ? ' onclick="window._openSessionDetail(' + s.id + ')"' : '') + '>' +
         '<div class="hist-timeline-dot" style="background:' + dotColor(s) + '"></div>' +
         '<div class="hist-timeline-info">' +
         '<div class="hist-timeline-name">' + s.userName + '</div>' +
         '<div class="hist-timeline-date">Sessão · ' + fmtDate(s.openedAt) + (s.closedAt?" → "+fmtDate(s.closedAt):" (em curso)") + '</div>' +
         '</div>' +
         '<span class="badge-status" style="background:' + badgeBg(s) + ';color:' + dotColor(s) + '">' + badgeLabel(s) + '</span>' +
+        (clickable ? '<i data-lucide="chevron-right" class="hist-timeline-arrow"></i>' : '') +
         '</div>';
     }
     if (ev.kind === "adjustment") {
@@ -1295,6 +1299,185 @@ async function loadAuditoria(from, to) {
 }
 
 // ── DETALHE DE VENDA ──────────────────────────────────────────────────────────
+window._openSessionDetail = async function(sessionId) {
+  var s = await db.get("sessions", sessionId);
+  if (!s) return;
+
+  var isLocal = !s.isImported;
+
+  var sales = await db.getAll("sales");
+  var sessionSales = isLocal ? sales.filter(function(x){ return x.sessionId === sessionId; }) : [];
+  var totalVendas = isLocal
+    ? sessionSales.reduce(function(a,x){ return a+((x.total||0)-(x.totalDevolvido||0)); }, 0)
+    : (s.totalVendas || 0);
+  var nVendas = isLocal ? sessionSales.length : (s.nVendas || 0);
+
+  var incidents = await db.getAll("incidents");
+  var sessionIncidents = incidents.filter(function(i){ return i.sessionId === sessionId; });
+
+  var hasCashData = s.cashExpected != null && s.cashCounted != null;
+  var cashDiff = s.cashDiff || 0;
+  var diffColor = cashDiff === 0 ? "var(--success)" : (cashDiff > 0 ? "var(--info)" : "var(--danger-muted)");
+  var diffLabel = cashDiff === 0 ? "Caixa exato" : (cashDiff > 0 ? "Sobra de caixa" : "Falta em caixa");
+
+  var durationMs = s.closedAt ? (new Date(s.closedAt) - new Date(s.openedAt)) : 0;
+  var durationH = Math.floor(durationMs / 3600000);
+  var durationM = Math.round((durationMs % 3600000) / 60000);
+  var durationLabel = durationH > 0 ? (durationH + "h" + (durationM>0?durationM+"min":"")) : (durationM + "min");
+
+  var sectionIdx = 0;
+  function sectionDelay() { return (sectionIdx++ * 60) + "ms"; }
+
+  var cashSection = "";
+  if (hasCashData) {
+    var maxV = Math.max(s.cashExpected, s.cashCounted, 1);
+    var expectedPct = Math.min(100, (s.cashExpected / maxV) * 100);
+    var countedPct = Math.min(100, (s.cashCounted / maxV) * 100);
+    cashSection =
+      '<div class="hist-session-cash hist-session-fade" style="animation-delay:' + sectionDelay() + '">' +
+        '<div class="hist-session-cash-title" style="color:var(--teal)"><i data-lucide="wallet"></i>Conferência de caixa</div>' +
+        '<div class="hist-session-cash-bar-row">' +
+          '<div class="hist-session-cash-bar-label">Esperado</div>' +
+          '<div class="hist-session-cash-bar-track"><div class="hist-session-cash-bar-fill hist-session-bar-anim" style="width:' + expectedPct + '%;background:var(--text4)"></div></div>' +
+          '<div class="hist-session-cash-bar-val">' + fmt(s.cashExpected) + '</div>' +
+        '</div>' +
+        '<div class="hist-session-cash-bar-row">' +
+          '<div class="hist-session-cash-bar-label">Contado</div>' +
+          '<div class="hist-session-cash-bar-track"><div class="hist-session-cash-bar-fill hist-session-bar-anim" style="width:' + countedPct + '%;background:' + diffColor + '"></div></div>' +
+          '<div class="hist-session-cash-bar-val">' + fmt(s.cashCounted) + '</div>' +
+        '</div>' +
+        '<div class="hist-session-cash-diff" style="background:' + diffColor + '1a;color:' + diffColor + '">' +
+          '<i data-lucide="' + (cashDiff===0?"check-circle":"alert-triangle") + '"></i>' +
+          diffLabel + (cashDiff!==0 ? ': ' + (cashDiff>0?"+":"") + fmt(cashDiff) : '') +
+        '</div>' +
+      '</div>';
+  }
+
+  var paymentSection = "";
+  if (isLocal && sessionSales.length) {
+    var byMethod = {};
+    sessionSales.forEach(function(x) {
+      var lbl = payLabel(x.payMethod);
+      byMethod[lbl] = (byMethod[lbl] || 0) + ((x.total||0)-(x.totalDevolvido||0));
+    });
+    var methods = Object.keys(byMethod);
+    var maxMethodV = Math.max.apply(null, methods.map(function(k){return byMethod[k];}).concat([1]));
+    paymentSection =
+      '<div class="hist-session-cash hist-session-fade" style="animation-delay:' + sectionDelay() + '">' +
+        '<div class="hist-session-cash-title" style="color:var(--primary)"><i data-lucide="pie-chart"></i>Vendas por forma de pagamento</div>' +
+        methods.map(function(lbl) {
+          var pct = Math.min(100, (byMethod[lbl] / maxMethodV) * 100);
+          var col = lbl === "Dinheiro" ? "var(--teal)" : lbl === "Multicaixa" ? "#4338ca" : lbl === "Fiado" ? "var(--warning-muted)" : "var(--info)";
+          return '<div class="hist-session-cash-bar-row">' +
+            '<div class="hist-session-cash-bar-label">' + lbl + '</div>' +
+            '<div class="hist-session-cash-bar-track"><div class="hist-session-cash-bar-fill hist-session-bar-anim" style="width:' + pct + '%;background:' + col + '"></div></div>' +
+            '<div class="hist-session-cash-bar-val">' + fmt(byMethod[lbl]) + '</div>' +
+          '</div>';
+        }).join("") +
+      '</div>';
+  }
+
+  var productsSection = "";
+  if (isLocal && sessionSales.length) {
+    var prodQty = {};
+    sessionSales.forEach(function(x) {
+      (x.items||[]).forEach(function(i) {
+        if (!prodQty[i.name]) prodQty[i.name] = { qty: 0, total: 0 };
+        prodQty[i.name].qty += i.qty;
+        prodQty[i.name].total += i.price * i.qty;
+      });
+    });
+    var topProdNames = Object.keys(prodQty).sort(function(a,b){ return prodQty[b].total - prodQty[a].total; }).slice(0, 5);
+    if (topProdNames.length) {
+      productsSection =
+        '<div class="hist-session-cash hist-session-fade" style="animation-delay:' + sectionDelay() + '">' +
+          '<div class="hist-session-cash-title" style="color:var(--success)"><i data-lucide="package"></i>Produtos mais vendidos</div>' +
+          topProdNames.map(function(name) {
+            return '<div class="hist-session-incident-row">' +
+              '<span>' + name + ' <span style="color:var(--text4)">×' + prodQty[name].qty + '</span></span>' +
+              '<strong style="color:var(--success)">' + fmt(prodQty[name].total) + '</strong>' +
+            '</div>';
+          }).join("") +
+        '</div>';
+    }
+  }
+
+  var fiadosSection = "";
+  if (isLocal) {
+    var allFiados = await db.getAll("fiado");
+    var sessionFiados = allFiados.filter(function(f){ return f.sessionId === sessionId; });
+    if (sessionFiados.length) {
+      var totalFiado = sessionFiados.reduce(function(a,f){ return a+(f.amount||0); }, 0);
+      fiadosSection =
+        '<div class="hist-session-cash hist-session-fade" style="animation-delay:' + sectionDelay() + '">' +
+          '<div class="hist-session-cash-title" style="color:var(--warning-muted)"><i data-lucide="hand-coins"></i>Fiados concedidos (' + sessionFiados.length + ')</div>' +
+          sessionFiados.map(function(f) {
+            return '<div class="hist-session-incident-row">' +
+              '<span>' + (f.clientName||"Cliente") + '</span>' +
+              '<strong style="color:var(--warning-muted)">' + fmt(f.amount) + '</strong>' +
+            '</div>';
+          }).join("") +
+          '<div class="hist-session-incident-row" style="border-top:1.5px solid rgba(0,0,0,.08);margin-top:4px;padding-top:8px">' +
+            '<span style="font-weight:700">Total</span>' +
+            '<strong style="color:var(--warning-muted)">' + fmt(totalFiado) + '</strong>' +
+          '</div>' +
+        '</div>';
+    }
+  }
+
+  var stockMovSection = "";
+  var allMoves = await db.getAll("stockMovements");
+  var sessionMoves = allMoves.filter(function(m){ return m.sessionId === sessionId; });
+  var adjustments = sessionMoves.filter(function(m){ return m.type === "adjustment"; });
+  if (adjustments.length) {
+    stockMovSection =
+      '<div class="hist-session-cash hist-session-fade" style="animation-delay:' + sectionDelay() + '">' +
+        '<div class="hist-session-cash-title" style="color:var(--primary-mid)"><i data-lucide="sliders-horizontal"></i>Ajustes de stock (' + adjustments.length + ')</div>' +
+        adjustments.map(function(m) {
+          var sign = m.qty > 0 ? "+" : "";
+          return '<div class="hist-session-incident-row">' +
+            '<span>' + (m.productName||"?") + '</span>' +
+            '<strong style="color:var(--primary-mid)">' + sign + m.qty + '</strong>' +
+          '</div>';
+        }).join("") +
+      '</div>';
+  }
+
+  var incidentsSection = sessionIncidents.length ?
+    '<div class="hist-session-incidents hist-session-fade" style="animation-delay:' + sectionDelay() + '">' +
+      '<div class="hist-session-cash-title"><i data-lucide="alert-triangle"></i>Incidentes reportados (' + sessionIncidents.length + ')</div>' +
+      sessionIncidents.map(function(i) {
+        return '<div class="hist-session-incident-row">' +
+          '<span>' + (i.productName||"?") + '</span>' +
+          '<strong style="color:var(--danger-muted)">' + (i.diff>0?"+":"") + i.diff + '</strong>' +
+        '</div>';
+      }).join("") +
+    '</div>' : "";
+
+  var importedNote = !isLocal ?
+    '<div class="hist-session-imported-note"><i data-lucide="info"></i>Sessão importada de outro dispositivo — detalhes de fiados, produtos e ajustes não estão disponíveis localmente.</div>' : "";
+
+  var hasAnySection = cashSection || paymentSection || productsSection || fiadosSection || stockMovSection || sessionIncidents.length;
+
+  var body =
+    '<div class="hist-session-summary hist-session-fade" style="animation-delay:0ms">' +
+      '<div class="hist-session-stat"><div class="hist-session-stat-val">' + fmt(totalVendas) + '</div><div class="hist-session-stat-label">Total vendido</div></div>' +
+      '<div class="hist-session-stat"><div class="hist-session-stat-val">' + nVendas + '</div><div class="hist-session-stat-label">Vendas</div></div>' +
+      '<div class="hist-session-stat"><div class="hist-session-stat-val">' + durationLabel + '</div><div class="hist-session-stat-label">Duração</div></div>' +
+    '</div>' +
+    importedNote +
+    cashSection +
+    paymentSection +
+    productsSection +
+    fiadosSection +
+    stockMovSection +
+    incidentsSection +
+    (!hasAnySection && isLocal ? '<div class="hist-empty" style="padding:20px"><div class="hist-empty-sub">Sem dados de conferência para este turno.</div></div>' : '');
+
+  openModal(s.userName + " · " + fmtDate(s.openedAt).split(",")[0], body);
+  refreshIcons(el("modal-box"));
+};
+
 window._openSaleDetail = async function(id) {
   var s     = await db.get("sales", id);
   if (!s) return;

@@ -2293,6 +2293,86 @@
 .hist-mov-icon--sm { width: 28px; height: 28px; margin-top: 0; }
 .hist-timeline { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .hist-timeline-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border2); }
+.hist-timeline-item--clickable { cursor: pointer; transition: var(--transition); }
+.hist-timeline-item--clickable:active { background: var(--border2); }
+.hist-timeline-arrow { width: 16px; height: 16px; color: var(--text4); flex-shrink: 0; }
+
+.hist-session-summary {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin-bottom: 16px;
+}
+.hist-session-stat {
+  background: var(--border2); border-radius: var(--radius-sm);
+  padding: 12px 8px; text-align: center;
+}
+.hist-session-stat-val { font-size: 15px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.hist-session-stat-label { font-size: 10.5px; color: var(--text3); margin-top: 2px; }
+
+.hist-session-cash {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px; margin-bottom: 14px;
+}
+.hist-session-cash-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 700; color: var(--text2); margin-bottom: 12px;
+}
+.hist-session-cash-title i, .hist-session-cash-title svg { width: 15px; height: 15px; color: var(--text4); }
+.hist-session-cash-bar-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 9px;
+}
+.hist-session-cash-bar-label { font-size: 11px; color: var(--text3); width: 52px; flex-shrink: 0; }
+.hist-session-cash-bar-track {
+  flex: 1; height: 8px; background: var(--border2); border-radius: 999px; overflow: hidden;
+}
+.hist-session-cash-bar-fill {
+  height: 100%; border-radius: 999px; width: 0;
+}
+.hist-session-bar-anim {
+  animation: sessionBarGrow .6s cubic-bezier(.25,.8,.35,1) forwards;
+  animation-delay: .1s;
+}
+@keyframes sessionBarGrow {
+  from { width: 0 !important; }
+}
+
+.hist-session-fade {
+  opacity: 0;
+  animation: sessionFadeIn .35s ease forwards;
+}
+@keyframes sessionFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hist-session-imported-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: var(--info-light); color: var(--info);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+  font-size: 12px; line-height: 1.45; margin-bottom: 14px;
+}
+.hist-session-imported-note i, .hist-session-imported-note svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
+.hist-session-cash-bar-val {
+  font-size: 12px; font-weight: 700; color: var(--text); width: 72px; text-align: right;
+  flex-shrink: 0; font-variant-numeric: tabular-nums;
+}
+.hist-session-cash-diff {
+  display: flex; align-items: center; gap: 6px; justify-content: center;
+  padding: 9px; border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 700;
+  margin-top: 4px;
+}
+.hist-session-cash-diff i, .hist-session-cash-diff svg { width: 14px; height: 14px; }
+
+.hist-session-incidents {
+  background: var(--danger-muted-light); border-radius: var(--radius); padding: 14px;
+}
+.hist-session-incidents .hist-session-cash-title { color: var(--danger-muted); }
+.hist-session-incidents .hist-session-cash-title i, .hist-session-incidents .hist-session-cash-title svg { color: var(--danger-muted); }
+.hist-session-incident-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12.5px; color: var(--text2); padding: 6px 0;
+  border-bottom: 1px solid rgba(0,0,0,.05);
+}
+.hist-session-incident-row:last-child { border-bottom: none; }
 .hist-timeline-item--adjustment { background: var(--primary-light); border-left: 3px solid var(--primary-mid); padding-left: 11px; }
 .hist-timeline-item:last-child { border-bottom: none; }
 .hist-timeline-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
