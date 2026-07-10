@@ -238,12 +238,10 @@ document.addEventListener("DOMContentLoaded", function() {
         <div id="historico-hero" class="hist-hero" style="display:none"></div>
         <div id="historico-stats" class="hist-stats-grid"></div>
         <div id="historico-chart" class="hist-chart-wrap" style="display:none"></div>
-        <div class="hist-actions" id="hist-actions" style="display:none;gap:8px">
-          <button id="btn-export-csv" style="flex:1;padding:11px;background:#fafafa;border:1.5px solid #e5e7eb;border-radius:11px;font-size:12.5px;font-weight:700;color:#52525b;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-            <i data-lucide="download" style="width:14px;height:14px"></i> CSV
-          </button>
-          <button id="btn-export-pdf" class="hist-btn-pdf" style="flex:1;padding:11px;background:#fafafa;border:1.5px solid #e5e7eb;border-radius:11px;font-size:12.5px;font-weight:700;color:#52525b;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-            <i data-lucide="file-text" style="width:14px;height:14px"></i> PDF mensal
+        <div class="hist-actions" id="hist-actions" style="display:none">
+          <button id="btn-export-menu" style="width:100%;padding:11px;background:#fafafa;border:1.5px solid #e5e7eb;border-radius:11px;font-size:12.5px;font-weight:700;color:#52525b;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+            <i data-lucide="download" style="width:14px;height:14px"></i> Exportar
+            <i data-lucide="chevron-down" style="width:13px;height:13px"></i>
           </button>
         </div>
         <div id="historico-list" class="hist-list"></div>

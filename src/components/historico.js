@@ -221,6 +221,39 @@ export async function initHistorico() {
 
 var calState = { viewYear:0, viewMonth:0, selFrom:null, selTo:null };
 
+window._openExportMenu = function(filtered) {
+  var isAdmin = getUser().role === "admin";
+  var body =
+    '<div class="hist-export-options">' +
+      '<button class="hist-export-option" onclick="window._exportChoice(\'csv\')">' +
+        '<div class="hist-export-icon hist-export-icon--csv"><i data-lucide="table"></i></div>' +
+        '<div class="hist-export-info">' +
+          '<div class="hist-export-title">Exportar CSV</div>' +
+          '<div class="hist-export-desc">Planilha com todas as vendas do período</div>' +
+        '</div>' +
+        '<i data-lucide="chevron-right" class="hist-export-arrow"></i>' +
+      '</button>' +
+      (isAdmin ?
+        '<button class="hist-export-option" onclick="window._exportChoice(\'pdf\')">' +
+          '<div class="hist-export-icon hist-export-icon--pdf"><i data-lucide="file-text"></i></div>' +
+          '<div class="hist-export-info">' +
+            '<div class="hist-export-title">Relatório PDF mensal</div>' +
+            '<div class="hist-export-desc">Documento pronto para partilhar ou imprimir</div>' +
+          '</div>' +
+          '<i data-lucide="chevron-right" class="hist-export-arrow"></i>' +
+        '</button>' : ''
+      ) +
+    '</div>';
+  openModal("Exportar dados", body);
+  window._exportFilteredData = filtered;
+};
+
+window._exportChoice = function(type) {
+  closeModal();
+  if (type === "csv") exportCSV(window._exportFilteredData);
+  if (type === "pdf") gerarRelatorioPDF(val("hist-from"), val("hist-to"));
+};
+
 window._openPeriodPicker = function() {
   var options = [
     { id:"hoje",   label:"Hoje" },
@@ -453,11 +486,12 @@ async function loadData() {
 
 // ── GERAL ─────────────────────────────────────────────────────────────────────
 function payIcon(method) {
-  if (!method) return "banknote";
+  if (!method) return "wallet";
   var m = method.toLowerCase();
-  if (m.includes("dinheiro") || m.includes("cash"))  return "banknote";
+  if (m.includes("dinheiro") || m.includes("cash"))  return "wallet";
   if (m.includes("transfer") || m.includes("banco")) return "landmark";
-  if (m.includes("fiado") || m.includes("crédito"))  return "clipboard-list";
+  if (m.includes("fiado") || m.includes("crédito"))  return "hand-coins";
+  if (m.includes("multicaixa") || m.includes("cartão") || m.includes("cartao")) return "credit-card";
   return "credit-card";
 }
 
@@ -467,6 +501,7 @@ function payClass(method) {
   if (m.includes("dinheiro") || m.includes("cash"))  return "hist-sale-avatar--dinheiro";
   if (m.includes("transfer") || m.includes("banco")) return "hist-sale-avatar--transferencia";
   if (m.includes("fiado") || m.includes("crédito"))  return "hist-sale-avatar--fiado";
+  if (m.includes("multicaixa") || m.includes("cartão") || m.includes("cartao")) return "hist-sale-avatar--multicaixa";
   return "hist-sale-avatar--outros";
 }
 
@@ -752,13 +787,10 @@ async function loadGeral(from, to) {
   // Acções
   var actions = el("hist-actions");
   if (actions) {
-    actions.style.display = filtered.length > 0 ? "flex" : "none";
-    var exportBtn = el("btn-export-csv");
-    if (exportBtn) exportBtn.onclick = function() { exportCSV(filtered); };
-    var pdfBtn = el("btn-export-pdf");
-    if (pdfBtn) {
-      pdfBtn.style.display = getUser().role==="admin" ? "flex" : "none";
-      pdfBtn.onclick = function() { gerarRelatorioPDF(); };
+    actions.style.display = filtered.length > 0 ? "block" : "none";
+    var exportMenuBtn = el("btn-export-menu");
+    if (exportMenuBtn) {
+      exportMenuBtn.onclick = function() { window._openExportMenu(filtered); };
     }
   }
 

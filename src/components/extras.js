@@ -177,15 +177,23 @@ window._confirmarDevolucao = async function() {
 };
 
 // ── RELATÓRIO PDF MENSAL ──────────────────────────────────────────────────────
-export async function gerarRelatorioPDF() {
+export async function gerarRelatorioPDF(from, to) {
   const licMod = await import("../license.js");
   if (!licMod.hasFeature("pdf_contabilidade")) {
     licMod.showUpgradeBanner("Exportar PDF disponível a partir do plano Pro. Contacta a Introxeer para upgrade.");
     return;
   }
-  var now   = new Date();
-  var mes   = now.toISOString().slice(0, 7);
-  var label = now.toLocaleDateString("pt-AO", { month: "long", year: "numeric" });
+  var now = new Date();
+  if (!from || !to) {
+    var mesAtual = now.toISOString().slice(0, 7);
+    from = mesAtual + "-01";
+    to   = now.toISOString().split("T")[0];
+  }
+  var fromD = new Date(from + "T00:00:00");
+  var toD   = new Date(to + "T00:00:00");
+  var label = (from === to)
+    ? fromD.toLocaleDateString("pt-AO", { day:"2-digit", month:"long", year:"numeric" })
+    : fromD.toLocaleDateString("pt-AO", { day:"2-digit", month:"short" }) + " – " + toD.toLocaleDateString("pt-AO", { day:"2-digit", month:"short", year:"numeric" });
 
   var [sales, products, purchases, fiados, store] = await Promise.all([
     db.getAll("sales"),
@@ -195,7 +203,10 @@ export async function gerarRelatorioPDF() {
     db.get("settings", "store").then(function(s){ return s||{}; }),
   ]);
 
-  var vendasMes = sales.filter(function(s){ return (s.date||"").startsWith(mes); });
+  var vendasMes = sales.filter(function(s){
+    var d = (s.date||"").split("T")[0];
+    return d >= from && d <= to;
+  });
   var receitaMes = vendasMes.reduce(function(a,s){ return a+(s.total||0); }, 0);
 
   var prodMap = {};
@@ -210,8 +221,10 @@ export async function gerarRelatorioPDF() {
 
   var lucroMes   = receitaMes - cogsMes;
   var margem     = receitaMes > 0 ? ((lucroMes/receitaMes)*100).toFixed(1) : "0.0";
-  var comprasMes = purchases.filter(function(p){ return (p.date||"").startsWith(mes); })
-    .reduce(function(a,p){ return a+(p.total||0); }, 0);
+  var comprasMes = purchases.filter(function(p){
+    var d = (p.date||"").split("T")[0];
+    return d >= from && d <= to;
+  }).reduce(function(a,p){ return a+(p.total||0); }, 0);
   var fiadoAberto = fiados.filter(function(f){ return f.status==="open"; })
     .reduce(function(a,f){ return a+(f.amount||0); }, 0);
 
@@ -294,7 +307,7 @@ export async function gerarRelatorioPDF() {
 
     '<div class="footer">' +
     'Documento de gestão interna · Sem validade fiscal perante a AGT · ' +
-    'Powered by Kontaki · Introxeer Technology · Angola' +
+    'Kontaki · Desenvolvido pela Introxeer · Angola' +
     '</div></div></body></html>';
 
   var win = window.open("", "_blank", "width=900,height=700");
