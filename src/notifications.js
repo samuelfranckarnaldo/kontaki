@@ -49,20 +49,26 @@ export async function getProductAlerts() {
     });
   }
   if (expired.length) {
+    var mostExpired = expired.slice().sort(function(a,b){ return daysUntil(a.expiryDate) - daysUntil(b.expiryDate); })[0];
+    var daysAgo = Math.abs(daysUntil(mostExpired.expiryDate));
     alerts.push({
       id: "product-expired", type: "product", category: "expired", severity: "danger",
       title: expired.length + " produto" + (expired.length>1?"s":"") + " vencido" + (expired.length>1?"s":""),
-      description: expired.slice(0,3).map(function(p){return p.name;}).join(", ") + (expired.length>3?" e mais...":""),
+      description: expired.slice(0,3).map(function(p){return p.name;}).join(", ") + (expired.length>3?" e mais...":"") +
+        " · há " + daysAgo + " dia" + (daysAgo!==1?"s":""),
       action: { page:"produtos", filter:"expired" },
       createdAt: latestTimestamp(expired, "updatedAt"),
       actionable: true,
     });
   }
   if (expiring.length) {
+    var soonest = expiring.slice().sort(function(a,b){ return daysUntil(a.expiryDate) - daysUntil(b.expiryDate); })[0];
+    var daysLeft = daysUntil(soonest.expiryDate);
     alerts.push({
       id: "product-expiring", type: "product", category: "expiring", severity: "warning",
-      title: expiring.length + " produto" + (expiring.length>1?"s":"") + " a vencer em 30 dias",
-      description: expiring.slice(0,3).map(function(p){return p.name;}).join(", ") + (expiring.length>3?" e mais...":""),
+      title: expiring.length + " produto" + (expiring.length>1?"s":"") + " a vencer",
+      description: expiring.slice(0,3).map(function(p){return p.name;}).join(", ") + (expiring.length>3?" e mais...":"") +
+        " · " + (daysLeft===0 ? "vence hoje" : daysLeft===1 ? "vence amanhã" : "em " + daysLeft + " dias"),
       action: { page:"produtos", filter:"expiring" },
       createdAt: latestTimestamp(expiring, "updatedAt"),
       actionable: true,

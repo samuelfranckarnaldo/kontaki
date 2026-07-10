@@ -257,8 +257,32 @@ window._addProd = (id) => {
 // ── CARRINHO ──────────────────────────────────────────────────────────────────
 function addToCart(p) {
   if (p.stock <= 0) { toast("Produto sem stock.", "error"); return; }
+  if (p.expiryDate) {
+    var diff = Math.ceil((new Date(p.expiryDate) - new Date()) / 86400000);
+    if (diff < 0) { showExpiredBlockedModal(p, diff); return; }
+  }
   handleAddToCart(p);
 }
+
+function showExpiredBlockedModal(p, diffDays) {
+  var daysAgo = Math.abs(diffDays);
+  openModal("Venda bloqueada",
+    '<div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:16px">' +
+    'O produto <strong>' + p.name + '</strong> está vencido há ' + daysAgo + ' dia' + (daysAgo!==1?'s':'') + ' e não pode ser vendido.' +
+    '</div>' +
+    '<div style="font-size:12px;color:var(--text4);margin-bottom:16px">Produtos vencidos são automaticamente bloqueados para venda, sem excepção.</div>' +
+    '<div style="display:flex;flex-direction:column;gap:8px">' +
+    '<button class="btn btn-primary btn-full" onclick="window._goToProdutoVencido(' + p.id + ')">Ver produto</button>' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+}
+
+window._goToProdutoVencido = function(id) {
+  closeModal();
+  if (window.router) window.router.go("produtos");
+  setTimeout(function() { if (window._openProdMenu) window._openProdMenu(id); }, 150);
+};
 
 async function handleAddToCart(p) {
   const incident = await getOpenIncidentForProduct(p.id);

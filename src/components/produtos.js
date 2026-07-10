@@ -2,6 +2,7 @@ import { db } from "../db.js";
 import { addStockMovement, getStock } from "../services.js";
 import { fmt, el, refreshIcons } from "../utils.js";
 import { openPicker } from "../picker.js";
+import { openDatePicker } from "../date-picker.js";
 
 const UNIT_OPTIONS = ["Unidade","Outro (escrever)","Kg","Grama","Litro","Mililitro","Metro","Duzia","Par",
   "Caixa","Fardo","Grade","Pacote","Saco","Garrafa","Lata"];
@@ -169,15 +170,16 @@ export function openProductForm(p = {}) {
         <div class="field-row" style="margin-bottom:var(--space-3)">
           <div class="field">
             <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Stock loja</label>
-            <input type="number" id="pf-stock" value="${p.stock||0}" min="0"
-              style="font-size:var(--text-lg);font-weight:var(--weight-strong);text-align:center;padding:var(--space-3)"/>
+            <input type="number" id="pf-stock" value="${p.stock||0}" min="0" ${isEdit?"disabled":""}
+              style="font-size:var(--text-lg);font-weight:var(--weight-strong);text-align:center;padding:var(--space-3)${isEdit?";background:var(--border2);color:var(--text3);cursor:not-allowed":""}"/>
           </div>
           <div class="field">
             <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Stock armazém</label>
-            <input type="number" id="pf-warehouse" value="${p.warehouseStock||0}" min="0"
-              style="font-size:var(--text-lg);font-weight:var(--weight-strong);text-align:center;padding:var(--space-3)"/>
+            <input type="number" id="pf-warehouse" value="${p.warehouseStock||0}" min="0" ${isEdit?"disabled":""}
+              style="font-size:var(--text-lg);font-weight:var(--weight-strong);text-align:center;padding:var(--space-3)${isEdit?";background:var(--border2);color:var(--text3);cursor:not-allowed":""}"/>
           </div>
         </div>
+        ${isEdit ? '<div style="font-size:11px;color:var(--text3);margin-bottom:var(--space-3);display:flex;align-items:center;gap:5px"><i data-lucide="lock" style="width:12px;height:12px;flex-shrink:0"></i>Para alterar o stock, usa Ajustar ou Transferir no menu do produto.</div>' : ""}
         <div class="field">
           <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Stock mínimo (alerta)</label>
           <input type="number" id="pf-minstock" value="${p.minStock||5}" min="0"/>
@@ -222,7 +224,13 @@ export function openProductForm(p = {}) {
           <div class="field-row">
             <div class="field">
               <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Data de validade</label>
-              <input type="date" id="pf-expiry" value="${p.expiryDate||""}"/>
+              <button type="button" id="pf-expiry-btn" onclick="window._openExpiryPicker()"
+                style="width:100%;text-align:left;background:#fff;border:1px solid var(--border2);border-radius:10px;
+                padding:12px;font-size:14px;color:${p.expiryDate?"#18181b":"var(--text4)"};font-family:inherit;display:flex;justify-content:space-between;align-items:center;cursor:pointer">
+                <span id="pf-expiry-display">${p.expiryDate ? new Date(p.expiryDate+"T00:00:00").toLocaleDateString("pt-AO",{day:"2-digit",month:"long",year:"numeric"}) : "Selecionar data"}</span>
+                <i data-lucide="calendar" style="width:16px;height:16px;color:var(--text3)"></i>
+              </button>
+              <input type="hidden" id="pf-expiry" value="${p.expiryDate||""}"/>
             </div>
             <div class="field">
               <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Lote (opcional)</label>
@@ -320,6 +328,24 @@ window._removeProductImage = () => {
     refreshIcons(preview);
   }
   if (hidden) hidden.value = "";
+};
+
+window._openExpiryPicker = () => {
+  const current = el("pf-expiry") ? el("pf-expiry").value : "";
+  openDatePicker("Data de validade", current, (dateStr) => {
+    const hidden = el("pf-expiry");
+    const display = el("pf-expiry-display");
+    if (hidden) hidden.value = dateStr;
+    if (display) {
+      if (dateStr) {
+        display.textContent = new Date(dateStr+"T00:00:00").toLocaleDateString("pt-AO",{day:"2-digit",month:"long",year:"numeric"});
+        display.style.color = "#18181b";
+      } else {
+        display.textContent = "Selecionar data";
+        display.style.color = "var(--text4)";
+      }
+    }
+  });
 };
 
 function categoryColor(cat) {
