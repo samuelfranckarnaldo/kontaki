@@ -268,6 +268,21 @@ export const productService = {
     await addStockMovement({productId,productName:p.name,type:"transfer_out",location:from,qty:-qty,reference:"transfer",note:`${from} → ${to}`,sessionId:null});
     await addStockMovement({productId,productName:p.name,type:"transfer_in",location:to,qty:+qty,reference:"transfer",note:`${from} → ${to}`,sessionId:null});
   },
+  async getPendingInitialCount() {
+    requireAuth();
+    const products=await db.getAll("products");
+    return products.filter(p=>p.pendingInitialCount===true);
+  },
+  async setInitialCount(productId, shopQty, warehouseQty) {
+    const user=requireAuth();
+    const p=await db.get("products",productId);
+    if(!p) throw new Error("Produto não encontrado.");
+    if(isNaN(shopQty)||shopQty<0||isNaN(warehouseQty)||warehouseQty<0) throw new Error("Valores inválidos.");
+    await addStockMovement({productId,productName:p.name,type:"initial_count",location:"shop",qty:shopQty,reference:"initial_count",note:"Primeiro Inventário",sessionId:null});
+    await addStockMovement({productId,productName:p.name,type:"initial_count",location:"warehouse",qty:warehouseQty,reference:"initial_count",note:"Primeiro Inventário",sessionId:null});
+    const fresh=await db.get("products",productId);
+    await db.put("products",{...fresh,pendingInitialCount:false,initialCountBy:user.id,initialCountAt:new Date().toISOString()});
+  },
 };
 
 export const saleService = {
@@ -587,7 +602,7 @@ export const catalogService = {
   },
 
   async apply(ktkcat) {
-    requireAuth();
+    const currentUser=requireAuth();
     if (!ktkcat || ktkcat.tipo!=="ktkcat" || !Array.isArray(ktkcat.produtos)) throw new Error("INVALID_FORMAT");
     const hashResult=await validateKtkcatHash(ktkcat);
     if (!hashResult.valid && !hashResult.legacy) throw new Error("INVALID_HASH");
@@ -614,6 +629,8 @@ export const catalogService = {
           masterBarcode:item.masterBarcode||"", price:item.price, costPrice:item.costPrice||0,
           minStock:item.minStock||5, category:item.category||"Outro", unit:item.unit||"unid",
           active:true, stock:0, warehouseStock:0, createdAt:new Date().toISOString(),
+          pendingInitialCount:true, pendingInitialCountBy:currentUser?currentUser.id:null,
+          pendingInitialCountAt:new Date().toISOString(),
         });
         created++;
       }

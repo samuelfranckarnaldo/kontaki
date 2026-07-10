@@ -3,7 +3,7 @@ import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { getUser } from "../auth.js";
-import { ktkService, sessionService, validateKtkHash, catalogService } from "../services.js";
+import { ktkService, sessionService, validateKtkHash, catalogService, productService } from "../services.js";
 
 export async function loadEscritorio() {
   var wrap = document.getElementById("escritorio-content");
@@ -25,6 +25,26 @@ export async function loadEscritorio() {
     '<i data-lucide="package"></i> Importar catálogo (.ktkcat)' +
     '</label>';
   wrap.appendChild(importSection);
+
+  var pendingProducts = await productService.getPendingInitialCount();
+  if (pendingProducts.length) {
+    var invSection = document.createElement("div");
+    invSection.className = "esc-import-section";
+    invSection.innerHTML =
+      '<div class="planos-section-title">Primeiro Inventário — ' + pendingProducts.length + ' produto' + (pendingProducts.length!==1?"s":"") + ' pendente' + (pendingProducts.length!==1?"s":"") + '</div>' +
+      '<div class="esc-pending-list">' +
+      pendingProducts.map(function(p) {
+        return '<button class="esc-pending-item" onclick="window._abrirContagemInicial(' + p.id + ')">' +
+          '<div>' +
+          '<div class="esc-pending-name">' + p.name + '</div>' +
+          '<div class="esc-pending-meta">' + (p.category||"Outro") + ' · ' + fmtDate(p.pendingInitialCountAt||p.createdAt) + '</div>' +
+          '</div>' +
+          '<span class="perfil-menu-chevron">›</span>' +
+          '</button>';
+      }).join("") +
+      '</div>';
+    wrap.appendChild(invSection);
+  }
 
   if (user.role === "admin") {
     var exportSection = document.createElement("div");
@@ -230,6 +250,39 @@ window._confirmarImportKtk = async function() {
     else if (err.message==="INVALID_FORMAT") toast("Formato .ktk inválido.","error");
     else toast("Erro: "+err.message,"error");
     closeModal();
+  }
+};
+
+window._abrirContagemInicial = async function(productId) {
+  var p = await db.get("products", productId);
+  if (!p) { toast("Produto não encontrado.","error"); return; }
+  openModal("Primeiro Inventário — " + p.name,
+    '<div style="font-size:13px;color:var(--text3);margin-bottom:14px">Declara a contagem física atual deste produto. Zero é uma contagem válida — usa se o produto ainda não chegou fisicamente.</div>' +
+    '<div style="margin-bottom:12px">' +
+    '<label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:4px">Loja</label>' +
+    '<input id="inv-shop" type="number" min="0" value="0" style="width:100%;padding:10px;border-radius:8px;border:1.5px solid var(--border2);font-size:14px;font-family:inherit"/>' +
+    '</div>' +
+    '<div style="margin-bottom:16px">' +
+    '<label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:4px">Armazém</label>' +
+    '<input id="inv-warehouse" type="number" min="0" value="0" style="width:100%;padding:10px;border-radius:8px;border:1.5px solid var(--border2);font-size:14px;font-family:inherit"/>' +
+    '</div>' +
+    '<button class="btn btn-primary btn-full" onclick="window._confirmarContagemInicial(' + p.id + ')">Confirmar contagem</button>');
+  refreshIcons(el("modal-box"));
+};
+
+window._confirmarContagemInicial = async function(productId) {
+  var shopQty = Number(el("inv-shop").value);
+  var whQty = Number(el("inv-warehouse").value);
+  if (isNaN(shopQty)||shopQty<0||isNaN(whQty)||whQty<0) { toast("Valores inválidos.","error"); return; }
+  try {
+    await productService.setInitialCount(productId, shopQty, whQty);
+    toast("Primeiro Inventário concluído.","success");
+    closeModal();
+    var stillPending = await productService.getPendingInitialCount();
+    if (!stillPending.length) toast("Primeiro Inventário concluído para todos os produtos.","success");
+    await loadEscritorio();
+  } catch(err) {
+    toast("Erro: "+err.message,"error");
   }
 };
 

@@ -717,18 +717,54 @@ window._applyAdjust = async (id) => {
     return;
   }
 
-  const doApply = async () => {
+  const doAdjustOnly = async () => {
     if (diffShop !== 0) {
       await addStockMovement({ productId:id, productName:p.name, type:"adjustment", location:"shop", qty:diffShop, reference:"adjust", note:reason, sessionId:null });
     }
     if (diffWh !== 0) {
       await addStockMovement({ productId:id, productName:p.name, type:"adjustment", location:"warehouse", qty:diffWh, reference:"adjust", note:reason, sessionId:null });
     }
-
     toast("Stock ajustado.","success");
     closeModal();
     products = await db.getAll("products");
     renderStats(); renderList();
+  };
+
+  const doInitialCount = async () => {
+    const { productService } = await import("../services.js");
+    try {
+      await productService.setInitialCount(id, ns, nw);
+      toast("Primeiro Inventário concluído.","success");
+      closeModal();
+      products = await db.getAll("products");
+      renderStats(); renderList();
+      const stillPending = (await productService.getPendingInitialCount()).length;
+      if (stillPending === 0) toast("Primeiro Inventário concluído para todos os produtos.","success");
+    } catch(err) {
+      toast("Erro: "+err.message,"error");
+    }
+  };
+
+  const doApply = async () => {
+    if (!p.pendingInitialCount) { await doAdjustOnly(); return; }
+
+    closeModal();
+    openModal("Primeiro Inventário pendente",
+      `<div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:16px">` +
+      `Este produto ainda não possui um Primeiro Inventário. O ajuste que pretende fazer corresponde à primeira contagem física deste produto?` +
+      `</div>` +
+      `<div style="display:flex;flex-direction:column;gap:8px">` +
+      `<button class="btn btn-primary btn-full" onclick="window._applyAdjustAsInitialCount()">Concluir Primeiro Inventário</button>` +
+      `<button class="btn btn-ghost btn-full" onclick="window._applyAdjustOnly()">Ajustar Stock Apenas</button>` +
+      `<button onclick="window._closeModal()" style="width:100%;padding:10px;background:none;border:none;color:var(--text3);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancelar</button>` +
+      `</div>`);
+    refreshIcons(el("modal-box"));
+
+    window._applyAdjustAsInitialCount = async () => { await doInitialCount(); };
+    window._applyAdjustOnly = async () => {
+      toast("O produto continuará pendente de Primeiro Inventário.","info");
+      await doAdjustOnly();
+    };
   };
 
   const unit = p.unit || "unid";
