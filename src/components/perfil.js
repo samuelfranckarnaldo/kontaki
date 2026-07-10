@@ -1641,56 +1641,43 @@ function loadSenhaPage() {
 var _countdownInterval = null;
 
 function startLicenseCountdown(lic) {
-  var timeLeftEl = el("perfil-time-left");
-  if (!timeLeftEl) return;
+  var titleEl = el("perfil-upgrade-title");
+  var subEl   = el("perfil-upgrade-sub");
+  if (!titleEl || !subEl) return;
 
   if (_countdownInterval) { clearInterval(_countdownInterval); _countdownInterval = null; }
 
-  if (lic.status === "expired" || (lic.daysLeft != null && lic.daysLeft <= 0 && lic.expiresAt)) {
-    timeLeftEl.style.display = "flex";
-    timeLeftEl.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#dc2626;flex-shrink:0"></span> Expirado';
-    return;
-  }
+  var isTopPlan = lic.plan === "enterprise";
 
-  if (!lic.expiresAt || lic.daysLeft === 999) {
-    timeLeftEl.style.display = "flex";
-    timeLeftEl.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#16a34a;flex-shrink:0"></span> Licença activa';
-    return;
+  function formatRemaining() {
+    if (!lic.expiresAt || lic.daysLeft === 999) return null;
+    var diff = new Date(lic.expiresAt).getTime() - Date.now();
+    if (diff <= 0) return null;
+    var d = Math.ceil(diff / 86400000);
+    if (d <= 1) return "Expira hoje";
+    return "Expira em " + d + " dias";
   }
-
-  var expiresAtMs = new Date(lic.expiresAt).getTime();
 
   function render() {
-    var now = Date.now();
-    var diff = expiresAtMs - now;
-
-    if (diff <= 0) {
-      timeLeftEl.style.display = "flex";
-      timeLeftEl.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#dc2626;flex-shrink:0"></span> Expirado';
+    if (lic.status === "expired" || (lic.daysLeft != null && lic.daysLeft <= 0 && lic.expiresAt)) {
+      titleEl.textContent = "Licença expirada";
+      subEl.textContent = "Toca para renovar";
       if (_countdownInterval) { clearInterval(_countdownInterval); _countdownInterval = null; }
       return;
     }
 
-    var d = Math.floor(diff / 86400000);
-    var h = Math.floor((diff % 86400000) / 3600000);
-    var m = Math.floor((diff % 3600000) / 60000);
-
-    var dotColor = d <= 7 ? "#d97706" : "#16a34a";
-    var text;
-    if (d > 0) {
-      text = d + "d " + h + "h restantes";
-    } else if (h > 0) {
-      text = h + "h " + m + "m restantes";
-      dotColor = "#dc2626";
+    if (isTopPlan) {
+      titleEl.textContent = "Licença activa";
+      var remaining = formatRemaining();
+      subEl.textContent = remaining ? remaining + " · Plano Enterprise" : "Plano Enterprise";
     } else {
-      text = m + "m restantes";
-      dotColor = "#dc2626";
+      titleEl.textContent = "Quer mais do Kontaki?";
+      subEl.textContent = "Faz upgrade para mais funcionalidades";
     }
-
-    timeLeftEl.style.display = "flex";
-    timeLeftEl.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:' + dotColor + ';flex-shrink:0"></span> ' + text;
   }
 
   render();
-  _countdownInterval = setInterval(render, 60000);
+  if (lic.expiresAt && lic.daysLeft !== 999) {
+    _countdownInterval = setInterval(render, 3600000);
+  }
 }

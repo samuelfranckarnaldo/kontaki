@@ -379,7 +379,7 @@
 
 .fiado-entry {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px; border-top: 1px solid var(--border2);
+  padding: 16px 16px 16px 20px; border-top: 1px solid var(--border2);
   background: var(--bg); font-size: 13px;
 }
 .fiado-entry-amt  { font-size: 14px; font-weight: 700; }
@@ -1406,7 +1406,7 @@
 .perfil-group-label {
   font-size: 11px; font-weight: 700; color: var(--text4);
   text-transform: uppercase; letter-spacing: .6px;
-  padding: 16px 4px 8px; margin-top: 4px;
+  padding: 10px 4px 6px; margin-top: 0;
 }
 .perfil-group {
   background: var(--bg2); border-radius: 16px;
@@ -1854,17 +1854,17 @@
   text-align: left;
 }
 .perfil-avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 15px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-mid));
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--primary);
   color: #fff;
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 16px rgba(91,33,182,.25);
+  box-shadow: none;
   flex-shrink: 0;
 }
 .perfil-avatar--logo {
@@ -2393,8 +2393,8 @@
 .fc-badge-overdue {
   display: inline-block;
   font-size: 10px; font-weight: 800;
-  color: var(--danger); background: var(--danger-light);
-  padding: 2px 7px; border-radius: 999px;
+  color: var(--danger-muted); background: var(--danger-muted-light);
+  padding: 2px 8px; border-radius: 999px;
   margin-top: 4px; letter-spacing: .2px;
 }
 
@@ -2409,7 +2409,7 @@
 
 .fc-wa-full-btn {
   width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 12px; margin-bottom: 14px;
+  padding: 12px; margin-bottom: 16px;
   background: #e7f9ee; color: #16a34a;
   border: 1px solid #bbf0d1; border-radius: 12px;
   font-size: 13px; font-weight: 700; font-family: var(--font);
@@ -2419,10 +2419,10 @@
 .fc-wa-full-btn i, .fc-wa-full-btn svg { width: 16px; height: 16px; }
 
 .fc-pay-quick-row {
-  display: flex; gap: 8px; margin-bottom: 18px;
+  display: flex; gap: 8px; margin-bottom: 16px;
 }
 .fc-pay-quick-btn {
-  flex: 1; padding: 10px; background: var(--primary-light);
+  flex: 1; padding: 12px; background: var(--primary-light);
   color: var(--primary); border: none; border-radius: 10px;
   font-size: 13px; font-weight: 700; font-family: var(--font);
   cursor: pointer; transition: all .15s;
@@ -2432,17 +2432,17 @@
 
 /* CARTAO CLIENTE v3 */
 .fc-body { padding: 0 16px 12px; }
-.fc-pending-row { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
-.fc-pending-val { font-size: 20px; font-weight: 800; color: var(--warning); }
+.fc-pending-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.fc-pending-val { font-size: 20px; font-weight: 800; color: var(--warning-muted); }
 .fc-pending-label { font-size: 12px; color: var(--text3); font-weight: 600; }
 .fc-last-purchase { font-size: 11px; color: var(--text4); margin-top: 4px; }
 
-.fc-action-footer { display: flex; gap: 8px; padding: 0 16px 14px; }
+.fc-action-footer { display: flex; gap: 8px; padding: 0 16px 16px; }
 .fc-action-footer .fc-detail-btn { flex: 1; text-align: center; }
 
 .fc-receive-btn {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 11px; background: var(--success); color: #fff;
+  padding: 12px; background: var(--success); color: #fff;
   border: none; border-radius: 10px; font-size: 13px; font-weight: 700;
   font-family: var(--font); cursor: pointer;
   box-shadow: 0 2px 8px rgba(22,163,74,.25); transition: all .15s;
@@ -2457,15 +2457,15 @@
 .fiados-summary-main-val { font-size: 28px; font-weight: 800; color: var(--text); line-height: 1.1; }
 .fiados-summary-main-label { font-size: 12px; color: var(--text3); font-weight: 600; margin-top: 2px; }
 .fiados-summary-sub {
-  margin-top: 10px; font-size: 12px; color: var(--text3); font-weight: 600;
-  display: flex; align-items: center; gap: 6px;
+  margin-top: 12px; font-size: 12px; color: var(--text3); font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
 }
 .fiados-summary-dot { color: var(--text4); }
 
 .fiados-tip {
-  display: flex; align-items: flex-start; gap: 10px;
+  display: flex; align-items: flex-start; gap: 12px;
   background: var(--primary-light); color: var(--primary);
-  border-radius: 14px; padding: 14px; margin-top: 4px;
+  border-radius: 14px; padding: 16px; margin-top: 4px;
   font-size: 12px; line-height: 1.5; font-weight: 600;
 }
 .fiados-tip i, .fiados-tip svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
@@ -2474,18 +2474,18 @@
 /* FIADOS v4 - hero + lista flat */
 .fiados-hero {
   background: linear-gradient(135deg, var(--primary) 0%, #4c1d95 100%);
-  border-radius: 18px; padding: 18px 20px;
+  border-radius: 18px; padding: 20px 20px;
   box-shadow: 0 8px 20px rgba(91,33,182,.25);
   margin-bottom: 4px;
 }
-.fiados-hero-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,.75); text-transform: uppercase; letter-spacing: .6px; }
+.fiados-hero-label { font-size: 11px; font-weight: 600; color: var(--text3); }
 .fiados-hero-val   { font-size: 30px; font-weight: 800; color: #fff; line-height: 1.15; margin-top: 2px; }
 .fiados-hero-sub   { font-size: 12px; color: rgba(255,255,255,.85); font-weight: 600; margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .fiados-hero-hot   { color: #fecaca; font-weight: 800; }
 
 .fc-row {
   display: flex; align-items: center; gap: 12px;
-  padding: 14px 6px; border-bottom: 1px solid var(--border2);
+  padding: 16px 8px; border-bottom: 1px solid var(--border2);
   cursor: pointer; transition: background .15s;
 }
 .fc-row:last-child { border-bottom: none; }
@@ -2500,8 +2500,8 @@
 .fc-row-name { font-size: 14px; font-weight: 700; color: var(--text); }
 .fc-row-meta { font-size: 11px; color: var(--text4); margin-top: 2px; }
 .fc-row-right { text-align: right; flex-shrink: 0; }
-.fc-row-val { font-size: 14px; font-weight: 800; color: var(--warning); }
-.fc-row-val.overdue { color: var(--danger); }
+.fc-row-val { font-size: 14px; font-weight: 800; color: var(--warning-muted); }
+.fc-row-val.overdue { color: var(--danger-muted); }
 .fc-row-sub { font-size: 10px; color: var(--text4); margin-top: 1px; }
 .fc-row-action { font-size: 11px; font-weight: 700; color: var(--success); margin-top: 3px; }
 .fc-row-saldo { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--success); }
@@ -2524,15 +2524,15 @@
   width: 48px; height: 48px; border-radius: 50%;
   background: var(--primary-light); color: var(--primary);
   display: flex; align-items: center; justify-content: center;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 .m3-confirm-icon i, .m3-confirm-icon svg { width: 22px; height: 22px; }
 .m3-confirm-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
-.m3-confirm-body { font-size: 13px; color: var(--text3); line-height: 1.55; margin-bottom: 22px; }
+.m3-confirm-body { font-size: 13px; color: var(--text3); line-height: 1.55; margin-bottom: 24px; }
 .m3-confirm-actions { display: flex; justify-content: flex-end; gap: 4px; width: 100%; }
 
 .m3-btn-text {
-  padding: 10px 16px; background: none; border: none;
+  padding: 12px 16px; background: none; border: none;
   color: var(--primary); font-size: 14px; font-weight: 700;
   font-family: var(--font); cursor: pointer; border-radius: 999px;
   transition: background .15s;
@@ -2540,7 +2540,7 @@
 .m3-btn-text:active { background: var(--primary-light); }
 
 .m3-btn-filled {
-  padding: 10px 20px; background: var(--primary); color: #fff;
+  padding: 12px 20px; background: var(--primary); color: #fff;
   border: none; border-radius: 999px; font-size: 14px; font-weight: 700;
   font-family: var(--font); cursor: pointer;
   box-shadow: 0 2px 8px rgba(91,33,182,.3); transition: all .15s;
@@ -2550,7 +2550,7 @@
 .m3-edit-hint {
   display: flex; align-items: center; gap: 8px;
   font-size: 11px; color: var(--text4); font-weight: 600;
-  background: var(--bg); border-radius: 10px; padding: 10px 12px;
+  background: var(--bg); border-radius: 10px; padding: 12px 12px;
 }
 
 .fc-icon-btn {
@@ -2566,14 +2566,14 @@
 .fc-tabbar {
   display: flex; gap: 4px;
   border-bottom: 1.5px solid var(--border2);
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 .fc-tab {
   position: relative;
-  flex: 1; padding: 10px 4px; background: none; border: none;
+  flex: 1; padding: 12px 4px; background: none; border: none;
   font-size: 13px; font-weight: 700; color: var(--text3);
   font-family: var(--font); cursor: pointer;
-  display: flex; align-items: center; justify-content: center; gap: 6px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
   transition: color .15s;
 }
 .fc-tab.active { color: var(--primary); }
@@ -2583,7 +2583,7 @@
 }
 .fc-tab-dot {
   width: 6px; height: 6px; border-radius: 50%;
-  background: var(--warning); display: inline-block;
+  background: var(--warning-muted); display: inline-block;
 }
 .fc-tab-panel { max-height: 280px; overflow-y: auto; margin-bottom: 4px; }
 
@@ -2591,10 +2591,10 @@
 /* CT 3-TABS + FULLSCREEN PROFILE */
 .ct-tabbar {
   display: flex; gap: 2px; background: #f4f4f5;
-  border-radius: 12px; padding: 4px; margin-bottom: 14px;
+  border-radius: 12px; padding: 4px; margin-bottom: 16px;
 }
 .ct-tab {
-  flex: 1; padding: 10px 4px; border: none; border-radius: 9px;
+  flex: 1; padding: 12px 4px; border: none; border-radius: 9px;
   background: none; color: var(--text3); font-size: 13px; font-weight: 700;
   font-family: var(--font); cursor: pointer; transition: all .15s;
 }
@@ -2603,33 +2603,33 @@
 .ct-hero-badge {
   display: inline-block; margin-top: 8px;
   background: rgba(255,255,255,.18); color: #fecaca;
-  font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 999px;
 }
 
-.ct-stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 18px; }
+.ct-stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 16px; }
 .ct-stat-card {
-  background: var(--bg2); border-radius: 12px; padding: 12px 14px;
+  background: var(--bg2); border-radius: 12px; padding: 12px 16px;
   box-shadow: var(--shadow-sm); border: 1px solid var(--border2);
   border-left: 3px solid var(--border2);
 }
-.ct-stat-danger  { border-left-color: var(--danger); }
+.ct-stat-danger  { border-left-color: var(--danger-muted); }
 .ct-stat-primary { border-left-color: var(--primary); }
 
 .ct-section-label {
-  font-size: 11px; font-weight: 700; color: var(--text4);
-  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px;
+  font-size: 11px; font-weight: 600; color: var(--text3);
+  margin-bottom: 8px;
 }
 
 .ct-devedor-row {
   display: flex; align-items: center; gap: 12px;
-  padding: 12px 14px; border-bottom: 1px solid var(--border2);
+  padding: 12px 16px; border-bottom: 1px solid var(--border2);
   cursor: pointer; transition: background .15s;
 }
 .ct-devedor-row:last-child { border-bottom: none; }
 .ct-devedor-row:active { background: var(--border2); }
 
 .ct-inline-summary {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   font-size: 12px; color: var(--text3); font-weight: 600;
 }
 .ct-inline-val { font-size: 18px; font-weight: 800; color: var(--text); }
@@ -2647,7 +2647,7 @@
 }
 .ct-profile-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 14px; background: linear-gradient(135deg, var(--primary) 0%, #4c1d95 100%);
+  padding: 16px 16px; background: linear-gradient(135deg, var(--primary) 0%, #4c1d95 100%);
   flex-shrink: 0;
 }
 .ct-profile-header-title { font-size: 16px; font-weight: 700; color: #fff; flex: 1; text-align: center; }
@@ -2679,12 +2679,12 @@
   font-size: 10px; color: var(--text4); margin-left: 6px; font-weight: 700;
   background: var(--border2); padding: 1px 6px; border-radius: 999px;
 }
-.fc-icon-btn-danger { background: var(--danger-light); color: var(--danger); }
+.fc-icon-btn-danger { background: var(--danger-muted-light); color: var(--danger-muted); }
 .fc-icon-btn-danger:active { background: #fecaca; }
 
-.m3-confirm-icon-danger { background: var(--danger-light); color: var(--danger); }
+.m3-confirm-icon-danger { background: var(--danger-muted-light); color: var(--danger-muted); }
 .m3-btn-filled-danger {
-  background: var(--danger); box-shadow: 0 2px 8px rgba(220,38,38,.3);
+  background: var(--danger-muted); box-shadow: 0 2px 8px rgba(220,38,38,.3);
 }
 
 
@@ -2704,16 +2704,16 @@
   content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
   background: var(--border2);
 }
-.fiado-entry[data-status="open"]::before      { background: var(--warning); }
-.fiado-entry[data-status="overdue"]::before   { background: var(--danger); }
+.fiado-entry[data-status="open"]::before      { background: var(--warning-muted); }
+.fiado-entry[data-status="overdue"]::before   { background: var(--danger-muted); }
 .fiado-entry[data-status="paid"]::before      { background: var(--success); }
 .fiado-entry[data-status="cancelled"]::before { background: var(--text4); }
 .fiado-entry[data-status="cancelled"]         { opacity: .65; }
 
 .fiado-entry-top {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
 }
-.fiado-entry-title-wrap { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; row-gap: 4px; }
+.fiado-entry-title-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 4px; }
 .fiado-entry-title { font-size: 13px; font-weight: 700; color: var(--text); }
 .fiado-entry-amount {
   font-size: 16px; font-weight: 800; letter-spacing: -.01em;
@@ -2727,7 +2727,7 @@
 }
 
 .fiado-overdue-chip {
-  font-size: 10px; font-weight: 800; color: var(--danger); background: var(--danger-light);
+  font-size: 10px; font-weight: 800; color: var(--danger-muted); background: var(--danger-muted-light);
   padding: 2px 8px; border-radius: 999px; letter-spacing: .1px; white-space: nowrap;
 }
 
@@ -2740,7 +2740,7 @@
 
 .fiado-receive-pill {
   display: flex; align-items: center; gap: 6px;
-  padding: 0 18px; height: 36px;
+  padding: 0 20px; height: 36px;
   background: var(--success); color: #fff; border: none; border-radius: 999px;
   font-size: 13px; font-weight: 700; font-family: var(--font); cursor: pointer;
   box-shadow: 0 2px 10px rgba(22,163,74,.28); transition: all .15s;
@@ -2750,12 +2750,12 @@
 .fiado-entry-actions-sheet { display: flex; flex-direction: column; gap: 2px; }
 .fiado-action-row {
   display: flex; align-items: center; gap: 12px; width: 100%;
-  padding: 14px 10px; background: none; border: none; border-radius: 12px;
+  padding: 16px 12px; background: none; border: none; border-radius: 12px;
   font-size: 14px; font-weight: 600; color: var(--text); font-family: var(--font);
   cursor: pointer; text-align: left; transition: background .15s;
 }
 .fiado-action-row:active { background: var(--border2); }
-.fiado-action-row.danger { color: var(--danger); }
+.fiado-action-row.danger { color: var(--danger-muted); }
 .fiado-action-row i, .fiado-action-row svg { width: 18px; height: 18px; flex-shrink: 0; }
 
 /* Numeros tabulares (alinhamento tipo extrato financeiro) */
@@ -2775,7 +2775,7 @@
 .fiados-hero-val   { color: var(--primary); }
 .fiados-hero-sub   { color: var(--text3); }
 .ct-hero-badge {
-  background: var(--danger-light); color: var(--danger);
+  background: var(--danger-muted-light); color: var(--danger-muted);
 }
 
 .ct-stat-success { border-left-color: var(--success); }
@@ -2830,3 +2830,51 @@
 .ct-fade-panel.ct-fade-in {
   opacity: 1;
 }
+
+
+/* CONSOLIDACAO KPIS + BOTOES COMPACTOS */
+.ct-attention-card {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--danger-muted-light); border-radius: 14px;
+  padding: 12px 16px; margin: 12px 0;
+}
+.ct-attention-card i, .ct-attention-card svg { color: var(--danger-muted); width: 20px; height: 20px; flex-shrink: 0; }
+.ct-attention-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.ct-attention-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+.ct-kpi-row {
+  display: flex; align-items: center;
+  background: var(--bg2); border-radius: 14px;
+  padding: 16px; margin-bottom: 16px;
+  border: 1px solid var(--border2); box-shadow: var(--shadow-sm);
+}
+.ct-kpi-item { flex: 1; text-align: center; min-width: 0; }
+.ct-kpi-val { font-size: 16px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+.ct-kpi-label { font-size: 10px; color: var(--text3); font-weight: 600; margin-top: 2px; }
+.ct-kpi-divider { width: 1px; height: 28px; background: var(--border2); flex-shrink: 0; }
+
+.ct-fiado-actions-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.ct-action-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 12px; border-radius: 10px; font-size: 12px; font-weight: 700;
+  font-family: var(--font); cursor: pointer; transition: all .15s;
+}
+.ct-action-btn i, .ct-action-btn svg { width: 14px; height: 14px; }
+.ct-action-btn-primary { background: var(--success); color: #fff; border: none; }
+.ct-action-btn-primary:active { transform: scale(.97); }
+.ct-action-btn-secondary { background: var(--bg); color: var(--text2); border: 1px solid var(--border2); }
+.ct-action-btn-secondary:active { background: var(--border2); }
+
+
+/* FONTE RESPONSIVA (mesmo padrao do historico) */
+.fiados-hero-val--sm { font-size: 22px; }
+.fiados-hero-val--xs { font-size: 18px; }
+
+.ct-kpi-val--sm { font-size: 13px; }
+.ct-kpi-val--xs { font-size: 11px; }
+
+.fc-row-val--sm { font-size: 12px; }
+.fc-row-val--xs { font-size: 11px; }
+
+.fiado-entry-amount--sm { font-size: 13px; }
+.fiado-entry-amount--xs { font-size: 11px; }
