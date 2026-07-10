@@ -21,12 +21,25 @@ function formatPhone(phone) {
   return phone;
 }
 
+function sizeMod(baseClass, val) {
+  const len = String(val).length;
+  if (len > 13) return " " + baseClass + "--xs";
+  if (len > 9)  return " " + baseClass + "--sm";
+  return "";
+}
+
 export async function initClientesTab() {
   document.querySelectorAll("#ct-tabbar .ct-tab").forEach(btn => {
     btn.onclick = () => switchCtTab(btn.dataset.tab);
   });
   window._openClienteForm = openClienteForm;
-  window._refreshClientesTab = () => switchCtTab(getActiveTab());
+  window._refreshClientesTab = () => {
+    const tab = getActiveTab();
+    if (tab === "geral")    renderGeral(false);
+    if (tab === "clientes") renderClientesList(false);
+    if (tab === "fiados")   renderFiadosList(false);
+    updateTopbarAddVisibility(tab);
+  };
   window._ctTopbarAdd = ctTopbarAdd;
   switchCtTab("geral");
 }
@@ -67,9 +80,9 @@ function switchCtTab(tab) {
   };
   fadeSwitch(panels[tab], Object.keys(panels).filter(k => k !== tab).map(k => panels[k]));
 
-  if (tab === "geral")    renderGeral();
-  if (tab === "clientes") renderClientesList();
-  if (tab === "fiados")   renderFiadosList();
+  if (tab === "geral")    renderGeral(true);
+  if (tab === "clientes") renderClientesList(true);
+  if (tab === "fiados")   renderFiadosList(true);
   updateTopbarAddVisibility(tab);
 }
 window._switchCtTab = switchCtTab;
@@ -85,8 +98,8 @@ function computeRisk(myFiados) {
 
   if (overdueEntries.length) {
     const maxDays = overdueEntries.reduce((m, e) => Math.max(m, daysOverdue(e)), 0);
-    if (maxDays >= 7) return { icon: "alert-octagon", label: "Em atraso", color: "var(--danger)", bg: "var(--danger-light)" };
-    return { icon: "alert-triangle", label: "Atenção", color: "var(--warning)", bg: "var(--warning-light)" };
+    if (maxDays >= 7) return { icon: "alert-octagon", label: "Em atraso", color: "var(--danger-muted)", bg: "var(--danger-muted-light)" };
+    return { icon: "alert-triangle", label: "Atenção", color: "var(--warning-muted)", bg: "var(--warning-muted-light)" };
   }
   if (trackedPaid.length === 0) {
     return { icon: "check-circle", label: "Bom pagador", color: "var(--success)", bg: "var(--success-light)" };
@@ -97,11 +110,37 @@ function computeRisk(myFiados) {
   if (lateRate < 0.34) {
     return { icon: "check-circle", label: "Bom pagador", color: "var(--success)", bg: "var(--success-light)" };
   }
-  return { icon: "alert-triangle", label: "Atenção", color: "var(--warning)", bg: "var(--warning-light)" };
+  return { icon: "alert-triangle", label: "Atenção", color: "var(--warning-muted)", bg: "var(--warning-muted-light)" };
 }
 
 // ── VISÃO GERAL ───────────────────────────────────────────────────────────────
-async function renderGeral() {
+function minDelay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function ctSkeletonRow() {
+  return '<div class="fc-row hist-skel">' +
+    '<div class="skel-circle"></div>' +
+    '<div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div>' +
+    '<div class="skel-line skel-line--price"></div>' +
+    '</div>';
+}
+
+function ctSkeletonStat() {
+  return '<div class="ct-stat-card hist-skel"><div class="skel-line skel-line--label"></div><div class="skel-line skel-line--val"></div></div>';
+}
+
+function ctSkeletonGeral() {
+  return '<div class="fiados-hero hist-skel"><div class="skel-line skel-line--label"></div><div class="skel-line skel-line--hero"></div></div>' +
+    '<div class="ct-stat-row">' + ctSkeletonStat() + ctSkeletonStat() + ctSkeletonStat() + ctSkeletonStat() + '</div>';
+}
+
+async function renderGeral(showSkeleton) {
+  if (showSkeleton) {
+    const panelSkel = el("ct-panel-geral");
+    if (panelSkel) panelSkel.innerHTML = ctSkeletonGeral();
+    await minDelay(550);
+  }
   const [clients, fiados] = await Promise.all([db.getAll("clients"), db.getAll("fiado")]);
 
   const enriched = clients.map(c => {
@@ -137,7 +176,7 @@ async function renderGeral() {
   panel.innerHTML =
     `<div class="fiados-hero">
       <div class="fiados-hero-label">Total a receber</div>
-      <div class="fiados-hero-val">${fmt(totalReceber)}</div>
+      <div class="fiados-hero-val${sizeMod("fiados-hero-val", fmt(totalReceber))}">${fmt(totalReceber)}</div>
       ${overdueTotal > 0 ? `<div class="ct-hero-badge">${fmt(overdueTotal)} atrasados</div>` : ""}
       <div class="fiados-hero-sub">
         <span>${clients.length} ${clients.length === 1 ? "cliente" : "clientes"}</span>
@@ -146,23 +185,29 @@ async function renderGeral() {
       </div>
     </div>
 
-    <div class="ct-stat-row">
-      <div class="ct-stat-card ct-stat-danger">
-        <div class="stat-label">Atrasados</div>
-        <div class="stat-val" style="color:var(--danger)">${overdueList.length}</div>
+    ${overdueList.length > 0 ? `
+    <div class="ct-attention-card">
+      <i data-lucide="alert-triangle"></i>
+      <div>
+        <div class="ct-attention-title">${overdueList.length} ${overdueList.length===1?"cliente atrasado":"clientes atrasados"}</div>
+        <div class="ct-attention-sub">${fmt(overdueTotal)} em atraso</div>
       </div>
-      <div class="ct-stat-card ct-stat-primary">
-        <div class="stat-label">Total clientes</div>
-        <div class="stat-val" style="color:var(--primary)">${clients.length}</div>
+    </div>` : ""}
+
+    <div class="ct-kpi-row">
+      <div class="ct-kpi-item">
+        <div class="ct-kpi-val${sizeMod("ct-kpi-val", clients.length)}">${clients.length}</div>
+        <div class="ct-kpi-label">clientes</div>
       </div>
-      <div class="ct-stat-card ct-stat-success">
-        <div class="stat-label">Recebido este mês</div>
-        <div class="stat-val" style="color:var(--success);font-size:16px">${fmt(recebidoMes)}</div>
+      <div class="ct-kpi-divider"></div>
+      <div class="ct-kpi-item">
+        <div class="ct-kpi-val${sizeMod("ct-kpi-val", fmt(recebidoMes))}">${fmt(recebidoMes)}</div>
+        <div class="ct-kpi-label">recebido/mês</div>
       </div>
-      <div class="ct-stat-card ct-stat-primary">
-        <div class="stat-label">Taxa de cobrança</div>
-        <div class="stat-val" style="color:var(--primary)">${taxaCobranca}%</div>
-        <div class="ct-stat-sub">desde sempre</div>
+      <div class="ct-kpi-divider"></div>
+      <div class="ct-kpi-item">
+        <div class="ct-kpi-val${sizeMod("ct-kpi-val", taxaCobranca + "%")}">${taxaCobranca}%</div>
+        <div class="ct-kpi-label">cobrança</div>
       </div>
     </div>
 
@@ -175,14 +220,14 @@ async function renderGeral() {
       : `<div class="list-card">
           ${top3.map(({ client: c, totalOpen, overdue, maxDays }) => `
             <div class="ct-devedor-row" onclick="window._openClienteProfile(${c.id})">
-              <div class="fc-row-avatar" style="background:${overdue ? "var(--danger-light);color:var(--danger)" : "var(--warning-light);color:var(--warning)"}">
+              <div class="fc-row-avatar" style="background:${overdue ? "var(--danger-muted-light);color:var(--danger-muted)" : "var(--warning-muted-light);color:var(--warning-muted)"}">
                 ${(c.name||"?").charAt(0).toUpperCase()}
               </div>
               <div class="fc-row-info">
                 <div class="fc-row-name">${c.name}</div>
                 ${overdue ? `<span class="fc-badge-overdue">Atrasado há ${maxDays} ${maxDays===1?"dia":"dias"}</span>` : ""}
               </div>
-              <div class="fc-row-val ${overdue ? "overdue" : ""}">${fmt(totalOpen)}</div>
+              <div class="fc-row-val ${overdue ? "overdue" : ""}${sizeMod("fc-row-val", fmt(totalOpen))}">${fmt(totalOpen)}</div>
             </div>`).join("")}
         </div>`
     }`;
@@ -190,9 +235,15 @@ async function renderGeral() {
 }
 
 // ── ABA CLIENTES ──────────────────────────────────────────────────────────────
-async function renderClientesList() {
+async function renderClientesList(showSkeleton) {
   const search = el("clientes-search");
-  if (search && !search.oninput) search.oninput = renderClientesList;
+  if (search && !search.oninput) search.oninput = () => renderClientesList();
+
+  if (showSkeleton) {
+    const listSkel = el("clientes-list");
+    if (listSkel) listSkel.innerHTML = ctSkeletonRow() + ctSkeletonRow() + ctSkeletonRow();
+    await minDelay(550);
+  }
 
   const [clients, sales, fiados] = await Promise.all([
     db.getAll("clients"), db.getAll("sales"), db.getAll("fiado"),
@@ -233,7 +284,7 @@ async function renderClientesList() {
     row.className = "fc-row";
     row.onclick = () => window._openClienteProfile(c.id);
     row.innerHTML =
-      `<div class="fc-row-avatar" style="background:${overdue ? "var(--danger-light);color:var(--danger)" : "var(--primary-light);color:var(--primary)"}">
+      `<div class="fc-row-avatar" style="background:${overdue ? "var(--danger-muted-light);color:var(--danger-muted)" : "var(--primary-light);color:var(--primary)"}">
         ${c.name.charAt(0).toUpperCase()}
       </div>
       <div class="fc-row-info">
@@ -243,7 +294,7 @@ async function renderClientesList() {
       </div>
       <div class="fc-row-right">
         ${fiadoAberto > 0
-          ? `<div class="fc-row-val ${overdue?"overdue":""}">${fmt(fiadoAberto)}</div><div class="fc-row-sub">${overdue?"Atrasado há "+maxDays+"d":"Pendente"}</div>`
+          ? `<div class="fc-row-val ${overdue?"overdue":""}${sizeMod("fc-row-val", fmt(fiadoAberto))}">${fmt(fiadoAberto)}</div><div class="fc-row-sub">${overdue?"Atrasado há "+maxDays+"d":"Pendente"}</div>`
           : `<div class="fc-row-saldo"><i data-lucide="check-circle" style="width:13px;height:13px"></i> Em dia</div>`
         }
       </div>
@@ -326,9 +377,9 @@ window._saveCliente = async (id) => {
 };
 
 // ── ABA FIADOS (agrupado por cliente, ação direta na linha) ───────────────────
-async function renderFiadosList() {
+async function renderFiadosList(showSkeleton) {
   const search = el("fiados-search");
-  if (search && !search.oninput) search.oninput = renderFiadosList;
+  if (search && !search.oninput) search.oninput = () => renderFiadosList();
   document.querySelectorAll("#fiados-filter-pills .pill").forEach(btn => {
     if (!btn.dataset.bound) {
       btn.dataset.bound = "1";
@@ -340,6 +391,12 @@ async function renderFiadosList() {
       });
     }
   });
+
+  if (showSkeleton) {
+    const listSkel = el("fiados-list");
+    if (listSkel) listSkel.innerHTML = ctSkeletonRow() + ctSkeletonRow() + ctSkeletonRow();
+    await minDelay(550);
+  }
 
   const [all, clients] = await Promise.all([db.getAll("fiado"), db.getAll("clients")]);
   const open = all.filter(f => f.status === "open");
@@ -365,8 +422,8 @@ async function renderFiadosList() {
 
   const grouped = {};
   filtered.forEach(f => {
-    const k = f.clientName;
-    if (!grouped[k]) grouped[k] = { clientName: k, entries: [], totalOpen: 0 };
+    const k = (f.clientName || "").toLowerCase().trim();
+    if (!grouped[k]) grouped[k] = { clientName: f.clientName, entries: [], totalOpen: 0 };
     grouped[k].entries.push(f);
     if (f.status === "open") grouped[k].totalOpen += f.amount || 0;
   });
@@ -398,7 +455,7 @@ async function renderFiadosList() {
 
     let avatarStyle;
     if (isSaldado) avatarStyle = "background:var(--success-light);color:var(--success)";
-    else if (groupOverdue) avatarStyle = "background:var(--danger-light);color:var(--danger)";
+    else if (groupOverdue) avatarStyle = "background:var(--danger-muted-light);color:var(--danger-muted)";
     else avatarStyle = "background:var(--primary-light);color:var(--primary)";
 
     const row = document.createElement("div");
@@ -439,7 +496,7 @@ function renderComprasPanel(mySales) {
         <div style="font-size:13px;font-weight:600">Compra</div>
         <div style="font-size:11px;color:var(--text4)">${fmtDate(s.date)} · ${(s.items||[]).length} item(s) · ${s.payMethod||""}</div>
       </div>
-      <div style="font-size:14px;font-weight:700;color:var(--primary)">${fmt(s.total)}</div>
+      <div style="font-size:14px;font-weight:700;color:var(--success)">${fmt(s.total)}</div>
     </div>`).join("");
 }
 
@@ -449,14 +506,16 @@ function renderFiadosPanel(myFiados, clientName) {
   const sorted = [...myFiados].sort((a,b) => new Date(b.date) - new Date(a.date));
 
   const actions =
-    (totalOpen > 0
-      ? `<button class="btn btn-success btn-full btn-sm" style="margin-bottom:8px" onclick="window._confirmReceiveAll('${encodeURIComponent(clientName)}',${totalOpen})">
-           <i data-lucide="check-check"></i> Receber tudo (${fmt(totalOpen)})
-         </button>` : ""
-    ) +
-    `<button class="btn btn-outline btn-full btn-sm" style="margin-bottom:14px" onclick="window._openFiadoAdd('${clientName.replace(/'/g,"\\'")}')">
-       <i data-lucide="plus"></i> Registar novo fiado
-     </button>`;
+    `<div class="ct-fiado-actions-row">
+      ${totalOpen > 0
+        ? `<button class="ct-action-btn ct-action-btn-primary" onclick="window._confirmReceiveAll('${encodeURIComponent(clientName)}',${totalOpen})">
+             <i data-lucide="check-check"></i> Receber tudo
+           </button>` : ""
+      }
+      <button class="ct-action-btn ct-action-btn-secondary" onclick="window._openFiadoAdd('${clientName.replace(/'/g,"\\'")}')">
+        <i data-lucide="plus"></i> Novo fiado
+      </button>
+    </div>`;
 
   if (!sorted.length) {
     return actions + `<div style="text-align:center;color:var(--text4);font-size:13px;padding:24px">Sem fiados registados</div>`;
@@ -467,7 +526,7 @@ function renderFiadosPanel(myFiados, clientName) {
     const paid = f.status === "paid";
     const overdue = !paid && !cancelled && isOverdue(f);
     const statusAttr = paid ? "paid" : cancelled ? "cancelled" : overdue ? "overdue" : "open";
-    const amountColor = paid ? "var(--success)" : cancelled ? "var(--text4)" : overdue ? "var(--danger)" : "var(--warning)";
+    const amountColor = paid ? "var(--success)" : cancelled ? "var(--text4)" : overdue ? "var(--danger-muted)" : "var(--warning-muted)";
     const title = paid ? "Pagamento recebido" : cancelled ? "Fiado anulado" : "Fiado";
     const days = overdue ? daysOverdue(f) : 0;
 
@@ -482,7 +541,7 @@ function renderFiadosPanel(myFiados, clientName) {
           <span class="fiado-entry-title">${title}</span>
           ${overdue ? `<span class="fiado-overdue-chip">Atrasado há ${days} ${days===1?"dia":"dias"}</span>` : ""}
         </div>
-        <span class="fiado-entry-amount" style="color:${amountColor};${cancelled?"text-decoration:line-through":""}">${fmt(f.amount)}</span>
+        <span class="fiado-entry-amount${sizeMod("fiado-entry-amount", fmt(f.amount))}" style="color:${amountColor};${cancelled?"text-decoration:line-through":""}">${fmt(f.amount)}</span>
       </div>
       <div class="fiado-entry-meta">${metaParts.join(" · ")}</div>
       ${f.status === "open" ? `
@@ -578,18 +637,20 @@ window._openClienteProfile = async (id) => {
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
-        <div class="stat-card" style="text-align:center">
-          <div class="stat-label">Compras</div>
-          <div class="stat-val" style="color:var(--primary);font-size:20px">${mySales.length}</div>
+      <div class="ct-kpi-row" style="margin-bottom:16px">
+        <div class="ct-kpi-item">
+          <div class="ct-kpi-val${sizeMod("ct-kpi-val", mySales.length)}">${mySales.length}</div>
+          <div class="ct-kpi-label">compras</div>
         </div>
-        <div class="stat-card" style="text-align:center">
-          <div class="stat-label">Total gasto</div>
-          <div class="stat-val" style="color:var(--success);font-size:14px">${fmt(totalGasto)}</div>
+        <div class="ct-kpi-divider"></div>
+        <div class="ct-kpi-item">
+          <div class="ct-kpi-val${sizeMod("ct-kpi-val", fmt(totalGasto))}" style="color:var(--success)">${fmt(totalGasto)}</div>
+          <div class="ct-kpi-label">total gasto</div>
         </div>
-        <div class="stat-card" style="text-align:center">
-          <div class="stat-label">Fiado</div>
-          <div class="stat-val" style="color:${fiadoAberto>0?"var(--warning)":"var(--success)"};font-size:14px">${fmt(fiadoAberto)}</div>
+        <div class="ct-kpi-divider"></div>
+        <div class="ct-kpi-item">
+          <div class="ct-kpi-val${sizeMod("ct-kpi-val", fmt(fiadoAberto))}" style="color:${fiadoAberto>0?"var(--warning-muted)":"var(--success)"}">${fmt(fiadoAberto)}</div>
+          <div class="ct-kpi-label">fiado</div>
         </div>
       </div>
 

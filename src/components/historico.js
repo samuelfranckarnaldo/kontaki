@@ -458,6 +458,26 @@ function payClass(method) {
   return "hist-sale-avatar--outros";
 }
 
+function payColor(method) {
+  if (!method) return "var(--teal)";
+  var m = method.toLowerCase();
+  if (m.includes("dinheiro") || m.includes("cash"))  return "var(--teal)";
+  if (m.includes("transfer") || m.includes("banco")) return "var(--info)";
+  if (m.includes("fiado") || m.includes("crédito"))  return "var(--warning-muted)";
+  if (m.includes("multicaixa") || m.includes("cartão") || m.includes("cartao")) return "#4338ca";
+  return "var(--text3)";
+}
+
+function payLabel(method) {
+  if (!method) return "Dinheiro";
+  var m = method.toLowerCase();
+  if (m.includes("dinheiro") || m.includes("cash"))  return "Dinheiro";
+  if (m.includes("transfer") || m.includes("banco")) return "Transferência";
+  if (m.includes("fiado") || m.includes("crédito"))  return "Fiado";
+  if (m.includes("multicaixa") || m.includes("cartão") || m.includes("cartao")) return "Multicaixa";
+  return method;
+}
+
 var DIAS_SEMANA = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
 var MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 
@@ -764,15 +784,19 @@ async function loadGeral(from, to) {
   function renderSaleCard(s) {
     var totalLiq = (s.total||0) - (s.totalDevolvido||0);
     var hasDev   = s.temDevolucao && (s.totalDevolvido||0) > 0;
-    return '<div class="hist-sale-card" onclick="window._openSaleDetail(' + s.id + ')">' +
+    var isFiado  = (s.payMethod||"").toLowerCase().includes("fiado");
+    var color    = payColor(s.payMethod);
+    var nItems   = s.items ? s.items.length : 0;
+
+    return '<div class="hist-sale-card" style="border-left:3px solid ' + color + '" onclick="window._openSaleDetail(' + s.id + ')">' +
       '<div class="hist-sale-avatar ' + payClass(s.payMethod) + '"><i data-lucide="' + payIcon(s.payMethod) + '" style="width:18px;height:18px"></i></div>' +
       '<div class="hist-sale-info">' +
       '<div class="hist-sale-id">Venda #' + String(s.id).padStart(4,"0") +
       (hasDev ? ' <span class="hist-badge-dev">↩ Dev.</span>' : '') + '</div>' +
-      '<div class="hist-sale-meta">' + fmtDate(s.date) +
-      (s.clientName ? " · " + s.clientName : "") +
-      " · " + (s.items?s.items.length:0) + " " + (s.items&&s.items.length===1?"item":"itens") +
-      '</div></div>' +
+      '<span class="hist-sale-tag" style="background:color-mix(in srgb, ' + color + ' 15%, white);color:' + color + '">' + payLabel(s.payMethod) + '</span>' +
+      '<div class="hist-sale-meta">' + fmtDate(s.date) + ' · ' + nItems + ' ' + (nItems===1?"item":"itens") + '</div>' +
+      (s.clientName ? '<div class="hist-sale-client' + (isFiado?' hist-sale-client--fiado':'') + '"><i data-lucide="user" style="width:11px;height:11px"></i>' + s.clientName + '</div>' : '') +
+      '</div>' +
       '<div class="hist-sale-right">' +
       (hasDev
         ? '<div class="hist-sale-total--dev">' + fmt(s.total) + '</div>' +

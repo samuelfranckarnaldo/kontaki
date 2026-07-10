@@ -2195,7 +2195,7 @@
 .hist-sale-card {
   background: var(--bg2); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 14px;
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: flex-start; gap: 12px;
   cursor: pointer; transition: var(--transition);
 }
 .hist-sale-card:active { background: var(--border2); }
@@ -2211,7 +2211,18 @@
 .hist-sale-avatar--multicaixa { background: #e0e7ff; color: #4338ca; }
 .hist-sale-info { flex: 1; min-width: 0; }
 .hist-sale-id { font-size: 14px; font-weight: 700; color: var(--text); }
-.hist-sale-meta { font-size: 11px; color: var(--text3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hist-sale-meta { font-size: 11px; color: var(--text3); margin-top: 5px; }
+.hist-sale-tag {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px; margin-top: 4px;
+}
+.hist-sale-client {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11.5px; color: var(--text2); font-weight: 600; margin-top: 4px;
+}
+.hist-sale-client i, .hist-sale-client svg { color: var(--text4); flex-shrink: 0; }
+.hist-sale-client--fiado { color: var(--warning-muted); }
+.hist-sale-client--fiado i, .hist-sale-client--fiado svg { color: var(--warning-muted); }
 .hist-sale-right { text-align: right; flex-shrink: 0; }
 .hist-sale-total { font-size: 15px; font-weight: 800; color: var(--success); }
 .hist-sale-total--dev { text-decoration: line-through; color: var(--text4); font-size: 12px; font-weight: 600; }
