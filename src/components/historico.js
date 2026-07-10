@@ -808,7 +808,8 @@ async function loadGeral(from, to) {
 
   var groups = groupByDay(filtered);
   list.innerHTML = groups.map(function(g) {
-    return '<div class="hist-day-label">' + dayLabel(g.date) + '</div>' +
+    var n = g.sales.length;
+    return '<div class="hist-day-label"><span>' + dayLabel(g.date) + '</span><span class="hist-day-label-count">' + n + ' ' + (n===1?"venda":"vendas") + '</span></div>' +
       g.sales.map(renderSaleCard).join("");
   }).join("");
 
