@@ -234,6 +234,16 @@ document.addEventListener("DOMContentLoaded", function() {
         <div id="historico-hero" class="hist-hero" style="display:none"></div>
         <div id="historico-stats" class="hist-stats-grid"></div>
         <div id="historico-chart" class="hist-chart-wrap" style="display:none"></div>
+        <div style="position:relative">
+          <div class="hist-search-wrap hist-search-wrap--persistent" id="hist-search-wrap">
+            <i data-lucide="search" class="hist-search-icon"></i>
+            <input id="hist-search-input" placeholder="Pesquisar produto, cliente ou valor..." autocomplete="off"/>
+            <button id="btn-hist-search-clear" class="hist-search-clear" style="display:none">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
+          <div id="hist-search-dropdown" class="hist-search-dropdown" style="display:none"></div>
+        </div>
         <div class="hist-actions" id="hist-actions" style="display:none">
           <button id="btn-export-menu" style="width:100%;padding:11px;background:#fafafa;border:1.5px solid #e5e7eb;border-radius:11px;font-size:12.5px;font-weight:700;color:#52525b;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
             <i data-lucide="download" style="width:14px;height:14px"></i> Exportar

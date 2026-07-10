@@ -282,6 +282,7 @@ async function renderClientesList(showSkeleton) {
 
     const row = document.createElement("div");
     row.className = "fc-row";
+    row.style.borderLeft = "3px solid " + risk.color;
     row.onclick = () => window._openClienteProfile(c.id);
     row.innerHTML =
       `<div class="fc-row-avatar" style="background:${overdue ? "var(--danger-muted-light);color:var(--danger-muted)" : "var(--primary-light);color:var(--primary)"}">
@@ -307,25 +308,28 @@ async function renderClientesList(showSkeleton) {
   refreshIcons(listEl);
 }
 
+function actionRow(icon, iconBg, iconColor, label, onclick, danger) {
+  return `<button class="fiado-action-row${danger ? " danger" : ""}" onclick="${onclick}">
+    <span class="ct-action-icon" style="background:${iconBg};color:${iconColor}"><i data-lucide="${icon}"></i></span>
+    ${label}
+  </button>`;
+}
+
 window._openClienteActions = async (id) => {
   const c = await db.get("clients", id);
   if (!c) return;
   const phone = (c.phone || "").trim();
+  const waMsg = waLink(phone, "Olá " + c.name + ", tudo bem?");
 
   openModal("",
     `<div class="fiado-entry-actions-sheet">
       ${phone ? `
-        <button class="fiado-action-row" onclick="window._closeModal();window.location.href='tel:${phone.replace(/\s+/g,"")}'">
-          <i data-lucide="phone"></i> Ligar
-        </button>
-        <button class="fiado-action-row" onclick="window._closeModal();window.open('${waLink(phone, "Olá " + c.name + ", tudo bem?")}','_blank')">
-          <i data-lucide="message-circle"></i> WhatsApp
-        </button>` : `
+        ${actionRow("phone", "var(--info-light,#dbeafe)", "var(--info,#2563eb)", "Ligar", "window._closeModal();window.location.href='tel:" + phone.replace(/\s+/g,"") + "'")}
+        ${actionRow("message-circle", "#dcfce7", "#16a34a", "WhatsApp", "window._closeModal();window.open('" + waMsg + "','_blank')")}
+        ` : `
         <div style="padding:8px 10px 14px;font-size:12px;color:var(--text4)">Este cliente não tem telefone registado.</div>`
       }
-      <button class="fiado-action-row" onclick="window._closeModal();window._openClienteProfile(${id})">
-        <i data-lucide="user"></i> Ver ficha completa
-      </button>
+      ${actionRow("user", "var(--primary-light)", "var(--primary)", "Ver ficha completa", "window._closeModal();window._openClienteProfile(" + id + ")")}
     </div>`);
   refreshIcons(el("modal-box"));
 };

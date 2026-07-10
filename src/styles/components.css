@@ -2300,7 +2300,58 @@
 .hist-timeline-name { font-size: 13px; font-weight: 700; color: var(--text); }
 .hist-timeline-date { font-size: 11px; color: var(--text3); margin-top: 1px; }
 .hist-timeline-uuid { font-size: 9px; color: var(--text4); font-family: monospace; margin-top: 2px; }
-.hist-actions { display: flex; flex-direction: column; gap: 6px; }
+.hist-actions { display: flex; flex-direction: row; gap: 8px; }
+.hist-search-toggle-btn {
+  width: 42px; height: 42px; flex-shrink: 0;
+  background: #fafafa; border: 1.5px solid #e5e7eb; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: var(--transition); color: var(--text3);
+}
+.hist-search-toggle-btn i, .hist-search-toggle-btn svg { width: 16px; height: 16px; }
+.hist-search-toggle-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.hist-search-toggle-btn:active { transform: scale(.94); }
+
+.hist-search-wrap {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--border2); border-radius: 10px;
+  padding: 0 12px; border: 1.5px solid var(--border);
+  animation: histSearchIn .2s ease;
+}
+@keyframes histSearchIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hist-search-icon { width: 16px; height: 16px; color: var(--text4); flex-shrink: 0; }
+.hist-search-wrap input {
+  flex: 1; background: none; border: none; padding: 11px 0;
+  font-size: 14px; font-family: inherit; outline: none; color: var(--text);
+}
+
+.hist-search-wrap--persistent { margin-bottom: 4px; }
+
+.hist-search-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--bg2); border-radius: var(--radius); border: 1px solid var(--border);
+  box-shadow: var(--shadow); z-index: 100; max-height: 280px; overflow-y: auto;
+}
+.hist-search-dropdown-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; border-bottom: 1px solid var(--border2); cursor: pointer;
+  transition: background var(--transition);
+}
+.hist-search-dropdown-item:last-child { border-bottom: none; }
+.hist-search-dropdown-item:active { background: var(--border2); }
+.hist-search-dropdown-info { flex: 1; min-width: 0; }
+.hist-search-dropdown-title { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.hist-search-dropdown-sub { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.hist-search-dropdown-val { font-size: 13px; font-weight: 700; color: var(--success); flex-shrink: 0; }
+.hist-search-dropdown-more { padding: 9px 14px; font-size: 11.5px; color: var(--text4); text-align: center; }
+.hist-search-clear {
+  width: 22px; height: 22px; border-radius: 50%; border: none;
+  background: var(--border); color: var(--text3); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.hist-search-clear i, .hist-search-clear svg { width: 12px; height: 12px; }
 .hist-btn-pdf { color: var(--danger); border-color: #fca5a5; }
 .hist-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px; text-align: center; color: var(--text4); gap: 8px; }
 .hist-empty i, .hist-empty svg { width: 40px; height: 40px; }
@@ -2807,12 +2858,19 @@
 .fc-risk-chip i, .fc-risk-chip svg { width: 11px; height: 11px; }
 
 .fc-row-kebab {
-  width: 32px; height: 32px; border-radius: 9px; border: none;
-  background: var(--border2); color: var(--text3);
+  width: 34px; height: 34px; border-radius: 50%; border: none;
+  background: var(--bg); color: var(--text3);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; flex-shrink: 0; margin-left: 6px; transition: all .15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
 }
-.fc-row-kebab:active { background: var(--border); transform: scale(.92); }
+.fc-row-kebab:active { background: var(--border2); transform: scale(.92); }
+
+.ct-action-icon {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.ct-action-icon i, .ct-action-icon svg { width: 16px; height: 16px; }
 
 
 /* ELEVACAO LISTA CLIENTES */
@@ -2897,3 +2955,7 @@
 
 .fiado-entry-amount--sm { font-size: 13px; }
 .fiado-entry-amount--xs { font-size: 11px; }
+
+
+/* BORDA LATERAL LINHA CLIENTE (padrao historico) */
+#clientes-list .fc-row { padding-left: 13px; }

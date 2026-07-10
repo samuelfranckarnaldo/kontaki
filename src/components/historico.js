@@ -760,7 +760,7 @@ async function loadGeral(from, to) {
   // Acções
   var actions = el("hist-actions");
   if (actions) {
-    actions.style.display = filtered.length > 0 ? "block" : "none";
+    actions.style.display = filtered.length > 0 ? "flex" : "none";
     var exportMenuBtn = el("btn-export-menu");
     if (exportMenuBtn) {
       exportMenuBtn.onclick = function() { window._openExportMenu(filtered); };
@@ -806,14 +806,89 @@ async function loadGeral(from, to) {
       '</div></div>';
   }
 
-  var groups = groupByDay(filtered);
-  list.innerHTML = groups.map(function(g) {
-    var n = g.sales.length;
-    return '<div class="hist-day-label"><span>' + dayLabel(g.date) + '</span><span class="hist-day-label-count">' + n + ' ' + (n===1?"venda":"vendas") + '</span></div>' +
-      g.sales.map(renderSaleCard).join("");
-  }).join("");
+  function renderSalesList(salesArr) {
+    if (!salesArr.length) {
+      list.innerHTML =
+        '<div class="hist-empty">' +
+        '<i data-lucide="search-x"></i>' +
+        '<div class="hist-empty-title">Nenhum resultado</div>' +
+        '<div class="hist-empty-sub">Tenta outro termo de pesquisa.</div>' +
+        '</div>';
+      refreshIcons(list);
+      return;
+    }
+    var groups = groupByDay(salesArr);
+    list.innerHTML = groups.map(function(g) {
+      var n = g.sales.length;
+      return '<div class="hist-day-label"><span>' + dayLabel(g.date) + '</span><span class="hist-day-label-count">' + n + ' ' + (n===1?"venda":"vendas") + '</span></div>' +
+        g.sales.map(renderSaleCard).join("");
+    }).join("");
+    refreshIcons(list);
+  }
 
-  refreshIcons(list);
+  renderSalesList(filtered);
+
+  var searchInput = el("hist-search-input");
+  var searchClearBtn = el("btn-hist-search-clear");
+  var searchDropdown = el("hist-search-dropdown");
+
+  function searchMatches(q) {
+    return filtered.filter(function(s) {
+      var clientMatch = (s.clientName||"").toLowerCase().includes(q);
+      var productMatch = (s.items||[]).some(function(i) { return (i.name||"").toLowerCase().includes(q); });
+      var valueMatch = String(s.total||"").includes(q);
+      var idMatch = String(s.id).includes(q);
+      return clientMatch || productMatch || valueMatch || idMatch;
+    });
+  }
+
+  function renderDropdown(results, q) {
+    if (!searchDropdown) return;
+    if (!q || !results.length) { searchDropdown.style.display = "none"; return; }
+    var top = results.slice(0, 5);
+    searchDropdown.style.display = "block";
+    searchDropdown.innerHTML = top.map(function(s) {
+      var nItems = s.items ? s.items.length : 0;
+      return '<div class="hist-search-dropdown-item" onclick="window._openSaleDetail(' + s.id + ')">' +
+        '<div class="hist-search-dropdown-info">' +
+        '<div class="hist-search-dropdown-title">Venda #' + String(s.id).padStart(4,"0") + (s.clientName ? " · " + s.clientName : "") + '</div>' +
+        '<div class="hist-search-dropdown-sub">' + fmtDate(s.date) + ' · ' + nItems + ' ' + (nItems===1?"item":"itens") + '</div>' +
+        '</div>' +
+        '<div class="hist-search-dropdown-val">' + fmt(s.total) + '</div>' +
+        '</div>';
+    }).join("") +
+    (results.length > 5 ? '<div class="hist-search-dropdown-more">+' + (results.length - 5) + ' resultado' + (results.length-5===1?"":"s") + ' na lista abaixo</div>' : '');
+  }
+
+  if (searchInput) {
+    searchInput.oninput = function() {
+      var q = searchInput.value.trim().toLowerCase();
+      if (searchClearBtn) searchClearBtn.style.display = q ? "flex" : "none";
+      if (!q) { renderSalesList(filtered); if (searchDropdown) searchDropdown.style.display = "none"; return; }
+
+      var results = searchMatches(q);
+      renderSalesList(results);
+      renderDropdown(results, q);
+    };
+
+    searchInput.onblur = function() {
+      setTimeout(function() { if (searchDropdown) searchDropdown.style.display = "none"; }, 150);
+    };
+    searchInput.onfocus = function() {
+      var q = searchInput.value.trim().toLowerCase();
+      if (q) renderDropdown(searchMatches(q), q);
+    };
+
+    if (searchClearBtn) {
+      searchClearBtn.onclick = function() {
+        searchInput.value = "";
+        searchClearBtn.style.display = "none";
+        renderSalesList(filtered);
+        if (searchDropdown) searchDropdown.style.display = "none";
+        searchInput.focus();
+      };
+    }
+  }
 }
 
 function animateHeroValue(from, to) {
