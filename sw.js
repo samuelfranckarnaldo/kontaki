@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kontaki-v132';
+const CACHE_NAME = 'kontaki-v133';
 const BASE = self.location.pathname.replace(/\/sw\.js$/, '');
 
 const ASSETS = [

@@ -163,53 +163,6 @@ function getPeriodLabel(sc, offset, dates) {
   return "";
 }
 
-window._seedMockSales = async function() {
-  var user = getUser();
-  var produtos = [
-    { name: "Arroz", price: 500 },
-    { name: "Água", price: 300 },
-    { name: "Trigo", price: 2000 },
-    { name: "Massa", price: 800 },
-    { name: "Ovos", price: 1500 },
-  ];
-  var pagamentos = ["dinheiro", "dinheiro", "dinheiro", "transferencia", "fiado"];
-
-  for (var d = 14; d >= 0; d--) {
-    var nVendasNoDia = Math.floor(Math.random() * 4) + 1;
-    for (var v = 0; v < nVendasNoDia; v++) {
-      var dt = new Date();
-      dt.setDate(dt.getDate() - d);
-      dt.setHours(8 + Math.floor(Math.random()*10), Math.floor(Math.random()*60), 0, 0);
-
-      var nItems = Math.floor(Math.random() * 3) + 1;
-      var items = [];
-      var total = 0;
-      for (var it = 0; it < nItems; it++) {
-        var p = produtos[Math.floor(Math.random()*produtos.length)];
-        var qty = Math.floor(Math.random()*5) + 1;
-        items.push({ id: it+1, name: p.name, price: p.price, qty: qty });
-        total += p.price * qty;
-      }
-
-      var pay = pagamentos[Math.floor(Math.random()*pagamentos.length)];
-
-      await db.add("sales", {
-        items: items,
-        subtotal: total, discount: 0,
-        total: total, payMethod: pay, date: dt.toISOString(),
-        userId: user ? user.id : 1, sessionId: user ? user.sessionId : null,
-        clientName: pay === "fiado" ? "Cliente Teste" : "",
-        clientPhone: "", clientId: null,
-        fiadoClient: pay === "fiado" ? "Cliente Teste" : null,
-        recebido: total, troco: 0,
-        hash: null,
-      });
-    }
-  }
-  alert("Dados de teste gerados! Recarrega a tela.");
-  loadData();
-};
-
 export async function initHistorico() {
   setVal("hist-from", today());
   setVal("hist-to",   today());
