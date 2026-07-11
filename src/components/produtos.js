@@ -499,7 +499,7 @@ window._openProdMenu = (id) => {
 
   openModal("",
     // Header do produto — nome, categoria e preco agrupados, sem duplicar o titulo
-    `<div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-5)">
+    `<div class="stagger-item" style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-5);animation-delay:0ms">
       <div style="width:52px;height:52px;border-radius:var(--radius-lg);flex-shrink:0;
         background:linear-gradient(135deg, ${cColor}, ${cColor}cc);
         display:flex;align-items:center;justify-content:center;
@@ -516,7 +516,7 @@ window._openProdMenu = (id) => {
     </div>` +
 
     // Stock cards
-    `<div class="prod-modal-stock" style="margin-bottom:var(--space-5)">
+    `<div class="prod-modal-stock stagger-item" style="margin-bottom:var(--space-5);animation-delay:40ms">
       <div class="prod-modal-stock-card" style="background:var(--primary-light);border-radius:10px">
         <div class="prod-modal-stock-label">Loja</div>
         <div class="prod-modal-stock-val" style="color:var(--primary)">${shopS}</div>
@@ -535,7 +535,7 @@ window._openProdMenu = (id) => {
     </div>` +
 
     // Info detalhes
-    `<div style="background:var(--bg);border-radius:var(--radius-lg);padding:2px var(--space-4);margin-bottom:var(--space-5)">` +
+    `<div class="stagger-item" style="background:var(--bg);border-radius:var(--radius-lg);padding:2px var(--space-4);margin-bottom:var(--space-5);animation-delay:80ms">` +
     (p.costPrice ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Preço custo</span><span style="font-weight:var(--weight-strong);color:var(--text)">${fmt(p.costPrice)}</span></div>` : "") +
     (margin!==null ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Margem</span><span style="font-weight:var(--weight-strong);color:${margin<0?"var(--danger)":"var(--success)"}">${fmt(p.price-p.costPrice)} (${margin}%)</span></div>` : "") +
     `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;font-size:var(--text-sm)"><span style="color:var(--text3)">Stock mínimo</span><span style="font-weight:var(--weight-strong);color:var(--text)">${p.minStock||5} ${p.unit||"un"}</span></div>` +
@@ -544,7 +544,7 @@ window._openProdMenu = (id) => {
 
     // Acções
     (user.role==="admin" ?
-      `<div class="prod-modal-actions" style="display:flex;flex-direction:column;gap:var(--space-2)">
+      `<div class="prod-modal-actions stagger-item" style="display:flex;flex-direction:column;gap:var(--space-2);animation-delay:120ms">
         <button class="btn btn-full" style="background:var(--success);color:#fff;border-radius:var(--radius);padding:var(--space-4);font-size:var(--text-base);font-weight:var(--weight-strong);box-shadow:none" onclick="window._openRegistarCompra(${p.id})">
           <i data-lucide="shopping-cart" style="width:16px;height:16px"></i> Registar Compra
         </button>

@@ -30,12 +30,13 @@ export function openPicker(title, options, currentValue, onSelect, config) {
   renderList();
 
   function renderList() {
-    listEl.innerHTML = options.map(function (opt) {
+    listEl.innerHTML = options.map(function (opt, idx) {
       var active = opt.toLowerCase() === (currentValue || "").toLowerCase();
-      return '<button data-val="' + opt.replace(/"/g, "&quot;") + '" style="display:flex;align-items:center;' +
+      var delay = Math.min(idx * 30, 240);
+      return '<button data-val="' + opt.replace(/"/g, "&quot;") + '" class="stagger-item" style="display:flex;align-items:center;' +
         'justify-content:space-between;width:100%;text-align:left;background:' + (active ? "var(--primary-light)" : "none") +
         ';border:none;padding:14px 12px;border-radius:10px;font-size:15px;color:' + (active ? "var(--primary)" : "#18181b") +
-        ';font-weight:' + (active ? "700" : "400") + ';cursor:pointer;font-family:inherit">' +
+        ';font-weight:' + (active ? "700" : "400") + ';cursor:pointer;font-family:inherit;animation-delay:' + delay + 'ms">' +
         opt + (active ? '<i data-lucide="check" style="width:18px;height:18px"></i>' : "") +
         '</button>';
     }).join("");

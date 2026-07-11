@@ -9,7 +9,16 @@ export function openModal(title, bodyHTML) {
   tEl.textContent  = title;
   bEl.innerHTML    = bodyHTML;
   ov.style.display = "flex";
-  if (box) refreshIcons(box);
+  ov.style.animation = "none";
+  if (box) {
+    box.style.animation = "none";
+    void box.offsetHeight; // forca reflow para a animacao disparar sempre, nao so na 1a vez
+    box.style.animation = "slideUp .25s ease";
+    refreshIcons(box);
+  }
+  void ov.offsetHeight;
+  ov.style.animation = "modalBackdropIn .2s ease";
+  ov.dataset.openedAt = Date.now();
 }
 
 export function closeModal() {
@@ -32,8 +41,18 @@ export function initModal() {
   }
   var ov = document.getElementById("modal-overlay");
   if (!ov) { console.error("Modal overlay nao encontrado"); return; }
-  ov.addEventListener("click", function(e) {
-    if (e.target === ov) closeModal();
+
+  var pointerDownOnBackdrop = false;
+  ov.addEventListener("pointerdown", function(e) {
+    pointerDownOnBackdrop = (e.target === ov);
+  });
+  ov.addEventListener("pointerup", function(e) {
+    var openedAt = Number(ov.dataset.openedAt || 0);
+    var justOpened = (Date.now() - openedAt) < 250;
+    if (pointerDownOnBackdrop && e.target === ov && !justOpened) {
+      closeModal();
+    }
+    pointerDownOnBackdrop = false;
   });
 }
 

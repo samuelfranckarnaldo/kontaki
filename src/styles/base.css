@@ -137,3 +137,13 @@ button:active, [onclick]:active, .btn:active {
 @keyframes ripple    { from{transform:scale(0);opacity:.4;} to{transform:scale(4);opacity:0;} }
 @keyframes spin      { to { transform:rotate(360deg); } }
 @keyframes skeleton  { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+
+/* ── STAGGER GENERICO — entrada em cascata para listas/opcoes ────────────── */
+.stagger-item {
+  opacity: 0;
+  animation: staggerIn .25s ease forwards;
+}
+@keyframes staggerIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
