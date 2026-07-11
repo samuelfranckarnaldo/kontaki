@@ -392,7 +392,7 @@ export function _statCard({label, value, sub, color, icon, filter, clickable, is
   const style = active ? `border-color:${color};background:${color}0d` : "";
   return `<div class="prod-stat-card${clickable?" prod-stat-clickable":""}" style="${style}" ${clickable?`onclick="window._filterProd('${filter}')"`:""}>`+
     `<div class="prod-stat-icon" style="background:${color}20;color:${color}"><i data-lucide="${icon}"></i></div>`+
-    `<div class="prod-stat-val2${String(value).length>9?" prod-stat-val2--sm":""}" style="color:${color}">${value}</div>`+
+    `<div class="prod-stat-val2${String(value).length>=13?" prod-stat-val2--xs":String(value).length>9?" prod-stat-val2--sm":""}" style="color:${color}">${value}</div>`+
     `<div class="prod-stat-label2">${label}</div>`+
     `<div class="prod-stat-sub">${sub}</div>`+
     `</div>`;
