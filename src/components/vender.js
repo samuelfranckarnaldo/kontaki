@@ -714,6 +714,13 @@ async function openCheckout() {
       </div>
     </details>
 
+    <div class="ck-notes-wrap">
+      <button type="button" class="ck-notes-toggle" onclick="window._ckToggleNotes()" id="ck-notes-toggle">
+        <i data-lucide="sticky-note"></i> Adicionar observação
+      </button>
+      <textarea id="ck-notes" placeholder="Ex: desconto por embalagem danificada, entrega pendente..." style="display:none" rows="2"></textarea>
+    </div>
+
     <button class="ck-confirm-btn" onclick="window._confirmarVenda()">
       <i data-lucide="check"></i>
       Confirmar venda · ${fmt(total)}
@@ -846,6 +853,18 @@ async function openCheckout() {
   window._ckPayMethod = "dinheiro";
 
   window._ckRecalcTotal = function() {};
+  window._ckToggleNotes = function() {
+    var textarea = document.getElementById("ck-notes");
+    var btn = document.getElementById("ck-notes-toggle");
+    if (!textarea || !btn) return;
+    var isHidden = textarea.style.display === "none";
+    textarea.style.display = isHidden ? "block" : "none";
+    if (isHidden) {
+      btn.style.display = "none";
+      textarea.focus();
+    }
+  };
+
   window._ckSetPay = function(btn, method) {
     window._ckPayMethod = method;
     document.querySelectorAll(".ck-pay-btn").forEach(b => b.classList.remove("active"));
@@ -926,11 +945,14 @@ window._confirmarVenda = async () => {
     const recebidoEl = document.getElementById("ck-recebido");
     const recebido   = method==="dinheiro" ? Number(recebidoEl ? recebidoEl.value : 0) || 0 : 0;
     const troco      = recebido > total ? recebido - total : 0;
+    const notesEl    = document.getElementById("ck-notes");
+    const notes      = notesEl ? notesEl.value.trim() : "";
 
     const sid = await db.add("sales", {
       items: cart.map(i=>({id:i.id,name:i.name,price:i.price,qty:i.qty})),
       subtotal, discount:da,
       ivaPct, ivaValor:ivaVal,
+      notes,
       total, payMethod:method, date:saleDate,
       userId:user.id, sessionId:user.sessionId||null,
       clientName, clientPhone, clientId,

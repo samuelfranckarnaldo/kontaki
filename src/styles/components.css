@@ -908,6 +908,24 @@
   background: var(--primary-light);
   border-color: var(--primary); color: var(--primary);
 }
+
+.ck-notes-wrap { margin-bottom: 16px; }
+.ck-notes-toggle {
+  display: flex; align-items: center; gap: 7px;
+  background: none; border: none; padding: 4px 0;
+  font-size: 13px; font-weight: 600; color: var(--text3);
+  cursor: pointer; font-family: var(--font);
+}
+.ck-notes-toggle i, .ck-notes-toggle svg { width: 15px; height: 15px; color: var(--text4); }
+.ck-notes-toggle:active { color: var(--primary); }
+#ck-notes {
+  width: 100%; box-sizing: border-box;
+  padding: 11px 13px; border: 1.5px solid var(--border); border-radius: 12px;
+  font-size: 13.5px; font-family: var(--font); color: var(--text);
+  background: var(--bg2); resize: vertical; outline: none;
+  animation: sessionFadeIn .2s ease;
+}
+#ck-notes:focus { border-color: var(--primary); }
 .ck-pay-btn:active { transform: scale(.97); }
 
 .ck-troco-wrap {
