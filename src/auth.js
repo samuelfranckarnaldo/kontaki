@@ -11,47 +11,29 @@ export function getUser()    { return currentUser; }
 export function getSession() { return currentSession; }
 export function _setSession(s) { currentSession = s; if (currentUser) currentUser.sessionId = s ? s.id : null; }
 
-// ── LOCKOUT DE TENTATIVAS ──────────────────────────────────────────────
-// Persistido em IndexedDB (store "loginAttempts"), não em memória, para
-// que um reload da página não reponha o contador a zero. Progressivo:
-// não penaliza um erro de dedo isolado, mas torna brute force impraticável.
-const LOCKOUT_STEPS = [
-  { after: 5,  lockMs: 30 * 1000 },        // 5ª falha  -> 30s
-  { after: 10, lockMs: 5  * 60 * 1000 },   // 10ª falha -> 5min
-  { after: 15, lockMs: 30 * 60 * 1000 },   // 15ª falha -> 30min
-];
+// ── TIMEOUT DE SESSÃO POR INATIVIDADE ──────────────────────────────────────
+// 15 minutos sem interação (toque, clique, tecla) faz logout automático.
+// Só ativo depois de currentUser existir (não corre no ecrã de login).
+const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
+let _inactivityTimer = null;
 
-async function _getLoginAttempts(userId) {
-  const rec = await db.get("loginAttempts", userId);
-  return rec || { userId, count: 0, lockedUntil: null };
+function _resetInactivityTimer() {
+  if (_inactivityTimer) clearTimeout(_inactivityTimer);
+  if (!currentUser) return;
+  _inactivityTimer = setTimeout(_handleInactivityTimeout, SESSION_TIMEOUT_MS);
 }
 
-async function _registerFailedAttempt(userId) {
-  const rec = await _getLoginAttempts(userId);
-  rec.count = (rec.count || 0) + 1;
-
-  const now = Date.now();
-  let step = null;
-  for (const s of LOCKOUT_STEPS) { if (rec.count >= s.after) step = s; }
-  if (step) rec.lockedUntil = now + step.lockMs;
-
-  await db.put("loginAttempts", rec);
-  return rec;
+function _handleInactivityTimeout() {
+  if (!currentUser) return;
+  console.info("Sessão terminada por inatividade.");
+  logout(true);
 }
 
-async function _clearLoginAttempts(userId) {
-  await db.delete("loginAttempts", userId).catch(() => {});
-}
-
-function _formatLockMessage(lockedUntil) {
-  const ms = lockedUntil - Date.now();
-  const totalSec = Math.max(1, Math.ceil(ms / 1000));
-  if (totalSec >= 60) {
-    const min = Math.ceil(totalSec / 60);
-    return "Demasiadas tentativas. Tenta novamente em " + min + " min.";
-  }
-  return "Demasiadas tentativas. Tenta novamente em " + totalSec + "s.";
-}
+(function initInactivityWatcher() {
+  ["touchstart", "mousedown", "keydown", "click"].forEach(function (evt) {
+    document.addEventListener(evt, _resetInactivityTimer, { passive: true });
+  });
+})();
 
 function ensurePinCardStyle() {
   if (document.getElementById("login-pin-card-style")) return;
@@ -205,7 +187,6 @@ async function _selectUserHandler(userId) {
   const errEl = document.getElementById("login-err");
   if (errEl) errEl.classList.remove("show");
 
-  // Se este utilizador já estiver bloqueado de uma sessão anterior, mostra logo.
   const attempts = await _getLoginAttempts(_selectedUser.id);
   if (attempts.lockedUntil && attempts.lockedUntil > Date.now()) {
     const errMsg = document.getElementById("login-err-msg");
@@ -262,11 +243,49 @@ window._backToRole = function() {
   _updatePinDots();
 };
 
+// ── LOCKOUT DE TENTATIVAS ──────────────────────────────────────────────
+const LOCKOUT_STEPS = [
+  { after: 5,  lockMs: 30 * 1000 },
+  { after: 10, lockMs: 5  * 60 * 1000 },
+  { after: 15, lockMs: 30 * 60 * 1000 },
+];
+
+async function _getLoginAttempts(userId) {
+  const rec = await db.get("loginAttempts", userId);
+  return rec || { userId, count: 0, lockedUntil: null };
+}
+
+async function _registerFailedAttempt(userId) {
+  const rec = await _getLoginAttempts(userId);
+  rec.count = (rec.count || 0) + 1;
+
+  const now = Date.now();
+  let step = null;
+  for (const s of LOCKOUT_STEPS) { if (rec.count >= s.after) step = s; }
+  if (step) rec.lockedUntil = now + step.lockMs;
+
+  await db.put("loginAttempts", rec);
+  return rec;
+}
+
+async function _clearLoginAttempts(userId) {
+  await db.delete("loginAttempts", userId).catch(() => {});
+}
+
+function _formatLockMessage(lockedUntil) {
+  const ms = lockedUntil - Date.now();
+  const totalSec = Math.max(1, Math.ceil(ms / 1000));
+  if (totalSec >= 60) {
+    const min = Math.ceil(totalSec / 60);
+    return "Demasiadas tentativas. Tenta novamente em " + min + " min.";
+  }
+  return "Demasiadas tentativas. Tenta novamente em " + totalSec + "s.";
+}
+
 async function _verifyPin() {
   if (!_selectedUser) return;
 
   try {
-    // 1) Verifica lockout ANTES de gastar tempo a calcular o PBKDF2.
     const attempts = await _getLoginAttempts(_selectedUser.id);
     if (attempts.lockedUntil && attempts.lockedUntil > Date.now()) {
       const errEl = document.getElementById("login-err");
@@ -306,7 +325,6 @@ async function _verifyPin() {
       return;
     }
 
-    // Login bem-sucedido: limpa qualquer histórico de falhas deste utilizador.
     await _clearLoginAttempts(_selectedUser.id);
 
     currentUser = _selectedUser;
@@ -341,6 +359,8 @@ async function _verifyPin() {
       sessionId: currentUser.sessionId || null
     }));
 
+    _resetInactivityTimer();
+
     const loginPage = document.getElementById("login-page");
     const app = document.getElementById("app");
 
@@ -368,8 +388,9 @@ function openForgotPassword() {
   alert("Para recuperar o PIN, contacta o administrador.");
 }
 
-export function logout() {
-  if (!confirm("Terminar sessão?")) return;
+export function logout(automatic) {
+  if (!automatic && !confirm("Terminar sessão?")) return;
+  if (_inactivityTimer) { clearTimeout(_inactivityTimer); _inactivityTimer = null; }
 
   if (currentSession?.id) {
     db.get("sessions", currentSession.id).then(s => {
@@ -415,6 +436,7 @@ export async function restoreSession() {
     currentUser = user;
     currentUser.sessionId = session.id;
     currentSession = session;
+    _resetInactivityTimer();
     return true;
   } catch (e) {
     localStorage.removeItem("kontaki_session");
