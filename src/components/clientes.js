@@ -4,6 +4,7 @@ import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import "./fiados.js";
 import { isOverdue, daysOverdue, waLink } from "./fiados.js";
+import { payIcon, payColor, payLabel, payClass } from "./historico.js";
 
 let fiadosFilter = "all";
 
@@ -102,7 +103,7 @@ function computeRisk(myFiados) {
     return { icon: "alert-triangle", label: "Atenção", color: "var(--warning-muted)", bg: "var(--warning-muted-light)" };
   }
   if (trackedPaid.length === 0) {
-    return { icon: "check-circle", label: "Bom pagador", color: "var(--success)", bg: "var(--success-light)" };
+    return { icon: "circle-dashed", label: "Sem histórico", color: "var(--text3)", bg: "var(--border)" };
   }
   if (lateRate === 0) {
     return { icon: "award", label: "Excelente", color: "var(--success)", bg: "var(--success-light)" };
@@ -282,7 +283,11 @@ async function renderClientesList(showSkeleton) {
 
     const row = document.createElement("div");
     row.className = "fc-row";
-    row.style.borderLeft = "3px solid " + risk.color;
+    if (risk.color === "var(--warning-muted)" || risk.color === "var(--danger-muted)") {
+      row.style.borderLeft = "3px solid " + risk.color;
+    } else {
+      row.style.borderLeft = "3px solid transparent";
+    }
     row.onclick = () => window._openClienteProfile(c.id);
     row.innerHTML =
       `<div class="fc-row-avatar" style="background:${overdue ? "var(--danger-muted-light);color:var(--danger-muted)" : "var(--primary-light);color:var(--primary)"}">
@@ -494,14 +499,26 @@ async function renderFiadosList(showSkeleton) {
 // ── FICHA DO CLIENTE — página cheia (overlay), não modal ──────────────────────
 function renderComprasPanel(mySales) {
   if (!mySales.length) return `<div style="text-align:center;color:var(--text4);font-size:13px;padding:24px">Sem compras registadas</div>`;
-  return mySales.slice(0,30).map(s => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border2)">
-      <div>
-        <div style="font-size:13px;font-weight:600">Compra</div>
-        <div style="font-size:11px;color:var(--text4)">${fmtDate(s.date)} · ${(s.items||[]).length} item(s) · ${s.payMethod||""}</div>
+  return mySales.slice(0,30).map(s => {
+    const totalLiq = (s.total||0) - (s.totalDevolvido||0);
+    const hasDev   = s.temDevolucao && (s.totalDevolvido||0) > 0;
+    const color    = payColor(s.payMethod);
+    const nItems   = (s.items||[]).length;
+    return `<div class="hist-sale-card" style="border-left:3px solid ${color}" onclick="window._openSaleDetail(${s.id})">
+      <div class="hist-sale-avatar ${payClass(s.payMethod)}"><i data-lucide="${payIcon(s.payMethod)}" style="width:18px;height:18px"></i></div>
+      <div class="hist-sale-info">
+        <div class="hist-sale-id">Venda #${String(s.id).padStart(4,"0")}${hasDev ? ' <span class="hist-badge-dev">↩ Dev.</span>' : ''}</div>
+        <span class="hist-sale-tag" style="background:color-mix(in srgb, ${color} 15%, white);color:${color}">${payLabel(s.payMethod)}</span>
+        <div class="hist-sale-meta">${fmtDate(s.date)} · ${nItems} ${nItems===1?"item":"itens"}</div>
       </div>
-      <div style="font-size:14px;font-weight:700;color:var(--success)">${fmt(s.total)}</div>
-    </div>`).join("");
+      <div class="hist-sale-right">
+        ${hasDev
+          ? `<div class="hist-sale-total--dev">${fmt(s.total)}</div><div class="hist-sale-total-liq">${fmt(totalLiq)}</div>`
+          : `<div class="hist-sale-total" style="color:${color}">${fmt(s.total)}</div>`}
+        ${s.discount>0 ? `<div style="font-size:10px;color:var(--danger)">-${fmt(s.discount)} desc.</div>` : ''}
+      </div>
+    </div>`;
+  }).join("");
 }
 
 function renderFiadosPanel(myFiados, clientName) {
@@ -566,12 +583,20 @@ function renderFiadosPanel(myFiados, clientName) {
 
 window._openFiadoActions = (id) => {
   openModal("",
-    `<div class="fiado-entry-actions-sheet">
-      <button class="fiado-action-row" onclick="window._closeModal();window._openEditFiado(${id})">
-        <i data-lucide="pencil"></i> Editar fiado
+    `<div class="hist-export-options">
+      <button class="hist-export-option" onclick="window._closeModal();window._openEditFiado(${id})">
+        <div class="hist-export-icon hist-export-icon--edit"><i data-lucide="pencil"></i></div>
+        <div class="hist-export-info">
+          <div class="hist-export-title">Editar fiado</div>
+        </div>
+        <i data-lucide="chevron-right" class="hist-export-arrow"></i>
       </button>
-      <button class="fiado-action-row danger" onclick="window._closeModal();window._openCancelFiado(${id})">
-        <i data-lucide="ban"></i> Anular fiado
+      <button class="hist-export-option" onclick="window._closeModal();window._openCancelFiado(${id})">
+        <div class="hist-export-icon hist-export-icon--cancel"><i data-lucide="ban"></i></div>
+        <div class="hist-export-info">
+          <div class="hist-export-title">Anular fiado</div>
+        </div>
+        <i data-lucide="chevron-right" class="hist-export-arrow"></i>
       </button>
     </div>`);
   refreshIcons(el("modal-box"));
@@ -666,7 +691,7 @@ window._openClienteProfile = async (id) => {
       </div>
 
       <div id="cp-panel-compras" class="fc-tab-panel ct-fade-panel" style="display:block;max-height:none">
-        ${renderComprasPanel(mySales)}
+        <div class="hist-list">${renderComprasPanel(mySales)}</div>
       </div>
       <div id="cp-panel-fiados" class="fc-tab-panel ct-fade-panel" style="display:none;max-height:none">
         ${renderFiadosPanel(myFiados, c.name)}

@@ -438,7 +438,7 @@ async function loadData() {
 }
 
 // ── GERAL ─────────────────────────────────────────────────────────────────────
-function payIcon(method) {
+export function payIcon(method) {
   if (!method) return "wallet";
   var m = method.toLowerCase();
   if (m.includes("dinheiro") || m.includes("cash"))  return "wallet";
@@ -448,7 +448,7 @@ function payIcon(method) {
   return "credit-card";
 }
 
-function payClass(method) {
+export function payClass(method) {
   if (!method) return "hist-sale-avatar--dinheiro";
   var m = method.toLowerCase();
   if (m.includes("dinheiro") || m.includes("cash"))  return "hist-sale-avatar--dinheiro";
@@ -458,7 +458,7 @@ function payClass(method) {
   return "hist-sale-avatar--outros";
 }
 
-function payColor(method) {
+export function payColor(method) {
   if (!method) return "var(--teal)";
   var m = method.toLowerCase();
   if (m.includes("dinheiro") || m.includes("cash"))  return "var(--teal)";
@@ -468,7 +468,7 @@ function payColor(method) {
   return "var(--text3)";
 }
 
-function payLabel(method) {
+export function payLabel(method) {
   if (!method) return "Dinheiro";
   var m = method.toLowerCase();
   if (m.includes("dinheiro") || m.includes("cash"))  return "Dinheiro";
@@ -1187,6 +1187,12 @@ async function loadAuditoria(from, to) {
     return "Fechado";
   }
 
+  var allAuditLog = await db.getAll("auditLog");
+  var periodAuditLog = allAuditLog.filter(function(a) {
+    var d = toLocalDateStr(a.createdAt);
+    return d >= from && d <= to;
+  }).filter(function(a){ return matchesFilter(a.userId); });
+
   var timelineEvents = [];
 
   chain.forEach(function(s) {
@@ -1197,6 +1203,9 @@ async function loadAuditoria(from, to) {
   });
   periodIncidents.forEach(function(i) {
     timelineEvents.push({ eventDate: i.createdAt, kind: "incident", data: i });
+  });
+  periodAuditLog.forEach(function(a) {
+    timelineEvents.push({ eventDate: a.createdAt, kind: "audit", data: a });
   });
 
   timelineEvents.sort(function(a,b) { return new Date(b.eventDate) - new Date(a.eventDate); });
@@ -1239,6 +1248,21 @@ async function loadAuditoria(from, to) {
         '<div class="hist-timeline-date">' + fmtDate(i.createdAt) + '</div>' +
         '</div>' +
         '<div style="font-size:15px;font-weight:800;color:var(--danger)">' + (i.diff>0?"+":"") + i.diff + '</div>' +
+        '</div>';
+    }
+    if (ev.kind === "audit") {
+      var a = ev.data;
+      var entityLabel = a.entityType === "product" ? "Produto" : a.entityType;
+      var actionLabel = a.action === "edit" ? "editado" : a.action === "create" ? "criado" : a.action;
+      var changesText = (a.changes||[]).map(function(c) {
+        return c.field + ': ' + c.before + ' → ' + c.after;
+      }).join(" · ");
+      return '<div class="hist-timeline-item hist-timeline-item--adjustment">' +
+        '<div class="hist-timeline-dot" style="background:var(--primary-mid)"></div>' +
+        '<div class="hist-timeline-info">' +
+        '<div class="hist-timeline-name">' + entityLabel + ' ' + actionLabel + '</div>' +
+        '<div class="hist-timeline-date">' + fmtDate(a.createdAt) + ' · <strong>' + a.userName + '</strong>' + (changesText ? ' · ' + changesText : '') + '</div>' +
+        '</div>' +
         '</div>';
     }
     return "";
