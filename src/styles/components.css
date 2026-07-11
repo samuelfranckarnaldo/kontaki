@@ -2038,6 +2038,8 @@
 .hist-export-icon i, .hist-export-icon svg { width: 21px; height: 21px; }
 .hist-export-icon--csv { background: var(--success-light); color: var(--success); }
 .hist-export-icon--pdf { background: var(--danger-light); color: var(--danger); }
+.hist-export-icon--edit { background: var(--primary-light); color: var(--primary); }
+.hist-export-icon--cancel { background: var(--danger-muted-light); color: var(--danger-muted); }
 .hist-export-info { flex: 1; min-width: 0; }
 .hist-export-title { font-size: 14.5px; font-weight: 700; color: var(--text); }
 .hist-export-desc { font-size: 12px; color: var(--text3); margin-top: 2px; line-height: 1.35; }

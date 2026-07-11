@@ -45,7 +45,7 @@ function pickerButtonHTML(idPrefix, displayValue) {
   return `
     <button type="button" id="${idPrefix}-btn" onclick="window._openFieldPicker('${idPrefix}')"
       style="width:100%;text-align:left;background:#fff;border:1px solid var(--border2);border-radius:10px;
-      padding:12px;font-size:14px;color:#18181b;font-family:inherit;display:flex;justify-content:space-between;align-items:center;cursor:pointer">
+      padding:10px 12px;font-size:14px;color:#18181b;font-family:inherit;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-sizing:border-box">
       <span id="${idPrefix}-display">${displayValue}</span>
       <i data-lucide="chevron-down" style="width:16px;height:16px;color:var(--text3)"></i>
     </button>
@@ -186,7 +186,7 @@ export function openProductForm(p = {}) {
         </div>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+      <div style="display:flex;flex-direction:column;gap:var(--space-2);margin-top:var(--space-2);border-top:1px solid var(--border2);padding-top:var(--space-4)">
         <button type="button" id="pf-conv-toggle-btn" onclick="window._toggleConvConfigForm()" style="background:none;border:none;color:var(--primary);font-weight:var(--weight-strong);font-size:var(--text-xs);cursor:pointer;font-family:inherit;text-align:left;padding:0">
           ${p.purchaseUnit ? "▼" : "▶"} Unidade de compra (grades, fardos, caixas...)
         </button>
@@ -204,7 +204,7 @@ export function openProductForm(p = {}) {
         </div>
       </div>
 
-      <div class="field">
+      <div class="field" style="margin-top:var(--space-2);border-top:1px solid var(--border2);padding-top:var(--space-4)">
         <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Código de barras (opcional)</label>
         <div style="display:flex;gap:var(--space-2)">
           <input id="pf-bar" value="${p.barcode||""}" placeholder="GTIN da unidade" autocomplete="off" style="flex:1"/>
@@ -216,7 +216,7 @@ export function openProductForm(p = {}) {
         </div>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+      <div style="display:flex;flex-direction:column;gap:var(--space-2);margin-top:var(--space-2);border-top:1px solid var(--border2);padding-top:var(--space-4)">
         <button type="button" id="pf-exp-toggle-btn" onclick="window._toggleExpConfigForm()" style="background:none;border:none;color:var(--primary);font-weight:var(--weight-strong);font-size:var(--text-xs);cursor:pointer;font-family:inherit;text-align:left;padding:0">
           ${p.expiryDate ? "▼" : "▶"} Validade e lote (produtos perecíveis, medicamentos...)
         </button>
@@ -240,7 +240,7 @@ export function openProductForm(p = {}) {
         </div>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+      <div style="display:flex;flex-direction:column;gap:var(--space-2);margin-top:var(--space-2);border-top:1px solid var(--border2);padding-top:var(--space-4)">
         <button type="button" id="pf-more-toggle-btn" onclick="window._toggleMoreConfigForm()" style="background:none;border:none;color:var(--primary);font-weight:var(--weight-strong);font-size:var(--text-xs);cursor:pointer;font-family:inherit;text-align:left;padding:0">
           ${(p.sku || p.imageData) ? "▼" : "▶"} Mais opções (SKU, imagem...)
         </button>
@@ -681,28 +681,30 @@ window._openAdjustProd = async (id) => {
   const curShopAdj = p.stock || 0;
   const curWhAdj   = p.warehouseStock || 0;
   openModal("Ajustar Stock — " + p.name,
-    `<div class="adj-stock-grid">
-      <div class="adj-stock-card">
-        <div class="adj-stock-label">Loja actual</div>
-        <div class="adj-stock-cur" style="color:var(--primary)">${curShopAdj}</div>
-        <div class="adj-stock-unit">${p.unit||"un"}</div>
+    `<div style="display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-4)">
+      <div style="display:flex;align-items:center;gap:var(--space-3);background:var(--bg);border-radius:var(--radius);padding:var(--space-3) var(--space-4)">
+        <div style="flex:1;text-align:center">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Loja — Atual</div>
+          <div style="font-size:22px;font-weight:800;color:var(--text3)">${curShopAdj}</div>
+        </div>
+        <i data-lucide="arrow-right" style="width:18px;height:18px;color:var(--text4);flex-shrink:0"></i>
+        <div style="flex:1">
+          <div style="font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;text-align:center">Novo</div>
+          <input type="number" id="adj-stock" value="${curShopAdj}" min="0"
+            style="font-size:22px;font-weight:800;text-align:center;padding:10px;color:var(--primary);border-color:var(--primary)"/>
+        </div>
       </div>
-      <div class="adj-stock-card">
-        <div class="adj-stock-label">Armazém actual</div>
-        <div class="adj-stock-cur" style="color:var(--info)">${curWhAdj}</div>
-        <div class="adj-stock-unit">${p.unit||"un"}</div>
-      </div>
-    </div>
-    <div class="adj-stock-fields">
-      <div class="field">
-        <label>Novo stock — Loja</label>
-        <input type="number" id="adj-stock" value="${curShopAdj}" min="0"
-          style="font-size:20px;font-weight:700;text-align:center;padding:14px"/>
-      </div>
-      <div class="field">
-        <label>Novo stock — Armazém</label>
-        <input type="number" id="adj-warehouse" value="${curWhAdj}" min="0"
-          style="font-size:20px;font-weight:700;text-align:center;padding:14px"/>
+      <div style="display:flex;align-items:center;gap:var(--space-3);background:var(--bg);border-radius:var(--radius);padding:var(--space-3) var(--space-4)">
+        <div style="flex:1;text-align:center">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Armazém — Atual</div>
+          <div style="font-size:22px;font-weight:800;color:var(--text3)">${curWhAdj}</div>
+        </div>
+        <i data-lucide="arrow-right" style="width:18px;height:18px;color:var(--text4);flex-shrink:0"></i>
+        <div style="flex:1">
+          <div style="font-size:10px;font-weight:700;color:var(--info);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;text-align:center">Novo</div>
+          <input type="number" id="adj-warehouse" value="${curWhAdj}" min="0"
+            style="font-size:22px;font-weight:800;text-align:center;padding:10px;color:var(--info);border-color:var(--info)"/>
+        </div>
       </div>
     </div>
     <div class="field" style="margin-bottom:16px">
@@ -959,10 +961,13 @@ window._openRegistarCompra = async (id) => {
 
       <div class="field">
         <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Adicionar em</label>
-        <select id="rc-dest">
-          <option value="shop">Loja</option>
-          <option value="warehouse">Armazém</option>
-        </select>
+        <button type="button" id="rc-dest-btn" onclick="window._openDestPicker()"
+          style="width:100%;text-align:left;background:#fff;border:1px solid var(--border2);border-radius:10px;
+          padding:10px 12px;font-size:14px;color:#18181b;font-family:inherit;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-sizing:border-box">
+          <span id="rc-dest-display">Loja</span>
+          <i data-lucide="chevron-down" style="width:16px;height:16px;color:var(--text3)"></i>
+        </button>
+        <input type="hidden" id="rc-dest" value="shop"/>
       </div>
 
       <label style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--text3);cursor:pointer">
@@ -972,7 +977,7 @@ window._openRegistarCompra = async (id) => {
 
     </div>
     <div style="margin-top:var(--space-5);display:flex;flex-direction:column;gap:var(--space-3)">
-      <button class="btn btn-full" style="background:var(--success);color:#fff;font-size:var(--text-lg);padding:var(--space-4);box-shadow:0 4px 14px rgba(22,163,74,.25)" onclick="window._confirmCompra(${id})">
+      <button class="btn btn-full" style="background:var(--success);color:#fff;font-size:var(--text-lg);padding:14px var(--space-4);box-shadow:0 4px 14px rgba(22,163,74,.25)" onclick="window._confirmCompra(${id})">
         <i data-lucide="check"></i> Confirmar Compra
       </button>
       <button onclick="window._closeModal()" style="background:none;border:none;color:var(--text3);font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;font-family:inherit;padding:var(--space-2);text-align:center;width:100%">
@@ -990,6 +995,14 @@ window._openRegistarCompra = async (id) => {
     if (fl) fl.textContent = "Cada " + p.purchaseUnit + " contém quantas " + (p.unit||"unid") + "?";
   }
   window._updateRegistarCompraCalc(id);
+};
+
+window._openDestPicker = () => {
+  const current = el("rc-dest").value === "shop" ? "Loja" : "Armazém";
+  openPicker("Adicionar em", ["Loja", "Armazém"], current, (val) => {
+    el("rc-dest-display").textContent = val;
+    el("rc-dest").value = val === "Loja" ? "shop" : "warehouse";
+  });
 };
 
 window._toggleConvConfig = () => {
