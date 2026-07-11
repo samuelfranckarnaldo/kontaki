@@ -1045,6 +1045,7 @@
 }
 .prod-stat-icon i, .prod-stat-icon svg { width: 15px; height: 15px; }
 .prod-stat-val2  { font-size: var(--text-xl); font-weight: var(--weight-strong); line-height: 1; }
+.prod-stat-val2--sm { font-size: var(--text-lg); }
 .prod-stat-label2{ font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--text2); margin-top: 2px; }
 .prod-stat-sub   { font-size: 10px; color: var(--text4); margin-top: 1px; }
 
@@ -2158,6 +2159,8 @@
 .hist-hero-trend--corner { position: absolute; top: 18px; right: 18px; }
 .hist-hero-label { font-size: 12px; font-weight: 600; opacity: .85; margin-bottom: 4px; }
 .hist-hero-val { font-size: 32px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.hist-hero-val--sm { font-size: 24px; }
+.hist-hero-val--xs { font-size: 19px; }
 .hist-hero-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
 .hist-hero-trend {
   font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
@@ -2625,13 +2628,12 @@
 
 /* FIADOS v4 - hero + lista flat */
 .fiados-hero {
-  background: linear-gradient(135deg, var(--primary) 0%, #4c1d95 100%);
-  border-radius: 18px; padding: 20px 20px;
-  box-shadow: 0 8px 20px rgba(91,33,182,.25);
+  background: linear-gradient(135deg, var(--primary), var(--primary-mid));
+  border-radius: var(--radius-lg); padding: 20px;
   margin-bottom: 4px;
 }
-.fiados-hero-label { font-size: 11px; font-weight: 600; color: var(--text3); }
-.fiados-hero-val   { font-size: 30px; font-weight: 800; color: #fff; line-height: 1.15; margin-top: 2px; }
+.fiados-hero-label { font-size: 12px; font-weight: 600; opacity: .85; }
+.fiados-hero-val   { font-size: 32px; font-weight: 800; color: #fff; line-height: 1; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .fiados-hero-sub   { font-size: 12px; color: rgba(255,255,255,.85); font-weight: 600; margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .fiados-hero-hot   { color: #fecaca; font-weight: 800; }
 
@@ -2649,7 +2651,7 @@
   flex-shrink: 0;
 }
 .fc-row-info { flex: 1; min-width: 0; }
-.fc-row-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.fc-row-name { font-size: 14px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fc-row-meta { font-size: 11px; color: var(--text4); margin-top: 2px; }
 .fc-row-right { text-align: right; flex-shrink: 0; }
 .fc-row-val { font-size: 14px; font-weight: 800; color: var(--warning-muted); }
@@ -2774,7 +2776,7 @@
 
 .ct-devedor-row {
   display: flex; align-items: center; gap: 12px;
-  padding: 12px 16px; border-bottom: 1px solid var(--border2);
+  padding: 16px; border-bottom: 1px solid var(--border2);
   cursor: pointer; transition: background .15s;
 }
 .ct-devedor-row:last-child { border-bottom: none; }
@@ -2917,18 +2919,8 @@
 }
 
 
-/* HERO SUAVE + RISCO + KPIS MES */
-.fiados-hero {
-  background: linear-gradient(160deg, #f3effc 0%, var(--bg2) 75%);
-  border: 1px solid var(--border2);
-  box-shadow: var(--shadow-sm);
-}
-.fiados-hero-label { color: var(--text3); }
-.fiados-hero-val   { color: var(--primary); }
-.fiados-hero-sub   { color: var(--text3); }
-.ct-hero-badge {
-  background: var(--danger-muted-light); color: var(--danger-muted);
-}
+/* Hero roxo cheio (decisão: 11/07/2026) — alinhado com Histórico/Produtos.
+   O "HERO SUAVE" anterior foi removido a pedido; ver .fiados-hero original na linha ~2627 (roxo). */
 
 .ct-stat-success { border-left-color: var(--success); }
 .ct-stat-sub { font-size: 9px; color: var(--text4); margin-top: 2px; }

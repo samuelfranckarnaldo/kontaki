@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { logAudit } from "../logger.js";
 import { addStockMovement, getStock } from "../services.js";
 import { fmt, el, refreshIcons } from "../utils.js";
 import { openPicker } from "../picker.js";
@@ -386,12 +387,12 @@ function renderStats() {
   refreshIcons(s);
 }
 
-function _statCard({label, value, sub, color, icon, filter, clickable, isAlert}) {
+export function _statCard({label, value, sub, color, icon, filter, clickable, isAlert}) {
   const active = isAlert && value > 0;
   const style = active ? `border-color:${color};background:${color}0d` : "";
   return `<div class="prod-stat-card${clickable?" prod-stat-clickable":""}" style="${style}" ${clickable?`onclick="window._filterProd('${filter}')"`:""}>`+
     `<div class="prod-stat-icon" style="background:${color}20;color:${color}"><i data-lucide="${icon}"></i></div>`+
-    `<div class="prod-stat-val2" style="color:${color}">${value}</div>`+
+    `<div class="prod-stat-val2${String(value).length>9?" prod-stat-val2--sm":""}" style="color:${color}">${value}</div>`+
     `<div class="prod-stat-label2">${label}</div>`+
     `<div class="prod-stat-sub">${sub}</div>`+
     `</div>`;
@@ -835,7 +836,19 @@ window._saveProduto = async (id) => {
   if (id) {
     // EDITAR — nunca mexe no stock aqui, so dados do produto
     const ex = await db.get("products", id);
+
+    var trackedFields = { name:"Nome", price:"Preço de venda", costPrice:"Preço de custo" };
+    var changes = [];
+    Object.keys(trackedFields).forEach(function(field) {
+      if (ex[field] !== baseData[field]) {
+        changes.push({ field: trackedFields[field], before: ex[field], after: baseData[field] });
+      }
+    });
+
     await db.put("products", { ...ex, ...baseData });
+    if (changes.length) {
+      await logAudit("product", id, "edit", changes);
+    }
     toast("Produto actualizado.","success");
   } else {
     // Verifica limite do plano antes de criar

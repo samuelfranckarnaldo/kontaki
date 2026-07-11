@@ -5,6 +5,7 @@ import { openModal, closeModal } from "../modal.js";
 import "./fiados.js";
 import { isOverdue, daysOverdue, waLink } from "./fiados.js";
 import { payIcon, payColor, payLabel, payClass } from "./historico.js";
+import { _statCard } from "./produtos.js";
 
 let fiadosFilter = "all";
 
@@ -175,11 +176,11 @@ async function renderGeral(showSkeleton) {
 
   const panel = el("ct-panel-geral");
   panel.innerHTML =
-    `<div class="fiados-hero">
-      <div class="fiados-hero-label">Total a receber</div>
-      <div class="fiados-hero-val${sizeMod("fiados-hero-val", fmt(totalReceber))}">${fmt(totalReceber)}</div>
+    `<div class="hist-hero">
+      <div class="hist-hero-label">Total a receber</div>
+      <div class="hist-hero-val${sizeMod("hist-hero-val", fmt(totalReceber))}">${fmt(totalReceber)}</div>
       ${overdueTotal > 0 ? `<div class="ct-hero-badge">${fmt(overdueTotal)} atrasados</div>` : ""}
-      <div class="fiados-hero-sub">
+      <div class="hist-hero-sub">
         <span>${clients.length} ${clients.length === 1 ? "cliente" : "clientes"}</span>
         <span>·</span>
         <span>${clientesComDivida} com dívida</span>
@@ -195,21 +196,10 @@ async function renderGeral(showSkeleton) {
       </div>
     </div>` : ""}
 
-    <div class="ct-kpi-row">
-      <div class="ct-kpi-item">
-        <div class="ct-kpi-val${sizeMod("ct-kpi-val", clients.length)}">${clients.length}</div>
-        <div class="ct-kpi-label">clientes</div>
-      </div>
-      <div class="ct-kpi-divider"></div>
-      <div class="ct-kpi-item">
-        <div class="ct-kpi-val${sizeMod("ct-kpi-val", fmt(recebidoMes))}">${fmt(recebidoMes)}</div>
-        <div class="ct-kpi-label">recebido/mês</div>
-      </div>
-      <div class="ct-kpi-divider"></div>
-      <div class="ct-kpi-item">
-        <div class="ct-kpi-val${sizeMod("ct-kpi-val", taxaCobranca + "%")}">${taxaCobranca}%</div>
-        <div class="ct-kpi-label">cobrança</div>
-      </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0">
+      ${_statCard({ label:"Clientes", value:clients.length, sub:"total", color:"var(--text)", icon:"users" })}
+      ${_statCard({ label:"Recebido", value:fmt(recebidoMes), sub:"este mês", color:"var(--success)", icon:"trending-up" })}
+      ${_statCard({ label:"Cobrança", value:taxaCobranca+"%", sub:"desde sempre", color:"var(--text)", icon:"percent" })}
     </div>
 
     <div class="ct-section-label">Maiores dívidas</div>
@@ -219,16 +209,17 @@ async function renderGeral(showSkeleton) {
           <div class="empty-state-title">Nenhuma dívida em aberto</div>
         </div>`
       : `<div class="list-card">
-          ${top3.map(({ client: c, totalOpen, overdue, maxDays }) => `
-            <div class="ct-devedor-row" onclick="window._openClienteProfile(${c.id})">
-              <div class="fc-row-avatar" style="background:${overdue ? "var(--danger-muted-light);color:var(--danger-muted)" : "var(--warning-muted-light);color:var(--warning-muted)"}">
+          ${top3.map(({ client: c, totalOpen, overdue, maxDays }, i) => `
+            <div class="ct-devedor-row" style="border-left:3px solid ${overdue ? "var(--danger-muted)" : "var(--warning)"}" onclick="window._openClienteProfile(${c.id})">
+              <div class="fc-row-avatar" style="background:${overdue ? "var(--danger-muted-light);color:var(--danger-muted)" : "#fef3c7;color:var(--warning)"}">
                 ${(c.name||"?").charAt(0).toUpperCase()}
               </div>
               <div class="fc-row-info">
-                <div class="fc-row-name">${c.name}</div>
-                ${overdue ? `<span class="fc-badge-overdue">Atrasado há ${maxDays} ${maxDays===1?"dia":"dias"}</span>` : ""}
+                <div class="fc-row-name" style="white-space:normal;overflow:visible;text-overflow:clip">${c.name}</div>
+                <div class="fc-row-meta">${overdue ? `Atrasado há ${maxDays} ${maxDays===1?"dia":"dias"}` : "Em aberto"}</div>
               </div>
-              <div class="fc-row-val ${overdue ? "overdue" : ""}${sizeMod("fc-row-val", fmt(totalOpen))}">${fmt(totalOpen)}</div>
+              <div class="fc-row-val ${overdue ? "overdue" : ""}${sizeMod("fc-row-val", fmt(totalOpen))}" style="color:${overdue ? "" : "var(--text)"}">${fmt(totalOpen)}</div>
+              <i data-lucide="chevron-right" class="hist-export-arrow"></i>
             </div>`).join("")}
         </div>`
     }`;
@@ -462,13 +453,14 @@ async function renderFiadosList(showSkeleton) {
     const maxDays = overdueEntries.reduce((m,e) => Math.max(m, daysOverdue(e)), 0);
     const matchClient = clients.find(c => (c.name||"").toLowerCase() === g.clientName.toLowerCase());
 
-    let avatarStyle;
-    if (isSaldado) avatarStyle = "background:var(--success-light);color:var(--success)";
-    else if (groupOverdue) avatarStyle = "background:var(--danger-muted-light);color:var(--danger-muted)";
-    else avatarStyle = "background:var(--primary-light);color:var(--primary)";
+    let avatarStyle, borderColor;
+    if (isSaldado) { avatarStyle = "background:var(--success-light);color:var(--success)"; borderColor = "transparent"; }
+    else if (groupOverdue) { avatarStyle = "background:var(--danger-muted-light);color:var(--danger-muted)"; borderColor = "var(--danger-muted)"; }
+    else { avatarStyle = "background:var(--warning-muted-light);color:var(--warning-muted)"; borderColor = "var(--warning-muted)"; }
 
     const row = document.createElement("div");
     row.className = "fc-row";
+    row.style.borderLeft = "3px solid " + borderColor;
     row.onclick = () => {
       if (matchClient) window._openClienteProfile(matchClient.id);
       else if (firstOpen) window._openPayModal(firstOpen.id);
