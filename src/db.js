@@ -1,5 +1,5 @@
 const DB_NAME    = "kontaki_db";
-const DB_VERSION = 14; // v14: adiciona store "loginAttempts" para lockout de PIN
+const DB_VERSION = 15; // v15: adiciona store "auditLog" para rastreio de ações administrativas
 let _db = null;
 
 function openDB() {
@@ -33,6 +33,7 @@ function openDB() {
       ensure("stockDecisions",   { keyPath:"id", autoIncrement:true }, [["productId",false],["decidedAt",false]]);
       ensure("stockCorrections", { keyPath:"id", autoIncrement:true }, [["importId",false],["productId",false],["correctedAt",false]]);
       ensure("loginAttempts",    { keyPath:"userId" });
+      ensure("auditLog",         { keyPath:"id", autoIncrement:true }, [["entityType",false],["entityId",false],["userId",false],["createdAt",false]]);
     };
     req.onsuccess = () => { _db = req.result; resolve(_db); };
     req.onerror   = () => reject(req.error);

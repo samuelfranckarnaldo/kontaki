@@ -98,14 +98,76 @@ export async function generateResetToken(userId, code) {
   return sha256hex("kontaki-reset-v1:" + payload);
 }
 
-const INVITE_SECRET = "kontaki-invite-v1";
+// ── VERIFICAÇÃO DE CONVITES (equipa) — ADR-0004 ───────────────────────────
+// A assinatura é feita pelo Console (chave privada, nunca no cliente).
+// O Kontaki só verifica, offline, com a chave pública embutida abaixo.
+// Ver docs/architecture/adrs/ADR-0004-assinatura-convites.md
 
-export async function signInvite(payload) {
-  const data = payload.storeId + ":" + payload.storeName + ":" + payload.inviteCode + ":" + payload.createdAt;
-  return sha256hex(INVITE_SECRET + ":" + data);
+const INVITE_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEhXcqSlrnvXmYvvzsFSZP6r1WFJUR
+noMVdUjbT0ZFt8XvlErh4FK/v3aAu0M+G2Cw181Ry8owuSKikFqchIGnXw==
+-----END PUBLIC KEY-----`;
+
+function pemToArrayBuffer(pem) {
+  const b64 = pem
+    .replace(/-----BEGIN PUBLIC KEY-----/, "")
+    .replace(/-----END PUBLIC KEY-----/, "")
+    .replace(/\s+/g, "");
+  const raw = atob(b64);
+  const buf = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+  return buf.buffer;
 }
 
-export async function verifyInviteSignature(payload, signature) {
-  const expected = await signInvite(payload);
-  return expected === signature;
+let _invitePublicKeyCache = null;
+async function getInvitePublicKey() {
+  if (_invitePublicKeyCache) return _invitePublicKeyCache;
+  const keyData = pemToArrayBuffer(INVITE_PUBLIC_KEY_PEM);
+  _invitePublicKeyCache = await crypto.subtle.importKey(
+    "spki", keyData, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]
+  );
+  return _invitePublicKeyCache;
+}
+
+// Assinatura recebida do Console vem em base64 (formato DER, produzido
+// por crypto.createSign('SHA256').sign(key, 'base64') no Node).
+// Web Crypto espera o formato "raw" (r || s, 64 bytes) para ECDSA —
+// por isso convertemos de DER para raw antes de verificar.
+function derToRawSignature(derB64) {
+  const der = atob(derB64);
+  const bytes = Array.from(der).map(c => c.charCodeAt(0));
+  let i = 2;
+  i++;
+  const rLen = bytes[i++];
+  let r = bytes.slice(i, i + rLen); i += rLen;
+  i++;
+  const sLen = bytes[i++];
+  let s = bytes.slice(i, i + sLen); i += sLen;
+  r = r.filter((b, idx) => !(idx === 0 && b === 0 && r.length > 32));
+  s = s.filter((b, idx) => !(idx === 0 && b === 0 && s.length > 32));
+  const pad = (arr) => {
+    const out = new Uint8Array(32);
+    out.set(arr, 32 - arr.length);
+    return out;
+  };
+  const raw = new Uint8Array(64);
+  raw.set(pad(r), 0);
+  raw.set(pad(s), 32);
+  return raw.buffer;
+}
+
+export async function verifyInviteSignature(payload, signatureB64) {
+  try {
+    const data = payload.storeId + ":" + payload.storeName + ":" +
+                 payload.inviteCode + ":" + payload.role + ":" + payload.createdAt;
+    const key = await getInvitePublicKey();
+    const sigBuf = derToRawSignature(signatureB64);
+    const dataBuf = new TextEncoder().encode(data);
+    return await crypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" }, key, sigBuf, dataBuf
+    );
+  } catch (e) {
+    console.error("Erro ao verificar assinatura de convite:", e);
+    return false;
+  }
 }

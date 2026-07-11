@@ -32,3 +32,28 @@ export async function clearLogs() {
   const all = await db.getAll("logs");
   for (const log of all) await db.delete("logs", log.id);
 }
+
+// ── AUDITORIA DE AÇÕES ADMINISTRATIVAS ──────────────────────────────────────
+export async function logAudit(entityType, entityId, action, changes) {
+  try {
+    const user = getUser();
+    await db.add("auditLog", {
+      entityType,           // ex: "product"
+      entityId,              // ex: 42
+      action,                // ex: "edit", "create", "delete"
+      changes: changes || null, // ex: [{ field:"price", before:500, after:600 }]
+      userId: user ? user.id : null,
+      userName: user ? user.name : "Desconhecido",
+      createdAt: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error("Falha ao registar auditoria:", e);
+  }
+}
+
+export async function getAuditLog(entityType, entityId) {
+  const all = await db.getAll("auditLog");
+  return all
+    .filter(a => (!entityType || a.entityType === entityType) && (!entityId || a.entityId === entityId))
+    .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+}

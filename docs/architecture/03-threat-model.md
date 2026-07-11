@@ -164,6 +164,11 @@ CSPRNG em vez de gerador não-criptográfico, e monitorização de
 padrões de abuso (tentativas sequenciais/repetidas sobre o mesmo
 prefixo de código).
 
+**Mitigação aplicada:** rate limiting dedicado e CSPRNG implementados
+(ver `adrs/ADR-0002-storekey.md` para o padrão de decisão equivalente
+aplicado a segredos). Monitorização de padrões de abuso permanece
+pendente.
+
 ---
 
 ## Cenário 10 — Forja de convites de equipa
@@ -177,6 +182,11 @@ assinatura de convites para o servidor (Console), que é o único lugar
 onde um segredo pode de facto ficar secreto; o cliente passa a
 verificar com uma chave pública ou validação online, nunca a assinar
 com um segredo embutido no próprio bundle.
+
+**Mitigação aplicada:** assinatura ECDSA P-256, chave privada no
+Console, verificação offline no cliente com chave pública embutida.
+Ver `adrs/ADR-0004-assinatura-convites.md`. Testado ponta a ponta,
+incluindo rejeição de payload adulterado.
 
 ---
 
