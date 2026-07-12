@@ -13,7 +13,7 @@ let auditUserFilter = "all";
 let periodOffset = 0;
 let heroLastValue = 0;
 
-function fmtChartVal(n) {
+export function fmtChartVal(n) {
   var abs = Math.abs(n);
   var sign = n < 0 ? "-" : "";
   if (abs < 1000) return sign + abs.toLocaleString("pt-AO") + " Kz";

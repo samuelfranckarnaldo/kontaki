@@ -4,7 +4,7 @@ import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import "./fiados.js";
 import { isOverdue, daysOverdue, waLink } from "./fiados.js";
-import { payIcon, payColor, payLabel, payClass } from "./historico.js";
+import { payIcon, payColor, payLabel, payClass, fmtChartVal } from "./historico.js";
 import { _statCard } from "./produtos.js";
 
 let fiadosFilter = "all";
@@ -21,6 +21,10 @@ function formatPhone(phone) {
   const digits = (phone || "").replace(/\D/g, "");
   if (digits.length === 9) return digits.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3");
   return phone;
+}
+
+function fmtStatVal(n) {
+  return Math.abs(n) >= 1000000 ? fmtChartVal(n) : fmt(n);
 }
 
 function sizeMod(baseClass, val) {
@@ -146,14 +150,26 @@ async function renderGeral(showSkeleton) {
   }
   const [clients, fiados] = await Promise.all([db.getAll("clients"), db.getAll("fiado")]);
 
-  const enriched = clients.map(c => {
-    const myFiados = fiados.filter(f =>
-      (f.clientName || "").toLowerCase() === (c.name || "").toLowerCase());
-    const open = myFiados.filter(f => f.status === "open");
+  const fiadoGroups = {};
+  fiados.forEach(f => {
+    const key = f.clientId ? "id:" + f.clientId : "name:" + (f.clientName || "").toLowerCase().trim();
+    if (!fiadoGroups[key]) fiadoGroups[key] = { clientId: f.clientId || null, clientName: f.clientName || "Desconhecido", entries: [] };
+    fiadoGroups[key].entries.push(f);
+  });
+
+  const enriched = Object.values(fiadoGroups).map(g => {
+    const matchClient = g.clientId
+      ? clients.find(c => c.id === g.clientId)
+      : clients.find(c => (c.name || "").toLowerCase() === g.clientName.toLowerCase());
+    const open = g.entries.filter(f => f.status === "open");
     const totalOpen = open.reduce((a, f) => a + (f.amount || 0), 0);
     const overdueEntries = open.filter(isOverdue);
     const maxDays = overdueEntries.reduce((m, e) => Math.max(m, daysOverdue(e)), 0);
-    return { client: c, totalOpen, overdue: overdueEntries.length > 0, maxDays };
+    const firstOpen = open[0];
+    return {
+      client: matchClient || { id: null, name: g.clientName },
+      totalOpen, overdue: overdueEntries.length > 0, maxDays, firstOpen
+    };
   });
 
   const totalReceber = enriched.reduce((a, e) => a + e.totalOpen, 0);
@@ -200,7 +216,7 @@ async function renderGeral(showSkeleton) {
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0">
       ${_statCard({ label:"Clientes", value:clients.length, sub:"total", color:"var(--text)", icon:"users" })}
-      ${_statCard({ label:"Recebido", value:fmt(recebidoMes), sub:"este mês", color:"var(--success)", icon:"trending-up" })}
+      ${_statCard({ label:"Recebido", value:fmtStatVal(recebidoMes), sub:"este mês", color:"var(--success)", icon:"trending-up" })}
       ${_statCard({ label:"Cobrança", value:taxaCobranca+"%", sub:"desde sempre", color:"var(--text)", icon:"percent" })}
     </div>
 
@@ -211,13 +227,13 @@ async function renderGeral(showSkeleton) {
           <div class="empty-state-title">Nenhuma dívida em aberto</div>
         </div>`
       : `<div class="list-card">
-          ${top3.map(({ client: c, totalOpen, overdue, maxDays }, i) => `
-            <div class="ct-devedor-row" style="border-left:3px solid ${overdue ? "var(--danger-muted)" : "var(--warning)"}" onclick="window._openClienteProfile(${c.id})">
+          ${top3.map(({ client: c, totalOpen, overdue, maxDays, firstOpen }, i) => `
+            <div class="ct-devedor-row" style="border-left:3px solid ${overdue ? "var(--danger-muted)" : "var(--warning)"}" onclick="${c.id ? `window._openClienteProfile(${c.id})` : (firstOpen ? `window._openPayModal(${firstOpen.id})` : "")}">
               <div class="fc-row-avatar" style="background:${overdue ? "var(--danger-muted-light);color:var(--danger-muted)" : "#fef3c7;color:var(--warning)"}">
                 ${(c.name||"?").charAt(0).toUpperCase()}
               </div>
               <div class="fc-row-info">
-                <div class="fc-row-name" style="white-space:normal;overflow:visible;text-overflow:clip">${c.name}</div>
+                <div class="fc-row-name" style="white-space:normal;overflow:visible;text-overflow:clip">${c.name}${!c.id ? ' <span class="ct-nocliente-tag">sem ficha</span>' : ""}</div>
                 <div class="fc-row-meta">${overdue ? `Atrasado há ${maxDays} ${maxDays===1?"dia":"dias"}` : "Em aberto"}</div>
               </div>
               <div class="fc-row-val ${overdue ? "overdue" : ""}${sizeMod("fc-row-val", fmt(totalOpen))}" style="color:${overdue ? "" : "var(--text)"}">${fmt(totalOpen)}</div>
@@ -458,10 +474,10 @@ async function renderFiadosList(showSkeleton) {
     let avatarStyle, borderColor;
     if (isSaldado) { avatarStyle = "background:var(--success-light);color:var(--success)"; borderColor = "transparent"; }
     else if (groupOverdue) { avatarStyle = "background:var(--danger-muted-light);color:var(--danger-muted)"; borderColor = "var(--danger-muted)"; }
-    else { avatarStyle = "background:var(--warning-muted-light);color:var(--warning-muted)"; borderColor = "var(--warning-muted)"; }
+    else { avatarStyle = "background:#fef3c7;color:var(--warning)"; borderColor = "var(--warning)"; }
 
     const row = document.createElement("div");
-    row.className = "fc-row";
+    row.className = "fc-row-card";
     row.style.borderLeft = "3px solid " + borderColor;
     row.onclick = () => {
       if (matchClient) window._openClienteProfile(matchClient.id);
@@ -682,8 +698,8 @@ window._openClienteProfile = async (id) => {
 
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
         ${_statCard({ label:"Compras", value:mySales.length, sub:"total", color:"var(--text)", icon:"shopping-bag" })}
-        ${_statCard({ label:"Total gasto", value:fmt(totalGasto), sub:"todas as compras", color:"var(--success)", icon:"wallet" })}
-        ${_statCard({ label:"Fiado", value:fmt(fiadoAberto), sub:fiadoAberto>0?"em aberto":"nada em aberto", color:fiadoAberto>0?"var(--warning)":"var(--success)", icon:"hand-coins" })}
+        ${_statCard({ label:"Total gasto", value:fmtStatVal(totalGasto), sub:"todas as compras", color:"var(--success)", icon:"wallet" })}
+        ${_statCard({ label:"Fiado", value:fmtStatVal(fiadoAberto), sub:fiadoAberto>0?"em aberto":"nada em aberto", color:fiadoAberto>0?"var(--warning)":"var(--success)", icon:"hand-coins" })}
       </div>
 
       <div class="fc-tabbar">

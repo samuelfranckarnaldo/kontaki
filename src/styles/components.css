@@ -2685,6 +2685,11 @@
   padding: 16px 8px; border-bottom: 1px solid var(--border2);
   cursor: pointer; transition: background .15s;
 }
+.fc-row-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px; margin-bottom: 8px; background: var(--bg2); border-radius: var(--radius); box-shadow: var(--shadow-sm);
+  cursor: pointer; transition: background .15s;
+}
 .fc-row:last-child { border-bottom: none; }
 .fc-row:active { background: var(--border2); }
 .fc-row-avatar {
