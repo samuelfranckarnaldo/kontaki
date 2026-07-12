@@ -3,6 +3,7 @@ import { logAudit } from "../logger.js";
 import { addStockMovement, getStock } from "../services.js";
 import { fmt, el, refreshIcons } from "../utils.js";
 import { openPicker } from "../picker.js";
+import { saveViewState, restoreViewState } from "../view-state.js";
 import { openDatePicker } from "../date-picker.js";
 
 const UNIT_OPTIONS = ["Unidade","Outro (escrever)","Kg","Grama","Litro","Mililitro","Metro","Duzia","Par",
@@ -116,7 +117,18 @@ export async function initProdutos() {
   const savedCats = await db.get("settings", "customCategories");
   customCategories = (savedCats && savedCats.value) ? savedCats.value : [];
   products = await db.getAll("products");
-  el("produtos-search").oninput = () => { filterMode="all"; renderList(); };
+
+  const saved = restoreViewState("produtos");
+  if (saved) {
+    if (saved.filterMode) filterMode = saved.filterMode;
+    if (saved.searchQuery) el("produtos-search").value = saved.searchQuery;
+  }
+
+  el("produtos-search").oninput = () => {
+    filterMode = "all";
+    saveViewState("produtos", { filterMode, searchQuery: el("produtos-search").value });
+    renderList();
+  };
   renderStats();
   renderList();
 }
@@ -401,6 +413,7 @@ export function _statCard({label, value, sub, color, icon, filter, clickable, is
 window._filterProd = (mode) => {
   filterMode = mode;
   el("produtos-search").value = "";
+  saveViewState("produtos", { filterMode: mode, searchQuery: "" });
   renderList();
   // Scroll para a lista
   var listEl = el("produtos-list");

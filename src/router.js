@@ -9,6 +9,7 @@ import { initPerfil }                      from "./components/perfil.js";
 import { initCamera }                      from "./components/camera.js";
 import { initDarkMode, checkBadges, startRealtimeSync } from "./components/extras.js";
 import { updateNotificationBadge } from "./notification-ui.js";
+import { saveScroll, restoreScroll } from "./view-state.js";
 import { loadDashboard }                    from "./components/dashboard.js";
 import { hasFeature, getLicense }          from "./license.js";
 
@@ -75,6 +76,14 @@ export var router = {
   go: function(pageId) {
     if (!PAGES[pageId]) return;
 
+    // Salva a posicao de scroll da pagina atual antes de trocar
+    var currentActive = document.querySelector(".page.active");
+    if (currentActive) {
+      var currentId = currentActive.id.replace("pg-", "");
+      var currentInner = currentActive.querySelector(".page-inner");
+      saveScroll(currentId, currentInner);
+    }
+
     if (pageId === "historico" && !hasFeature("historico")) {
       bloqueado("historico");
       return;
@@ -133,6 +142,10 @@ export var router = {
     updateNotificationBadge();
     var pgEl = el("pg-" + pageId);
     if (pgEl) refreshIcons(pgEl);
+
+    // Restaura a posicao de scroll da pagina que acabou de abrir
+    var newInner = pgEl ? pgEl.querySelector(".page-inner") : null;
+    restoreScroll(pageId, newInner);
   },
 };
 

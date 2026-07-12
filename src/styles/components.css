@@ -2222,6 +2222,14 @@
   display: flex; align-items: flex-start; gap: 12px;
   cursor: pointer; transition: var(--transition);
 }
+.cp-sale-card {
+  background: var(--bg2); box-shadow: var(--shadow-sm);
+  border-radius: var(--radius); padding: 14px;
+  display: flex; align-items: flex-start; gap: 12px;
+  cursor: pointer; transition: var(--transition);
+}
+.cp-sale-card:active { background: var(--border2); }
+
 .hist-sale-card:active { background: var(--border2); }
 .hist-sale-avatar {
   width: 40px; height: 40px; border-radius: var(--radius-sm);
@@ -2879,8 +2887,6 @@
 
 /* FIADO ENTRY PREMIUM REDESIGN */
 .fiado-entries-list {
-  border: 1px solid var(--border2); border-radius: 14px;
-  overflow: hidden; background: var(--bg2);
 }
 .fiado-entry {
   position: relative;
@@ -2928,11 +2934,11 @@
 .fiado-kebab-btn:active { background: var(--border2); transform: scale(.94); }
 
 .fiado-receive-pill {
-  display: flex; align-items: center; gap: 6px;
-  padding: 0 20px; height: 36px;
+  display: flex; align-items: center; gap: 5px;
+  padding: 0 14px; height: 32px;
   background: var(--success); color: #fff; border: none; border-radius: 999px;
-  font-size: 13px; font-weight: 700; font-family: var(--font); cursor: pointer;
-  box-shadow: 0 2px 10px rgba(22,163,74,.28); transition: all .15s;
+  font-size: 12px; font-weight: 700; font-family: var(--font); cursor: pointer;
+  box-shadow: none; transition: all .15s;
 }
 .fiado-receive-pill:active { transform: scale(.96); box-shadow: none; }
 
@@ -3031,7 +3037,7 @@
 .ct-kpi-row {
   display: flex; align-items: center;
   background: var(--bg2); border-radius: 14px;
-  padding: 16px; margin-bottom: 16px;
+  padding: 20px 16px; margin-bottom: 16px; gap: 8px;
   border: 1px solid var(--border2); box-shadow: var(--shadow-sm);
 }
 .ct-kpi-item { flex: 1; text-align: center; min-width: 0; }
@@ -3044,6 +3050,7 @@
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
   padding: 10px 12px; border-radius: 10px; font-size: 12px; font-weight: 700;
   font-family: var(--font); cursor: pointer; transition: all .15s;
+  box-shadow: none;
 }
 .ct-action-btn i, .ct-action-btn svg { width: 14px; height: 14px; }
 .ct-action-btn-primary { background: var(--success); color: #fff; border: none; }
