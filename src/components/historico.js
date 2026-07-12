@@ -1509,34 +1509,64 @@ window._openSaleDetail = async function(id) {
   var hasDev   = s.temDevolucao && (s.totalDevolvido||0) > 0;
   var totalLiq = (s.total||0) - (s.totalDevolvido||0);
   var isAdmin  = getUser().role === "admin";
+  var color    = payColor(s.payMethod);
+  var nItems   = s.items ? s.items.length : 0;
+  var idx      = 0;
+  function fadeDelay() { return (idx++ * 50) + "ms"; }
+
+  var headerHtml =
+    '<div class="hist-detail-header hist-session-fade" style="animation-delay:' + fadeDelay() + '">' +
+      '<div class="hist-sale-avatar ' + payClass(s.payMethod) + '" style="width:48px;height:48px"><i data-lucide="' + payIcon(s.payMethod) + '" style="width:22px;height:22px"></i></div>' +
+      '<div>' +
+        '<span class="hist-sale-tag" style="background:color-mix(in srgb, ' + color + ' 15%, white);color:' + color + '">' + payLabel(s.payMethod) + '</span>' +
+        '<div class="hist-detail-header-date">' + fmtDate(s.date) + '</div>' +
+      '</div>' +
+    '</div>';
+
+  var clientHtml = "";
+  if (s.clientName) {
+    var isFiado = (s.payMethod||"").toLowerCase().includes("fiado");
+    clientHtml =
+      '<div class="hist-sale-client' + (isFiado?' hist-sale-client--fiado':'') + '" style="margin-bottom:12px">' +
+      '<i data-lucide="user" style="width:12px;height:12px"></i>' + s.clientName +
+      (s.clientPhone ? ' · ' + s.clientPhone : '') +
+      '</div>';
+  }
+
+  var notesHtml = s.notes ?
+    '<div class="hist-detail-notes hist-session-fade" style="animation-delay:' + fadeDelay() + '">' +
+      '<div class="hist-detail-notes-title"><i data-lucide="sticky-note"></i>Observação</div>' +
+      '<div class="hist-detail-notes-text">' + s.notes + '</div>' +
+    '</div>' : "";
 
   openModal("Venda #" + String(s.id).padStart(4,"0"),
     '<div class="hist-detail-wrap">' +
 
-    '<div class="hist-detail-info">' +
-    detailRow("Data",       fmtDate(s.date)) +
-    detailRow("Pagamento",  s.payMethod||"—") +
-    (s.clientName  ? detailRow("Cliente",  s.clientName)  : "") +
-    (s.clientPhone ? detailRow("Telefone", s.clientPhone) : "") +
+    headerHtml +
+    clientHtml +
+
+    '<div class="hist-detail-info hist-session-fade" style="animation-delay:' + fadeDelay() + '">' +
     detailRow("Subtotal",   fmt(s.subtotal||s.total)) +
     (s.discount>0  ? detailRow("Desconto", "- "+fmt(s.discount)) : "") +
     detailRow("Total",      fmt(s.total), true) +
-    (hasDev ? detailRow("Líquido", fmt(totalLiq), true, "var(--warning)") : "") +
+    (hasDev ? detailRow("Líquido", fmt(totalLiq), true, "var(--warning-muted)") : "") +
     '</div>' +
 
-    '<div class="hist-section-label">Itens</div>' +
-    '<div class="hist-detail-info">' +
+    '<div class="hist-section-label">Itens (' + nItems + ')</div>' +
+    '<div class="hist-detail-info hist-session-fade" style="animation-delay:' + fadeDelay() + '">' +
     (s.items||[]).map(function(i) {
       return detailRow(i.name + " x" + i.qty, fmt(i.price*i.qty));
     }).join("") +
     '</div>' +
 
+    notesHtml +
+
     (hasDev ?
-      '<div class="hist-dev-box">' +
+      '<div class="hist-dev-box hist-session-fade" style="animation-delay:' + fadeDelay() + '">' +
       '<div class="hist-dev-title">↩ Devoluções registadas</div>' +
       (s.devolucoes||[]).map(function(d) {
         return '<div class="hist-dev-row">' + fmtDate(d.date) + ' · ' + d.itens.join(", ") +
-          ' · <strong style="color:var(--warning)">-' + fmt(d.total) + '</strong></div>';
+          ' · <strong style="color:var(--warning-muted)">-' + fmt(d.total) + '</strong></div>';
       }).join("") +
       '</div>' : "") +
 

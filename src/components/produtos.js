@@ -550,8 +550,8 @@ window._openProdMenu = (id) => {
 
     // Info detalhes
     `<div class="stagger-item" style="background:var(--bg);border-radius:var(--radius-lg);padding:2px var(--space-4);margin-bottom:var(--space-5);animation-delay:80ms">` +
-    (p.costPrice ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Preço custo</span><span style="font-weight:var(--weight-strong);color:var(--text)">${fmt(p.costPrice)}</span></div>` : "") +
-    (margin!==null ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Margem</span><span style="font-weight:var(--weight-strong);color:${margin<0?"var(--danger)":"var(--success)"}">${fmt(p.price-p.costPrice)} (${margin}%)</span></div>` : "") +
+    (user.role==="admin" && p.costPrice ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Preço custo</span><span style="font-weight:var(--weight-strong);color:var(--text)">${fmt(p.costPrice)}</span></div>` : "") +
+    (user.role==="admin" && margin!==null ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Margem</span><span style="font-weight:var(--weight-strong);color:${margin<0?"var(--danger)":"var(--success)"}">${fmt(p.price-p.costPrice)} (${margin}%)</span></div>` : "") +
     `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;font-size:var(--text-sm)"><span style="color:var(--text3)">Stock mínimo</span><span style="font-weight:var(--weight-strong);color:var(--text)">${p.minStock||5} ${p.unit||"un"}</span></div>` +
     (p.barcode ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-top:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Código de barras</span><span style="font-family:monospace;font-weight:var(--weight-strong);color:var(--text)">${p.barcode}</span></div>` : "") +
     `</div>` +
@@ -595,14 +595,15 @@ window._openProdMenu = (id) => {
 
 window._editProd = async (id) => { const p = await db.get("products",id); closeModal(); setTimeout(function(){ openProductForm(p); }, 50); };
 
-window._deactivateProd = async (id) => {
-  if (!confirm("Desativar este produto?")) return;
-  const p = await db.get("products",id);
-  await db.put("products",{...p,active:false});
-  toast("Produto desativado.","success");
-  closeModal();
-  products = await db.getAll("products");
-  renderStats(); renderList();
+window._deactivateProd = (id) => {
+  confirmDialog("Tens a certeza que queres desativar este produto?", async () => {
+    const p = await db.get("products",id);
+    await db.put("products",{...p,active:false});
+    toast("Produto desativado.","success");
+    closeModal();
+    products = await db.getAll("products");
+    renderStats(); renderList();
+  }, { title: "Desativar produto", confirmText: "Desativar", danger: true, icon: "trash-2" });
 };
 
 window._openTransfer = async (id) => {

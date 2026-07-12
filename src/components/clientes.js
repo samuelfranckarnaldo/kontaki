@@ -41,6 +41,7 @@ export async function initClientesTab() {
     if (tab === "clientes") renderClientesList(false);
     if (tab === "fiados")   renderFiadosList(false);
     updateTopbarAddVisibility(tab);
+    if (window._ctOpenProfileId) window._openClienteProfile(window._ctOpenProfileId);
   };
   window._ctTopbarAdd = ctTopbarAdd;
   switchCtTab("geral");
@@ -185,6 +186,7 @@ async function renderGeral(showSkeleton) {
         <span>·</span>
         <span>${clientesComDivida} com dívida</span>
       </div>
+      ${clientesComDivida > 0 ? `<div class="hist-hero-context" style="margin-top:6px">${clientesComDivida === 1 ? "Apenas 1 cliente precisa de cobrança" : clientesComDivida + " clientes precisam de cobrança"}</div>` : ""}
     </div>
 
     ${overdueList.length > 0 ? `
@@ -496,7 +498,7 @@ function renderComprasPanel(mySales) {
     const hasDev   = s.temDevolucao && (s.totalDevolvido||0) > 0;
     const color    = payColor(s.payMethod);
     const nItems   = (s.items||[]).length;
-    return `<div class="hist-sale-card" style="border-left:3px solid ${color}" onclick="window._openSaleDetail(${s.id})">
+    return `<div class="cp-sale-card" style="border-left:3px solid ${color}" onclick="window._openSaleDetail(${s.id})">
       <div class="hist-sale-avatar ${payClass(s.payMethod)}"><i data-lucide="${payIcon(s.payMethod)}" style="width:18px;height:18px"></i></div>
       <div class="hist-sale-info">
         <div class="hist-sale-id">Venda #${String(s.id).padStart(4,"0")}${hasDev ? ' <span class="hist-badge-dev">↩ Dev.</span>' : ''}</div>
@@ -534,7 +536,8 @@ function renderFiadosPanel(myFiados, clientName) {
     return actions + `<div style="text-align:center;color:var(--text4);font-size:13px;padding:24px">Sem fiados registados</div>`;
   }
 
-  const rows = sorted.slice(0,30).map(f => {
+  const sortedSliced = sorted.slice(0,30);
+  const rows = sortedSliced.map((f, idx) => {
     const cancelled = f.status === "cancelled";
     const paid = f.status === "paid";
     const overdue = !paid && !cancelled && isOverdue(f);
@@ -542,35 +545,49 @@ function renderFiadosPanel(myFiados, clientName) {
     const amountColor = paid ? "var(--success)" : cancelled ? "var(--text4)" : overdue ? "var(--danger-muted)" : "var(--warning-muted)";
     const title = paid ? "Pagamento recebido" : cancelled ? "Fiado anulado" : "Fiado";
     const days = overdue ? daysOverdue(f) : 0;
+    const isLast = idx === sortedSliced.length - 1;
 
     const metaParts = [fmtDate(f.date)];
     if (f.notes) metaParts.push(f.notes);
     if (f.dueDate && f.status === "open") metaParts.push("vence " + fmtDate(f.dueDate));
     if (cancelled && f.cancelReason) metaParts.push("Motivo: " + f.cancelReason);
 
-    return `<div class="fiado-entry" data-status="${statusAttr}">
-      <div class="fiado-entry-top">
-        <div class="fiado-entry-title-wrap">
-          <span class="fiado-entry-title">${title}</span>
-          ${overdue ? `<span class="fiado-overdue-chip">Atrasado há ${days} ${days===1?"dia":"dias"}</span>` : ""}
-        </div>
-        <span class="fiado-entry-amount${sizeMod("fiado-entry-amount", fmt(f.amount))}" style="color:${amountColor};${cancelled?"text-decoration:line-through":""}">${fmt(f.amount)}</span>
+    const entryIcon = paid ? "check-circle" : cancelled ? "ban" : overdue ? "alert-triangle" : "hand-coins";
+    const entryIconBg = paid ? "var(--success-light)" : cancelled ? "var(--border2)" : overdue ? "var(--danger-muted-light)" : "#fef3c7";
+    const entryIconColor = paid ? "var(--success)" : cancelled ? "var(--text4)" : overdue ? "var(--danger-muted)" : "var(--warning)";
+
+    return `<div class="ct-timeline-item" data-status="${statusAttr}" style="${isLast?"padding-bottom:0;":""}${cancelled?"opacity:.6;":""}">
+      <div class="ct-timeline-marker" style="background:${entryIconBg};color:${entryIconColor}">
+        <i data-lucide="${entryIcon}" style="width:16px;height:16px"></i>
       </div>
-      <div class="fiado-entry-meta">${metaParts.join(" · ")}</div>
-      ${f.status === "open" ? `
-        <div class="fiado-entry-bottom">
-          <button class="fiado-kebab-btn" onclick="window._openFiadoActions(${f.id})">
-            <i data-lucide="more-vertical" style="width:16px;height:16px"></i>
-          </button>
-          <button class="fiado-receive-pill" onclick="window._openPayModal(${f.id})">
-            <i data-lucide="check" style="width:14px;height:14px"></i> Receber
-          </button>
-        </div>` : ""
-      }
+      <div class="ct-timeline-content">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+          <div class="fiado-entry-title-wrap">
+            <span class="fiado-entry-title">${title}</span>
+            ${overdue ? `<span class="fiado-overdue-chip">Atrasado há ${days} ${days===1?"dia":"dias"}</span>` : ""}
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+            <span class="fiado-entry-amount${sizeMod("fiado-entry-amount", fmt(f.amount))}" style="color:${amountColor};${cancelled?"text-decoration:line-through":""}">${fmt(f.amount)}</span>
+            ${f.status === "open" ? `
+              <button class="fiado-kebab-btn-sm" onclick="window._openFiadoActions(${f.id})">
+                <i data-lucide="more-vertical" style="width:15px;height:15px"></i>
+              </button>` : ""
+            }
+          </div>
+        </div>
+        <div class="fiado-entry-meta">${metaParts.join(" · ")}</div>
+        ${f.status === "open" ? `
+          <div style="display:flex;justify-content:flex-end;margin-top:8px">
+            <button class="fiado-receive-pill" onclick="window._openPayModal(${f.id})">
+              <i data-lucide="check" style="width:14px;height:14px"></i> Receber
+            </button>
+          </div>` : ""
+        }
+      </div>
     </div>`;
   }).join("");
 
-  return actions + `<div class="fiado-entries-list">${rows}</div>`;
+  return actions + `<div class="ct-timeline">${rows}</div>`;
 }
 
 window._openFiadoActions = (id) => {
@@ -595,6 +612,7 @@ window._openFiadoActions = (id) => {
 };
 
 function switchProfileTab(tab) {
+  window._ctOpenProfileTab = tab;
   document.querySelectorAll("#cliente-profile-overlay .fc-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
   const compras = document.getElementById("cp-panel-compras");
   const fiadosP = document.getElementById("cp-panel-fiados");
@@ -603,6 +621,8 @@ function switchProfileTab(tab) {
 window._switchProfileTab = switchProfileTab;
 
 window._closeClienteProfile = () => {
+  window._ctOpenProfileId = null;
+  window._ctOpenProfileTab = null;
   const ov = document.getElementById("cliente-profile-overlay");
   if (ov) ov.remove();
   document.body.style.overflow = "";
@@ -612,6 +632,8 @@ window._closeClienteProfile = () => {
 window._openClienteProfile = async (id) => {
   const c = await db.get("clients", id);
   if (!c) { toast("Cliente não encontrado.", "error"); return; }
+  window._ctOpenProfileId = id;
+  const activeTab = window._ctOpenProfileTab || "compras";
 
   const [sales, fiados] = await Promise.all([db.getAll("sales"), db.getAll("fiado")]);
   const mySales  = sales.filter(s => s.clientId===c.id || (s.clientName||"").toLowerCase()===c.name.toLowerCase())
@@ -644,9 +666,9 @@ window._openClienteProfile = async (id) => {
       </button>
     </div>
     <div class="ct-profile-body">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
-        <div style="width:60px;height:60px;border-radius:18px;background:var(--primary-light);color:var(--primary);
-          font-size:24px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow-sm)">
+        <div style="width:51px;height:51px;border-radius:15px;background:var(--primary-light);color:var(--primary);
+          font-size:20px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">
           ${c.name.charAt(0).toUpperCase()}
         </div>
         <div>
@@ -658,40 +680,30 @@ window._openClienteProfile = async (id) => {
         </div>
       </div>
 
-      <div class="ct-kpi-row" style="margin-bottom:16px">
-        <div class="ct-kpi-item">
-          <div class="ct-kpi-val${sizeMod("ct-kpi-val", mySales.length)}">${mySales.length}</div>
-          <div class="ct-kpi-label">compras</div>
-        </div>
-        <div class="ct-kpi-divider"></div>
-        <div class="ct-kpi-item">
-          <div class="ct-kpi-val${sizeMod("ct-kpi-val", fmt(totalGasto))}" style="color:var(--success)">${fmt(totalGasto)}</div>
-          <div class="ct-kpi-label">total gasto</div>
-        </div>
-        <div class="ct-kpi-divider"></div>
-        <div class="ct-kpi-item">
-          <div class="ct-kpi-val${sizeMod("ct-kpi-val", fmt(fiadoAberto))}" style="color:${fiadoAberto>0?"var(--warning-muted)":"var(--success)"}">${fmt(fiadoAberto)}</div>
-          <div class="ct-kpi-label">fiado</div>
-        </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+        ${_statCard({ label:"Compras", value:mySales.length, sub:"total", color:"var(--text)", icon:"shopping-bag" })}
+        ${_statCard({ label:"Total gasto", value:fmt(totalGasto), sub:"todas as compras", color:"var(--success)", icon:"wallet" })}
+        ${_statCard({ label:"Fiado", value:fmt(fiadoAberto), sub:fiadoAberto>0?"em aberto":"nada em aberto", color:fiadoAberto>0?"var(--warning)":"var(--success)", icon:"hand-coins" })}
       </div>
 
       <div class="fc-tabbar">
-        <button class="fc-tab active" data-tab="compras" onclick="window._switchProfileTab('compras')">Compras</button>
-        <button class="fc-tab" data-tab="fiados" onclick="window._switchProfileTab('fiados')">
+        <button class="fc-tab${activeTab==="compras"?" active":""}" data-tab="compras" onclick="window._switchProfileTab('compras')">Compras</button>
+        <button class="fc-tab${activeTab==="fiados"?" active":""}" data-tab="fiados" onclick="window._switchProfileTab('fiados')">
           Fiados${fiadoAberto > 0 ? `<span class="fc-tab-dot"></span>` : ""}
         </button>
       </div>
 
-      <div id="cp-panel-compras" class="fc-tab-panel ct-fade-panel" style="display:block;max-height:none">
+      <div id="cp-panel-compras" class="fc-tab-panel ct-fade-panel" style="display:${activeTab==="compras"?"block":"none"};max-height:none">
         <div class="hist-list">${renderComprasPanel(mySales)}</div>
       </div>
-      <div id="cp-panel-fiados" class="fc-tab-panel ct-fade-panel" style="display:none;max-height:none">
+      <div id="cp-panel-fiados" class="fc-tab-panel ct-fade-panel" style="display:${activeTab==="fiados"?"block":"none"};max-height:none">
         ${renderFiadosPanel(myFiados, c.name)}
       </div>
     </div>`;
   refreshIcons(ov);
+  window._ctOpenProfileTab = activeTab;
   requestAnimationFrame(() => {
-    const initPanel = document.getElementById("cp-panel-compras");
+    const initPanel = document.getElementById(activeTab === "fiados" ? "cp-panel-fiados" : "cp-panel-compras");
     if (initPanel) initPanel.classList.add("ct-fade-in");
   });
 };
