@@ -2,6 +2,7 @@ import { db } from "./db.js";
 import { refreshIcons } from "./utils.js";
 import { hashPassword, verifyPassword } from "./crypto.js";
 import { toast } from "./toast.js";
+import { confirmDialog } from "./modal.js";
 
 let currentUser    = null;
 let currentSession = null;
@@ -389,8 +390,7 @@ function openForgotPassword() {
   toast("Para recuperar o PIN, contacta o administrador.", "error");
 }
 
-export function logout(automatic) {
-  if (!automatic && !confirm("Terminar sessão?")) return;
+function doLogout() {
   if (_inactivityTimer) { clearTimeout(_inactivityTimer); _inactivityTimer = null; }
 
   if (currentSession?.id) {
@@ -418,6 +418,13 @@ export function logout(automatic) {
 
   _updatePinDots();
   _renderLoginUsers();
+}
+
+export function logout(automatic) {
+  if (automatic) { doLogout(); return; }
+  confirmDialog("Tens a certeza que queres terminar a sessão?", doLogout, {
+    title: "Terminar sessão", confirmText: "Terminar sessão", icon: "log-out"
+  });
 }
 
 export async function restoreSession() {

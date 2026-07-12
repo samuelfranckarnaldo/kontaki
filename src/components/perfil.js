@@ -8,7 +8,7 @@ import { loadEscritorio } from "./escritorio.js";
 import { db }                    from "../db.js";
 import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
-import { openModal, closeModal } from "../modal.js";
+import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { generateInvite } from "../invite.js";
 import { getUser, logout, changePasswordAuth, createUser } from "../auth.js";
 import { getLicense, loadLicense, activateLicense, PLANS, showUpgradeBanner } from "../license.js";
@@ -725,10 +725,15 @@ window._toggleUser = async (id) => {
 window._deleteUser = async (id) => {
   const u = await db.get("users", id);
   if (!u) return;
-  if (!confirm("Eliminar " + u.name + "? Esta acção é irreversível. O histórico de vendas e sessões deste funcionário será mantido para auditoria, mas ele deixará de poder entrar no sistema.")) return;
-  await db.delete("users", id);
-  toast("Funcionário eliminado.", "success");
-  loadEquipa();
+  confirmDialog(
+    "Eliminar " + u.name + "? Esta ação é irreversível. O histórico de vendas e sessões deste funcionário será mantido para auditoria, mas ele deixará de poder entrar no sistema.",
+    async () => {
+      await db.delete("users", id);
+      toast("Funcionário eliminado.", "success");
+      loadEquipa();
+    },
+    { title: "Eliminar funcionário", confirmText: "Eliminar", danger: true, icon: "user-x" }
+  );
 };
 
 async function loadLoja() {
@@ -879,6 +884,19 @@ async function loadContactosPage() {
 async function loadContabilidade() {
   var wrap = document.getElementById("contabilidade-content");
   if (!wrap) return;
+
+  // Contabilidade expõe COGS, margens e accountingArchive — dados
+  // operacional-confidenciais (ver docs/architecture/
+  // 04-data-classification.md). Só admin. Ver Threat Model, Cenário 3.
+  var _user = getUser();
+  if (!_user || _user.role !== "admin") {
+    wrap.innerHTML =
+      '<div style="text-align:center;padding:48px 20px;color:#a1a1aa">' +
+      '<div style="font-size:14px;font-weight:600">Acesso restrito</div>' +
+      '<div style="font-size:13px;margin-top:6px">Esta secção está disponível apenas para administradores.</div>' +
+      '</div>';
+    return;
+  }
 
   var sales    = await db.getAll("sales");
   var purchases= await db.getAll("purchases");

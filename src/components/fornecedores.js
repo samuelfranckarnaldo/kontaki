@@ -92,7 +92,7 @@ async function renderFornecedores() {
             </div>
             <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
               <div style="font-size:14px;font-weight:700;color:#dc2626">${fmt(p.total)}</div>
-              <button onclick="window._editCompra(${p.id})" style="background:none;border:none;color:#5b21b6;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Editar</button>
+              ${getUser().role === "admin" ? `<button onclick="window._editCompra(${p.id})" style="background:none;border:none;color:#5b21b6;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Editar</button>` : ""}
               <button onclick="window._archivePurchase(${p.id})" style="background:none;border:none;color:#71717a;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Arquivar</button>
             </div>
           </div>
@@ -480,6 +480,12 @@ window._editCompra = async (purchaseId) => {
 };
 
 window._saveEditCompra = async (purchaseId) => {
+  const _user = getUser();
+  if (!_user || _user.role !== "admin") {
+    toast("Apenas administradores podem editar compras.", "error");
+    return;
+  }
+
   const p = await db.get("purchases", purchaseId);
   if (!p) return;
   const item = (p.items||[])[0] || {};

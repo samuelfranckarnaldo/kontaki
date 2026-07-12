@@ -178,6 +178,16 @@ window._confirmarDevolucao = async function() {
 
 // ── RELATÓRIO PDF MENSAL ──────────────────────────────────────────────────────
 export async function gerarRelatorioPDF(from, to) {
+  // Defesa em profundidade: o relatório contém COGS/margens
+  // (operacional-confidencial). Já protegido na UI em historico.js e
+  // perfil.js, mas a função em si também verifica — para que um
+  // futuro ponto de chamada não fique desprotegido por esquecimento.
+  const _user = getUser();
+  if (!_user || _user.role !== "admin") {
+    toast("Apenas administradores podem gerar este relatório.", "error");
+    return;
+  }
+
   const licMod = await import("../license.js");
   if (!licMod.hasFeature("pdf_contabilidade")) {
     licMod.showUpgradeBanner("Exportar PDF disponível a partir do plano Pro. Contacta a Introxeer para upgrade.");

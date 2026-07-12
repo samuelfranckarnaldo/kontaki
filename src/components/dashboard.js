@@ -110,11 +110,19 @@ export async function loadDashboard() {
   // KPIs
   var kpiGrid = document.createElement("div");
   kpiGrid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:8px";
+  // "Lucro est." depende de costPrice (custo dos produtos), que é
+  // informação operacional-confidencial (ver docs/architecture/
+  // 04-data-classification.md) — só visível a admin. Operadores de
+  // caixa veem o número de vendas do mês no lugar, para manter o
+  // grid 2x2 sem espaço vazio.
+  var isAdmin = user && user.role === "admin";
   kpiGrid.innerHTML =
     _kpi("Vendas hoje",  fmt(totalHoje),  vendasHoje.length+" transações") +
     _kpi("Caixa",        fmt(saldoCaixa), "dinheiro físico") +
     _kpi("Este mês",     fmt(totalMes),   vendasMes.length+" vendas") +
-    _kpi("Lucro est.",   fmt(lucroMes>0?lucroMes:0), lucroMes>=0?"positivo":"negativo");
+    (isAdmin
+      ? _kpi("Lucro est.", fmt(lucroMes>0?lucroMes:0), lucroMes>=0?"positivo":"negativo")
+      : _kpi("Transações", vendasMes.length, "este mês"));
   header.appendChild(kpiGrid);
   sheet.appendChild(header);
 

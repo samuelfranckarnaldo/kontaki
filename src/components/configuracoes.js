@@ -1,4 +1,5 @@
 import { db }              from "../db.js";
+import { getUser }         from "../auth.js";
 import { fmt, el, val, refreshIcons } from "../utils.js";
 import { toast }           from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
@@ -14,6 +15,19 @@ export async function loadConfiguracoes() {
 async function renderConfiguracoes() {
   const wrap = document.getElementById("configuracoes-content");
   if (!wrap) return;
+
+  // Configurações expõe operações sensíveis (backup completo, incluindo
+  // credenciais de utilizadores; limpeza de histórico de vendas) — só
+  // admin. Ver docs/architecture/03-threat-model.md, Cenário 3.
+  const user = getUser();
+  if (!user || user.role !== "admin") {
+    wrap.innerHTML =
+      '<div style="text-align:center;padding:48px 20px;color:#a1a1aa">' +
+      '<div style="font-size:14px;font-weight:600">Acesso restrito</div>' +
+      '<div style="font-size:13px;margin-top:6px">Esta secção está disponível apenas para administradores.</div>' +
+      '</div>';
+    return;
+  }
 
   const store = (await db.get("settings","store")) || {};
   const logs  = await getLogs(5);

@@ -1,7 +1,7 @@
 import { db }            from "../db.js";
 import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast }         from "../toast.js";
-import { openModal, closeModal } from "../modal.js";
+import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser }       from "../auth.js";
 
 var CATEGORIAS = ["Renda","Electricidade","Água","Salários","Transporte","Manutenção","Internet/Telefone","Impostos e Taxas","Combustível","Marketing e Publicidade","Seguros","Material de Escritório","Limpeza","Segurança","Comissões","Outro"];
@@ -610,13 +610,14 @@ window._saveDespesa = async function() {
   await renderDespesas();
 };
 
-window._archiveDespesa = async function(id) {
-  if (!confirm("Arquivar esta despesa? Sai da lista mas fica guardada para auditoria.")) return;
-  var e = await db.get("expenses", id);
-  if (!e) return;
-  await db.put("expenses", Object.assign({}, e, { archived:true, archivedAt:new Date().toISOString() }));
-  toast("Despesa arquivada.","success");
-  await renderDespesas();
+window._archiveDespesa = function(id) {
+  confirmDialog("Arquivar esta despesa? Sai da lista mas fica guardada para auditoria.", async () => {
+    var e = await db.get("expenses", id);
+    if (!e) return;
+    await db.put("expenses", Object.assign({}, e, { archived:true, archivedAt:new Date().toISOString() }));
+    toast("Despesa arquivada.","success");
+    await renderDespesas();
+  }, { title: "Arquivar despesa", confirmText: "Arquivar", icon: "archive" });
 };
 
 window._restoreDespesa = async function(id) {
