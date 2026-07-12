@@ -10,6 +10,19 @@ import { router } from "./router.js";
 // Expõe o router globalmente
 window.router = router;
 
+// Bloqueia zoom por duplo-toque (o meta viewport user-scalable=no
+// nao cobre isto de forma confiavel em todos os Android/Chrome).
+(function preventDoubleTapZoom() {
+  var lastTouchEnd = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - lastTouchEnd <= 350) {
+      e.preventDefault();
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
+})();
+
 async function boot() {
   await seed();
   initModal();
