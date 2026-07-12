@@ -1,3 +1,5 @@
+import { toast } from "../toast.js";
+
 let _activeStream  = null;
 let _activeInterval = null;
 
@@ -31,16 +33,16 @@ export function initCamera(onDetected) {
     .catch((err) => {
       overlay.style.display = "none";
       if (err.name === "NotAllowedError") {
-        alert("Permissão da câmara foi negada. Vai a Definições do site no browser e permite o acesso à câmara para continuar.");
+        toast("Permissão da câmara negada. Vai a Definições do site no browser e permite o acesso.", "error");
       } else {
-        alert("Câmara não disponível. Use a pesquisa manual.");
+        toast("Câmara não disponível. Usa a pesquisa manual.", "error");
       }
     });
 
   function scanLoop() {
     if (!window.BarcodeDetector) {
       overlay.style.display = "none";
-      alert("Este browser não suporta leitura de códigos. Use a pesquisa manual.");
+      toast("Este browser não suporta leitura de códigos. Usa a pesquisa manual.", "error");
       stopCamera(); return;
     }
     const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "qr_code", "code_128"] });
@@ -65,7 +67,7 @@ export function openCameraForInvite(onInvite) {
       var data = JSON.parse(rawValue);
       onInvite(data);
     } catch (e) {
-      alert("QR code inválido. Pede um novo convite ao teu patrão.");
+      toast("QR code inválido. Pede um novo convite ao teu patrão.", "error");
     }
   });
 }

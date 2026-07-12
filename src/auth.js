@@ -1,6 +1,7 @@
 import { db } from "./db.js";
 import { refreshIcons } from "./utils.js";
 import { hashPassword, verifyPassword } from "./crypto.js";
+import { toast } from "./toast.js";
 
 let currentUser    = null;
 let currentSession = null;
@@ -385,7 +386,7 @@ async function _verifyPin() {
 }
 
 function openForgotPassword() {
-  alert("Para recuperar o PIN, contacta o administrador.");
+  toast("Para recuperar o PIN, contacta o administrador.", "error");
 }
 
 export function logout(automatic) {

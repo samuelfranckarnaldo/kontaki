@@ -1,6 +1,7 @@
 import { db, isFirstTime } from "./db.js";
 import { hashPassword }    from "./crypto.js";
 import { refreshIcons }    from "./utils.js";
+import { toast }           from "./toast.js";
 
 export async function checkSetup() {
   const first = await isFirstTime();
@@ -266,9 +267,9 @@ function showSetup() {
     var storeName  = (document.getElementById("setup-store-name")  || {}).value || "";
     var adminName  = (document.getElementById("setup-admin-name")  || {}).value || "";
     var storePhone = (document.getElementById("setup-store-phone") || {}).value || "";
-    if (!storeName.trim())  { alert("Insere o nome da loja."); return; }
-    if (!adminName.trim())  { alert("Insere o nome do administrador."); return; }
-    if (!storePhone.trim()) { alert("Insere o telefone."); return; }
+    if (!storeName.trim())  { toast("Insere o nome da loja.", "error"); return; }
+    if (!adminName.trim())  { toast("Insere o nome do administrador.", "error"); return; }
+    if (!storePhone.trim()) { toast("Insere o telefone.", "error"); return; }
     switchStep("setup-step-1", "setup-step-2", "66.66%");
   };
 
@@ -334,12 +335,12 @@ function showSetup() {
   window._setupFinalizar = async function() {
     var termsChecked = document.getElementById("setup-terms-check");
     if (!termsChecked || !termsChecked.checked) {
-      alert("Precisas de aceitar os Termos, a Política de Privacidade e a Política de Uso Aceitável para continuar.");
+      toast("Precisas de aceitar os Termos e Políticas para continuar.", "error");
       return;
     }
-    if (_pin.length !== 6) { alert("O PIN deve ter 6 dígitos."); return; }
+    if (_pin.length !== 6) { toast("O PIN deve ter 6 dígitos.", "error"); return; }
     if (_pin !== _pinConfirm) {
-      alert("Os PINs não coincidem. Tenta novamente.");
+      toast("Os PINs não coincidem. Tenta novamente.", "error");
       _pin = ""; _pinConfirm = ""; _step = "enter";
       var lbl = document.getElementById("setup-pin-label");
       if (lbl) { lbl.textContent = "Cria um PIN de 6 dígitos"; lbl.style.color = "#71717a"; }

@@ -620,7 +620,7 @@ window._setInviteRole = function(r) {
 window._generateInviteQR = async function() {
   var codeInput = document.getElementById("inv-code");
   var code = codeInput ? codeInput.value.trim() : "";
-  if (!code) { alert("Insere um código de convite."); return; }
+  if (!code) { toast("Insere um código de convite.", "error"); return; }
 
   try {
     var payload = await generateInvite(code, window._inviteRole);

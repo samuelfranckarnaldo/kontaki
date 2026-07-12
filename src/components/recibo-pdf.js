@@ -1,5 +1,6 @@
 import { db }           from "../db.js";
 import { fmt, fmtDate }  from "../utils.js";
+import { toast }        from "../toast.js";
 
 // ── PDF 80mm ─────────────────────────────────────────────────────────────────
 function getQrDataUrl(text) {
@@ -32,7 +33,7 @@ function getQrDataUrl(text) {
 
 async function buildPdfDoc(sale, store) {
   var jsPDFLib = window.jspdf ? window.jspdf.jsPDF : null;
-  if (!jsPDFLib) { alert("Biblioteca PDF não carregada."); return null; }
+  if (!jsPDFLib) { toast("Biblioteca PDF não carregada.", "error"); return null; }
 
   var pageW  = 80;
   var margin = 5;
@@ -267,7 +268,7 @@ async function printReciboHTML(saleId) {
   ].join("\n");
 
   var win = window.open("", "_blank", "width=400,height=600");
-  if (!win) { alert("Permite pop-ups para imprimir."); return; }
+  if (!win) { toast("Permite pop-ups para imprimir.", "error"); return; }
   win.document.write(html);
   win.document.close();
   win.focus();
