@@ -10,6 +10,7 @@ let activeTab = "geral";
 let activeShortcut = "hoje";
 let histChartInstance = null;
 let auditUserFilter = "all";
+let auditKindFilter = "all";
 let periodOffset = 0;
 let heroLastValue = 0;
 
@@ -1091,6 +1092,11 @@ window._auditFilterUser = function(uid) {
   loadAuditoria(val("hist-from"), val("hist-to"));
 };
 
+window._auditFilterKind = function(kind) {
+  auditKindFilter = kind;
+  loadAuditoria(val("hist-from"), val("hist-to"));
+};
+
 async function loadAuditoria(from, to) {
   var hero    = el("historico-hero");
   var stats   = el("historico-stats");
@@ -1168,6 +1174,17 @@ async function loadAuditoria(from, to) {
     '<button class="hist-audit-chip' + (auditUserFilter==="all"?" active":"") + '" onclick="window._auditFilterUser(\'all\')">Todos</button>' +
     Object.keys(employeeIds).map(function(uid) {
       return '<button class="hist-audit-chip' + (String(auditUserFilter)===String(uid)?" active":"") + '" onclick="window._auditFilterUser(\'' + uid + '\')">' + (employeeIds[uid]||"?") + '</button>';
+    }).join("") +
+    '</div>' +
+    '<div class="hist-audit-filters" style="margin-top:6px">' +
+    [
+      { id:"all",        label:"Tudo" },
+      { id:"session",     label:"Sessões" },
+      { id:"adjustment",  label:"Ajustes" },
+      { id:"incident",    label:"Incidentes" },
+      { id:"audit",       label:"Edições" },
+    ].map(function(k) {
+      return '<button class="hist-audit-chip' + (auditKindFilter===k.id?" active":"") + '" onclick="window._auditFilterKind(\'' + k.id + '\')">' + k.label + '</button>';
     }).join("") +
     '</div>';
 
@@ -1266,6 +1283,10 @@ async function loadAuditoria(from, to) {
         '</div>';
     }
     return "";
+  }
+
+  if (auditKindFilter !== "all") {
+    timelineEvents = timelineEvents.filter(function(ev) { return ev.kind === auditKindFilter; });
   }
 
   var timelineGroups = groupByDay(timelineEvents, "eventDate");

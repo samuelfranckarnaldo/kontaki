@@ -1,0 +1,50 @@
+840287f refactor: substitui confirm() nativo por confirmDialog() customizado (fase 2)
+58b4ebd feat: consolida os 4 botões de formato de impressão num único menu 'Imprimir', remove duplicação no rodapé do detalhe de venda
+db17f02 fix: corrige QR code ausente na reimpressão de vendas pelo Histórico (talão e factura), cria função compartilhada getQrDataUrl
+0606290 Timeout de sessão por inatividade (15min); restringe dados confidenciais (COGS, margem, contabilidade) a admin em produtos, dashboard, configurações, extras, fornecedores e perfil
+41b5a29 fix: agregação da Visão Geral (match por clientId, inclui fiados órfãos) + abreviação de valores Kz extremos
+774a064 feat: redesign completo do módulo Clientes (hero, stat cards, timeline narrativa) + fix de refresh pós-pagamento
+2d9c387 docs: adiciona reflexão sobre estilo de design, criatividade e colaboração no projeto
+2142f3a refactor: substitui alert() nativo por toast() customizado em todo o app
+f88d105 feat: bloqueia zoom por gesto (pinca e duplo-toque)
+2587808 feat: persistencia de estado entre sessoes (scroll, filtro, busca)
+b428f1a fix: threshold de fonte responsiva em _statCard (len>=13, não >13) + nowrap de segurança
+aa54155 feat: adiciona campo de observações opcional na venda, escondido por padrão
+ef07a20 feat: adiciona rastreamento de ações administrativas (edição de produto) com nova tabela auditLog, integrado à timeline da Auditoria
+5681470 Corrige forja de convites (ECDSA), adiciona auditLog, PBKDF2+lockout de PIN, documentação de arquitetura
+446e6f5 feat: hero roxo unificado, cartões de estatística e redesign de Maiores dívidas em Clientes
+6017b69 fix: risco neutro sem histórico, sheet fiado com ícones circulares, cores de pagamento na ficha do cliente
+13a6540 feat(ux): microinteracoes — animacoes de modal, cascata em listas, resistencia a toque acidental
+00036cc refactor(produtos): reformula Ajustar Stock, alinha campos, corrige select nativo
+3cec0b9 docs: adiciona relato pessoal de experiência de trabalho no projeto, para continuidade entre sessões
+d4b5ca7 feat: detalhe completo de sessão na Auditoria (caixa, pagamentos, produtos, fiados, ajustes, incidentes), com verificação de sessões importadas e animações em cascata
+1176bb3 docs(architecture): add threat model, data classification and ADRs
+0553a6f feat: adiciona busca por produto, cliente ou valor no Histórico, com dropdown de resultados rápidos e filtro da lista completa
+f8aff81 feat: adiciona contagem de vendas ao separador de dia na lista do Histórico
+774aef8 feat: redesenha card de venda com borda colorida por pagamento, tag de forma de pagamento, cliente destacado (âmbar para fiado)
+9a902ff feat: fecha furo de auditoria + date-picker customizado + bloqueio de venda vencida
+8c44a30 Primeiro Inventário: pendingInitialCount, setInitialCount, secção em Escritório, bifurcação de 3 vias no ajuste manual
+3fb1238 Remove src/components/incidentes.js (código morto, nunca importado); bump SW cache v139->v140
+fe0b30a feat: redesign do cabeçalho do Perfil — cards fundidos, estilo Claude Settings
+5291a43 docs: adiciona Design System documentando cores, tipografia, componentes e convenções consolidadas
+9d5f8f6 chore: remove botão e função de debug de dados de teste, incrementa versão do service worker
+8e676d0 fix: PDF de relatório agora usa o período selecionado (não mais fixo no mês corrente), corrige texto do rodapé, atualiza ícones/cores de forma de pagamento (wallet teal, multicaixa índigo, fiado hand-coins)
+868f29e feat: adiciona selo de recorde de período (últimos 6), avisos de fiado alto e devoluções anómalas nos KPIs, corrige duplicação de ícone/emoji
+35d8120 fix(compras): unifica dois sistemas paralelos de registo de compra
+803c87d feat(produtos): chips de filtro rapido, reordenacao do resumo, refinamentos visuais
+9b9860c revert: remove linha de comparação (período anterior) do gráfico por ser confusa em tela pequena, mantém melhorias de marcos inteligentes e rótulos horizontais
+5bff667 feat: eixo X do gráfico mostra marcos inteligentes (primeiro, último, espaçados) em vez de todos os dias
+e74dbf8 feat: gráfico mostra apenas primeiro e último valor fixos, demais pontos disponíveis via toque/tooltip; adiciona botão temporário de dados de teste
+5450798 feat: gráfico com transições suaves entre períodos (update() em vez de recriar), corrige bug de ordem de execução do plugin de labels
+0fe0dc5 feat: badge de tendência no canto do hero, percentual limitado a 100%, gráfico antes dos KPIs, fonte tabular nos números
+bb84b3f feat: animação de contador no hero, reseta ao reabrir a aba Histórico
+8b1464f feat(produtos): campos avancados (SKU, imagem) + legibilidade da lista
+89596cd feat: frase contextual no hero, KPIs neutros por padrão, gráfico com valores abreviados e mais espaçamento
+2fc639b Documentação completa do Kontaki - Design, Funcionalidades, Segurança
+2fa0aa2 fix: reduz uso excessivo do roxo forte nos KPIs neutros (Nº Vendas, Operações, Vendas), reservando a cor de marca para elementos de destaque real
+5d679bc feat: adiciona skeleton loading com shimmer ao trocar de aba/período no Histórico
+af977e1 feat: calendário visual customizado no seletor de período (substitui input date nativo), com status de seleção, animações direcionais e transições suaves
+22619d5 feat: barra de filtro compactada numa linha, painel modal para seleção de período
+cb40d30 feat: navegação entre períodos (anterior/próximo), cores terracota/âmbar suaves nos KPIs de atenção, fonte responsiva para valores grandes
+90b39bc feat: unifica timeline de Auditoria (sessões, ajustes, incidentes) com destaque visual para ajustes manuais
+6aa217f feat: sistema global de notificacoes (sino + central)

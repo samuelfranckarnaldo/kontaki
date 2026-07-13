@@ -1,5 +1,5 @@
 const DB_NAME    = "kontaki_db";
-const DB_VERSION = 15; // v15: adiciona store "auditLog" para rastreio de ações administrativas
+const DB_VERSION = 16; // v16: adiciona store "pendingSales" para pedidos guardados
 let _db = null;
 
 function openDB() {
@@ -34,6 +34,7 @@ function openDB() {
       ensure("stockCorrections", { keyPath:"id", autoIncrement:true }, [["importId",false],["productId",false],["correctedAt",false]]);
       ensure("loginAttempts",    { keyPath:"userId" });
       ensure("auditLog",         { keyPath:"id", autoIncrement:true }, [["entityType",false],["entityId",false],["userId",false],["createdAt",false]]);
+      ensure("pendingSales",     { keyPath:"id", autoIncrement:true }, [["createdAt",false],["sessionId",false],["status",false]]);
     };
     req.onsuccess = () => { _db = req.result; resolve(_db); };
     req.onerror   = () => reject(req.error);

@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { fmt, fmtDate, el, val, setVal, refreshIcons, generateQR } from "../utils.js";
 import { toast } from "../toast.js";
-import { openModal, closeModal } from "../modal.js";
+import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
 import { initCamera } from "./camera.js";
 import { addStockMovement, getStock, getOpenIncidentForProduct, getStockIncidentPolicy, verifyAdminPin } from "../services.js";
@@ -13,6 +13,7 @@ let cart      = [];
 let payMethod = "dinheiro";
 let discType  = "pct";
 let lastRemoved = null;
+let pedidoEmRetomaId = null;
 
 function genHash(sid, date) {
   const str = "KONTAKI-" + sid + "-" + date;
@@ -28,6 +29,16 @@ const PAY_DESC = {
   fiado:         "Produto cedido a crédito. Registado em fiados.",
 };
 
+function validarItensContraStock(items, productsList) {
+  return items.filter(function(item) {
+    var p = productsList.find(function(p){ return p.id === item.id; });
+    return p && p.stock > 0;
+  }).map(function(item) {
+    var p = productsList.find(function(p){ return p.id === item.id; });
+    return Object.assign({}, item, { stock: p.stock, price: p.price, name: p.name });
+  });
+}
+
 export async function initVender() {
   products = await db.getAll("products").then(p => p.filter(x => x.active));
   _storeIvaCache = null;
@@ -37,20 +48,13 @@ export async function initVender() {
     var saved = localStorage.getItem("kontaki-cart");
     if (saved) {
       var savedCart = JSON.parse(saved);
-      // Validar que os produtos ainda existem e têm stock suficiente
-      cart = savedCart.filter(function(item) {
-        var p = products.find(function(p){ return p.id === item.id; });
-        return p && p.stock > 0;
-      }).map(function(item) {
-        var p = products.find(function(p){ return p.id === item.id; });
-        return Object.assign({}, item, {
-          stock: p.stock, price: p.price, name: p.name
-        });
-      });
+      cart = validarItensContraStock(savedCart, products);
     } else {
       cart = [];
     }
   } catch(e) { cart = []; }
+
+  await atualizarBadgePedidos();
 
   const btnScanner   = el("btn-scanner");
   const btnLimpar    = el("btn-limpar");
@@ -202,6 +206,10 @@ function onBarcode(code) {
 }
 
 // ── PESQUISA ──────────────────────────────────────────────────────────────────
+function categoryColorVender(cat) {
+  return {"Alimentacao":"#f97316","Bebidas":"#3b82f6","Higiene":"#ec4899","Limpeza":"#10b981","Outro":"#6b7280"}[cat] || "#6b7280";
+}
+
 async function renderRecentProducts() {
   const sales  = await db.getAll("sales");
   const recent = sales.slice(-30).reverse();
@@ -224,13 +232,20 @@ async function renderRecentProducts() {
   wrap.innerHTML =
     `<div class="recentes-label">Recentes</div>` +
     `<div class="recentes-scroll">` +
-    recProd.map(p =>
-      `<button onclick="window._addProd(${p.id})" class="recente-chip">
-        <div class="recente-chip-name">${p.name}</div>
-        <div class="recente-chip-price">${fmt(p.price)}</div>
-        <div class="recente-chip-stock" style="color:${p.stock<=5?"var(--warning)":"var(--text4)"}">${p.stock} em stock</div>
-      </button>`
-    ).join("") + `</div>`;
+    recProd.map(p => {
+      const cColor = categoryColorVender(p.category);
+      const avatarHTML = p.imageData
+        ? `<div class="recente-chip-avatar" style="background-image:url(${p.imageData});background-size:cover;background-position:center"></div>`
+        : `<div class="recente-chip-avatar" style="background:${cColor}20;color:${cColor}">${(p.name||"P").charAt(0).toUpperCase()}</div>`;
+      return `<button onclick="window._addProd(${p.id})" class="recente-chip">
+        ${avatarHTML}
+        <div class="recente-chip-info">
+          <div class="recente-chip-name">${p.name}</div>
+          <div class="recente-chip-price">${fmt(p.price)}</div>
+          <div class="recente-chip-stock" style="color:${p.stock<=5?"var(--warning)":"var(--text4)"}">${p.stock} em stock</div>
+        </div>
+      </button>`;
+    }).join("") + `</div>`;
 }
 
 function renderSearchResults(f) {
@@ -424,6 +439,86 @@ window._removeItem = (id) => {
 
 window._limparCart = limpar;
 
+async function atualizarBadgePedidos() {
+  var badge = document.getElementById("pending-sales-badge");
+  if (!badge) return;
+  var all = await db.getAll("pendingSales");
+  var pending = all.filter(function(p){ return p.status === "pending"; });
+  if (pending.length > 0) {
+    badge.textContent = pending.length > 9 ? "9+" : String(pending.length);
+    badge.style.display = "flex";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+async function guardarPedido() {
+  if (!cart.length) { toast("Carrinho vazio.", "error"); return; }
+  var { getSession } = await import("../auth.js");
+  if (!getSession()) { toast("Abre um turno para guardar um pedido.", "error"); return; }
+  var user = getUser();
+  var { total } = calcTotal();
+  await db.add("pendingSales", {
+    items: cart.map(function(i){ return { id:i.id, name:i.name, price:i.price, qty:i.qty }; }),
+    total: total,
+    createdAt: new Date().toISOString(),
+    userId: user.id,
+    sessionId: user.sessionId || null,
+    status: "pending",
+  });
+  limpar();
+  toast("Pedido guardado.", "success");
+  await atualizarBadgePedidos();
+}
+window._guardarPedido = guardarPedido;
+
+window._abrirPedidosGuardados = async function() {
+  var all = await db.getAll("pendingSales");
+  var pending = all.filter(function(p){ return p.status === "pending"; })
+    .sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); });
+
+  var rowsHtml = pending.length ? pending.map(function(p) {
+    var itemCount = p.items.reduce(function(a,i){ return a+i.qty; }, 0);
+    return '<button class="esc-pending-item" onclick="window._retomarPedido(' + p.id + ')">' +
+      '<div>' +
+      '<div class="esc-pending-name">' + itemCount + ' ' + (itemCount===1?"produto":"produtos") + ' · ' + fmt(p.total) + '</div>' +
+      '<div class="esc-pending-meta">' + fmtDate(p.createdAt) + '</div>' +
+      '</div>' +
+      '<span class="perfil-menu-chevron">›</span>' +
+      '</button>';
+  }).join("") : '<div class="empty-state"><div class="empty-state-title">Nenhum pedido guardado</div></div>';
+
+  openModal("Pedidos guardados", '<div class="esc-pending-list">' + rowsHtml + '</div>');
+  refreshIcons(el("modal-box"));
+};
+
+window._retomarPedido = async function(id) {
+  var pedido = await db.get("pendingSales", id);
+  if (!pedido) { toast("Pedido não encontrado.", "error"); return; }
+
+  var doRetomar = function() {
+    var itensValidados = validarItensContraStock(pedido.items, products);
+    var removidos = pedido.items.length - itensValidados.length;
+    cart = itensValidados;
+    pedidoEmRetomaId = id;
+    closeModal();
+    renderCart(); renderSummary();
+    if (removidos > 0) toast(removidos + " produto(s) removido(s) por falta de stock.", "info");
+    toast("Pedido retomado.", "success");
+  };
+
+  if (cart.length > 0) {
+    closeModal();
+    confirmDialog(
+      '<div style="font-size:14px;color:var(--text2);line-height:1.6">O carrinho atual tem itens. Retomar este pedido vai substituir o carrinho atual. Continuar?</div>',
+      doRetomar,
+      { title: "Substituir carrinho?", confirmText: "Sim, substituir", icon: "shopping-cart" }
+    );
+  } else {
+    doRetomar();
+  }
+};
+
 let undoTimer = null;
 function showUndo(name) {
   var old = document.getElementById("undo-toast");
@@ -585,7 +680,7 @@ function toggleDiscType() {
 }
 
 function limpar() {
-  cart = []; lastRemoved = null;
+  cart = []; lastRemoved = null; pedidoEmRetomaId = null;
   try { localStorage.removeItem("kontaki-cart"); } catch(e){}
   var old = document.getElementById("undo-toast");
   if (old) old.remove();
@@ -1000,8 +1095,13 @@ window._confirmarVenda = async () => {
     }
 
     const cartSnap = [...cart];
+    const pedidoIdConcluido = pedidoEmRetomaId;
     closeModal();
     limpar();
+    if (pedidoIdConcluido) {
+      await db.delete("pendingSales", pedidoIdConcluido);
+      await atualizarBadgePedidos();
+    }
     products = await db.getAll("products").then(p => p.filter(x => x.active));
     renderRecentProducts();
 

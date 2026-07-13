@@ -112,17 +112,20 @@ export var router = {
       }
     }
 
-    var qrBtn    = el("btn-topbar-qr");
-    var addBtn   = el("btn-topbar-add");
-    var quickBtn = el("btn-topbar-quick");
+    var qrBtn      = el("btn-topbar-qr");
+    var addBtn     = el("btn-topbar-add");
+    var quickBtn   = el("btn-topbar-quick");
+    var pedidosBtn = el("btn-topbar-pedidos");
 
-    if (qrBtn)    { qrBtn.style.display    = "none"; }
-    if (addBtn)   { addBtn.style.display   = "none"; addBtn.onclick = null; }
-    if (quickBtn) { quickBtn.style.display = "none"; }
+    if (qrBtn)      { qrBtn.style.display      = "none"; }
+    if (addBtn)     { addBtn.style.display     = "none"; addBtn.onclick = null; }
+    if (quickBtn)   { quickBtn.style.display   = "none"; }
+    if (pedidosBtn) { pedidosBtn.style.display = "none"; }
 
     if (pageId === "vender") {
       if (quickBtn && hasFeature("venda_rapida")) quickBtn.style.display = "flex";
       if (qrBtn && hasFeature("scanner"))         qrBtn.style.display    = "flex";
+      if (pedidosBtn) pedidosBtn.style.display = "flex";
     }
     if (pageId === "produtos") {
       if (addBtn) {

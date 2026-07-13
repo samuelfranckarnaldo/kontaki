@@ -89,49 +89,44 @@ function renderMenu() {
   const user = getUser();
 
   const adminItems = [
-    // ── Operações diárias ──
-    { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno",         group: "Operações"  },
-    { label: "Despesas",          sub: "Renda, salários e outros custos",icon: "receipt",        color: "#fee2e2", iconColor: "#dc2626", page: "despesas",      group: "Operações"  },
     // ── Gestão ──
-    { label: "Escritório",        sub: "Importar e confirmar turnos",    icon: "archive",        color: "#ede9fe", iconColor: "#5b21b6", page: "escritorio",    group: "Gestão"     },
+    { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno",         group: "Gestão"     },
     { label: "Contabilidade",     sub: "Receitas, lucros e despesas",    icon: "bar-chart-2",    color: "#dcfce7", iconColor: "#16a34a", page: "contabilidade", group: "Gestão"     },
     { label: "Gestão de Stock",   sub: "Produtos e inventário",          icon: "package",        color: "#ede9fe", iconColor: "#5b21b6", page: "stock",         group: "Gestão"     },
     { label: "Fornecedores",      sub: "Compras e fornecedores",         icon: "truck",          color: "#fef3c7", iconColor: "#d97706", page: "fornecedores",  group: "Gestão"     },
-    { label: "Equipa",            sub: "Funcionários e acessos",         icon: "users-2",        color: "#dbeafe", iconColor: "#2563eb", page: "equipa",        group: "Gestão"     },
+    { label: "Despesas",          sub: "Renda, salários e outros custos",icon: "receipt",        color: "#fee2e2", iconColor: "#dc2626", page: "despesas",      group: "Gestão"     },
+    { label: "Escritório",        sub: "Importar e confirmar turnos",    icon: "archive",        color: "#ede9fe", iconColor: "#5b21b6", page: "escritorio",    group: "Gestão"     },
     { label: "Incidentes",        sub: "Divergências de stock",          icon: "alert-triangle", color: "#fef3c7", iconColor: "#d97706", page: "incidentes",    group: "Gestão"     },
+    { label: "Equipa",            sub: "Funcionários e acessos",         icon: "users-2",        color: "#dbeafe", iconColor: "#2563eb", page: "equipa",        group: "Gestão"     },
+    { label: "Dados da Loja",     sub: "Nome, logo, endereço e IVA",     icon: "store",          color: "#dcfce7", iconColor: "#16a34a", page: "loja",          group: "Gestão"     },
     // ── Sistema ──
-    { label: "Dados da Loja",     sub: "Nome, logo, endereço e IVA",     icon: "store",          color: "#dcfce7", iconColor: "#16a34a", page: "loja",          group: "Sistema"    },
     { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "#fee2e2", iconColor: "#dc2626", page: "seguranca",     group: "Sistema"    },
     { label: "Configurações",     sub: "Backup, logs e dados",           icon: "settings",       color: "#f4f4f5", iconColor: "#71717a", page: "configuracoes", group: "Sistema"    },
   ];
 
   const caixaItems = [
-    { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno",         group: "Operações"  },
-    { label: "Escritório",        sub: "Importar ficheiros de turno",    icon: "archive",        color: "#ede9fe", iconColor: "#5b21b6", page: "escritorio",    group: "Operações"  },
-    { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "#fee2e2", iconColor: "#dc2626", page: "seguranca",     group: "Operações"  },
+    { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno",         group: "Gestão"     },
+    { label: "Escritório",        sub: "Importar ficheiros de turno",    icon: "archive",        color: "#ede9fe", iconColor: "#5b21b6", page: "escritorio",    group: "Gestão"     },
+    { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "#fee2e2", iconColor: "#dc2626", page: "seguranca",     group: "Gestão"     },
   ];
 
   const commonItems = [
     { label: "Alterar PIN",       sub: "Mudar PIN de acesso",            icon: "lock",           color: "#f4f4f5", iconColor: "#5b21b6", page: "senha",         group: "Sistema"    },
     { label: "Assinatura",        sub: "Licença e plano activo",         icon: "award",          color: "#ede9fe", iconColor: "#5b21b6", page: "assinatura",    group: "Sistema"    },
-    { label: "Ajuda",             sub: "Perguntas frequentes e como usar",icon: "help-circle",   color: "#dbeafe", iconColor: "#2563eb", page: "ajuda",         group: "Sistema"    },
-    { label: "Contactos",         sub: "Suporte Introxeer Technology",   icon: "headphones",     color: "#dbeafe", iconColor: "#2563eb", page: "contactos",     group: "Sistema"    },
-    { label: "Sobre",             sub: "Termos, ajuda e versão",         icon: "info",           color: "#f4f4f5", iconColor: "#71717a", page: "sobre",         group: "Sistema"    },
+    { label: "Ajuda",             sub: "Perguntas frequentes e como usar",icon: "help-circle",   color: "#dbeafe", iconColor: "#2563eb", page: "ajuda",         group: "Sobre"      },
+    { label: "Contactos",         sub: "Suporte Introxeer Technology",   icon: "headphones",     color: "#dbeafe", iconColor: "#2563eb", page: "contactos",     group: "Sobre"      },
+    { label: "Sobre",             sub: "Termos, ajuda e versão",         icon: "info",           color: "#f4f4f5", iconColor: "#71717a", page: "sobre",         group: "Sobre"      },
     { label: "Terminar Sessão",   sub: "",                               icon: "log-out",        color: "#fee2e2", iconColor: "#dc2626", page: "logout",        group: null         },
   ];
 
   const items = [...(user.role === "admin" ? adminItems : caixaItems), ...commonItems];
 
-  function renderItem(item) {
-    return '<button class="perfil-menu-item" id="' + (item.page==="incidentes"?"perfil-menu-incidentes":"") + '" onclick="window._perfilNav(\'' + item.page + '\')">' +
-      '<div class="perfil-menu-item-left">' +
-      '<div class="perfil-menu-icon" style="background:' + item.color + '">' +
+  function renderGridItem(item) {
+    return '<button class="perfil-grid-item" id="' + (item.page==="incidentes"?"perfil-menu-incidentes":"") + '" onclick="window._perfilNav(\'' + item.page + '\')">' +
+      '<div class="perfil-grid-icon" style="background:' + item.color + '">' +
       '<i data-lucide="' + item.icon + '" style="color:' + item.iconColor + '"></i>' +
-      '</div><div>' +
-      '<div style="font-size:15px;font-weight:600">' + item.label + '</div>' +
-      (item.sub ? '<div style="font-size:12px;color:#71717a;margin-top:2px">' + item.sub + '</div>' : '') +
-      '</div></div>' +
-      '<span class="perfil-menu-chevron">›</span>' +
+      '</div>' +
+      '<div class="perfil-grid-label">' + item.label + '</div>' +
       '</button>';
   }
 
@@ -146,8 +141,8 @@ function renderMenu() {
   var html = groupOrder.map(function(groupName) {
     var groupItems = grouped.filter(function(i) { return i.group === groupName; });
     return '<div class="perfil-group-label">' + groupName + '</div>' +
-      '<div class="perfil-group">' +
-      groupItems.map(renderItem).join("") +
+      '<div class="perfil-grid">' +
+      groupItems.map(renderGridItem).join("") +
       '</div>';
   }).join("");
 

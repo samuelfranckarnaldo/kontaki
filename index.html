@@ -96,6 +96,10 @@ document.addEventListener("DOMContentLoaded", function() {
       <button class="topbar-btn" id="btn-topbar-qr" style="display:none">
         <i data-lucide="scan-qr-code"></i>
       </button>
+      <button class="topbar-btn" id="btn-topbar-pedidos" style="display:none" onclick="window._abrirPedidosGuardados()">
+        <i data-lucide="clipboard-list"></i>
+        <span id="pending-sales-badge" class="badge" style="display:none"></span>
+      </button>
       <button class="topbar-btn" id="btn-topbar-add" style="display:none">
         <i data-lucide="plus"></i>
       </button>
@@ -147,6 +151,10 @@ document.addEventListener("DOMContentLoaded", function() {
           <span class="vender-total-label">Total</span>
           <span class="vender-total-value" id="total-val">0,00 Kz</span>
         </div>
+        <button class="vender-guardar-btn" id="btn-guardar-pedido" onclick="window._guardarPedido()">
+          <i data-lucide="bookmark"></i>
+          Guardar
+        </button>
         <button class="vender-finalizar-btn" id="btn-finalizar">
           Finalizar
           <i data-lucide="arrow-right"></i>
