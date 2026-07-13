@@ -1,9 +1,8 @@
-import { fmt, fmtDate } from "./utils.js";
-import { generateQR }   from "./utils.js";
+import { fmt, fmtDate, getQrDataUrl } from "./utils.js";
 
-export function printRecibo(sale, store, format) {
+export async function printRecibo(sale, store, format) {
   format = format || "58mm";
-  const html = buildRecibo(sale, store, format);
+  const html = await buildRecibo(sale, store, format);
   const win  = window.open("","_blank","width=800,height=600");
   win.document.write(
     "<!DOCTYPE html><html><head><meta charset='UTF-8'/>" +
@@ -17,13 +16,14 @@ export function printRecibo(sale, store, format) {
   win.document.close();
 }
 
-export function buildRecibo(sale, store, format) {
+export async function buildRecibo(sale, store, format) {
   format = format || "58mm";
-  if (format === "a4" || format === "a5") return buildFactura(sale, store, format);
-  return buildTalao(sale, store, format);
+  const qrDataUrl = await getQrDataUrl(sale.hash || "");
+  if (format === "a4" || format === "a5") return buildFactura(sale, store, format, qrDataUrl);
+  return buildTalao(sale, store, format, qrDataUrl);
 }
 
-function buildTalao(sale, store, format) {
+function buildTalao(sale, store, format, qrDataUrl) {
   const storeName = (store && store.name) || "Kontaki";
   const items     = sale.items || [];
   const currency  = (store && store.currency) || "Kz";
@@ -60,7 +60,7 @@ function buildTalao(sale, store, format) {
     '<div class="recibo-row total"><span>TOTAL</span><span>' + fmt(sale.total) + '</span></div>' +
     '<div class="recibo-row"><span>Pagamento</span><span>' + sale.payMethod + '</span></div>' +
     '<hr class="recibo-divider"/>' +
-    '<div class="recibo-qr" id="qr-print-' + sale.id + '"></div>' +
+    (qrDataUrl ? '<div class="recibo-qr"><img src="' + qrDataUrl + '" style="width:90px;height:90px;display:block;margin:0 auto"/></div>' : '') +
     '<div class="recibo-aviso">Código: <strong>' + (sale.hash || "N/A") + '</strong></div>' +
     '<hr class="recibo-divider"/>' +
     '<div class="recibo-footer">' +
@@ -72,7 +72,7 @@ function buildTalao(sale, store, format) {
   );
 }
 
-function buildFactura(sale, store, format) {
+function buildFactura(sale, store, format, qrDataUrl) {
   const storeName = (store && store.name)    || "Kontaki";
   const storeAddr = (store && store.address) || "";
   const storePhone= (store && store.phone)   || "";
@@ -119,10 +119,15 @@ function buildFactura(sale, store, format) {
     '<div class="row total"><span>TOTAL</span><span>' + fmt(sale.total) + '</span></div>' +
     '</div>' +
     '<hr class="recibo-divider"/>' +
+    (qrDataUrl ?
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">' +
+      '<img src="' + qrDataUrl + '" style="width:70px;height:70px;flex-shrink:0"/>' +
+      '<div style="font-size:11px;color:#71717a;line-height:1.5">Código de verificação<br/><strong style="color:#18181b;font-size:12px">' + (sale.hash || "N/A") + '</strong></div>' +
+      '</div>' : '') +
     '<div class="recibo-footer">' +
-    'Código de verificação: <strong>' + (sale.hash || "N/A") + '</strong><br/>' +
+    (!qrDataUrl ? 'Código de verificação: <strong>' + (sale.hash || "N/A") + '</strong><br/>' : '') +
     'Documento de gestão interna · Sem validade fiscal perante a AGT<br/>' +
-    '<strong>Powered by Kontaki · Introxeer Technology</strong>' +
+    'Kontaki · Desenvolvido pela Introxeer' +
     '</div>' +
     '</div>'
   );

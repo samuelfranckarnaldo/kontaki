@@ -1607,7 +1607,7 @@ window._printSale = async function(id, format) {
   var s     = await db.get("sales", id);
   var store = (await db.get("settings","store")) || {};
   closeModal();
-  printRecibo(s, store, format);
+  await printRecibo(s, store, format);
 };
 
 window._gerarReciboPDF     = async (id) => { await gerarReciboPDF(id);     };

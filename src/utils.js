@@ -25,6 +25,46 @@ export const refreshIcons = (node = document) => {
 };
 
 // QR Code gerado offline via Canvas - implementação minimalista
+export function getQrDataUrl(text) {
+  return new Promise(function(resolve) {
+    if (typeof window.QRCode === "undefined") {
+      console.error("QRCode: biblioteca não carregada");
+      resolve(null);
+      return;
+    }
+    if (!text) {
+      resolve(null);
+      return;
+    }
+    try {
+      var temp = document.createElement("div");
+      temp.style.cssText = "position:fixed;left:-9999px;top:-9999px";
+      document.body.appendChild(temp);
+
+      new window.QRCode(temp, {
+        text: text, width: 200, height: 200,
+        colorDark: "#18181b", colorLight: "#ffffff",
+        correctLevel: window.QRCode.CorrectLevel.M,
+      });
+
+      setTimeout(function() {
+        var canvas = temp.querySelector("canvas");
+        var dataUrl = null;
+        if (canvas) {
+          try { dataUrl = canvas.toDataURL("image/png"); } catch(e) { console.error("QRCode: falha ao converter canvas", e); }
+        } else {
+          console.error("QRCode: canvas não gerado a tempo");
+        }
+        document.body.removeChild(temp);
+        resolve(dataUrl);
+      }, 400);
+    } catch (e) {
+      console.error("QRCode: erro ao instanciar", e);
+      resolve(null);
+    }
+  });
+}
+
 export function generateQR(text, container, size) {
   size = size || 120;
   if (!container) return;
