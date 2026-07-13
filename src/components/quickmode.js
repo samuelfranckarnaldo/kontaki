@@ -3,6 +3,7 @@ import { fmt, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { getUser } from "../auth.js";
 import { initCamera } from "./camera.js";
+import { confirmDialog } from "../modal.js";
 
 let qmProducts  = [];
 let qmCart      = [];
@@ -41,24 +42,18 @@ async function openQuickMode() {
   bindBtn("btn-qm-scan",  () => initCamera(onQmBarcode));
   bindBtn("btn-qm-finalizar", finalizarQm);
   bindBtn("btn-qm-cancel", () => {
+    const doCancel = () => {
+      qmCart = [];
+      renderQmCart();
+      renderQmTotal();
+      resetSearch();
+      document.getElementById("qm-search").focus();
+    };
     if (qmCart.length > 0) {
-      if (!confirm("Cancelar a venda? O carrinho será limpo.")) return;
+      confirmDialog("Cancelar a venda? O carrinho será limpo.", doCancel, { title: "Cancelar venda", confirmText: "Sim, cancelar", danger: true, icon: "x-circle" });
+    } else {
+      doCancel();
     }
-    qmCart = [];
-    renderQmCart();
-    renderQmTotal();
-    resetSearch();
-    document.getElementById("qm-search").focus();
-  });
-  bindBtn("btn-qm-cancel", () => {
-    if (qmCart.length > 0) {
-      if (!confirm("Cancelar a venda? O carrinho será limpo.")) return;
-    }
-    qmCart = [];
-    renderQmCart();
-    renderQmTotal();
-    resetSearch();
-    document.getElementById("qm-search").focus();
   });
 
   // Pesquisa

@@ -496,15 +496,20 @@ async function loadIncidentes() {
   refreshIcons(el("inc-list"));
 }
 
-window._clearResolvedIncidents = async function() {
-  if (!confirm("Arquivar todos os incidentes resolvidos? Saem desta lista mas continuam guardados em \"Arquivados\" para auditoria.")) return;
-  const all = await db.getAll("incidents");
-  const resolved = all.filter(function(i){ return i.status==="resolved" && !i.archived; });
-  for (var i=0;i<resolved.length;i++) {
-    await db.put("incidents", Object.assign({}, resolved[i], { archived:true, archivedAt:new Date().toISOString() }));
-  }
-  toast(resolved.length + " incidente(s) arquivado(s).", "success");
-  await loadIncidentes();
+window._clearResolvedIncidents = function() {
+  confirmDialog(
+    "Arquivar todos os incidentes resolvidos? Saem desta lista mas continuam guardados em \"Arquivados\" para auditoria.",
+    async () => {
+      const all = await db.getAll("incidents");
+      const resolved = all.filter(function(i){ return i.status==="resolved" && !i.archived; });
+      for (var i=0;i<resolved.length;i++) {
+        await db.put("incidents", Object.assign({}, resolved[i], { archived:true, archivedAt:new Date().toISOString() }));
+      }
+      toast(resolved.length + " incidente(s) arquivado(s).", "success");
+      await loadIncidentes();
+    },
+    { title: "Arquivar incidentes", confirmText: "Arquivar", icon: "archive" }
+  );
 };
 
 window._openResolveModal = function(id) {

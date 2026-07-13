@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
-import { openModal, closeModal } from "../modal.js";
+import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
 import { ktkService, sessionService, validateKtkHash, catalogService, productService } from "../services.js";
 
@@ -356,16 +356,17 @@ window._confirmarKtkPendente = async function(importId) {
   }
 };
 
-window._rejeitarKtkPendente = async function(importId) {
-  if (!confirm("Rejeitar este turno? Esta ação não pode ser desfeita.")) return;
-  try {
-    await ktkService.rejectImport(importId, "Rejeitado manualmente no Escritório");
-    toast("Turno rejeitado.","info");
-    closeModal();
-    await loadEscritorio();
-  } catch(err) {
-    toast("Erro: "+err.message,"error");
-  }
+window._rejeitarKtkPendente = function(importId) {
+  confirmDialog("Rejeitar este turno? Esta ação não pode ser desfeita.", async () => {
+    try {
+      await ktkService.rejectImport(importId, "Rejeitado manualmente no Escritório");
+      toast("Turno rejeitado.","info");
+      closeModal();
+      await loadEscritorio();
+    } catch(err) {
+      toast("Erro: "+err.message,"error");
+    }
+  }, { title: "Rejeitar turno", confirmText: "Rejeitar", danger: true, icon: "x-circle" });
 };
 
 window._exportarCatalogo = async function() {
