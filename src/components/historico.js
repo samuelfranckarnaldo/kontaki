@@ -1570,14 +1570,9 @@ window._openSaleDetail = async function(id) {
       }).join("") +
       '</div>' : "") +
 
-    '<div class="hist-section-label">Imprimir</div>' +
-    '<div class="hist-print-grid">' +
-    ["58mm","80mm","A5","A4"].map(function(f) {
-      return '<button class="hist-print-btn" onclick="window._printSale(' + s.id + ',\'' + f.toLowerCase() + '\')">' + f + '</button>';
-    }).join("") +
-    '</div>' +
-
     '<div class="hist-detail-actions">' +
+    '<button class="btn btn-primary btn-full" onclick="window._openPrintMenu(' + s.id + ')">' +
+    '<i data-lucide="printer"></i> Imprimir</button>' +
     '<button class="btn btn-outline btn-full" onclick="window._gerarReciboPDF(' + s.id + ')">' +
     '<i data-lucide="file-text"></i> Gerar PDF</button>' +
     '<button class="btn btn-outline btn-full hist-btn-whatsapp" onclick="window._partilharReciboPDF(' + s.id + ')">' +
@@ -1588,12 +1583,38 @@ window._openSaleDetail = async function(id) {
 
     '<div class="form-actions">' +
     '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>' +
-    '<button class="btn btn-primary btn-full" onclick="window._printSale(' + s.id + ',\'58mm\')">' +
-    '<i data-lucide="printer"></i> Imprimir Talão</button>' +
     '</div></div>'
   );
 
   refreshIcons(el("modal-box"));
+};
+
+window._openPrintMenu = function(saleId) {
+  var formats = [
+    { id:"58mm", label:"Talão 58mm", desc:"Impressora térmica pequena", icon:"receipt" },
+    { id:"80mm", label:"Talão 80mm", desc:"Impressora térmica padrão",  icon:"receipt" },
+    { id:"a5",   label:"Factura A5", desc:"Meia página, formato compacto", icon:"file-text" },
+    { id:"a4",   label:"Factura A4", desc:"Página inteira, formato completo", icon:"file-text" },
+  ];
+  var body =
+    '<div class="hist-export-options">' +
+    formats.map(function(f, i) {
+      return '<button class="hist-export-option" style="animation-delay:' + (i*50) + 'ms" onclick="window._printFromMenu(' + saleId + ',\'' + f.id + '\')">' +
+        '<div class="hist-export-icon hist-export-icon--csv"><i data-lucide="' + f.icon + '"></i></div>' +
+        '<div class="hist-export-info">' +
+          '<div class="hist-export-title">' + f.label + '</div>' +
+          '<div class="hist-export-desc">' + f.desc + '</div>' +
+        '</div>' +
+        '<i data-lucide="chevron-right" class="hist-export-arrow"></i>' +
+      '</button>';
+    }).join("") +
+    '</div>';
+  openModal("Formato de impressão", body);
+};
+
+window._printFromMenu = async function(saleId, format) {
+  closeModal();
+  await window._printSale(saleId, format);
 };
 
 function detailRow(label, value, bold, color) {
