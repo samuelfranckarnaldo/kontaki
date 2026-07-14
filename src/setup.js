@@ -410,7 +410,7 @@ export function _fallbackCopy(text) {
   document.body.removeChild(ta);
 }
 
-function showRecoveryCodesScreen(codes, onDone) {
+export function showRecoveryCodesScreen(codes, onDone) {
   var ov = document.createElement("div");
   ov.id = "recovery-codes-overlay";
   ov.style.cssText = "position:fixed;inset:0;background:#fff;z-index:10000;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;font-family:inherit;animation:onbFadeIn .3s ease";
