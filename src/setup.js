@@ -393,7 +393,24 @@ function showSetup() {
 // Mostra os 10 códigos de recuperação UMA ÚNICA VEZ — nunca mais
 // aparecem depois disto (só ficam hashes localmente). onDone só corre
 // depois de o utilizador confirmar explicitamente que os guardou.
-export function showRecoveryCodesScreen(codes, onDone) {
+export function _fallbackCopy(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand("copy");
+    toast("Códigos copiados.", "success");
+  } catch (e) {
+    toast("Não foi possível copiar. Escreve os códigos manualmente.", "error");
+  }
+  document.body.removeChild(ta);
+}
+
+function showRecoveryCodesScreen(codes, onDone) {
   var ov = document.createElement("div");
   ov.id = "recovery-codes-overlay";
   ov.style.cssText = "position:fixed;inset:0;background:#fff;z-index:10000;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;font-family:inherit;animation:onbFadeIn .3s ease";
@@ -431,7 +448,14 @@ export function showRecoveryCodesScreen(codes, onDone) {
   });
 
   document.getElementById("recovery-codes-copy").onclick = function() {
-    navigator.clipboard.writeText(codes.join("\n")).then(function() { toast("Códigos copiados.", "success"); });
+    const text = codes.join("\n");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(function() { toast("Códigos copiados.", "success"); })
+        .catch(function() { _fallbackCopy(text); });
+    } else {
+      _fallbackCopy(text);
+    }
   };
 
   continueBtn.onclick = function() {
