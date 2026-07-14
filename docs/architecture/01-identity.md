@@ -49,6 +49,7 @@ distinção de âmbito é a razão de existir deste documento.
 | `licenseId` / código de licença | Sistema | Sim | Código muda em renovação; `licenseId` não | Servidor, exclusivamente |
 | `saleId` | **Local** (hoje) | Sim | Não | Cliente |
 | `catalogId` | Loja | Sim | Não | Cliente — parte do catálogo exportável (`.ktkcat`) |
+| `client.uuid` | Loja | Sim | Não | Cliente, na criação da entidade (ver ADR-0005) |
 
 **Leitura da tabela:** as duas linhas marcadas "Local" (`userId`,
 `saleId`) são o ponto de atenção mais importante desta tabela — não
@@ -88,6 +89,12 @@ identificador local).
   Nota: `sessions` já resolve este problema para sessões
   (`uuid` + `prevSessionUuid`) — esse padrão é o candidato natural a
   reutilizar para `sales`, caso a lacuna venha a ser fechada.
+
+- **`.ktk` viola a Regra 1 de forma concreta e já corrigível** —
+  `stock_esperado`/`stock_movements`, dentro do `.ktk`, ainda
+  referenciam `productId` local em vez de `catalogId`, apesar de este
+  já existir e já ser usado corretamente no `.ktkcat`. Ver
+  `ADR-0005` para a decisão de correção.
 
 ## Não-decisões
 
