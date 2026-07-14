@@ -63,6 +63,52 @@ automaticamente — é sinalizado para reconciliação manual (Princípio
 Qualquer mecanismo de sincronização futuro deve passar este cenário
 sem fazer desaparecer uma venda nem "ajustar" o stock silenciosamente.
 
+## Limitações conhecidas
+
+Esta secção regista comportamento existente que ainda não satisfaz
+completamente os princípios acima — distinto de "Não-decisões"
+(que são escolhas deliberadas de âmbito), isto é uma lacuna entre o
+que o código faz hoje e o que este documento exige.
+
+### Deteção de conflitos entre dispositivos
+
+A implementação atual de `ktkService.detectConflicts` compara apenas
+importações `.ktk` ainda pendentes entre si. Não compara operações
+recebidas contra vendas ou movimentos já confirmados no dispositivo
+reconciliador.
+
+Consequentemente, cenários onde:
+- um dispositivo executa operações localmente;
+- outro dispositivo executa operações offline;
+- uma das operações já está confirmada antes da sincronização;
+
+podem não ser identificados pelo mecanismo atual — o cenário de
+referência descrito acima (duas vendas concorrentes do mesmo produto)
+só é detetado quando ambas chegam como ficheiro `.ktk` pendente; não
+quando uma delas já é o estado local confirmado do dispositivo que
+reconcilia.
+
+Esta limitação não altera o princípio definido neste documento:
+conflitos entre estados divergentes devem ser identificados através
+de identidade global e regras explícitas de reconciliação. A
+expansão deste comportamento fica pendente de definição do modelo
+completo de conflitos multi-dispositivo — a decidir quando houver
+conteúdo suficiente para tratar conflito de stock, de venda, de
+cliente, prioridade entre dispositivos, resolução automática vs.
+manual, e estados possíveis de um conflito (ex: `pending_resolution`,
+`resolved`). Até lá, permanece como questão aberta dentro deste
+documento, não como documento próprio.
+
+A implementação atual também utiliza identificadores locais
+(`productId`) para agrupamento de produtos durante a deteção de
+conflitos. Como definido em `01-identity.md`, referências entre
+dispositivos devem usar identidade global (`catalogId`). A correção
+desta inconsistência específica depende da implementação do contrato
+de identidade definido em `ADR-0005` — mas expandir o âmbito da
+deteção (comparar também contra estado local confirmado, não só entre
+pendentes) é decisão separada, que fica para o modelo completo de
+conflitos multi-dispositivo, não para o `ADR-0005`.
+
 ## Não-decisões
 
 - Não desenha o protocolo de sincronização real (formato de payload,
