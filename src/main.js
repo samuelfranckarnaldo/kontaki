@@ -1,8 +1,9 @@
 import { loadLicense } from "./license.js";
 import { seed, db } from "./db.js";
+import { seedChartOfAccounts } from "./pgc.js";
 import { checkSetup } from "./setup.js";
 import { showOnboarding } from "./onboarding.js";
-import { initAuth } from "./auth.js";
+import { initAuth, restoreSession } from "./auth.js";
 import { initModal } from "./modal.js";
 import { logger } from "./logger.js";
 import { router } from "./router.js";
@@ -25,6 +26,7 @@ window.router = router;
 
 async function boot() {
   await seed();
+  await seedChartOfAccounts();
   initModal();
   await loadLicense();
 
@@ -42,6 +44,18 @@ async function boot() {
     await new Promise(resolve => {
       document.addEventListener("DOMContentLoaded", resolve);
     });
+  }
+
+  const restored = await restoreSession().catch(() => false);
+  if (restored) {
+    document.getElementById("login-page").style.display = "none";
+    document.getElementById("app").style.display = "flex";
+    if (window.router) setTimeout(() => window.router.init(), 100);
+    import("./components/dashboard.js").then(m => {
+      if (m.loadDashboard) m.loadDashboard();
+    }).catch(() => {});
+    if (window.lucide) window.lucide.createIcons();
+    return;
   }
 
   const login = document.getElementById("login-users-list");
