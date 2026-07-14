@@ -2,6 +2,7 @@ import { db, isFirstTime } from "./db.js";
 import { hashPassword }    from "./crypto.js";
 import { refreshIcons }    from "./utils.js";
 import { toast }           from "./toast.js";
+import { generateCodesForUser } from "./recovery-codes.js";
 
 export async function checkSetup() {
   const first = await isFirstTime();
@@ -369,7 +370,7 @@ function showSetup() {
 
     var pinHash  = await hashPassword(_pin);
     var username = adminName.toLowerCase().replace(/\s+/g, ".");
-    await db.add("users", {
+    var adminId = await db.add("users", {
       name: adminName, phone: storePhone, username: username,
       passwordHash: pinHash, password: null,
       role: "admin", active: true,
@@ -377,11 +378,65 @@ function showSetup() {
       createdAt: new Date().toISOString(),
     });
 
-    var ov = document.getElementById("setup-overlay");
-    ov.style.animation = "onbFadeOut .25s ease forwards";
-    setTimeout(function() {
-      ov.remove();
-      window.location.reload();
-    }, 220);
+    var codes = await generateCodesForUser(adminId);
+    showRecoveryCodesScreen(codes, function() {
+      var ov = document.getElementById("setup-overlay");
+      ov.style.animation = "onbFadeOut .25s ease forwards";
+      setTimeout(function() {
+        ov.remove();
+        window.location.reload();
+      }, 220);
+    });
+  };
+}
+
+// Mostra os 10 códigos de recuperação UMA ÚNICA VEZ — nunca mais
+// aparecem depois disto (só ficam hashes localmente). onDone só corre
+// depois de o utilizador confirmar explicitamente que os guardou.
+export function showRecoveryCodesScreen(codes, onDone) {
+  var ov = document.createElement("div");
+  ov.id = "recovery-codes-overlay";
+  ov.style.cssText = "position:fixed;inset:0;background:#fff;z-index:10000;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;font-family:inherit;animation:onbFadeIn .3s ease";
+
+  ov.innerHTML = [
+    '<div style="width:100%;max-width:380px;text-align:center">',
+      '<div style="width:56px;height:56px;background:#fef3c7;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">',
+        '<i data-lucide="key-round" style="width:26px;height:26px;color:#d97706"></i>',
+      '</div>',
+      '<div style="font-size:19px;font-weight:800;color:#18181b;margin-bottom:8px">Guarda os teus códigos de recuperação</div>',
+      '<div style="font-size:13px;color:#71717a;margin-bottom:20px;line-height:1.5">Se esqueceres o PIN, usa um destes códigos para o repor. Cada código só funciona uma vez. <strong>Não vais voltar a vê-los.</strong></div>',
+      '<div style="background:#fafafa;border:1.5px solid #e4e4e7;border-radius:14px;padding:16px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-family:monospace;font-size:14px;font-weight:700;color:#18181b">',
+        codes.map(function(c) { return '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:8px;padding:8px;text-align:center">' + c + '</div>'; }).join(''),
+      '</div>',
+      '<button id="recovery-codes-copy" style="width:100%;padding:12px;background:#fff;border:1.5px solid #e4e4e7;color:#18181b;border-radius:12px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">',
+        '<i data-lucide="copy" style="width:15px;height:15px"></i> Copiar todos',
+      '</button>',
+      '<label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:16px;cursor:pointer;text-align:left">',
+        '<input type="checkbox" id="recovery-codes-confirm" style="width:16px;height:16px;margin-top:1px;accent-color:#5b21b6;flex-shrink:0;cursor:pointer"/>',
+        '<span style="font-size:12px;color:#71717a;line-height:1.5">Guardei estes códigos num local seguro (papel, gestor de senhas, etc.)</span>',
+      '</label>',
+      '<button id="recovery-codes-continue" disabled style="width:100%;padding:14px;background:#d4d4d8;color:#fff;border:none;border-radius:13px;font-size:14.5px;font-weight:700;cursor:not-allowed;font-family:inherit">Continuar</button>',
+    '</div>',
+  ].join('');
+
+  document.body.appendChild(ov);
+  refreshIcons(ov);
+
+  var confirmCheck = document.getElementById("recovery-codes-confirm");
+  var continueBtn  = document.getElementById("recovery-codes-continue");
+  confirmCheck.addEventListener("change", function() {
+    continueBtn.disabled = !confirmCheck.checked;
+    continueBtn.style.background = confirmCheck.checked ? "#16a34a" : "#d4d4d8";
+    continueBtn.style.cursor = confirmCheck.checked ? "pointer" : "not-allowed";
+  });
+
+  document.getElementById("recovery-codes-copy").onclick = function() {
+    navigator.clipboard.writeText(codes.join("\n")).then(function() { toast("Códigos copiados.", "success"); });
+  };
+
+  continueBtn.onclick = function() {
+    if (continueBtn.disabled) return;
+    ov.remove();
+    onDone();
   };
 }

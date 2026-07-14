@@ -387,7 +387,116 @@ async function _verifyPin() {
 }
 
 function openForgotPassword() {
-  toast("Para recuperar o PIN, contacta o administrador.", "error");
+  if (!_selectedUser) return;
+  showRecoveryScreen(_selectedUser);
+}
+
+function showRecoveryScreen(targetUser) {
+  var ov = document.createElement("div");
+  ov.id = "recovery-redeem-overlay";
+  ov.style.cssText = "position:fixed;inset:0;background:#fff;z-index:10001;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;font-family:inherit";
+
+  ov.innerHTML = [
+    '<div style="width:100%;max-width:340px;text-align:center">',
+      '<button id="recovery-redeem-back" style="position:absolute;top:20px;left:20px;background:none;border:none;color:#a1a1aa;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Voltar</button>',
+      '<div style="width:56px;height:56px;background:#f5f3ff;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">',
+        '<i data-lucide="key-round" style="width:26px;height:26px;color:#5b21b6"></i>',
+      '</div>',
+      '<div style="font-size:18px;font-weight:800;color:#18181b;margin-bottom:8px">Recuperar PIN</div>',
+      '<div style="font-size:13px;color:#71717a;margin-bottom:20px;line-height:1.5">Introduz um dos teus códigos de recuperação de 8 caracteres.</div>',
+      '<input id="recovery-code-input" type="text" placeholder="XXXX-XXXX" maxlength="9" autocapitalize="characters" autocomplete="off" style="width:100%;padding:14px;border:1.5px solid #e4e4e7;border-radius:12px;font-size:18px;font-family:monospace;text-align:center;letter-spacing:2px;box-sizing:border-box;margin-bottom:16px;text-transform:uppercase"/>',
+      '<div id="recovery-redeem-error" style="display:none;margin-bottom:14px;padding:10px;background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;color:#dc2626;font-size:12px;font-weight:600"></div>',
+      '<button id="recovery-redeem-submit" style="width:100%;padding:14px;background:#5b21b6;color:#fff;border:none;border-radius:13px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit">Verificar código</button>',
+    '</div>',
+  ].join('');
+
+  document.body.appendChild(ov);
+  refreshIcons(ov);
+
+  document.getElementById("recovery-redeem-back").onclick = function() { ov.remove(); };
+
+  document.getElementById("recovery-redeem-submit").onclick = async function() {
+    var input = document.getElementById("recovery-code-input");
+    var errEl = document.getElementById("recovery-redeem-error");
+    var code = input.value.trim();
+    errEl.style.display = "none";
+
+    if (!code) return;
+
+    try {
+      var mod = await import("./recovery-codes.js");
+      var result = await mod.redeemRecoveryCode(code);
+
+      if (!result.valid || result.userId !== targetUser.id) {
+        errEl.textContent = "Código inválido. Verifica e tenta novamente.";
+        errEl.style.display = "block";
+        return;
+      }
+
+      ov.remove();
+      showSetNewPinScreen(targetUser, result.remaining);
+    } catch (e) {
+      errEl.textContent = "Erro ao verificar o código.";
+      errEl.style.display = "block";
+    }
+  };
+}
+
+function showSetNewPinScreen(targetUser, remaining) {
+  var ov = document.createElement("div");
+  ov.id = "recovery-newpin-overlay";
+  ov.style.cssText = "position:fixed;inset:0;background:#fff;z-index:10001;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;font-family:inherit";
+
+  var lowWarning = remaining <= 3
+    ? '<div style="margin-bottom:14px;padding:10px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;color:#92400e;font-size:12px;font-weight:600">Restam apenas ' + remaining + ' códigos de recuperação. Considera gerar um novo conjunto em Segurança.</div>'
+    : '';
+
+  ov.innerHTML = [
+    '<div style="width:100%;max-width:340px;text-align:center">',
+      '<div style="width:56px;height:56px;background:#f0fdf4;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">',
+        '<i data-lucide="lock-open" style="width:26px;height:26px;color:#16a34a"></i>',
+      '</div>',
+      '<div style="font-size:18px;font-weight:800;color:#18181b;margin-bottom:8px">Código válido</div>',
+      '<div style="font-size:13px;color:#71717a;margin-bottom:16px">Define um novo PIN para ' + targetUser.name + '.</div>',
+      lowWarning,
+      '<input id="newpin-input" type="password" inputmode="numeric" maxlength="6" placeholder="Novo PIN (6 dígitos)" style="width:100%;padding:14px;border:1.5px solid #e4e4e7;border-radius:12px;font-size:16px;text-align:center;letter-spacing:4px;box-sizing:border-box;margin-bottom:10px"/>',
+      '<input id="newpin-confirm" type="password" inputmode="numeric" maxlength="6" placeholder="Confirma o PIN" style="width:100%;padding:14px;border:1.5px solid #e4e4e7;border-radius:12px;font-size:16px;text-align:center;letter-spacing:4px;box-sizing:border-box;margin-bottom:16px"/>',
+      '<div id="newpin-error" style="display:none;margin-bottom:14px;padding:10px;background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;color:#dc2626;font-size:12px;font-weight:600"></div>',
+      '<button id="newpin-submit" style="width:100%;padding:14px;background:#16a34a;color:#fff;border:none;border-radius:13px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit">Guardar novo PIN</button>',
+    '</div>',
+  ].join('');
+
+  document.body.appendChild(ov);
+  refreshIcons(ov);
+
+  document.getElementById("newpin-submit").onclick = async function() {
+    var pin = document.getElementById("newpin-input").value;
+    var conf = document.getElementById("newpin-confirm").value;
+    var errEl = document.getElementById("newpin-error");
+    errEl.style.display = "none";
+
+    if (!/^\d{6}$/.test(pin)) { errEl.textContent = "O PIN deve ter 6 dígitos."; errEl.style.display = "block"; return; }
+    if (pin !== conf) { errEl.textContent = "Os PINs não coincidem."; errEl.style.display = "block"; return; }
+
+    var newHash = await hashPassword(pin);
+    var fresh = await db.get("users", targetUser.id);
+    if (!fresh) { errEl.textContent = "Utilizador não encontrado."; errEl.style.display = "block"; return; }
+    await db.put("users", Object.assign({}, fresh, { passwordHash: newHash }));
+    await _clearLoginAttempts(targetUser.id).catch(function () {});
+
+    // PIN mudou -> regenera códigos de recuperação (mesma lógica de
+    // perfil.js/changePassword, mas aqui o utilizador está deslogado).
+    var recMod = await import("./recovery-codes.js");
+    var setupMod = await import("./setup.js");
+    var newCodes = await recMod.generateCodesForUser(targetUser.id);
+
+    ov.remove();
+    setupMod.showRecoveryCodesScreen(newCodes, function() {
+      toast("PIN atualizado com sucesso. Podes entrar com o novo PIN.", "success");
+      _pinBuffer = "";
+      _updatePinDots();
+    });
+  };
 }
 
 function doLogout() {

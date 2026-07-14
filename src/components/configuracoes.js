@@ -5,6 +5,7 @@ import { toast }           from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { backupService }   from "../backup.js";
 import { getLogs, clearLogs } from "../logger.js";
+import { generateUUID } from "../services.js";
 
 export async function loadConfiguracoes() {
   const btn = document.getElementById("btn-back-configuracoes");
@@ -100,6 +101,14 @@ async function renderConfiguracoes() {
     '<button onclick="window._debugStockMovements()" style="width:100%;padding:12px;background:#f4f4f5;color:#18181b;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Ver últimos 5 movimentos de stock (bruto)</button>' +
     '</div>';
 
+  // Migração: identidade global de clientes (ADR-0005)
+  wrap.innerHTML +=
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;margin-top:8px">Migração de dados</div>' +
+    '<div class="vender-card" style="margin-bottom:14px">' +
+    '<div style="font-size:13px;color:#71717a;margin-bottom:10px;line-height:1.5">Atribui um identificador global (uuid) a clientes criados antes desta funcionalidade existir. Necessário para fiados sincronizarem corretamente entre dispositivos. Corre uma única vez por dispositivo — clientes já com uuid não são alterados.</div>' +
+    '<button onclick="window._migrarClientesUUID()" style="width:100%;padding:12px;background:#f4f4f5;color:#18181b;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Atribuir identidade a clientes existentes</button>' +
+    '</div>';
+
   // Limpeza de histórico
   wrap.innerHTML +=
     '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;margin-top:8px">Limpar histórico de vendas</div>' +
@@ -133,6 +142,24 @@ window._setIncidentPolicy = async (policy) => {
   await db.put("settings", { ...store, key:"store", stockIncidentPolicy: policy });
   toast("Política de inventário actualizada.", "success");
   await renderConfiguracoes();
+};
+
+window._migrarClientesUUID = async () => {
+  const user = getUser();
+  if (!user || user.role !== "admin") {
+    toast("Apenas administradores podem executar esta migração.", "error");
+    return;
+  }
+  const clients = await db.getAll("clients");
+  const semUuid = clients.filter(function(c){ return !c.uuid; });
+  if (!semUuid.length) {
+    toast("Todos os clientes já têm identidade global. Nada a fazer.", "success");
+    return;
+  }
+  for (const c of semUuid) {
+    await db.put("clients", { ...c, uuid: generateUUID() });
+  }
+  toast(semUuid.length + " cliente(s) atualizado(s) com identidade global.", "success");
 };
 
 window._debugStockMovements = async () => {

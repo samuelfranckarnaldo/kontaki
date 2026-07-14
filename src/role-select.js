@@ -2,6 +2,8 @@ import { db } from "./db.js";
 import { hashPassword } from "./crypto.js";
 import { refreshIcons } from "./utils.js";
 import { verifyInvite, saveStoreLink } from "./invite.js";
+import { generateCodesForUser } from "./recovery-codes.js";
+import { showRecoveryCodesScreen as showStaffRecoveryCodes } from "./setup.js";
 import { checkSetup } from "./setup.js";
 import { openCameraForInvite, stopCamera } from "./components/camera.js";
 
@@ -309,7 +311,7 @@ function showStaffProfile(payload) {
     var pinHash = await hashPassword(_pin);
     var username = name.toLowerCase().replace(/\s+/g, ".");
 
-    await db.add("users", {
+    var newUserId = await db.add("users", {
       name: name, username: username,
       passwordHash: pinHash, password: null,
       role: payload.role === "admin" ? "admin" : "caixa", active: true,
@@ -317,6 +319,9 @@ function showStaffProfile(payload) {
       createdAt: new Date().toISOString(),
     });
 
-    fadeOutOverlay(overlay, function() { window.location.reload(); });
+    var codes = await generateCodesForUser(newUserId);
+    fadeOutOverlay(overlay, function() {
+      showStaffRecoveryCodes(codes, function() { window.location.reload(); });
+    });
   };
 }

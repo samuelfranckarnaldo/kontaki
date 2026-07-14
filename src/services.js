@@ -285,6 +285,23 @@ export const productService = {
   },
 };
 
+// clientService — identidade global de cliente (ADR-0005): uuid gerado
+// na criação, não na primeira exportação. Único ponto de criação de
+// cliente no sistema — clientes.js e vender.js chamam esta função em
+// vez de db.add("clients", ...) direto, para o uuid nunca divergir
+// entre os dois pontos de entrada.
+export const clientService = {
+  async create(data) {
+    requireAuth();
+    const uuid = generateUUID();
+    const id = await db.add("clients", {
+      name: data.name, phone: data.phone||"", address: data.address||"",
+      notes: data.notes||"", uuid, createdAt: new Date().toISOString(),
+    });
+    return id;
+  },
+};
+
 export const saleService = {
   async create(items, payMethod, discount, clientName, clientPhone) {
     const user=requireAuth();

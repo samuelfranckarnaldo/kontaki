@@ -1398,6 +1398,30 @@ window._openSessionDetail = async function(sessionId) {
       '</div>';
   }
 
+  var salesListSection = "";
+  if (isLocal && sessionSales.length) {
+    var sortedSales = sessionSales.slice().sort(function(a,b){ return new Date(b.date) - new Date(a.date); });
+    salesListSection =
+      '<div class="hist-session-cash hist-session-fade" style="animation-delay:' + sectionDelay() + '">' +
+        '<div class="hist-session-cash-title" style="color:var(--info)"><i data-lucide="receipt"></i>Vendas realizadas (' + sortedSales.length + ')</div>' +
+        sortedSales.map(function(x) {
+          var col = payColor(x.payMethod);
+          var timeStr = fmtDate(x.date).split(",")[1] || fmtDate(x.date);
+          return '<div class="hist-session-sale-row" onclick="window._openSaleDetail(' + x.id + ')">' +
+            '<div class="hist-sale-avatar ' + payClass(x.payMethod) + '" style="width:32px;height:32px"><i data-lucide="' + payIcon(x.payMethod) + '" style="width:15px;height:15px"></i></div>' +
+            '<div style="flex:1;min-width:0">' +
+            '<div class="hist-session-sale-row-name">#' + String(x.id).padStart(4,"0") + (x.clientName ? ' · ' + x.clientName : '') + '</div>' +
+            '<div class="hist-session-sale-row-meta">' + timeStr.trim() + '</div>' +
+            '</div>' +
+            '<div style="text-align:right;flex-shrink:0">' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text)">' + fmt(x.total) + '</div>' +
+            '</div>' +
+            '<i data-lucide="chevron-right" class="hist-timeline-arrow"></i>' +
+            '</div>';
+        }).join("") +
+      '</div>';
+  }
+
   var paymentSection = "";
   if (isLocal && sessionSales.length) {
     var byMethod = {};
@@ -1513,6 +1537,7 @@ window._openSessionDetail = async function(sessionId) {
     importedNote +
     cashSection +
     paymentSection +
+    salesListSection +
     productsSection +
     fiadosSection +
     stockMovSection +
@@ -1548,9 +1573,11 @@ window._openSaleDetail = async function(id) {
   if (s.clientName) {
     var isFiado = (s.payMethod||"").toLowerCase().includes("fiado");
     clientHtml =
-      '<div class="hist-sale-client' + (isFiado?' hist-sale-client--fiado':'') + '" style="margin-bottom:12px">' +
+      '<div class="hist-sale-client' + (isFiado?' hist-sale-client--fiado':'') + '" style="margin-bottom:12px;cursor:' + (s.clientId?'pointer':'default') + '"' +
+      (s.clientId ? ' onclick="window._closeModal();window._openClienteProfile(' + s.clientId + ')"' : '') + '>' +
       '<i data-lucide="user" style="width:12px;height:12px"></i>' + s.clientName +
       (s.clientPhone ? ' · ' + s.clientPhone : '') +
+      (s.clientId ? ' <i data-lucide="chevron-right" style="width:11px;height:11px;margin-left:2px"></i>' : '') +
       '</div>';
   }
 

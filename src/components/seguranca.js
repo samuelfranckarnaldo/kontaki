@@ -3,6 +3,9 @@ import { toast }             from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { refreshIcons }      from "../utils.js";
 import { storeKeyService }   from "../services.js";
+import { getUser }           from "../auth.js";
+import { countAvailableCodes, isLowOnCodes, generateCodesForUser } from "../recovery-codes.js";
+import { showRecoveryCodesScreen } from "../setup.js";
 
 export async function loadSeguranca() {
   const btn = document.getElementById("btn-back-seguranca");
@@ -20,7 +23,42 @@ async function renderSeguranca() {
   const distributed= (sk&&sk.distributed) || false;
   const importedAt = (sk&&sk.importedAt)   || null;
 
+  const user = getUser();
+  const codesLeft = user ? await countAvailableCodes(user.id) : 0;
+  const isLow = isLowOnCodes(codesLeft);
+
   wrap.innerHTML = `
+
+    <!-- Códigos de recuperação -->
+    <div style="background:${isLow?"#fffbeb":"#f0fdf4"};border:1.5px solid ${isLow?"#fde68a":"#bbf7d0"};
+                border-radius:12px;padding:14px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:${isLow?"10px":"0"}">
+        <div style="width:36px;height:36px;border-radius:50%;
+                    background:${isLow?"#fef3c7":"#dcfce7"};
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i data-lucide="key-round" style="width:18px;height:18px;color:${isLow?"#d97706":"#16a34a"}"></i>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:700;color:${isLow?"#d97706":"#16a34a"}">
+            ${codesLeft} código${codesLeft===1?"":"s"} de recuperação disponíve${codesLeft===1?"l":"is"}
+          </div>
+          <div style="font-size:12px;color:#71717a;margin-top:2px">
+            Usa-os se esqueceres o teu PIN
+          </div>
+        </div>
+      </div>
+      ${isLow ? `
+      <div style="font-size:12px;color:#92400e;line-height:1.5;margin-bottom:10px">
+        Restam poucos códigos. Gera um novo conjunto para não ficares sem acesso de recuperação.
+      </div>` : ""}
+      <button onclick="window._regenerateRecoveryCodes()"
+              style="width:100%;padding:11px;background:#fff;border:1.5px solid ${isLow?"#fde68a":"#bbf7d0"};
+                     color:${isLow?"#92400e":"#16a34a"};border-radius:10px;font-size:13px;font-weight:700;
+                     cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+        <i data-lucide="refresh-cw" style="width:14px;height:14px"></i>
+        Gerar novo conjunto de códigos
+      </button>
+    </div>
 
     <!-- Status da chave -->
     <div style="background:${hasKey?"#f0fdf4":"#fff5f5"};border:1.5px solid ${hasKey?"#bbf7d0":"#fca5a5"};
@@ -113,6 +151,17 @@ async function renderSeguranca() {
 
   refreshIcons(wrap);
 }
+
+window._regenerateRecoveryCodes = async function() {
+  const user = getUser();
+  if (!user) return;
+  if (!confirm("Gerar um novo conjunto de 10 códigos? Os códigos antigos deixam de funcionar.")) return;
+
+  const codes = await generateCodesForUser(user.id);
+  showRecoveryCodesScreen(codes, function() {
+    renderSeguranca();
+  });
+};
 
 let _keyFileData = null;
 

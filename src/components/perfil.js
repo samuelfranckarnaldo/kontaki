@@ -11,6 +11,8 @@ import { toast }                 from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { generateInvite } from "../invite.js";
 import { getUser, logout, changePasswordAuth, createUser } from "../auth.js";
+import { generateCodesForUser } from "../recovery-codes.js";
+import { showRecoveryCodesScreen } from "../setup.js";
 import { getLicense, loadLicense, activateLicense, PLANS, showUpgradeBanner } from "../license.js";
 import { gerarRelatorioPDF } from "./extras.js";
 import { addStockMovement, getStock } from "../services.js";
@@ -800,8 +802,15 @@ async function changePassword() {
   if (nw !== conf) { toast("Os PINs não coincidem.", "error"); return; }
   try {
     await changePasswordAuth(cur, nw);
-    toast("PIN alterado com sucesso.", "success");
     el("pw-cur").value = ""; el("pw-new").value = ""; el("pw-conf").value = "";
+
+    // PIN mudou -> códigos de recuperação antigos deixam de fazer
+    // sentido (associados ao PIN anterior); regenera automaticamente.
+    const user = getUser();
+    const codes = await generateCodesForUser(user.id);
+    showRecoveryCodesScreen(codes, function() {
+      toast("PIN alterado. Novos códigos de recuperação gerados.", "success");
+    });
   } catch(err) {
     toast(err.message, "error");
   }

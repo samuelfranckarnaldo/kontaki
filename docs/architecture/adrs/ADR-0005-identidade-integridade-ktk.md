@@ -156,5 +156,15 @@ para a decisão abaixo.
 - Não implementa `incident.uuid` — fica recomendado, não bloqueante.
 - Não desenha a estratégia exata de versão/compatibilidade do formato
   `.ktk` — só regista que é necessária.
-- Não resolve o backfill de `uuid` para clientes já existentes em
-  instalações atuais — fica para a implementação.
+- A introdução de `client.uuid` requer uma migração única dos
+  registos existentes. Esta migração atribui identidade global apenas
+  às entidades existentes **no dispositivo onde é executada** — não
+  tenta inferir nem reconciliar identidade entre clientes históricos
+  de dispositivos diferentes. Dois "João Silva" antigos, um em cada
+  dispositivo, recebem `uuid`s distintos e continuam sendo tratados
+  como clientes diferentes; só clientes criados depois desta migração,
+  através de `clientService.create()`, têm identidade global desde a
+  origem. Implementada como ferramenta administrativa em
+  `configuracoes.js` (`_migrarClientesUUID`), não como migração de
+  `DB_VERSION` — o campo `uuid` é opcional no objeto, não exige
+  alteração de schema.

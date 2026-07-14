@@ -1,5 +1,5 @@
 const DB_NAME    = "kontaki_db";
-const DB_VERSION = 16; // v16: adiciona store "pendingSales" para pedidos guardados
+const DB_VERSION = 17; // v17: adiciona stores "recoveryCodes" e "recoveryBackupState" para recuperação de PIN offline
 let _db = null;
 
 function openDB() {
@@ -35,6 +35,8 @@ function openDB() {
       ensure("loginAttempts",    { keyPath:"userId" });
       ensure("auditLog",         { keyPath:"id", autoIncrement:true }, [["entityType",false],["entityId",false],["userId",false],["createdAt",false]]);
       ensure("pendingSales",     { keyPath:"id", autoIncrement:true }, [["createdAt",false],["sessionId",false],["status",false]]);
+      ensure("recoveryCodes",      { keyPath:"id", autoIncrement:true }, [["userId",false],["hash",false],["usedAt",false]]);
+      ensure("recoveryBackupState",{ keyPath:"key" }); // { key:"state", version, pending, lastSync }
     };
     req.onsuccess = () => { _db = req.result; resolve(_db); };
     req.onerror   = () => reject(req.error);

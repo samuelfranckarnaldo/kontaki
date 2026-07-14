@@ -2,6 +2,7 @@ import { db } from "../db.js";
 import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
+import { clientService } from "../services.js";
 import "./fiados.js";
 import { isOverdue, daysOverdue, waLink } from "./fiados.js";
 import { payIcon, payColor, payLabel, payClass, fmtChartVal } from "./historico.js";
@@ -48,7 +49,101 @@ export async function initClientesTab() {
     if (window._ctOpenProfileId) window._openClienteProfile(window._ctOpenProfileId);
   };
   window._ctTopbarAdd = ctTopbarAdd;
+  setupCtSwipe();
   switchCtTab("geral");
+}
+
+const CT_TAB_ORDER = ["geral", "clientes", "fiados"];
+
+function setupCtSwipe() {
+  const container = document.querySelector("#pg-fiados .page-inner");
+  if (!container || container.dataset.swipeBound) return;
+  container.dataset.swipeBound = "1";
+
+  const tabbar = document.getElementById("ct-tabbar");
+  let indicator = document.getElementById("ct-tab-indicator");
+  if (!indicator) {
+    indicator = document.createElement("div");
+    indicator.id = "ct-tab-indicator";
+    indicator.className = "ct-tab-indicator";
+    tabbar.appendChild(indicator);
+  }
+
+  function computeRects() {
+    return CT_TAB_ORDER.map(t => {
+      const btn = tabbar.querySelector('.ct-tab[data-tab="' + t + '"]');
+      return { left: btn.offsetLeft, width: btn.offsetWidth };
+    });
+  }
+  let rects = computeRects();
+
+  function setIndicator(idx, animate) {
+    const r = rects[idx];
+    if (!r) return;
+    indicator.style.transition = animate ? "transform .25s ease, width .25s ease" : "none";
+    indicator.style.width = r.width + "px";
+    indicator.style.transform = "translateX(" + r.left + "px)";
+  }
+
+  setIndicator(CT_TAB_ORDER.indexOf(getActiveTab()), false);
+
+  document.querySelectorAll("#ct-tabbar .ct-tab").forEach(btn => {
+    btn.onclick = () => {
+      switchCtTab(btn.dataset.tab);
+      setIndicator(CT_TAB_ORDER.indexOf(btn.dataset.tab), true);
+    };
+  });
+
+  let startX = 0, startY = 0, tracking = false, curIdx = 0;
+
+  container.addEventListener("touchstart", (e) => {
+    if (document.getElementById("cliente-profile-overlay")) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+    curIdx = CT_TAB_ORDER.indexOf(getActiveTab());
+    rects = computeRects();
+  }, { passive: true });
+
+  container.addEventListener("touchmove", (e) => {
+    if (!tracking) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (Math.abs(dx) < Math.abs(dy) * 1.2) return;
+
+    let targetIdx = dx < 0 ? curIdx + 1 : curIdx - 1;
+    if (targetIdx < 0 || targetIdx > CT_TAB_ORDER.length - 1) targetIdx = curIdx;
+
+    const cur = rects[curIdx], tgt = rects[targetIdx];
+    const tabWidth = cur.width || 100;
+    const progress = Math.min(Math.abs(dx) / tabWidth, 1);
+    const interpLeft = cur.left + (tgt.left - cur.left) * progress;
+    const interpWidth = cur.width + (tgt.width - cur.width) * progress;
+
+    indicator.style.transition = "none";
+    indicator.style.transform = "translateX(" + interpLeft + "px)";
+    indicator.style.width = interpWidth + "px";
+  }, { passive: true });
+
+  container.addEventListener("touchend", (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+
+    if (Math.abs(dx) >= 60 && Math.abs(dx) >= Math.abs(dy) * 1.2) {
+      if (dx < 0 && curIdx < CT_TAB_ORDER.length - 1) {
+        switchCtTab(CT_TAB_ORDER[curIdx + 1]);
+        setIndicator(curIdx + 1, true);
+        return;
+      } else if (dx > 0 && curIdx > 0) {
+        switchCtTab(CT_TAB_ORDER[curIdx - 1]);
+        setIndicator(curIdx - 1, true);
+        return;
+      }
+    }
+    setIndicator(curIdx, true);
+  }, { passive: true });
 }
 
 function getActiveTab() {
@@ -383,7 +478,7 @@ window._saveCliente = async (id) => {
     await db.put("clients", { ...ex, ...data });
     toast("Cliente actualizado.", "success");
   } else {
-    await db.add("clients", { ...data, createdAt: new Date().toISOString() });
+    await clientService.create(data);
     toast("Cliente adicionado.", "success");
   }
   closeModal();

@@ -80,6 +80,28 @@ export async function verifyPassword(password, stored) {
 // o servidor), não só troca de algoritmo. Mantidas aqui inalteradas
 // para não partir imports existentes enquanto isso não for desenhado.
 
+// ── CÓDIGOS DE RECUPERAÇÃO DE PIN (offline, consumíveis) ───────────────────
+// Alta entropia (~2^40 por código) — sem stretching (SHA-256 simples
+// basta; ao contrário do PIN de 6 dígitos, aqui não há espaço de busca
+// pequeno a proteger contra brute-force offline). Ver
+// docs/architecture (ADR de recuperação de PIN).
+export function generateRecoveryCodesBatch(count) {
+  const n = count || 10;
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const codes = [];
+  for (let i = 0; i < n; i++) {
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    const raw = Array.from(bytes).map(function (b) { return chars[b % chars.length]; }).join("");
+    codes.push(raw.slice(0, 4) + "-" + raw.slice(4, 8));
+  }
+  return codes;
+}
+
+export async function hashRecoveryCode(code) {
+  return sha256hex("kontaki-recovery-v1:" + code.trim().toUpperCase());
+}
+
 export function generateRecoveryCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const bytes = new Uint8Array(8);
