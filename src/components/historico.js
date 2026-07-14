@@ -420,6 +420,9 @@ function renderHistSkeleton(tab) {
   if (chart) chart.style.display = "none";
   if (stats) stats.innerHTML = skeletonKpi() + skeletonKpi() + skeletonKpi() + skeletonKpi();
   if (list)  list.innerHTML  = skeletonCard() + skeletonCard() + skeletonCard();
+
+  var searchWrap = el("hist-search-wrap");
+  if (searchWrap) searchWrap.classList.add("hist-skel");
 }
 
 function minDelay(ms) {
@@ -436,6 +439,9 @@ async function loadData() {
   if (activeTab === "geral")     await loadGeral(from, to);
   if (activeTab === "stock")     await loadStock(from, to);
   if (activeTab === "auditoria") await loadAuditoria(from, to);
+
+  var searchWrapDone = el("hist-search-wrap");
+  if (searchWrapDone) searchWrapDone.classList.remove("hist-skel");
 }
 
 // ── GERAL ─────────────────────────────────────────────────────────────────────

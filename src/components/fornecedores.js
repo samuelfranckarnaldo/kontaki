@@ -256,7 +256,7 @@ window._saveSupplier = async (id) => {
 };
 
 // ── COMPRA (formulário com selects customizados) ─────────────────────────────
-var _cpState = { supplierId: null, productId: null, dest: "warehouse", payment: "paid" };
+var _cpState = { supplierId: null, dest: "warehouse", payment: "paid", items: [], itemSeq: 0 };
 var _cpSuppliers = [];
 var _cpProducts = [];
 
@@ -269,37 +269,45 @@ const PAYMENT_OPTIONS = [
   { value: "credit", label: "A Crédito" },
 ];
 
-async function openCompraForm() {
+export async function openCompraForm() {
   const [suppliers, products] = await Promise.all([
     db.getAll("suppliers"),
     db.getAll("products").then(p => p.filter(x => x.active)),
   ]);
 
-  if (!suppliers.length) { toast("Adiciona um fornecedor primeiro.", "error"); return; }
-
   _cpSuppliers = suppliers;
   _cpProducts  = products;
+  const todayStr = new Date().toISOString().slice(0,10);
   _cpState = {
-    supplierId: suppliers[0].id,
-    productId:  products.length ? products[0].id : null,
+    supplierId: suppliers.length ? suppliers[0].id : null,
     dest: "warehouse",
     payment: "paid",
+    items: [],
+    itemSeq: 0,
   };
+  _cpAddItemRow(products.length ? products[0].id : null);
 
   openModal("Registar Compra",
     `<div style="display:flex;flex-direction:column;gap:14px">
-      ${cselField("Fornecedor *", "cp-supplier-trigger", "Seleccionar fornecedor")}
-      ${cselField("Produto *", "cp-product-trigger", products.length ? "Seleccionar produto" : "Nenhum produto disponível")}
+      ${cselField("Fornecedor", "cp-supplier-trigger", suppliers.length ? "Seleccionar fornecedor" : "Sem fornecedor (compra avulsa)")}
       <div class="field-row">
         <div class="field">
-          <label>Quantidade *</label>
-          <input type="number" id="cp-qty" placeholder="0" min="1"/>
+          <label>Data da compra</label>
+          <input type="date" id="cp-date" value="${todayStr}"/>
         </div>
         <div class="field">
-          <label>Preço unitário (Kz) *</label>
-          <input type="number" id="cp-cost" placeholder="0"/>
+          <label>Referência / Factura</label>
+          <input id="cp-invoice" placeholder="Opcional..."/>
         </div>
       </div>
+      <div>
+        <label style="font-size:12px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:8px">Produtos *</label>
+        <div id="cp-items-list"></div>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="window._cpAddItem()">
+          <i data-lucide="plus"></i> Adicionar produto
+        </button>
+      </div>
+      <div style="text-align:right;font-size:15px;font-weight:800;color:var(--primary)" id="cp-total-display">Total: 0,00 Kz</div>
       ${cselField("Destino", "cp-dest-trigger", "Armazém")}
       ${cselField("Forma de Pagamento", "cp-payment-trigger", "Pago no acto")}
       <div class="field" id="cp-paid-wrap" style="display:none">
@@ -319,25 +327,21 @@ async function openCompraForm() {
     </div>`);
   refreshIcons(el("modal-box"));
 
-  _setCselLabel("cp-supplier-trigger", suppliers.find(s=>s.id===_cpState.supplierId));
-  _setCselLabel("cp-product-trigger", products.find(p=>p.id===_cpState.productId), true);
+  if (suppliers.length) {
+    _setCselLabel("cp-supplier-trigger", suppliers.find(s=>s.id===_cpState.supplierId));
+  }
   _setCselLabel("cp-dest-trigger", DEST_OPTIONS[0]);
   _setCselLabel("cp-payment-trigger", PAYMENT_OPTIONS[0]);
+  _cpRenderItems();
 
   var suppTrigger = document.getElementById("cp-supplier-trigger");
   if (suppTrigger) suppTrigger.onclick = function() {
-    openCselSheet("Fornecedor", suppliers.map(s => ({ value: s.id, label: s.name })), function(opt) {
-      _cpState.supplierId = Number(opt.value);
+    var opts = [{ value: "", label: "Sem fornecedor (compra avulsa)" }].concat(
+      suppliers.map(s => ({ value: s.id, label: s.name }))
+    );
+    openCselSheet("Fornecedor", opts, function(opt) {
+      _cpState.supplierId = opt.value === "" ? null : Number(opt.value);
       _setCselLabelDirect("cp-supplier-trigger", opt.label);
-    });
-  };
-
-  var prodTrigger = document.getElementById("cp-product-trigger");
-  if (prodTrigger) prodTrigger.onclick = function() {
-    if (!products.length) { toast("Nenhum produto disponível.", "error"); return; }
-    openCselSheet("Produto", products.map(p => ({ value: p.id, label: p.name })), function(opt) {
-      _cpState.productId = Number(opt.value);
-      _setCselLabelDirect("cp-product-trigger", opt.label);
     });
   };
 
@@ -360,6 +364,75 @@ async function openCompraForm() {
   };
 }
 
+function _cpAddItemRow(productId) {
+  var seq = _cpState.itemSeq++;
+  _cpState.items.push({ rowId: seq, productId: productId || null, qty: 1, unitCost: 0 });
+  return seq;
+}
+
+window._cpAddItem = function() {
+  if (!_cpProducts.length) { toast("Nenhum produto disponível.", "error"); return; }
+  var used = _cpState.items.map(function(it){ return it.productId; });
+  var next = _cpProducts.find(function(p){ return used.indexOf(p.id) === -1; }) || _cpProducts[0];
+  _cpAddItemRow(next.id);
+  _cpRenderItems();
+};
+
+window._cpRemoveItem = function(rowId) {
+  if (_cpState.items.length <= 1) { toast("A compra precisa de pelo menos um produto.", "error"); return; }
+  _cpState.items = _cpState.items.filter(function(it){ return it.rowId !== rowId; });
+  _cpRenderItems();
+};
+
+window._cpItemFieldChanged = function(rowId, field, value) {
+  var it = _cpState.items.find(function(x){ return x.rowId === rowId; });
+  if (!it) return;
+  it[field] = field === "productId" ? Number(value) : Number(value) || 0;
+  _cpUpdateTotal();
+};
+
+window._cpOpenProductPicker = function(rowId) {
+  openCselSheet("Produto", _cpProducts.map(function(p){ return { value: p.id, label: p.name }; }), function(opt) {
+    var it = _cpState.items.find(function(x){ return x.rowId === rowId; });
+    if (!it) return;
+    it.productId = Number(opt.value);
+    _cpRenderItems();
+  });
+};
+
+function _cpUpdateTotal() {
+  var total = _cpState.items.reduce(function(a, it){ return a + (it.qty * it.unitCost); }, 0);
+  var disp = document.getElementById("cp-total-display");
+  if (disp) disp.textContent = "Total: " + fmt(total);
+}
+
+function _cpRenderItems() {
+  var wrap = document.getElementById("cp-items-list");
+  if (!wrap) return;
+  wrap.innerHTML = _cpState.items.map(function(it) {
+    var prod = _cpProducts.find(function(p){ return p.id === it.productId; });
+    var name = prod ? prod.name : "Seleccionar produto";
+    return '<div style="background:var(--bg);border-radius:10px;padding:10px;margin-bottom:8px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px;margin-bottom:8px">' +
+      '<div class="field" style="flex:1;margin-bottom:0">' +
+      '<label>Produto</label>' +
+      '<button type="button" class="csel-trigger" onclick="window._cpOpenProductPicker(' + it.rowId + ')">' +
+      '<span' + (prod ? '' : ' class="csel-placeholder"') + '>' + name + '</span>' +
+      '<i data-lucide="chevron-down" style="width:16px;height:16px;color:#a1a1aa;flex-shrink:0"></i>' +
+      '</button>' +
+      '</div>' +
+      (_cpState.items.length > 1 ? '<button type="button" onclick="window._cpRemoveItem(' + it.rowId + ')" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:4px;flex-shrink:0"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button>' : '') +
+      '</div>' +
+      '<div class="field-row">' +
+      '<div class="field"><label>Quantidade</label><input type="number" min="1" value="' + it.qty + '" oninput="window._cpItemFieldChanged(' + it.rowId + ',\'qty\',this.value)"/></div>' +
+      '<div class="field"><label>Preço unitário (Kz)</label><input type="number" min="0" value="' + it.unitCost + '" oninput="window._cpItemFieldChanged(' + it.rowId + ',\'unitCost\',this.value)"/></div>' +
+      '</div>' +
+      '</div>';
+  }).join("");
+  refreshIcons(wrap);
+  _cpUpdateTotal();
+}
+
 function _setCselLabel(triggerId, obj, isProduct) {
   var trigger = document.getElementById(triggerId);
   if (!trigger || !obj) return;
@@ -376,26 +449,39 @@ function _setCselLabelDirect(triggerId, text) {
 
 window._saveCompra = async () => {
   const suppId  = _cpState.supplierId;
-  const prodId  = _cpState.productId;
-  const qty     = Number(el("cp-qty").value);
-  const cost    = Number(el("cp-cost").value);
   const dest    = _cpState.dest;
   const payMethod = _cpState.payment;
-  const total     = qty * cost;
-  const amountPaid = payMethod === "paid" ? total : Number((el("cp-paid")||{}).value || 0);
+  const dateVal = (el("cp-date")||{}).value;
+  const invoiceRef = (el("cp-invoice")||{}).value || "";
 
-  if (!prodId) { toast("Selecciona um produto.", "error"); return; }
-  if (!qty || !cost) { toast("Quantidade e preço são obrigatórios.", "error"); return; }
+  const items = _cpState.items;
+  for (const it of items) {
+    if (!it.productId) { toast("Selecciona o produto em todas as linhas.", "error"); return; }
+    if (!it.qty || it.qty <= 0) { toast("Quantidade inválida numa das linhas.", "error"); return; }
+    if (!it.unitCost || it.unitCost <= 0) { toast("Preço unitário inválido numa das linhas.", "error"); return; }
+  }
+  const seen = {};
+  for (const it of items) {
+    if (seen[it.productId]) { toast("O mesmo produto aparece em mais do que uma linha — junta-o numa só.", "error"); return; }
+    seen[it.productId] = true;
+  }
+
+  const total = items.reduce((a, it) => a + it.qty * it.unitCost, 0);
+  const amountPaid = payMethod === "paid" ? total : Number((el("cp-paid")||{}).value || 0);
   if (amountPaid > total) { toast("O valor pago não pode ser maior que o total.", "error"); return; }
 
-  const supplier = await db.get("suppliers", suppId);
+  const supplier = suppId ? await db.get("suppliers", suppId) : null;
   const { purchaseService } = await import("../services.js");
 
+  const purchaseDate = dateVal ? new Date(dateVal + "T12:00:00").toISOString() : new Date().toISOString();
+
   await purchaseService.register({
-    productId: prodId, qty, unitCost: cost, location: dest,
-    supplierId: suppId, supplierName: supplier.name,
+    items: items.map(it => ({ productId: it.productId, qty: it.qty, unitCost: it.unitCost })),
+    location: dest,
+    supplierId: suppId, supplierName: supplier ? supplier.name : "",
     paymentStatus: amountPaid >= total ? "paid" : (amountPaid > 0 ? "partial" : "pending"),
-    amountPaid, notes: el("cp-notes").value, userId: getUser().id,
+    amountPaid, notes: el("cp-notes").value, invoiceRef, date: purchaseDate,
+    userId: getUser().id,
   });
 
   toast("Compra registada. Stock actualizado.", "success");

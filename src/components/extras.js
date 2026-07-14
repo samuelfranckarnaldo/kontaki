@@ -1,4 +1,5 @@
 import { db }            from "../db.js";
+import { postReturnJournal } from "../pgc.js";
 import { fmt, fmtDate, refreshIcons } from "../utils.js";
 import { toast }         from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
@@ -104,6 +105,7 @@ window._confirmarDevolucao = async function() {
   var user  = getUser();
   var items = sale.items || [];
   var totalDevolvido = 0;
+  var cogsDevolvido  = 0;
   var devolvidos = [];
 
   for (var i = 0; i < items.length; i++) {
@@ -147,6 +149,7 @@ window._confirmarDevolucao = async function() {
     }
 
     totalDevolvido += item.price * qty;
+    cogsDevolvido  += (product ? (product.costPrice||0) : 0) * qty;
     devolvidos.push(item.name + " x" + qty);
   }
 
@@ -170,6 +173,22 @@ window._confirmarDevolucao = async function() {
     temDevolucao:  true,
     totalDevolvido:(saleAtual.totalDevolvido||0) + totalDevolvido,
   });
+
+  // Contabilidade — estorno de partidas dobradas (PGC)
+  try {
+    var ivaPctVenda = saleAtual.ivaPct || 0;
+    var ivaValorDevolvido = ivaPctVenda > 0 ? totalDevolvido * (ivaPctVenda/100) : 0;
+    await postReturnJournal({
+      saleId:      sale.id,
+      date:        new Date().toISOString(),
+      payMethod:   saleAtual.payMethod,
+      totalBase:   totalDevolvido,
+      ivaValor:    ivaValorDevolvido,
+      cogs:        cogsDevolvido,
+    });
+  } catch (pgcErr) {
+    console.error("Erro ao lançar devolução na contabilidade:", pgcErr);
+  }
 
   closeModal();
   toast("Devolução registada: " + devolvidos.join(", ") + " — " + fmt(totalDevolvido) + " reembolsados.", "success");

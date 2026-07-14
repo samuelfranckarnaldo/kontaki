@@ -146,15 +146,22 @@ document.addEventListener("DOMContentLoaded", function() {
       </div>
 
       <!-- Barra inferior fixa: total + finalizar -->
-      <div class="vender-bottom-bar">
+      <div class="vender-bottom-bar" style="position:relative">
         <div class="vender-total-info">
           <span class="vender-total-label">Total</span>
           <span class="vender-total-value" id="total-val">0,00 Kz</span>
         </div>
-        <button class="vender-guardar-btn" id="btn-guardar-pedido" onclick="window._guardarPedido()">
-          <i data-lucide="bookmark"></i>
-          Guardar
+        <button class="vender-fab" id="btn-vender-fab" onclick="window._toggleVenderFab()">
+          <i data-lucide="plus"></i>
         </button>
+        <div class="vender-fab-popover" id="vender-fab-popover" style="display:none">
+          <button class="vender-fab-action" onclick="window._guardarPedido(); window._toggleVenderFab();">
+            <i data-lucide="bookmark"></i> Guardar pedido
+          </button>
+          <button class="vender-fab-action" onclick="window._openCategoryFilter()">
+            <i data-lucide="tag"></i> Filtrar por categoria
+          </button>
+        </div>
         <button class="vender-finalizar-btn" id="btn-finalizar">
           Finalizar
           <i data-lucide="arrow-right"></i>
@@ -291,25 +298,28 @@ document.addEventListener("DOMContentLoaded", function() {
       <div id="subpage-stock" style="display:none">
         <div class="page-inner">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <button class="btn btn-ghost btn-sm" id="btn-back-stock">← Voltar</button>
-            <button class="btn btn-primary btn-sm" id="btn-prod-add">
-              <i data-lucide="plus"></i> Produto
-            </button>
+            <button class="btn btn-ghost btn-sm" id="btn-back-stock" onclick="window._closeEstoque()">← Voltar</button>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline btn-sm" onclick="window._estComprar()">
+                <i data-lucide="package-plus"></i>
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="window._estInventario()">
+                <i data-lucide="clipboard-list"></i>
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="window._estGoToIncidents()">
+                <i data-lucide="alert-triangle"></i>
+              </button>
+              <button class="btn btn-primary btn-sm" id="btn-prod-add" onclick="window._estoqueAddProduct()">
+                <i data-lucide="plus"></i> Produto
+              </button>
+            </div>
           </div>
+          <div class="produtos-stats" id="estoque-stats"></div>
           <div class="search-wrap">
             <i data-lucide="search" class="search-icon"></i>
-            <input id="stock-search" placeholder="Pesquisar..."/>
+            <input id="estoque-search" placeholder="Pesquisar..."/>
           </div>
-          <div id="inv-alert" class="alert alert-warn" style="display:none">
-            <i data-lucide="alert-triangle"></i>
-            Modo Inventário — insira as contagens físicas.
-          </div>
-          <div class="list-card" id="stock-list"></div>
-          <div style="display:flex;gap:10px" id="inv-actions">
-            <button class="btn btn-ghost btn-full" id="btn-inv-toggle">
-              <i data-lucide="clipboard-list"></i> Modo Inventário
-            </button>
-          </div>
+          <div class="list-card" id="estoque-list"></div>
         </div>
       </div>
 

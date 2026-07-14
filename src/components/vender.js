@@ -7,6 +7,7 @@ import { initCamera } from "./camera.js";
 import { addStockMovement, getStock, getOpenIncidentForProduct, getStockIncidentPolicy, verifyAdminPin, clientService } from "../services.js";
 import { gerarReciboPDF, partilharReciboPDF, printReciboHTML } from "./recibo-pdf.js";
 import { printRecibo } from "../print.js";
+import { postSaleJournal } from "../pgc.js";
 
 let products  = [];
 let cart      = [];
@@ -471,6 +472,46 @@ async function guardarPedido() {
   await atualizarBadgePedidos();
 }
 window._guardarPedido = guardarPedido;
+
+window._toggleVenderFab = () => {
+  const pop = el("vender-fab-popover");
+  const btn = el("btn-vender-fab");
+  if (!pop) return;
+  const opening = pop.style.display === "none";
+  pop.style.display = opening ? "flex" : "none";
+  pop.style.flexDirection = "column";
+  if (btn) btn.classList.toggle("open", opening);
+};
+
+window._openCategoryFilter = async () => {
+  window._toggleVenderFab();
+  const { openPicker } = await import("../picker.js");
+  const savedCats = await db.get("settings", "customCategories");
+  const customCategories = (savedCats && savedCats.value) ? savedCats.value : [];
+  const categories = ["Alimentacao","Bebidas","Higiene","Limpeza", ...customCategories, "Outro"];
+  openPicker("Filtrar por categoria", categories, "", (cat) => {
+    const filtered = products.filter(p => p.active && p.stock > 0 && p.category === cat);
+    const recentWrap = el("recent-products");
+    if (recentWrap) recentWrap.style.display = "none";
+    const wrap = el("search-results");
+    if (wrap) {
+      wrap.style.display = "block";
+      if (!filtered.length) {
+        wrap.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text4);font-size:13px">Nenhum produto em ${cat}</div>`;
+      } else {
+        wrap.innerHTML = filtered.map(p =>
+          `<div class="search-result-item" onclick="window._addProd(${p.id})">
+            <div>
+              <div style="font-size:14px;font-weight:600">${p.name}</div>
+              <div style="font-size:11px;color:#71717a">${p.category||""} · ${p.stock} ${p.unit||"unid"} em stock</div>
+            </div>
+            <div style="font-size:14px;font-weight:700;color:#5b21b6">${fmt(p.price)}</div>
+          </div>`
+        ).join("");
+      }
+    }
+  });
+};
 
 window._abrirPedidosGuardados = async function() {
   var all = await db.getAll("pendingSales");
@@ -1026,8 +1067,7 @@ window._confirmarVenda = async () => {
       }
     }
     const da       = window._checkoutDa     || 0;
-    const ivaEl    = document.getElementById("ck-iva-pct");
-    const ivaPct   = ivaEl ? (Number(ivaEl.value)||0) : (window._checkoutIvaPct||0);
+    const ivaPct   = window._checkoutIvaPct || 0;
     const sub2     = window._checkoutSub || 0;
     const ivaVal   = (sub2 - da) * ivaPct / 100;
     const total    = (sub2 - da) + ivaVal;
@@ -1099,6 +1139,16 @@ window._confirmarVenda = async () => {
         saleId:sid, sessionId:user.sessionId||null, userId:user.id,
         date:saleDate, status:"open", note:"",
       });
+    }
+
+    // Contabilidade — lançamentos de partidas dobradas (PGC)
+    try {
+      await postSaleJournal(
+        { id:sid, date:saleDate, total, subtotal, discount:da, ivaValor:ivaVal, payMethod:method },
+        cart.map(i => ({ id:i.id, qty:i.qty }))
+      );
+    } catch (pgcErr) {
+      console.error("Erro ao lançar venda na contabilidade:", pgcErr);
     }
 
     const cartSnap = [...cart];

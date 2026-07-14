@@ -209,9 +209,8 @@ window._perfilNav = async (page) => {
 
   showSubpage(page);
   if (page === "stock") {
-    showSubpage(null);
-    var prodNav = document.querySelector('.nav-item[data-page="produtos"]');
-    if (prodNav) prodNav.click();
+    var estMod = await import("./estoque.js");
+    await estMod.loadEstoquePage();
     return;
   }
   if (page === "incidentes") await loadIncidentes();
@@ -1231,7 +1230,7 @@ async function loadAssinatura() {
     '<div class="lic-activate-title">' + (lic.code ? "Renovar licença" : "Activar licença") + '</div>' +
     '<div class="lic-activate-sub">Recebeste um código da Introxeer? Insere aqui para activar ou renovar o teu plano.</div>' +
     '<div class="field lic-activate-field">' +
-      '<input class="lic-code-input" id="activation-code" placeholder="KTKI-XXXX-XXXX-XXXXXXXX" maxlength="27"/>' +
+      '<input class="lic-code-input" id="activation-code" placeholder="KTKI-XXXX-XXXX-XXXXXXXXXXXX" maxlength="35"/>' +
     '</div>' +
     '<button class="btn btn-primary btn-full btn-lg" onclick="window._activarLicenca()">' +
       '<i data-lucide="zap"></i> Activar licença' +
@@ -1296,7 +1295,11 @@ async function loadAssinatura() {
 
 function formatLicenseCodeInput() {
   var raw = this.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  var groups = [4, 4, 4, 8];
+  // Últimos 3 segmentos são sempre 4 (KTKI, plano, ano); o segmento
+  // final é o código aleatório em si, cujo comprimento já mudou uma
+  // vez (8 -> 12 caracteres, ver ADR de licenças/CSPRNG) -- por isso
+  // não tem tamanho fixo aqui, absorve o resto do que for digitado.
+  var groups = [4, 4, 4, Infinity];
   var out = "";
   var pos = 0;
   for (var g = 0; g < groups.length; g++) {

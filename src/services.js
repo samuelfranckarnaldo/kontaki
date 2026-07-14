@@ -127,50 +127,61 @@ export async function rebuildStock(productId, location) {
 }
 
 export const purchaseService = {
-  // Motor unico de "registar compra": aplica conversao de unidade,
+  // Motor unico de "registar compra": aplica conversao de unidade por item,
   // grava no historico de stock (stockMovements) e, opcionalmente,
-  // no registo de compras/fornecedor (purchases).
-  async register({ productId, qty, unitCost, location, supplierId, supplierName,
-                    paymentStatus, amountPaid, notes, userId }) {
-    const product = await db.get("products", productId);
-    if (!product) throw new Error("Produto não encontrado.");
-
-    const factor = (product.conversionFactor && product.conversionFactor > 0) ? product.conversionFactor : 1;
-    const rawTotal = qty * factor;
-    const totalUnits = Math.floor(rawTotal);
-    const costPerUnit = totalUnits > 0 ? (qty * unitCost) / totalUnits : unitCost;
-    const totalCost = qty * unitCost;
+  // no registo de compras/fornecedor (purchases). Suporta multi-item.
+  async register({ items, location, supplierId, supplierName,
+                    paymentStatus, amountPaid, notes, userId, invoiceRef, date }) {
+    if (!Array.isArray(items) || !items.length) throw new Error("Sem itens na compra.");
     const dest = location || "warehouse";
+    const purchaseDate = date || new Date().toISOString();
 
-    const purchaseUnitLabel = product.purchaseUnit || product.unit || "unid";
-    const note = supplierName
-      ? `Compra de ${supplierName}: ${qty} ${purchaseUnitLabel} x ${unitCost}`
-      : `Compra: ${qty} ${purchaseUnitLabel} x ${unitCost}`;
+    let totalCost = 0;
+    const savedItems = [];
 
-    await addStockMovement({
-      productId, productName: product.name, type: "purchase", location: dest,
-      qty: totalUnits, reference: "purchase", note, userId,
-    });
+    for (const it of items) {
+      const product = await db.get("products", it.productId);
+      if (!product) throw new Error("Produto não encontrado.");
 
-    const updatedProduct = await db.get("products", productId);
-    if (updatedProduct) {
-      await db.put("products", { ...updatedProduct, costPrice: costPerUnit, updatedAt: new Date().toISOString() });
+      const factor = (product.conversionFactor && product.conversionFactor > 0) ? product.conversionFactor : 1;
+      const rawTotal = it.qty * factor;
+      const totalUnits = Math.floor(rawTotal);
+      const costPerUnit = totalUnits > 0 ? (it.qty * it.unitCost) / totalUnits : it.unitCost;
+      const itemCost = it.qty * it.unitCost;
+      totalCost += itemCost;
+
+      const purchaseUnitLabel = product.purchaseUnit || product.unit || "unid";
+      const note = supplierName
+        ? `Compra de ${supplierName}: ${it.qty} ${purchaseUnitLabel} x ${it.unitCost}`
+        : `Compra: ${it.qty} ${purchaseUnitLabel} x ${it.unitCost}`;
+
+      await addStockMovement({
+        productId: it.productId, productName: product.name, type: "purchase", location: dest,
+        qty: totalUnits, reference: "purchase", note, userId, createdAt: purchaseDate,
+      });
+
+      const updatedProduct = await db.get("products", it.productId);
+      if (updatedProduct) {
+        await db.put("products", { ...updatedProduct, costPrice: costPerUnit, updatedAt: new Date().toISOString() });
+      }
+
+      savedItems.push({ productId: it.productId, productName: product.name, qty: it.qty, unitCost: it.unitCost, totalUnits });
     }
 
     let purchaseId = null;
     if (supplierId) {
       purchaseId = await db.add("purchases", {
         supplierId, supplierName: supplierName || "",
-        items: [{ productId, productName: product.name, qty, unitCost, totalUnits }],
+        items: savedItems,
         total: totalCost, dest,
         paymentStatus: paymentStatus || "paid",
         amountPaid: amountPaid != null ? amountPaid : totalCost,
-        notes: notes || "",
-        userId, date: new Date().toISOString(),
+        notes: notes || "", invoiceRef: invoiceRef || "",
+        userId, date: purchaseDate,
       });
     }
 
-    return { totalUnits, costPerUnit, totalCost, purchaseId };
+    return { savedItems, totalCost, purchaseId };
   },
 };
 

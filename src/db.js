@@ -1,5 +1,5 @@
 const DB_NAME    = "kontaki_db";
-const DB_VERSION = 17; // v17: adiciona stores "recoveryCodes" e "recoveryBackupState" para recuperação de PIN offline
+const DB_VERSION = 18; // v18: adiciona stores "chartOfAccounts" e "journalEntries" para o motor de Contabilidade (PGC Angola)
 let _db = null;
 
 function openDB() {
@@ -37,6 +37,9 @@ function openDB() {
       ensure("pendingSales",     { keyPath:"id", autoIncrement:true }, [["createdAt",false],["sessionId",false],["status",false]]);
       ensure("recoveryCodes",      { keyPath:"id", autoIncrement:true }, [["userId",false],["hash",false],["usedAt",false]]);
       ensure("recoveryBackupState",{ keyPath:"key" }); // { key:"state", version, pending, lastSync }
+      ensure("chartOfAccounts", { keyPath:"code" }); // plano de contas PGC (classes 1-8), semeado por seedChartOfAccounts()
+      ensure("journalEntries",  { keyPath:"id", autoIncrement:true },
+        [["date",false],["sourceType",false],["sourceId",false]]); // lançamentos de partidas dobradas
     };
     req.onsuccess = () => { _db = req.result; resolve(_db); };
     req.onerror   = () => reject(req.error);

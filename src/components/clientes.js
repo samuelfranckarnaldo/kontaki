@@ -50,7 +50,7 @@ export async function initClientesTab() {
   };
   window._ctTopbarAdd = ctTopbarAdd;
   setupCtSwipe();
-  switchCtTab("geral");
+  switchCtTab("geral", true);
 }
 
 const CT_TAB_ORDER = ["geral", "clientes", "fiados"];
@@ -173,7 +173,8 @@ function fadeSwitch(showEl, hideEls) {
   }
 }
 
-function switchCtTab(tab) {
+function switchCtTab(tab, fromBack) {
+  const prevTab = getActiveTab();
   document.querySelectorAll("#ct-tabbar .ct-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
   const panels = {
     geral:    document.getElementById("ct-panel-geral"),
@@ -186,6 +187,10 @@ function switchCtTab(tab) {
   if (tab === "clientes") renderClientesList(true);
   if (tab === "fiados")   renderFiadosList(true);
   updateTopbarAddVisibility(tab);
+
+  if (!fromBack && prevTab !== tab && window._ctNav) {
+    window._ctNav.push(() => switchCtTab(prevTab, true));
+  }
 }
 window._switchCtTab = switchCtTab;
 
@@ -722,27 +727,33 @@ window._openFiadoActions = (id) => {
   refreshIcons(el("modal-box"));
 };
 
-function switchProfileTab(tab) {
+function switchProfileTab(tab, fromBack) {
+  const prevTab = window._ctOpenProfileTab || "compras";
   window._ctOpenProfileTab = tab;
   document.querySelectorAll("#cliente-profile-overlay .fc-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
   const compras = document.getElementById("cp-panel-compras");
   const fiadosP = document.getElementById("cp-panel-fiados");
   fadeSwitch(tab === "compras" ? compras : fiadosP, [tab === "compras" ? fiadosP : compras]);
+
+  if (!fromBack && prevTab !== tab && window._ctNav) {
+    window._ctNav.push(() => switchProfileTab(prevTab, true));
+  }
 }
 window._switchProfileTab = switchProfileTab;
 
-window._closeClienteProfile = () => {
+window._closeClienteProfile = (fromBack) => {
   window._ctOpenProfileId = null;
   window._ctOpenProfileTab = null;
   const ov = document.getElementById("cliente-profile-overlay");
   if (ov) ov.remove();
   document.body.style.overflow = "";
-  switchCtTab(getActiveTab());
+  switchCtTab(getActiveTab(), true);
 };
 
-window._openClienteProfile = async (id) => {
+window._openClienteProfile = async (id, fromBack) => {
   const c = await db.get("clients", id);
   if (!c) { toast("Cliente não encontrado.", "error"); return; }
+  const wasAlreadyOpen = !!document.getElementById("cliente-profile-overlay");
   window._ctOpenProfileId = id;
   const activeTab = window._ctOpenProfileTab || "compras";
 
@@ -817,6 +828,10 @@ window._openClienteProfile = async (id) => {
     const initPanel = document.getElementById(activeTab === "fiados" ? "cp-panel-fiados" : "cp-panel-compras");
     if (initPanel) initPanel.classList.add("ct-fade-in");
   });
+
+  if (!fromBack && !wasAlreadyOpen && window._ctNav) {
+    window._ctNav.push(() => window._closeClienteProfile(true));
+  }
 };
 
 window._closeModal = closeModal;

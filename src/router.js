@@ -38,6 +38,36 @@ function bloqueado(feature) {
   });
 }
 
+// ── Pilha de navegação genérica ────────────────────────────────────────
+// Cada ação "para a frente" (trocar de página, trocar de aba, abrir ficha...)
+// empilha uma função de "desfazer". O gesto/botão de recuar desempilha uma
+// de cada vez, nível a nível. Quando a pilha esvazia, "recuar" volta para
+// "vender"; a partir de "vender" com a pilha vazia, pergunta se quer sair.
+window._ctNav = {
+  stack: [],
+  push: function(undoFn) {
+    this.stack.push(undoFn);
+    history.pushState({ ctDepth: this.stack.length }, "", "");
+  },
+  rearm: function() {
+    history.pushState({ ctDepth: this.stack.length }, "", "");
+  },
+  handleBack: function() {
+    if (this.stack.length > 0) {
+      var undo = this.stack.pop();
+      undo();
+      this.rearm();
+      return;
+    }
+    if (router.currentPage() !== "vender") {
+      router.go("vender", true);
+      this.rearm();
+      return;
+    }
+    router.confirmExit();
+  },
+};
+
 export var router = {
   init: function() {
     var self = this;
@@ -70,11 +100,52 @@ export var router = {
       initQuickMode();
     }
 
-    setTimeout(function() { self.go("vender"); }, 50);
+    history.replaceState({ ctDepth: 0 }, "", "");
+    setTimeout(function() { self.go("vender", true); }, 50);
+
+    window.addEventListener("popstate", function() {
+      // Prioridade 0: fechar modal genérico, se aberto (não entra na pilha)
+      var modalOv = document.getElementById("modal-overlay");
+      if (modalOv && modalOv.style.display !== "none" && modalOv.style.display !== "") {
+        modalOv.style.display = "none";
+        var bEl = document.getElementById("modal-body");
+        if (bEl) bEl.innerHTML = "";
+        window._ctNav.rearm();
+        return;
+      }
+      window._ctNav.handleBack();
+    });
   },
 
-  go: function(pageId) {
+  currentPage: function() {
+    var active = document.querySelector(".page.active");
+    return active ? active.id.replace("pg-", "") : "vender";
+  },
+
+  confirmExit: function() {
+    window._ctNav.rearm();
+    var ov = document.createElement("div");
+    ov.className = "m3-confirm-overlay";
+    ov.innerHTML =
+      '<div class="m3-confirm-box">' +
+        '<div class="m3-confirm-title">Sair do Kontaki?</div>' +
+        '<div class="m3-confirm-actions">' +
+          '<button class="m3-btn-text" id="ct-exit-cancel">Cancelar</button>' +
+          '<button class="m3-btn-filled" id="ct-exit-confirm">Sair</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    document.getElementById("ct-exit-cancel").onclick = function() { ov.remove(); };
+    document.getElementById("ct-exit-confirm").onclick = function() {
+      history.go(-(history.length - 1));
+      setTimeout(function() { window.close(); }, 50);
+    };
+  },
+
+  go: function(pageId, fromBack) {
     if (!PAGES[pageId]) return;
+    var self = this;
+    var prevPage = this.currentPage();
 
     // Salva a posicao de scroll da pagina atual antes de trocar
     var currentActive = document.querySelector(".page.active");
@@ -149,6 +220,10 @@ export var router = {
     // Restaura a posicao de scroll da pagina que acabou de abrir
     var newInner = pgEl ? pgEl.querySelector(".page-inner") : null;
     restoreScroll(pageId, newInner);
+
+    if (!fromBack && prevPage !== pageId && window._ctNav) {
+      window._ctNav.push(function() { self.go(prevPage, true); });
+    }
   },
 };
 

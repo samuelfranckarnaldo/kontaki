@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { postSaleJournal } from "../pgc.js";
 import { fmt, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { getUser } from "../auth.js";
@@ -240,15 +241,17 @@ async function finalizarQm() {
     toast("Insira o nome do cliente para fiado.", "error"); return;
   }
 
-  const total    = qmCart.reduce((a, i) => a + i.price * i.qty, 0);
-  const sub      = total;
+  const sub      = qmCart.reduce((a, i) => a + i.price * i.qty, 0);
   const saleDate = new Date().toISOString();
 
   try {
-    const store = (await db.get("settings","store")) || {};
+    const store  = (await db.get("settings","store")) || {};
+    const ivaPct = Number(store.iva) || 0;
+    const ivaVal = ivaPct > 0 ? sub * (ivaPct/100) : 0;
+    const total  = sub + ivaVal;
     const sid   = await db.add("sales", {
       items:       qmCart.map(i => ({ id:i.id, name:i.name, price:i.price, qty:i.qty, itemDisc:0 })),
-      subtotal:    sub, discount:0, total,
+      subtotal:    sub, discount:0, ivaPct, ivaValor:ivaVal, total,
       payMethod:   qmPayMethod, date:saleDate,
       userId:      getUser().id, sessionId:getUser().sessionId,
       clientName:  fc, clientPhone:"",
@@ -270,6 +273,16 @@ async function finalizarQm() {
         clientName:fc, amount:total, saleId:sid,
         date:saleDate, status:"open", userId:getUser().id, notes:"",
       });
+    }
+
+    // Contabilidade — lançamentos de partidas dobradas (PGC)
+    try {
+      await postSaleJournal(
+        { id:sid, date:saleDate, total, subtotal:sub, discount:0, ivaValor:ivaVal, payMethod:qmPayMethod },
+        qmCart.map(i => ({ id:i.id, qty:i.qty }))
+      );
+    } catch (pgcErr) {
+      console.error("Erro ao lançar venda (quickmode) na contabilidade:", pgcErr);
     }
 
     if (navigator.vibrate) navigator.vibrate([60,40,60]);
