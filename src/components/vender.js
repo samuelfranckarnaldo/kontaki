@@ -4,7 +4,7 @@ import { toast } from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
 import { initCamera } from "./camera.js";
-import { addStockMovement, getStock, getOpenIncidentForProduct, getStockIncidentPolicy, verifyAdminPin } from "../services.js";
+import { addStockMovement, getStock, getOpenIncidentForProduct, getStockIncidentPolicy, verifyAdminPin, clientService } from "../services.js";
 import { gerarReciboPDF, partilharReciboPDF, printReciboHTML } from "./recibo-pdf.js";
 import { printRecibo } from "../print.js";
 
@@ -236,7 +236,7 @@ async function renderRecentProducts() {
       const cColor = categoryColorVender(p.category);
       const avatarHTML = p.imageData
         ? `<div class="recente-chip-avatar" style="background-image:url(${p.imageData});background-size:cover;background-position:center"></div>`
-        : `<div class="recente-chip-avatar" style="background:${cColor}20;color:${cColor}">${(p.name||"P").charAt(0).toUpperCase()}</div>`;
+        : `<div class="recente-chip-avatar" style="background:linear-gradient(135deg, ${cColor}, ${cColor}cc)">${(p.name||"P").charAt(0).toUpperCase()}</div>`;
       return `<button onclick="window._addProd(${p.id})" class="recente-chip">
         ${avatarHTML}
         <div class="recente-chip-info">
@@ -559,6 +559,7 @@ function renderCart() {
     itemsEl.innerHTML = `<div class="cart-empty-state">
       <i data-lucide="shopping-cart"></i>
       <span>Nenhum produto adicionado</span>
+      <div class="cart-empty-hint">Pesquisa ou digitaliza um produto para começar</div>
     </div>`;
     refreshIcons(itemsEl);
     return;
@@ -567,8 +568,14 @@ function renderCart() {
   cart.forEach(item => {
     const isLow = item.qty >= item.stock * 0.8 && item.stock > 0;
     const total = item.price * item.qty;
+    const fullProd = products.find(p => p.id === item.id);
+    const cColor = categoryColorVender(fullProd ? fullProd.category : "Outro");
+    const avatarHTML = (fullProd && fullProd.imageData)
+      ? `<div class="cart-item-avatar" style="background-image:url(${fullProd.imageData});background-size:cover;background-position:center"></div>`
+      : `<div class="cart-item-avatar" style="background:linear-gradient(135deg, ${cColor}, ${cColor}cc);color:#fff">${(item.name||"P").charAt(0).toUpperCase()}</div>`;
     html +=
       `<div class="cart-item-row${isLow?" low":""}">` +
+      avatarHTML +
       `<div style="flex:1;min-width:0">` +
       `<div class="cart-item-name">${item.name}</div>` +
       `<div class="cart-item-sub">${fmt(item.price)} / un${isLow?" · <span style='color:var(--warning);font-weight:700'>Stock baixo</span>":""}</div>` +
@@ -1015,7 +1022,7 @@ window._confirmarVenda = async () => {
         clientId = match.id;
         if (clientPhone && !match.phone) await db.put("clients", { ...match, phone:clientPhone });
       } else {
-        clientId = await db.add("clients", { name:clientName, phone:clientPhone||"", address:"", notes:"", createdAt:new Date().toISOString() });
+        clientId = await clientService.create({ name:clientName, phone:clientPhone||"", address:"", notes:"" });
       }
     }
     const da       = window._checkoutDa     || 0;
