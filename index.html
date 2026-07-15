@@ -300,14 +300,8 @@ document.addEventListener("DOMContentLoaded", function() {
           <div style="display:flex;justify-content:space-between;align-items:center">
             <button class="btn btn-ghost btn-sm" id="btn-back-stock" onclick="window._closeEstoque()">← Voltar</button>
             <div style="display:flex;gap:6px">
-              <button class="btn btn-outline btn-sm" onclick="window._estComprar()">
-                <i data-lucide="package-plus"></i>
-              </button>
-              <button class="btn btn-outline btn-sm" onclick="window._estInventario()">
-                <i data-lucide="clipboard-list"></i>
-              </button>
-              <button class="btn btn-outline btn-sm" onclick="window._estGoToIncidents()">
-                <i data-lucide="alert-triangle"></i>
+              <button class="btn btn-outline btn-sm" onclick="window._estOpenMoreMenu()">
+                <i data-lucide="more-horizontal"></i>
               </button>
               <button class="btn btn-primary btn-sm" id="btn-prod-add" onclick="window._estoqueAddProduct()">
                 <i data-lucide="plus"></i> Produto

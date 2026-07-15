@@ -93,6 +93,6 @@ export function confirmDialog(message, onConfirm, options) {
   var cancelBtn  = document.getElementById("cd-cancel");
   var confirmBtn = document.getElementById("cd-confirm");
 
-  if (cancelBtn)  cancelBtn.onclick  = function() { closeModal(); };
+  if (cancelBtn)  cancelBtn.onclick  = function() { closeModal(); if (options.onCancel) options.onCancel(); };
   if (confirmBtn) confirmBtn.onclick = function() { closeModal(); onConfirm(); };
 }

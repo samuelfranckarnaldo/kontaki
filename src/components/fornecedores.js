@@ -4,6 +4,15 @@ import { toast } from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
 
+async function _refreshStockIfVisible() {
+  const stockPage = document.getElementById("subpage-stock");
+  const isVisible = stockPage && stockPage.style.display === "block";
+  if (isVisible) {
+    const mod = await import("./estoque.js");
+    if (mod.loadEstoquePage) await mod.loadEstoquePage();
+  }
+}
+
 export async function loadFornecedores() {
   const btn = el("btn-back-fornecedores");
   if (btn) btn.onclick = () => window._showSubpage(null);
@@ -269,7 +278,7 @@ const PAYMENT_OPTIONS = [
   { value: "credit", label: "A Crédito" },
 ];
 
-export async function openCompraForm() {
+export async function openCompraForm(prefill) {
   const [suppliers, products] = await Promise.all([
     db.getAll("suppliers"),
     db.getAll("products").then(p => p.filter(x => x.active)),
@@ -277,15 +286,34 @@ export async function openCompraForm() {
 
   _cpSuppliers = suppliers;
   _cpProducts  = products;
-  const todayStr = new Date().toISOString().slice(0,10);
   _cpState = {
     supplierId: suppliers.length ? suppliers[0].id : null,
-    dest: "warehouse",
+    dest: (prefill && prefill.dest) || "warehouse",
     payment: "paid",
     items: [],
     itemSeq: 0,
+    dateStr: new Date().toISOString().slice(0,10),
+    invoiceRef: "",
+    notes: "",
   };
-  _cpAddItemRow(products.length ? products[0].id : null);
+
+  if (prefill && prefill.productId) {
+    const rowId = _cpAddItemRow(prefill.productId);
+    const row = _cpState.items.find(function(it){ return it.rowId === rowId; });
+    if (row && prefill.qty) row.qty = prefill.qty;
+    if (row) {
+      const prod = products.find(function(p){ return p.id === prefill.productId; });
+      if (prod && prod.costPrice) row.unitCost = prod.costPrice;
+    }
+  } else {
+    _cpAddItemRow(products.length ? products[0].id : null);
+  }
+  _cpRenderForm();
+}
+
+function _cpRenderForm() {
+  const suppliers = _cpSuppliers;
+  const products  = _cpProducts;
 
   openModal("Registar Compra",
     `<div style="display:flex;flex-direction:column;gap:14px">
@@ -293,11 +321,11 @@ export async function openCompraForm() {
       <div class="field-row">
         <div class="field">
           <label>Data da compra</label>
-          <input type="date" id="cp-date" value="${todayStr}"/>
+          <input type="date" id="cp-date" value="${_cpState.dateStr}" oninput="window._cpFieldSet('dateStr',this.value)"/>
         </div>
         <div class="field">
           <label>Referência / Factura</label>
-          <input id="cp-invoice" placeholder="Opcional..."/>
+          <input id="cp-invoice" placeholder="Opcional..." value="${_cpState.invoiceRef}" oninput="window._cpFieldSet('invoiceRef',this.value)"/>
         </div>
       </div>
       <div>
@@ -316,11 +344,11 @@ export async function openCompraForm() {
       </div>
       <div class="field">
         <label>Notas</label>
-        <input id="cp-notes" placeholder="Opcional..."/>
+        <input id="cp-notes" placeholder="Opcional..." value="${_cpState.notes}" oninput="window._cpFieldSet('notes',this.value)"/>
       </div>
     </div>
     <div class="form-actions">
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
+      <button class="btn btn-ghost btn-full" onclick="window._cpCancelForm()">Cancelar</button>
       <button class="btn btn-primary btn-full" onclick="window._saveCompra()">
         <i data-lucide="package-plus"></i> Registar
       </button>
@@ -391,14 +419,102 @@ window._cpItemFieldChanged = function(rowId, field, value) {
   _cpUpdateTotal();
 };
 
+window._cpFieldSet = function(field, value) {
+  _cpState[field] = value;
+};
+
+window._cpCancelForm = function() {
+  closeModal();
+};
+
+var _cpCreatingProduct = false;
+
 window._cpOpenProductPicker = function(rowId) {
-  openCselSheet("Produto", _cpProducts.map(function(p){ return { value: p.id, label: p.name }; }), function(opt) {
+  var opts = [{ value: "__new__", label: "+ Criar novo produto" }].concat(
+    _cpProducts.map(function(p){ return { value: p.id, label: p.name }; })
+  );
+  openCselSheet("Produto", opts, function(opt) {
+    if (opt.value === "__new__") {
+      if (_cpCreatingProduct) { toast("Já há uma criação de produto em curso.", "info"); return; }
+      _cpCreatingProduct = true;
+      _cpCreateProductInline(rowId);
+      return;
+    }
     var it = _cpState.items.find(function(x){ return x.rowId === rowId; });
     if (!it) return;
     it.productId = Number(opt.value);
     _cpRenderItems();
   });
 };
+function _cpShowProcessing(msg) {
+  if (!document.getElementById("cp-spin-style")) {
+    var st = document.createElement("style");
+    st.id = "cp-spin-style";
+    st.textContent = "@keyframes cpSpin { to { transform:rotate(360deg); } }";
+    document.head.appendChild(st);
+  }
+  openModal("",
+    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:50px 0;gap:16px">' +
+    '<div style="width:38px;height:38px;border:3px solid var(--border2);border-top-color:var(--primary);border-radius:50%;animation:cpSpin .7s linear infinite"></div>' +
+    '<div style="font-size:13.5px;color:var(--text2);font-weight:600">' + msg + '</div>' +
+    '</div>'
+  );
+}
+
+async function _cpCreateProductInline(rowId) {
+  const existingIds = _cpProducts.map(function(p){ return p.id; });
+  const mod = await import("./produtos.js");
+  mod.openProductForm({}, { hideStockFields: true });
+
+  let attempts = 0;
+  const poll = setInterval(function() {
+    attempts++;
+    const overlay = document.getElementById("modal-overlay");
+    const stillOpen = overlay && overlay.style.display === "flex";
+    if (stillOpen) {
+      if (attempts > 600) clearInterval(poll);
+      return;
+    }
+    clearInterval(poll);
+    _cpFinishProductCreation(rowId, existingIds);
+  }, 300);
+}
+
+async function _cpFinishProductCreation(rowId, existingIds) {
+  _cpCreatingProduct = false;
+
+  // Mostra logo o "a processar" para nao haver instante parado —
+  // tempo minimo visivel de 500ms (tempo estavel observado + margem de seguranca).
+  _cpShowProcessing("A criar o produto, aguarde um segundo...");
+  const minVisible = new Promise(function(resolve){ setTimeout(resolve, 500); });
+
+  const fetchWork = (async function() {
+    const fresh = await db.getAll("products");
+    _cpProducts = fresh.filter(function(p){ return p.active; });
+
+    if (window._pfLastResolvedProductId != null) {
+      const resolvedId = window._pfLastResolvedProductId;
+      window._pfLastResolvedProductId = null;
+      return fresh.find(function(p){ return p.id === resolvedId; }) || null;
+    }
+
+    return fresh
+      .filter(function(p){ return existingIds.indexOf(p.id) === -1 && p.active; })
+      .sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); })[0];
+  })();
+
+  const [created] = await Promise.all([fetchWork, minVisible]);
+
+  if (created) {
+    const it = _cpState.items.find(function(x){ return x.rowId === rowId; });
+    if (it) {
+      it.productId = created.id;
+      if (created.costPrice) it.unitCost = created.costPrice;
+    }
+  }
+  _cpRenderForm();
+  if (created) toast("Produto criado e seleccionado.", "success");
+}
 
 function _cpUpdateTotal() {
   var total = _cpState.items.reduce(function(a, it){ return a + (it.qty * it.unitCost); }, 0);
@@ -487,6 +603,7 @@ window._saveCompra = async () => {
   toast("Compra registada. Stock actualizado.", "success");
   closeModal();
   renderFornecedores();
+  await _refreshStockIfVisible();
 };
 
 window._closeModal = closeModal;
@@ -542,18 +659,22 @@ window._archivePurchase = async (purchaseId) => {
 window._editCompra = async (purchaseId) => {
   const p = await db.get("purchases", purchaseId);
   if (!p) return;
-  const item = (p.items||[])[0] || {};
+  const items = p.items || [];
   closeModal();
+
+  const rowsHtml = items.map(function(item, idx) {
+    return '<div style="background:#f4f4f5;border-radius:10px;padding:12px;margin-bottom:10px">' +
+      '<div style="font-size:12px;color:#71717a;margin-bottom:8px">' + (item.productName||"?") + '</div>' +
+      '<div class="field-row">' +
+      '<div class="field"><label>Quantidade</label><input type="number" class="ec-qty" data-idx="' + idx + '" value="' + (item.qty||0) + '" min="1"/></div>' +
+      '<div class="field"><label>Custo Unitário (Kz)</label><input type="number" class="ec-cost" data-idx="' + idx + '" value="' + (item.unitCost||0) + '" min="0"/></div>' +
+      '</div>' +
+      '</div>';
+  }).join("");
+
   openModal("Editar Compra",
-    `<div style="background:#f4f4f5;border-radius:10px;padding:12px;margin-bottom:14px">
-      <div style="font-size:12px;color:#71717a">Produto</div>
-      <div style="font-size:14px;font-weight:700">${item.productName||"?"}</div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="field-row">
-        <div class="field"><label>Quantidade</label><input type="number" id="ec-qty" value="${item.qty||0}" min="1"/></div>
-        <div class="field"><label>Custo Unitário (Kz)</label><input type="number" id="ec-cost" value="${item.unitCost||0}" min="0"/></div>
-      </div>
+    `<div style="display:flex;flex-direction:column;gap:4px">
+      ${rowsHtml}
       <div class="field"><label>Notas</label><input id="ec-notes" value="${p.notes||""}"/></div>
     </div>
     <div class="form-actions">
@@ -574,33 +695,48 @@ window._saveEditCompra = async (purchaseId) => {
 
   const p = await db.get("purchases", purchaseId);
   if (!p) return;
-  const item = (p.items||[])[0] || {};
-  const newQty  = Number(el("ec-qty").value);
-  const newCost = Number(el("ec-cost").value);
+  const items = p.items || [];
   const newNotes = el("ec-notes").value;
 
-  if (!newQty || newQty <= 0) { toast("Quantidade inválida.", "error"); return; }
+  const qtyInputs  = document.querySelectorAll(".ec-qty");
+  const costInputs = document.querySelectorAll(".ec-cost");
 
-  const diffQty = newQty - (item.qty||0);
-  const product = await db.get("products", item.productId);
+  const updatedItems = [];
+  let total = 0;
+  const { addStockMovement } = await import("../services.js");
 
-  if (product && diffQty !== 0) {
-    const { addStockMovement } = await import("../services.js");
-    await addStockMovement({
-      productId: item.productId, productName: item.productName,
-      type: "adjustment", location: p.dest||"shop",
-      qty: diffQty, reference: "purchase-edit#"+purchaseId,
-      note: "Correcção de compra editada", sessionId: null,
-    });
-  }
-  if (product && newCost !== item.unitCost) {
-    await db.put("products", { ...product, costPrice: newCost });
+  for (let idx = 0; idx < items.length; idx++) {
+    const item = items[idx];
+    const qtyInput  = document.querySelector('.ec-qty[data-idx="' + idx + '"]');
+    const costInput = document.querySelector('.ec-cost[data-idx="' + idx + '"]');
+    const newQty  = Number(qtyInput ? qtyInput.value : item.qty);
+    const newCost = Number(costInput ? costInput.value : item.unitCost);
+
+    if (!newQty || newQty <= 0) { toast("Quantidade inválida em " + (item.productName||"um item") + ".", "error"); return; }
+
+    const diffQty = newQty - (item.qty||0);
+    const product = await db.get("products", item.productId);
+
+    if (product && diffQty !== 0) {
+      await addStockMovement({
+        productId: item.productId, productName: item.productName,
+        type: "adjustment", location: p.dest||"shop",
+        qty: diffQty, reference: "purchase-edit#"+purchaseId,
+        note: "Correcção de compra editada", sessionId: null,
+      });
+    }
+    if (product && newCost !== item.unitCost) {
+      await db.put("products", { ...product, costPrice: newCost });
+    }
+
+    updatedItems.push({ ...item, qty: newQty, unitCost: newCost });
+    total += newQty * newCost;
   }
 
   await db.put("purchases", {
     ...p,
-    items: [{ ...item, qty:newQty, unitCost:newCost }],
-    total: newQty * newCost,
+    items: updatedItems,
+    total,
     notes: newNotes,
     editedAt: new Date().toISOString(),
   });
@@ -608,4 +744,5 @@ window._saveEditCompra = async (purchaseId) => {
   toast("Compra actualizada.", "success");
   closeModal();
   renderFornecedores();
+  await _refreshStockIfVisible();
 };

@@ -50,6 +50,12 @@ function categoryColor(cat) {
   return {"Alimentacao":"#f97316","Bebidas":"#3b82f6","Higiene":"#ec4899","Limpeza":"#10b981","Outro":"#6b7280"}[cat] || "#6b7280";
 }
 
+function daysUntil(dateStr) {
+  if (!dateStr) return Infinity;
+  var diff = new Date(dateStr) - new Date();
+  return Math.ceil(diff / 86400000);
+}
+
 export async function loadEstoquePage() {
   allProducts = await db.getAll("products");
   filterMode = "all";
@@ -88,6 +94,10 @@ function renderEstoqueStats() {
   s.style.gridTemplateColumns = "1fr 1fr 1fr";
   s.style.gap = "8px";
 
+  const expiring = active.filter(p => p.expiryDate && daysUntil(p.expiryDate) <= 30 && daysUntil(p.expiryDate) >= 0).length;
+  const expired   = active.filter(p => p.expiryDate && daysUntil(p.expiryDate) < 0).length;
+  const hasExpiryTracking = active.some(p => p.expiryDate);
+
   s.innerHTML =
     `<div class="hist-hero" style="grid-column:span 3">` +
     `<div class="hist-hero-label">Valor total em stock</div>` +
@@ -101,7 +111,12 @@ function renderEstoqueStats() {
     _estStatCard({ label:"Produtos", value:total, sub:"activos", color:"var(--primary)", icon:"package", filter:"all", clickable:true }) +
     _estStatCard({ label:"Stock baixo", value:low, sub:"a repor", color:"var(--warning)", icon:"alert-triangle", filter:"low", clickable:low>0, isAlert:true }) +
     _estStatCard({ label:"Esgotados", value:zero, sub:"sem stock", color:"var(--danger)", icon:"x-circle", filter:"zero", clickable:zero>0, isAlert:true }) +
-    `</div>`;
+    `</div>` +
+    (hasExpiryTracking ?
+      `<div style="grid-column:span 3;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">` +
+      _estStatCard({ label:"A vencer", value:expiring, sub:"nos próx. 30 dias", color:"var(--warning)", icon:"clock", filter:"expiring", clickable:expiring>0, isAlert:true }) +
+      _estStatCard({ label:"Vencidos", value:expired, sub:"fora do prazo", color:"var(--danger)", icon:"calendar-x", filter:"expired", clickable:expired>0, isAlert:true }) +
+      `</div>` : "");
 
   refreshIcons(s);
 }
@@ -122,11 +137,17 @@ function renderEstoqueList() {
 
   if (filterMode === "low")  list = list.filter(p => (p.stock||0)>0 && (p.stock||0)<=(p.minStock||5));
   else if (filterMode === "zero") list = list.filter(p => (p.stock||0)===0);
+  else if (filterMode === "expiring") list = list.filter(p => p.expiryDate && daysUntil(p.expiryDate) <= 30 && daysUntil(p.expiryDate) >= 0);
+  else if (filterMode === "expired")  list = list.filter(p => p.expiryDate && daysUntil(p.expiryDate) < 0);
   else if (q) list = list.filter(p => p.name.toLowerCase().includes(q) || (p.barcode||"").includes(q));
 
-  list.sort((a,b) => (a.stock||0) - (b.stock||0));
+  if (filterMode === "expiring" || filterMode === "expired") {
+    list.sort((a,b) => daysUntil(a.expiryDate) - daysUntil(b.expiryDate));
+  } else {
+    list.sort((a,b) => (a.stock||0) - (b.stock||0));
+  }
 
-  const FILTER_LABELS = { low:"Stock Baixo", zero:"Esgotados" };
+  const FILTER_LABELS = { low:"Stock Baixo", zero:"Esgotados", expiring:"A Vencer", expired:"Vencidos" };
   const filterLabel = FILTER_LABELS[filterMode] || "";
 
   const listContainer = el("estoque-list");
@@ -158,6 +179,16 @@ function renderEstoqueList() {
     const avatarHTML = p.imageData
       ? `<div class="produto-avatar" style="background-image:url(${p.imageData});background-size:cover;background-position:center"></div>`
       : `<div class="produto-avatar" style="background:${cColor}20;color:${cColor}">${initial}</div>`;
+
+    let expiryTag = "";
+    let expiryBadgeClass = "";
+    if (p.expiryDate) {
+      const d = daysUntil(p.expiryDate);
+      if (d < 0) { expiryTag = "Vencido"; expiryBadgeClass = "produto-badge-zero"; }
+      else if (d <= 30) { expiryTag = "Vence em " + d + "d"; expiryBadgeClass = "produto-badge-low"; }
+    }
+    const batchMeta = p.batchNumber ? ` · Lote ${p.batchNumber}` : "";
+
     html +=
       `<div class="produto-item ${qty===0?"produto-item-zero":qty<=min?"produto-item-low":""}">` +
       avatarHTML +
@@ -165,8 +196,9 @@ function renderEstoqueList() {
       `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">` +
       `<div class="produto-name">${p.name}</div>` +
       (tag ? `<span class="produto-badge ${badgeClass}">${tag}</span>` : "") +
+      (expiryTag ? `<span class="produto-badge ${expiryBadgeClass}">${expiryTag}</span>` : "") +
       `</div>` +
-      `<div class="produto-meta">${p.barcode?p.barcode+" · ":""}${p.category}</div>` +
+      `<div class="produto-meta">${p.barcode?p.barcode+" · ":""}${p.category}${batchMeta}</div>` +
       `<div class="produto-stock-line">` +
       `<span><span class="produto-stock-label">Loja</span> ${qty}</span>` +
       `<span><span class="produto-stock-label">Arm.</span> ${arm}</span>` +
@@ -188,6 +220,10 @@ function renderEstoqueList() {
 function _estActionsBar(p) {
   const user = getUser();
   const isAdmin = user && user.role === "admin";
+  const qty = p.stock || 0;
+  const min = p.minStock || 5;
+  const isLow = qty <= min;
+
   let btns = `<button class="btn btn-ghost btn-sm" style="flex:1" onclick="window._estHistory(${p.id})"><i data-lucide="history"></i> Histórico</button>`;
   if (isAdmin) {
     btns =
@@ -195,8 +231,26 @@ function _estActionsBar(p) {
       `<button class="btn btn-ghost btn-sm" style="flex:1" onclick="window._estTransfer(${p.id})"><i data-lucide="arrow-left-right"></i> Transferir</button>` +
       btns;
   }
-  return `<div style="display:flex;gap:6px;padding:8px 14px 12px 14px;border-top:1px solid var(--border2)">${btns}</div>`;
+
+  let reporBtn = "";
+  if (isAdmin && isLow) {
+    reporBtn = `<button class="btn btn-primary btn-sm" style="flex:1" onclick="window._estRepor(${p.id})"><i data-lucide="package-plus"></i> Repor</button>`;
+  }
+
+  return `<div style="display:flex;gap:6px;padding:8px 14px 12px 14px;border-top:1px solid var(--border2)">${btns}</div>` +
+    (reporBtn ? `<div style="display:flex;gap:6px;padding:0 14px 12px 14px">${reporBtn}</div>` : "");
 }
+
+window._estRepor = async (id) => {
+  const p = allProducts.find(x => x.id === id);
+  if (!p) return;
+  const qty = p.stock || 0;
+  const min = p.minStock || 5;
+  const suggestedQty = Math.max(min - qty, 1);
+
+  const mod = await import("./fornecedores.js");
+  mod.openCompraForm({ productId: id, qty: suggestedQty, dest: "shop" });
+};
 
 window._estAdjust = (id) => {
   const p = allProducts.find(x => x.id === id);
@@ -403,6 +457,170 @@ window._estGoToIncidents = () => {
     if (window._setIncFilter) window._setIncFilter("type", "stock");
   });
 };
+
+window._estOpenMoreMenu = () => {
+  const items = [
+    { icon: "package-plus", label: "Comprar", action: "window._estComprar()" },
+    { icon: "clipboard-list", label: "Inventário Periódico", action: "window._estInventario()" },
+    { icon: "alert-triangle", label: "Incidentes de Stock", action: "window._estGoToIncidents()" },
+    { icon: "bar-chart-3", label: "Relatórios", action: "window._estOpenReports()" },
+  ];
+  openModal("Mais opções",
+    items.map(function(it) {
+      return '<button class="perfil-menu-item" style="width:100%;text-align:left" onclick="window._closeModal();' + it.action + '">' +
+        '<i data-lucide="' + it.icon + '"></i><span>' + it.label + '</span>' +
+        '<span class="perfil-menu-chevron">›</span>' +
+        '</button>';
+    }).join("")
+  );
+  refreshIcons(document.getElementById("modal-box") || document.body);
+};
+
+window._estOpenReports = async () => {
+  const [sales, allProds] = await Promise.all([
+    db.getAll("sales"),
+    Promise.resolve(allProducts.filter(p => p.active)),
+  ]);
+
+  openModal("Relatórios de Stock",
+    `<div style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto">
+      <button class="produto-filter-chip produto-filter-chip--active" id="rep-tab-parados" onclick="window._estRepTab('parados')">Parados</button>
+      <button class="produto-filter-chip" id="rep-tab-rotatividade" onclick="window._estRepTab('rotatividade')">Rotatividade</button>
+      <button class="produto-filter-chip" id="rep-tab-abc" onclick="window._estRepTab('abc')">Análise ABC</button>
+    </div>
+    <div id="rep-content"></div>`
+  );
+  refreshIcons(document.getElementById("modal-box") || document.body);
+
+  window._estReportsData = { sales, products: allProds };
+  window._estRepTab("parados");
+};
+
+window._estRepTab = (tab) => {
+  ["parados","rotatividade","abc"].forEach(function(t) {
+    const btn = document.getElementById("rep-tab-" + t);
+    if (btn) btn.classList.toggle("produto-filter-chip--active", t === tab);
+  });
+  const content = document.getElementById("rep-content");
+  if (!content) return;
+
+  if (tab === "parados") content.innerHTML = _estRenderParados();
+  else if (tab === "rotatividade") content.innerHTML = _estRenderRotatividade();
+  else if (tab === "abc") content.innerHTML = _estRenderABC();
+
+  refreshIcons(content);
+};
+
+function _estRenderParados() {
+  const { sales, products } = window._estReportsData;
+  const now = new Date();
+  const cutoff = 30;
+
+  const lastSaleByProduct = {};
+  sales.forEach(function(s) {
+    (s.items || []).forEach(function(it) {
+      const d = new Date(s.date);
+      if (!lastSaleByProduct[it.id] || d > lastSaleByProduct[it.id]) lastSaleByProduct[it.id] = d;
+    });
+  });
+
+  const parados = products.map(function(p) {
+    const last = lastSaleByProduct[p.id] || null;
+    const daysSince = last ? Math.floor((now - last) / 86400000) : null;
+    return { p, last, daysSince };
+  }).filter(function(x) {
+    return x.daysSince === null || x.daysSince >= cutoff;
+  }).sort(function(a, b) {
+    if (a.daysSince === null) return -1;
+    if (b.daysSince === null) return 1;
+    return b.daysSince - a.daysSince;
+  });
+
+  if (!parados.length) {
+    return '<div class="empty-state"><div class="empty-state-title">Sem produtos parados</div><div class="empty-state-sub">Todos os produtos tiveram venda nos últimos 30 dias.</div></div>';
+  }
+
+  return '<div style="font-size:12px;color:var(--text3);margin-bottom:10px">Produtos sem venda há 30+ dias (ou nunca vendidos):</div>' +
+    parados.map(function(x) {
+      const label = x.daysSince === null ? "Nunca vendido" : x.daysSince + " dias sem venda";
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border2)">' +
+        '<div><div style="font-size:13px;font-weight:600">' + x.p.name + '</div>' +
+        '<div style="font-size:11px;color:var(--text3)">' + (x.p.category||"Outro") + '</div></div>' +
+        '<div style="font-size:12px;font-weight:700;color:' + (x.daysSince === null ? "var(--danger)" : "var(--warning)") + '">' + label + '</div>' +
+        '</div>';
+    }).join("");
+}
+
+function _estRenderRotatividade() {
+  const { sales, products } = window._estReportsData;
+
+  const soldByProduct = {};
+  sales.forEach(function(s) {
+    (s.items || []).forEach(function(it) {
+      soldByProduct[it.id] = (soldByProduct[it.id] || 0) + it.qty;
+    });
+  });
+
+  const rows = products.map(function(p) {
+    const sold = soldByProduct[p.id] || 0;
+    const stock = p.stock || 0;
+    const ratio = stock > 0 ? sold / stock : (sold > 0 ? Infinity : 0);
+    return { p, sold, stock, ratio };
+  }).sort(function(a, b) { return b.ratio - a.ratio; });
+
+  return '<div style="font-size:12px;color:var(--text3);margin-bottom:10px">Vendido (total) ÷ Stock actual — maior número, mais rápido gira:</div>' +
+    rows.map(function(x) {
+      const ratioLabel = x.ratio === Infinity ? "∞" : x.ratio.toFixed(1) + "x";
+      const color = x.ratio === 0 ? "var(--text3)" : x.ratio >= 3 ? "var(--success)" : x.ratio >= 1 ? "var(--warning)" : "var(--danger)";
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border2)">' +
+        '<div><div style="font-size:13px;font-weight:600">' + x.p.name + '</div>' +
+        '<div style="font-size:11px;color:var(--text3)">' + x.sold + ' vendidos · ' + x.stock + ' em stock</div></div>' +
+        '<div style="font-size:14px;font-weight:800;color:' + color + '">' + ratioLabel + '</div>' +
+        '</div>';
+    }).join("");
+}
+
+function _estRenderABC() {
+  const { sales, products } = window._estReportsData;
+
+  const revenueByProduct = {};
+  sales.forEach(function(s) {
+    (s.items || []).forEach(function(it) {
+      revenueByProduct[it.id] = (revenueByProduct[it.id] || 0) + (it.qty * it.price);
+    });
+  });
+
+  const rows = products
+    .map(function(p) { return { p, revenue: revenueByProduct[p.id] || 0 }; })
+    .filter(function(x) { return x.revenue > 0; })
+    .sort(function(a, b) { return b.revenue - a.revenue; });
+
+  const total = rows.reduce(function(a, x) { return a + x.revenue; }, 0);
+  let cumulative = 0;
+
+  const classified = rows.map(function(x) {
+    cumulative += x.revenue;
+    const pct = total > 0 ? (cumulative / total) * 100 : 0;
+    const klass = pct <= 80 ? "A" : pct <= 95 ? "B" : "C";
+    return { ...x, pct, klass };
+  });
+
+  const klassColor = { A: "var(--success)", B: "var(--warning)", C: "var(--text3)" };
+  const klassBg    = { A: "var(--success-light)", B: "var(--warning-light)", C: "var(--border2)" };
+
+  if (!classified.length) {
+    return '<div class="empty-state"><div class="empty-state-title">Sem dados de venda</div><div class="empty-state-sub">Ainda não há vendas suficientes para classificar.</div></div>';
+  }
+
+  return '<div style="font-size:12px;color:var(--text3);margin-bottom:10px">Classificação por receita — A: top 80%, B: próximos 15%, C: restantes 5%</div>' +
+    classified.map(function(x) {
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border2)">' +
+        '<div style="width:26px;height:26px;border-radius:50%;background:' + klassBg[x.klass] + ';color:' + klassColor[x.klass] + ';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0">' + x.klass + '</div>' +
+        '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + x.p.name + '</div></div>' +
+        '<div style="text-align:right;flex-shrink:0"><div style="font-size:13px;font-weight:700">' + fmt(x.revenue) + '</div></div>' +
+        '</div>';
+    }).join("");
+}
 
 window._closeEstoque = () => {
   const sub = el("subpage-stock"); if (sub) sub.style.display = "none";

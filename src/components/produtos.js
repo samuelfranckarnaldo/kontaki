@@ -139,9 +139,15 @@ function daysUntil(dateStr) {
   return Math.ceil(diff / 86400000);
 }
 
-export function openProductForm(p = {}) {
+let _pfOnCreated = null;
+let _pfLastOpts = {};
+
+export function openProductForm(p = {}, opts = {}) {
   window._pfSaleUnit = p.unit || "unid";
   const isEdit = !!p.id;
+  const hideStock = !!opts.hideStockFields;
+  _pfOnCreated = opts.onCreated || null;
+  _pfLastOpts = opts;
   openModal(isEdit ? "Editar Produto" : "Novo Produto",
     `<div style="display:flex;flex-direction:column;gap:var(--space-3)">
 
@@ -180,6 +186,7 @@ export function openProductForm(p = {}) {
 
       <div style="background:rgba(91,33,182,.05);border:1px solid rgba(91,33,182,.12);border-radius:var(--radius);padding:var(--space-4)">
         <div style="font-size:var(--text-xs);font-weight:var(--weight-strong);color:var(--primary);margin-bottom:var(--space-3);text-transform:uppercase;letter-spacing:.4px">Stock</div>
+        ${hideStock ? '<div style="font-size:11px;color:var(--text3);margin-bottom:var(--space-3);display:flex;align-items:center;gap:5px"><i data-lucide="info" style="width:12px;height:12px;flex-shrink:0"></i>A quantidade desta compra vai definir o stock.</div>' : `
         <div class="field-row" style="margin-bottom:var(--space-3)">
           <div class="field">
             <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Stock loja</label>
@@ -193,6 +200,7 @@ export function openProductForm(p = {}) {
           </div>
         </div>
         ${isEdit ? '<div style="font-size:11px;color:var(--text3);margin-bottom:var(--space-3);display:flex;align-items:center;gap:5px"><i data-lucide="lock" style="width:12px;height:12px;flex-shrink:0"></i>Para alterar o stock, usa Ajustar ou Transferir no menu do produto.</div>' : ""}
+        `}
         <div class="field">
           <label style="text-transform:none;font-weight:var(--weight-medium);letter-spacing:0;font-size:var(--text-xs);color:var(--text2)">Stock mínimo (alerta)</label>
           <input type="number" id="pf-minstock" value="${p.minStock||5}" min="0"/>
@@ -865,8 +873,33 @@ window._saveProduto = async (id) => {
     }
     toast("Produto actualizado.","success");
   } else {
-    // Verifica limite do plano antes de criar
     const allProducts = await db.getAll("products");
+
+    const dupe = allProducts.find(function(p){
+      return p.active && p.name.trim().toLowerCase() === name.trim().toLowerCase();
+    });
+    if (dupe) {
+      const retryOpts = _pfLastOpts;
+      confirmDialog(
+        'Já existe um produto chamado "' + dupe.name + '". Usar o produto existente em vez de criar um novo?',
+        function() {
+          closeModal();
+          window._pfLastResolvedProductId = dupe.id;
+          if (_pfOnCreated) { const cb = _pfOnCreated; _pfOnCreated = null; cb(dupe.id); }
+          toast("A usar o produto já existente.", "info");
+        },
+        {
+          title: "Produto já existe", confirmText: "Usar existente", cancelText: "Escolher outro nome",
+          onCancel: function() {
+            toast("Escolhe outro nome para o produto.", "info");
+            openProductForm({}, retryOpts);
+          }
+        }
+      );
+      return;
+    }
+
+    // Verifica limite do plano antes de criar
     const activeCount = allProducts.filter(function(p){ return p.active; }).length;
     const licMod = await import("../license.js");
     const planLimit = licMod.getPlanLimit("maxProducts");
