@@ -40,3 +40,4 @@ rejeitada também fazia sentido nalgum critério.
 | 0003 | Modelo de Integridade Local | Aguarda revisão pós-P0 | `adrs/ADR-0003-integridade-local.md` |
 | 0004 | Assinatura Assimétrica de Convites | Aceite | `adrs/ADR-0004-assinatura-convites.md` |
 | 0005 | Identidade e Integridade do Payload `.ktk` | Proposta | `adrs/ADR-0005-identidade-integridade-ktk.md` |
+| 0006 | Movimento como Unidade de Sincronização | Proposta | `adrs/ADR-0006-movimento-unidade-sincronizacao.md` |

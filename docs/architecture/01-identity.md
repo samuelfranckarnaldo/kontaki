@@ -96,6 +96,17 @@ identificador local).
   já existir e já ser usado corretamente no `.ktkcat`. Ver
   `ADR-0005` para a decisão de correção.
 
+- **Gestão formal de dispositivos/equipa** — futuramente poderá existir
+  uma identidade formal de dispositivo/participante (ex: "esta loja
+  tem N caixas ativos, este está desativado") para permitir
+  acompanhamento de quantos dispositivos ainda faltam sincronizar, ou
+  revogação de um dispositivo específico. Esta capacidade **não faz
+  parte** do contrato atual de identidade, e deliberadamente não é
+  pré-requisito de `ADR-0006` — o mecanismo de sincronização por
+  movimento aí decidido é correto mesmo sem o sistema saber quantos
+  dispositivos existem. Saber "quantos faltam" é uma camada de gestão
+  operacional, não uma condição para a sincronização funcionar.
+
 ## Não-decisões
 
 - Não define formatos exatos de geração (algoritmos, comprimento) —
