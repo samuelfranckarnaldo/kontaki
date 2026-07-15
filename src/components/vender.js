@@ -680,21 +680,22 @@ async function renderSummary() {
     else discRow.style.display = "none";
   }
 
-  // Linha de IVA dinâmica
+  // Linha de IVA dinâmica — empilhada DENTRO de .vender-total-info, nao como item
+  // separado na barra horizontal (bug anterior: competia por espaco com FAB/Finalizar)
   var ivaRow = el("iva-amt-row");
   if (!ivaRow) {
-    var totalRow = totalEl ? totalEl.closest("div") : null;
-    if (totalRow && totalRow.parentNode) {
+    var totalInfo = document.querySelector(".vender-total-info");
+    if (totalInfo) {
       ivaRow = document.createElement("div");
       ivaRow.id = "iva-amt-row";
-      ivaRow.style.cssText = "display:none;justify-content:space-between;font-size:13px;color:#d97706;padding:2px 0";
-      ivaRow.innerHTML = '<span>IVA <span id="iva-pct-label"></span>%</span><span id="iva-amt-val"></span>';
-      totalRow.parentNode.insertBefore(ivaRow, totalRow);
+      ivaRow.style.cssText = "display:none;font-size:10px;color:#d97706;font-weight:600;white-space:nowrap;margin-top:1px";
+      ivaRow.innerHTML = 'IVA <span id="iva-pct-label"></span>%: <span id="iva-amt-val"></span>';
+      totalInfo.appendChild(ivaRow);
     }
   }
   if (ivaRow) {
     if (ivaPct > 0 && valorIva > 0) {
-      ivaRow.style.display = "flex";
+      ivaRow.style.display = "block";
       var pl = document.getElementById("iva-pct-label"); if (pl) pl.textContent = ivaPct;
       var iv = document.getElementById("iva-amt-val"); if (iv) iv.textContent = "+ " + fmt(valorIva);
     } else {

@@ -6,6 +6,7 @@ import { loadTurno } from "./turno.js";
 import { loadFornecedores } from "./fornecedores.js";
 import { loadEscritorio } from "./escritorio.js";
 import { db }                    from "../db.js";
+import { CHART_OF_ACCOUNTS } from "../pgc.js";
 import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
@@ -889,6 +890,28 @@ async function loadContactosPage() {
   await loadContactos();
 }
 
+var activeContaTab = "resumo";
+
+function renderContaTabs() {
+  var tabs = [
+    { id:"resumo",         label:"Resumo"         },
+    { id:"razao",          label:"Livro Razão"    },
+    { id:"balancete",      label:"Balancete"      },
+    { id:"demonstracoes",  label:"Demonstrações"  },
+  ];
+  var wrap = document.getElementById("contabilidade-tabs");
+  if (!wrap) return;
+  wrap.innerHTML = tabs.map(function(t) {
+    return '<button class="hist-tab' + (activeContaTab===t.id?" active":"") + '" onclick="window._contaTab(\'' + t.id + '\')">' + t.label + '</button>';
+  }).join("");
+}
+
+window._contaTab = async function(tab) {
+  activeContaTab = tab;
+  renderContaTabs();
+  await loadContabilidade();
+};
+
 async function loadContabilidade() {
   var wrap = document.getElementById("contabilidade-content");
   if (!wrap) return;
@@ -906,6 +929,14 @@ async function loadContabilidade() {
     return;
   }
 
+  renderContaTabs();
+  if (activeContaTab === "resumo")     return loadContaResumo(wrap);
+  if (activeContaTab === "razao")      return loadContaRazao(wrap);
+  if (activeContaTab === "balancete")      return loadContaBalancete(wrap);
+  if (activeContaTab === "demonstracoes")  return loadContaDemonstracoes(wrap);
+}
+
+async function loadContaResumo(wrap) {
   var sales    = await db.getAll("sales");
   var purchases= await db.getAll("purchases");
   var products = await db.getAll("products");
@@ -1141,6 +1172,248 @@ function row(label, value, sub) {
 
 function fmt(v) {
   return (v||0).toLocaleString("pt-AO") + " Kz";
+}
+
+
+// ── LIVRO RAZÃO ────────────────────────────────────────────────────────────────
+var _razaoContaSel = null;
+
+async function loadContaRazao(wrap) {
+  var entries = await db.getAll("journalEntries");
+
+  var comMovimento = {};
+  entries.forEach(function(e) {
+    (e.lines||[]).forEach(function(l) { comMovimento[l.account] = true; });
+  });
+  var contasComMov = CHART_OF_ACCOUNTS.filter(function(c) { return comMovimento[c.code]; });
+
+  if (!contasComMov.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:48px 20px;color:#a1a1aa">' +
+      '<div style="font-size:14px;font-weight:600">Sem lançamentos ainda</div>' +
+      '<div style="font-size:13px;margin-top:6px">O livro razão preenche-se à medida que houver vendas.</div>' +
+      '</div>';
+    return;
+  }
+
+  if (!_razaoContaSel || !comMovimento[_razaoContaSel]) {
+    _razaoContaSel = contasComMov[0].code;
+  }
+
+  var options = contasComMov.map(function(c) {
+    return '<option value="' + c.code + '"' + (c.code===_razaoContaSel?' selected':'') + '>' +
+      c.code + ' — ' + c.name + '</option>';
+  }).join("");
+
+  wrap.innerHTML =
+    '<select id="razao-conta-select" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-bottom:14px">' +
+    options + '</select>' +
+    '<div id="razao-lancamentos"></div>';
+
+  var sel = document.getElementById("razao-conta-select");
+  sel.onchange = function() { _razaoContaSel = sel.value; renderRazaoLancamentos(entries); };
+  renderRazaoLancamentos(entries);
+}
+
+function renderRazaoLancamentos(entries) {
+  var wrap = document.getElementById("razao-lancamentos");
+  if (!wrap) return;
+  var conta = CHART_OF_ACCOUNTS.find(function(c){ return c.code === _razaoContaSel; });
+  if (!conta) return;
+
+  var linhas = [];
+  entries.forEach(function(e) {
+    (e.lines||[]).forEach(function(l) {
+      if (l.account === _razaoContaSel && (l.debit||l.credit)) {
+        linhas.push({ date:e.date, description:e.description, debit:l.debit||0, credit:l.credit||0 });
+      }
+    });
+  });
+  linhas.sort(function(a,b){ return new Date(a.date) - new Date(b.date); });
+
+  var saldo = 0;
+  var rows = linhas.map(function(l) {
+    saldo += conta.natureza === "devedora" ? (l.debit - l.credit) : (l.credit - l.debit);
+    return '<div class="conta-row">' +
+      '<div><div class="conta-row-label">' + l.description + '</div>' +
+      '<div class="conta-row-sub">' + fmtDate(l.date) + (l.debit?' · Débito '+fmt(l.debit):'') + (l.credit?' · Crédito '+fmt(l.credit):'') + '</div></div>' +
+      '<div class="conta-row-val">' + fmt(saldo) + '</div>' +
+      '</div>';
+  }).join("");
+
+  wrap.innerHTML =
+    '<div class="conta-section-label">' + conta.code + ' — ' + conta.name + '</div>' +
+    '<div class="conta-card">' + rows + '</div>' +
+    '<div class="conta-hero" style="margin-top:14px;background:linear-gradient(135deg,#4c1d95,#7c3aed)">' +
+    '<div class="conta-hero-label">Saldo atual</div>' +
+    '<div class="conta-hero-val" style="font-size:26px">' + fmt(saldo) + '</div>' +
+    '</div>';
+}
+
+function fmtDate(iso) {
+  var d = new Date(iso);
+  return d.toLocaleDateString("pt-AO", { day:"2-digit", month:"2-digit", year:"numeric" });
+}
+
+// ── BALANCETE ─────────────────────────────────────────────────────────────────
+async function loadContaBalancete(wrap) {
+  var entries = await db.getAll("journalEntries");
+
+  var totals = {};
+  CHART_OF_ACCOUNTS.forEach(function(c) { totals[c.code] = { debit:0, credit:0 }; });
+
+  entries.forEach(function(e) {
+    (e.lines||[]).forEach(function(l) {
+      if (!totals[l.account]) return;
+      totals[l.account].debit  += l.debit||0;
+      totals[l.account].credit += l.credit||0;
+    });
+  });
+
+  var contasComMov = CHART_OF_ACCOUNTS.filter(function(c) {
+    return totals[c.code].debit > 0 || totals[c.code].credit > 0;
+  });
+
+  if (!contasComMov.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:48px 20px;color:#a1a1aa">' +
+      '<div style="font-size:14px;font-weight:600">Sem lançamentos ainda</div>' +
+      '<div style="font-size:13px;margin-top:6px">O balancete preenche-se à medida que houver vendas.</div>' +
+      '</div>';
+    return;
+  }
+
+  var totalDebitGeral = 0, totalCreditGeral = 0;
+  var porClasse = {};
+  contasComMov.forEach(function(c) {
+    porClasse[c.classe] = porClasse[c.classe] || [];
+    porClasse[c.classe].push(c);
+    totalDebitGeral  += totals[c.code].debit;
+    totalCreditGeral += totals[c.code].credit;
+  });
+
+  var classeNomes = {
+    1:"Meios Fixos e Investimentos", 2:"Existências", 3:"Terceiros", 4:"Meios Monetários",
+    5:"Capital e Reservas", 6:"Proveitos por Natureza", 7:"Custos por Natureza", 8:"Resultados",
+  };
+
+  var html = Object.keys(porClasse).sort().map(function(classe) {
+    var rows = porClasse[classe].map(function(c) {
+      var t = totals[c.code];
+      var saldo = c.natureza === "devedora" ? (t.debit - t.credit) : (t.credit - t.debit);
+      return '<div class="conta-row">' +
+        '<div><div class="conta-row-label">' + c.code + ' — ' + c.name + '</div>' +
+        '<div class="conta-row-sub">D: ' + fmt(t.debit) + ' · C: ' + fmt(t.credit) + '</div></div>' +
+        '<div class="conta-row-val">' + fmt(saldo) + '</div>' +
+        '</div>';
+    }).join("");
+    return '<div class="conta-section-label">Classe ' + classe + ' — ' + classeNomes[classe] + '</div>' +
+      '<div class="conta-card">' + rows + '</div>';
+  }).join("");
+
+  var diff = Math.round((totalDebitGeral - totalCreditGeral) * 100) / 100;
+  var bateOK = diff === 0;
+
+  wrap.innerHTML =
+    '<div class="conta-hero" style="background:' + (bateOK?'linear-gradient(135deg,#059669,#10b981)':'linear-gradient(135deg,#dc2626,#ef4444)') + '">' +
+    '<div class="conta-hero-label">' + (bateOK?'Balancete equilibrado':'Balancete desequilibrado') + '</div>' +
+    '<div class="conta-hero-val" style="font-size:22px">D: ' + fmt(totalDebitGeral) + '</div>' +
+    '<div class="conta-hero-sub">C: ' + fmt(totalCreditGeral) + (bateOK?' · ✓ bate certo':' · diferença: '+fmt(diff)) + '</div>' +
+    '</div>' + html;
+}
+
+
+// ── DEMONSTRAÇÕES FINANCEIRAS ───────────────────────────────────────────────────
+async function loadContaDemonstracoes(wrap) {
+  var entries = await db.getAll("journalEntries");
+
+  var totals = {};
+  CHART_OF_ACCOUNTS.forEach(function(c) { totals[c.code] = { debit:0, credit:0 }; });
+  entries.forEach(function(e) {
+    (e.lines||[]).forEach(function(l) {
+      if (!totals[l.account]) return;
+      totals[l.account].debit  += l.debit||0;
+      totals[l.account].credit += l.credit||0;
+    });
+  });
+
+  function saldoConta(c) {
+    var t = totals[c.code];
+    return c.natureza === "devedora" ? (t.debit - t.credit) : (t.credit - t.debit);
+  }
+  function contasComMov(tipo) {
+    return CHART_OF_ACCOUNTS.filter(function(c) {
+      return c.tipo === tipo && (totals[c.code].debit > 0 || totals[c.code].credit > 0);
+    });
+  }
+
+  if (!entries.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:48px 20px;color:#a1a1aa">' +
+      '<div style="font-size:14px;font-weight:600">Sem lançamentos ainda</div>' +
+      '<div style="font-size:13px;margin-top:6px">As demonstrações preenchem-se à medida que houver movimento.</div>' +
+      '</div>';
+    return;
+  }
+
+  // ── Demonstração de Resultados ──
+  var proveitos = contasComMov("proveito");
+  var custos    = contasComMov("custo");
+  var totalProveitos = proveitos.reduce(function(a,c){ return a + saldoConta(c); }, 0);
+  var totalCustos    = custos.reduce(function(a,c){ return a + saldoConta(c); }, 0);
+  var resultado = totalProveitos - totalCustos;
+
+  var drRows = proveitos.map(function(c) {
+    return contaRow(c.code + " — " + c.name, fmt(saldoConta(c)), "#16a34a");
+  }).join("") + custos.map(function(c) {
+    return contaRow(c.code + " — " + c.name, "-" + fmt(saldoConta(c)), "#dc2626");
+  }).join("");
+
+  // ── Balanço ──
+  var ativos   = contasComMov("activo");
+  var passivos = contasComMov("passivo");
+  var capitais = contasComMov("capital");
+  var totalAtivo    = ativos.reduce(function(a,c){ return a + saldoConta(c); }, 0);
+  var totalPassivo  = passivos.reduce(function(a,c){ return a + saldoConta(c); }, 0);
+  var totalCapital  = capitais.reduce(function(a,c){ return a + saldoConta(c); }, 0);
+  // Resultado do período ainda não foi encerrado para 81/88 — entra como "plug" do lado do capital
+  var totalPassivoCapital = totalPassivo + totalCapital + resultado;
+
+  var ativoRows = ativos.map(function(c) {
+    return contaRow(c.code + " — " + c.name, fmt(saldoConta(c)), "#111827");
+  }).join("");
+  var passivoRows = passivos.map(function(c) {
+    return contaRow(c.code + " — " + c.name, fmt(saldoConta(c)), "#111827");
+  }).join("") + capitais.map(function(c) {
+    return contaRow(c.code + " — " + c.name, fmt(saldoConta(c)), "#111827");
+  }).join("") + contaRow("Resultado do período (não encerrado)", fmt(resultado), resultado>=0?"#16a34a":"#dc2626");
+
+  var diff = Math.round((totalAtivo - totalPassivoCapital) * 100) / 100;
+  var bateOK = diff === 0;
+
+  wrap.innerHTML =
+    '<div class="conta-hero" style="background:' + (resultado>=0?'linear-gradient(135deg,#059669,#10b981)':'linear-gradient(135deg,#dc2626,#ef4444)') + '">' +
+    '<div class="conta-hero-label">Resultado líquido do período</div>' +
+    '<div class="conta-hero-val">' + fmt(resultado) + '</div>' +
+    '<div class="conta-hero-sub">' + (resultado>=0?'▲ Lucro':'▼ Prejuízo') + '</div>' +
+    '</div>' +
+
+    '<div class="conta-section-label">Demonstração de Resultados</div>' +
+    '<div class="conta-card">' + drRows + '</div>' +
+    '<div class="conta-card" style="margin-top:8px">' +
+    contaRow("Total Proveitos", fmt(totalProveitos), "#16a34a") +
+    contaRow("Total Custos", fmt(totalCustos), "#dc2626") +
+    contaRow("Resultado líquido", fmt(resultado), resultado>=0?"#16a34a":"#dc2626") +
+    '</div>' +
+
+    '<div class="conta-section-label" style="margin-top:18px">Balanço — Ativo</div>' +
+    '<div class="conta-card">' + (ativoRows||contaRow("Sem contas de ativo com movimento","","#a1a1aa")) + '</div>' +
+
+    '<div class="conta-section-label" style="margin-top:14px">Balanço — Passivo + Capital</div>' +
+    '<div class="conta-card">' + passivoRows + '</div>' +
+
+    '<div class="conta-hero" style="margin-top:14px;background:' + (bateOK?'linear-gradient(135deg,#059669,#10b981)':'linear-gradient(135deg,#dc2626,#ef4444)') + '">' +
+    '<div class="conta-hero-label">' + (bateOK?'Balanço equilibrado':'Balanço desequilibrado') + '</div>' +
+    '<div class="conta-hero-val" style="font-size:22px">Ativo: ' + fmt(totalAtivo) + '</div>' +
+    '<div class="conta-hero-sub">Passivo+Capital: ' + fmt(totalPassivoCapital) + (bateOK?' · ✓ bate certo':' · diferença: '+fmt(diff)) + '</div>' +
+    '</div>';
 }
 
 async function loadAssinatura() {

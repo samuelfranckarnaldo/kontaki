@@ -152,3 +152,62 @@ export async function postReturnJournal(params) {
     ]);
   }
 }
+
+// Mapeia forma de pagamento de compra -> conta
+function purchasePaymentAccount(method) {
+  var m = (method || "").toLowerCase();
+  if (m.includes("credit") || m.includes("crédito") || m.includes("credito")) return "32"; // Fornecedores
+  if (m.includes("transfer") || m.includes("multicaixa") || m.includes("cartão") || m.includes("cartao")) return "43"; // Depósitos à ordem
+  return "45"; // Dinheiro (default)
+}
+
+// Lançamento de uma compra: débito Mercadorias, crédito conta de pagamento (ou Fornecedores, se a crédito)
+export async function postPurchaseJournal(params) {
+  var acctCredito = purchasePaymentAccount(params.payMethod);
+  await createJournalEntry(params.date, "Compra #" + params.purchaseId, "purchase", params.purchaseId, [
+    { account: "26", debit: params.total, credit: 0 },
+    { account: acctCredito, debit: 0, credit: params.total },
+  ]);
+}
+
+// Liquidação parcial de uma compra a crédito no próprio acto (assume pagamento em dinheiro)
+export async function postSupplierPaymentJournal(params) {
+  await createJournalEntry(params.date, "Pagamento a fornecedor — Compra #" + params.purchaseId, "purchase", params.purchaseId, [
+    { account: "32", debit: params.amountPaid, credit: 0 },
+    { account: "45", debit: 0, credit: params.amountPaid },
+  ]);
+}
+
+// Mapeia forma de pagamento de despesa -> conta de crédito (despesas são sempre pagas no acto)
+function expensePaymentAccount(method) {
+  var m = (method || "").toLowerCase();
+  if (m.includes("transfer") || m.includes("multicaixa")) return "43"; // Depósitos à ordem
+  return "45"; // Dinheiro (default)
+}
+
+// Mapeia categoria de despesa -> conta de custo
+function expenseCostAccount(category) {
+  if ((category||"").toLowerCase() === "salários" || (category||"").toLowerCase() === "salarios") return "72"; // Custos com o pessoal
+  return "75"; // Outros custos e perdas operacionais
+}
+
+// Remove lançamentos anteriores de uma origem (usado antes de re-lançar numa edição)
+async function deleteJournalEntriesBySource(sourceType, sourceId) {
+  var all = await db.getAll("journalEntries");
+  var toDelete = all.filter(function(e){ return e.sourceType === sourceType && e.sourceId === sourceId; });
+  for (var i = 0; i < toDelete.length; i++) {
+    await db.delete("journalEntries", toDelete[i].id);
+  }
+}
+
+// Lançamento de uma despesa: débito conta de custo, crédito Caixa/Depósitos
+export async function postExpenseJournal(expense) {
+  await deleteJournalEntriesBySource("expense", expense.id);
+  if (!expense.countsInAccounting) return;
+  var acctCusto  = expenseCostAccount(expense.category);
+  var acctCredito = expensePaymentAccount(expense.payMethod);
+  await createJournalEntry(expense.date, "Despesa — " + expense.description, "expense", expense.id, [
+    { account: acctCusto, debit: expense.amount, credit: 0 },
+    { account: acctCredito, debit: 0, credit: expense.amount },
+  ]);
+}

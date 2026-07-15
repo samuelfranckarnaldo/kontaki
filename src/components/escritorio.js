@@ -297,7 +297,7 @@ function showRevisaoModal(rec) {
   var stockRows = Object.values(ktk.stock_esperado||{});
 
   var rowsHtml = stockRows.map(function(r) {
-    return '<div class="esc-review-row" data-product-id="' + r.productId + '" data-received="' + r.received + '">' +
+    return '<div class="esc-review-row" data-product-id="' + r.productId + '" data-catalog-id="' + (r.catalogId||"") + '" data-received="' + r.received + '">' +
       '<span class="esc-review-name">' + r.productName + '</span>' +
       '<span class="esc-review-received">' + r.received + '</span>' +
       '<input class="esc-review-input" type="number" value="' + r.sold + '" oninput="window._recalcEsperado(this)"/>' +
@@ -331,10 +331,12 @@ window._recalcEsperado = function(input) {
 window._confirmarKtkPendente = async function(importId) {
   var corrections = {};
   document.querySelectorAll(".esc-review-row").forEach(function(row) {
+    var catalogId = row.getAttribute("data-catalog-id");
     var pid = Number(row.getAttribute("data-product-id"));
+    var key = catalogId ? catalogId : pid; // ADR-0005: catalogId quando disponível (.ktk 2.1+), productId em .ktk 2.0 legado
     var input = row.querySelector(".esc-review-input");
     var val = Number(input.value || 0);
-    if (String(val) !== input.defaultValue) corrections[pid] = val;
+    if (String(val) !== input.defaultValue) corrections[key] = val;
   });
   try {
     var result = await ktkService.confirmImport(importId, corrections);

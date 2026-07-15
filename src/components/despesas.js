@@ -3,6 +3,7 @@ import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast }         from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser }       from "../auth.js";
+import { postExpenseJournal } from "../pgc.js";
 
 var CATEGORIAS = ["Renda","Electricidade","Água","Salários","Transporte","Manutenção","Internet/Telefone","Impostos e Taxas","Combustível","Marketing e Publicidade","Seguros","Material de Escritório","Limpeza","Segurança","Comissões","Outro"];
 
@@ -539,7 +540,7 @@ window._updateDespesa = async function(id) {
   var payElU  = document.getElementById("de-paymethod-value");
   var supBtnU = document.getElementById("de-supplier-btn");
   var supIdU  = supBtnU ? supBtnU.getAttribute("data-id") : "";
-  await db.put("expenses", Object.assign({}, existing, {
+  var updatedExpense = Object.assign({}, existing, {
     description: desc,
     category: (catBtnU ? catBtnU.getAttribute("data-value") : null) || "Outro",
     amount: amount,
@@ -549,7 +550,16 @@ window._updateDespesa = async function(id) {
     supplierName: (supIdU && supBtnU.querySelector("span")) ? supBtnU.querySelector("span").textContent : null,
     countsInAccounting: accEl ? accEl.checked : true,
     isRecurring: (document.getElementById("de-recurring")||{}).checked || false,
-  }));
+  });
+  await db.put("expenses", updatedExpense);
+
+  // Contabilidade — substitui o lançamento anterior pelo actualizado
+  try {
+    await postExpenseJournal(updatedExpense);
+  } catch (pgcErr) {
+    console.error("Erro ao re-lançar despesa editada na contabilidade:", pgcErr);
+  }
+
   toast("Despesa actualizada.", "success");
   closeModal();
   await renderDespesas();
@@ -591,7 +601,7 @@ window._saveDespesa = async function() {
   var payEl2  = document.getElementById("de-paymethod-value");
   var supBtnN = document.getElementById("de-supplier-btn");
   var sess    = getSession();
-  await db.add("expenses", {
+  var newExpense = {
     description: desc,
     category: (catBtnN ? catBtnN.getAttribute("data-value") : null) || "Outro",
     amount: amount,
@@ -604,7 +614,16 @@ window._saveDespesa = async function() {
     countsInAccounting: accEl2 ? accEl2.checked : true,
     isRecurring: (document.getElementById("de-recurring")||{}).checked || false,
     createdAt: new Date().toISOString(),
-  });
+  };
+  var newExpenseId = await db.add("expenses", newExpense);
+
+  // Contabilidade — lançamento de partidas dobradas (PGC)
+  try {
+    await postExpenseJournal(Object.assign({ id: newExpenseId }, newExpense));
+  } catch (pgcErr) {
+    console.error("Erro ao lançar despesa na contabilidade:", pgcErr);
+  }
+
   toast("Despesa registada.","success");
   closeModal();
   await renderDespesas();

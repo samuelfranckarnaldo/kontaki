@@ -274,8 +274,10 @@ const DEST_OPTIONS = [
   { value: "shop",       label: "Loja" },
 ];
 const PAYMENT_OPTIONS = [
-  { value: "paid",   label: "Pago no acto" },
-  { value: "credit", label: "A Crédito" },
+  { value: "dinheiro",      label: "Dinheiro" },
+  { value: "transferencia", label: "Transferência" },
+  { value: "multicaixa",    label: "Multicaixa" },
+  { value: "credit",        label: "A Crédito" },
 ];
 
 export async function openCompraForm(prefill) {
@@ -583,15 +585,16 @@ window._saveCompra = async () => {
   }
 
   const total = items.reduce((a, it) => a + it.qty * it.unitCost, 0);
-  const amountPaid = payMethod === "paid" ? total : Number((el("cp-paid")||{}).value || 0);
+  const amountPaid = payMethod === "credit" ? Number((el("cp-paid")||{}).value || 0) : total;
   if (amountPaid > total) { toast("O valor pago não pode ser maior que o total.", "error"); return; }
 
   const supplier = suppId ? await db.get("suppliers", suppId) : null;
   const { purchaseService } = await import("../services.js");
+  const { postPurchaseJournal, postSupplierPaymentJournal } = await import("../pgc.js");
 
   const purchaseDate = dateVal ? new Date(dateVal + "T12:00:00").toISOString() : new Date().toISOString();
 
-  await purchaseService.register({
+  const result = await purchaseService.register({
     items: items.map(it => ({ productId: it.productId, qty: it.qty, unitCost: it.unitCost })),
     location: dest,
     supplierId: suppId, supplierName: supplier ? supplier.name : "",
@@ -599,6 +602,25 @@ window._saveCompra = async () => {
     amountPaid, notes: el("cp-notes").value, invoiceRef, date: purchaseDate,
     userId: getUser().id,
   });
+
+  // Contabilidade — lançamentos de partidas dobradas (PGC)
+  try {
+    await postPurchaseJournal({
+      purchaseId: result.purchaseId,
+      date: purchaseDate,
+      payMethod: payMethod,
+      total: total,
+    });
+    if (payMethod === "credit" && amountPaid > 0) {
+      await postSupplierPaymentJournal({
+        purchaseId: result.purchaseId,
+        date: purchaseDate,
+        amountPaid: amountPaid,
+      });
+    }
+  } catch (pgcErr) {
+    console.error("Erro ao lançar compra na contabilidade:", pgcErr);
+  }
 
   toast("Compra registada. Stock actualizado.", "success");
   closeModal();

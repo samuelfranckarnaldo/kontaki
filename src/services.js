@@ -1,6 +1,7 @@
 import { db } from "./db.js";
 import { getUser } from "./auth.js";
 import { verifyPassword } from "./crypto.js";
+import { logger } from "./logger.js";
 
 export function generateUUID() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -25,7 +26,7 @@ export async function hmacSha256(message) {
   return Array.from(new Uint8Array(sig)).map(b=>b.toString(16).padStart(2,"0")).join("");
 }
 
-export async function generateKtkHash(ktk) {
+async function generateKtkHashV20(ktk) {
   const payload=JSON.stringify({
     versao:ktk.versao, id_sessao:ktk.id_sessao,
     loja_id:ktk.loja_id, loja_nome:ktk.loja_nome,
@@ -39,11 +40,36 @@ export async function generateKtkHash(ktk) {
   return hmacSha256(payload);
 }
 
+// v2.1 — ADR-0005: stock_movements passa a incluir catalogId no payload
+// assinado, fechando a assimetria em que só stock_esperado (por entrar sem
+// filtro) ficava protegido contra alteração de identidade de produto.
+async function generateKtkHashV21(ktk) {
+  const payload=JSON.stringify({
+    versao:ktk.versao, id_sessao:ktk.id_sessao,
+    loja_id:ktk.loja_id, loja_nome:ktk.loja_nome,
+    funcionario_id:ktk.funcionario_id,
+    data_abertura:ktk.data_abertura, data_fecho:ktk.data_fecho,
+    total_vendas:ktk.total_vendas, n_vendas:ktk.n_vendas,
+    vendas:(ktk.vendas||[]).map(v=>({id:v.id,total:v.total,date:v.date})),
+    stock_esperado:ktk.stock_esperado,
+    stock_movements:(ktk.stock_movements||[]).map(m=>({type:m.type,productId:m.productId,catalogId:m.catalogId||null,qty:m.qty,createdAt:m.createdAt})),
+  });
+  return hmacSha256(payload);
+}
+
+// Fórmula atual — usada sempre que um novo .ktk é gerado.
+export async function generateKtkHash(ktk) {
+  return generateKtkHashV21(ktk);
+}
+
 export async function validateKtkHash(ktk) {
   if(!ktk.hash) return {valid:false,reason:"sem_hash",legacy:false};
   if(ktk.versao==="1.0") return {valid:true,reason:"hash_legado",legacy:true};
   try {
-    const expected=await generateKtkHash(ktk);
+    let expected;
+    if (ktk.versao === "2.0") expected = await generateKtkHashV20(ktk);
+    else if (ktk.versao === "2.1") expected = await generateKtkHashV21(ktk);
+    else return {valid:false,reason:"versao_nao_suportada",legacy:false};
     return expected===ktk.hash ? {valid:true,reason:"ok",legacy:false} : {valid:false,reason:"hash_invalido",legacy:false};
   } catch { return {valid:false,reason:"chave_em_falta",legacy:false}; }
 }
@@ -236,6 +262,13 @@ export async function verifyAdminPin(pin) {
   return {ok:false,reason:"invalid"};
 }
 
+async function ensureProductCatalogId(product) {
+  if (product.catalogId) return product.catalogId;
+  const catalogId = generateUUID();
+  await db.put("products", { ...product, catalogId });
+  return catalogId;
+}
+
 export const productService = {
   async getAll() {
     requireAuth();
@@ -389,9 +422,10 @@ export const sessionService = {
     const totalVendas=sessionSales.reduce((a,s)=>a+((s.total||0)-(s.totalDevolvido||0)),0);
     const stockEsperado={};
     for(const p of products) {
+      const catalogId = await ensureProductCatalogId(p);
       const vendido=sessionSales.reduce((a,s)=>a+(s.items||[]).filter(i=>i.id===p.id).reduce((b,i)=>b+i.qty,0),0);
       const recebido = (session.stockRecebido && session.stockRecebido[p.id] && session.stockRecebido[p.id].found) || shopMap[p.id] || 0;
-      stockEsperado[p.id]={productId:p.id,productName:p.name,received:recebido,sold:vendido,expected:recebido-vendido,current:shopMap[p.id]||0,unit:p.unit};
+      stockEsperado[p.id]={productId:p.id,catalogId,productName:p.name,received:recebido,sold:vendido,expected:recebido-vendido,current:shopMap[p.id]||0,unit:p.unit};
     }
     const closedAt=new Date().toISOString();
     await db.put("sessions",{...session,status:"closed",closedAt,stockEsperado,totalVendas,nVendas:sessionSales.length});
@@ -438,16 +472,18 @@ export const ktkService = {
     const user=requireAuth();
     const session=await db.get("sessions",sessionId);
     if(!session) throw new Error("Sessão não encontrada.");
-    const [sales,fiados,incidents,movements,store]=await Promise.all([
+    const [sales,fiados,incidents,movements,store,products]=await Promise.all([
       db.getAll("sales"),db.getAll("fiado"),db.getAll("incidents"),
-      db.getAll("stockMovements"),db.get("settings","store").then(s=>s||{}),
+      db.getAll("stockMovements"),db.get("settings","store").then(s=>s||{}),db.getAll("products"),
     ]);
+    const catalogIdByProductId={};
+    products.forEach(p=>{ if(p.catalogId) catalogIdByProductId[p.id]=p.catalogId; });
     const sessionSales=sales.filter(s=>s.sessionId===sessionId);
     const sessionFiados=fiados.filter(f=>f.sessionId===sessionId);
     const sessionIncidents=incidents.filter(i=>i.sessionId===sessionId);
     const sessionMoves=movements.filter(m=>m.sessionId===sessionId&&m.imported!==true);
     const ktk={
-      versao:"2.0", app:"Kontaki", empresa:"Introxeer Technology",
+      versao:"2.1", app:"Kontaki", empresa:"Introxeer Technology",
       loja_id:store.id||"kontaki-loja-default",
       loja_nome:store.name||"Loja Kontaki",
       id_sessao:session.uuid, id_sessao_local:sessionId,
@@ -456,7 +492,7 @@ export const ktkService = {
       sessao_anterior:session.prevSessionUuid||null,
       stock_recebido:session.stockRecebido||{},
       stock_esperado:session.stockEsperado||{},
-      stock_movements:sessionMoves.map(m=>({type:m.type,productId:m.productId,productName:m.productName,location:m.location,qty:m.qty,qtyBefore:m.qtyBefore,qtyAfter:m.qtyAfter,reference:m.reference,createdAt:m.createdAt})),
+      stock_movements:sessionMoves.map(m=>({type:m.type,productId:m.productId,catalogId:catalogIdByProductId[m.productId]||null,productName:m.productName,location:m.location,qty:m.qty,qtyBefore:m.qtyBefore,qtyAfter:m.qtyAfter,reference:m.reference,createdAt:m.createdAt})),
       vendas:sessionSales.map(s=>({id:s.id,total:s.total,payMethod:s.payMethod,date:s.date,items:s.items||[],clientName:s.clientName||"",hash:s.hash})),
       fiados:sessionFiados.map(f=>({clientName:f.clientName,amount:f.amount,amountPaid:f.amountPaid||0,date:f.date,status:f.status})),
       incidentes:sessionIncidents.map(i=>({productName:i.productName,expected:i.expected,found:i.found,diff:i.diff,date:i.createdAt})),
@@ -501,6 +537,10 @@ export const ktkService = {
     if(dup) { await db.put("ktkImports",{...rec,status:"rejected",rejectedReason:"Duplicado no momento da confirmação"}); throw new Error(`DUPLICATE:${dup.id}:${dup.openedAt}`); }
 
     const user=getUser();
+    const localProducts=await db.getAll("products");
+    const productByCatalogId={};
+    localProducts.forEach(p=>{ if(p.catalogId) productByCatalogId[p.catalogId]=p; });
+
     const sessionId=await db.add("sessions",{
       uuid:ktk.id_sessao, userId:ktk.funcionario_id, userName:ktk.funcionario,
       status:"validated", openedAt:ktk.data_abertura, closedAt:ktk.data_fecho,
@@ -527,13 +567,43 @@ export const ktkService = {
     }
 
     // Reconciliação real do stock: aplica o delta vendido (corrigido ou original).
+    // ADR-0005: resolve o produto local por catalogId quando presente (identidade
+    // global, .ktk 2.1+); recua para productId local só em .ktk 2.0 legado, sem
+    // catalogId. Referência sem correspondência local não é silenciada — fica de
+    // fora da reconciliação de stock, mas gera aviso técnico em logs. A política
+    // completa (bloquear/pendente/etc.) fica deliberadamente fora deste ADR, para
+    // o Modelo de Consistência entre Dispositivos.
     const stockRows = Object.values(ktk.stock_esperado||{});
     for (const row of stockRows) {
-      const hasCorrection = Object.prototype.hasOwnProperty.call(manualCorrections, row.productId);
-      const soldFinal = hasCorrection ? Number(manualCorrections[row.productId]) : Number(row.sold||0);
+      const correctionKey = row.catalogId || row.productId;
+      const hasCorrection = Object.prototype.hasOwnProperty.call(manualCorrections, correctionKey);
+      const soldFinal = hasCorrection ? Number(manualCorrections[correctionKey]) : Number(row.sold||0);
+
+      let localProductId = row.productId;
+      if (row.catalogId) {
+        const localProduct = productByCatalogId[row.catalogId];
+        if (localProduct) {
+          localProductId = localProduct.id;
+        } else {
+          logger.warn(
+            "Referência não resolvida na importação de .ktk: catalogId " + row.catalogId +
+            ' (produto "' + row.productName + '") não existe neste dispositivo — stock não ajustado.'
+          );
+          if (hasCorrection) {
+            await db.add("stockCorrections", {
+              importId, productId: row.productId, catalogId: row.catalogId, productName: row.productName,
+              originalValue: Number(row.sold||0), correctedValue: soldFinal,
+              correctedBy: user.id, correctedAt: new Date().toISOString(),
+              note: "Correção registada, mas produto não encontrado localmente — stock não aplicado.",
+            });
+          }
+          continue;
+        }
+      }
+
       if (soldFinal !== 0) {
         await addStockMovement({
-          productId: row.productId, productName: row.productName,
+          productId: localProductId, productName: row.productName,
           type: "import_turno", location: "shop", qty: -soldFinal,
           reference: "ktk:"+ktk.id_sessao, note: "Importado do turno de "+ktk.funcionario,
           sessionId, userId: ktk.funcionario_id, createdAt: new Date().toISOString(),
@@ -541,7 +611,7 @@ export const ktkService = {
       }
       if (hasCorrection) {
         await db.add("stockCorrections", {
-          importId, productId: row.productId, productName: row.productName,
+          importId, productId: localProductId, catalogId: row.catalogId||null, productName: row.productName,
           originalValue: Number(row.sold||0), correctedValue: soldFinal,
           correctedBy: user.id, correctedAt: new Date().toISOString(),
         });
@@ -606,11 +676,7 @@ export const catalogService = {
     const active=products.filter(p=>p.active!==false);
     const items=[];
     for (const p of active) {
-      let catalogId=p.catalogId;
-      if (!catalogId) {
-        catalogId=generateUUID();
-        await db.put("products",{...p,catalogId});
-      }
+      const catalogId = await ensureProductCatalogId(p);
       items.push({
         catalogId, name:p.name, barcode:p.barcode||"", masterBarcode:p.masterBarcode||"",
         price:p.price, costPrice:p.costPrice||0, minStock:p.minStock||5,
