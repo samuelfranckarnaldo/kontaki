@@ -133,6 +133,21 @@ export async function activateLicense(code) {
   };
 }
 
+// Dispara sincronização pendente (recovery codes) e revalidação de
+// licença assim que a rede volta, sem depender de nova geração de
+// códigos ou de o utilizador reabrir a app manualmente.
+if (typeof window !== "undefined") {
+  window.addEventListener("online", async function () {
+    try {
+      await validateLicenseOnline();
+    } catch (e) {}
+    try {
+      const recMod = await import("./recovery-codes.js");
+      await recMod.triggerPendingSync();
+    } catch (e) {}
+  });
+}
+
 export async function validateLicenseOnline() {
   var lic = await db.get("settings", "license");
   if (!lic || !lic.code) return;
