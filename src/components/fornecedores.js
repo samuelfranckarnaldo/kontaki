@@ -13,6 +13,8 @@ async function _refreshStockIfVisible() {
   }
 }
 
+let _fornSearchQuery = "";
+
 export async function loadFornecedores() {
   const btn = el("btn-back-fornecedores");
   if (btn) btn.onclick = () => window._showSubpage(null);
@@ -23,7 +25,25 @@ export async function loadFornecedores() {
   const btnCompra = el("btn-compra-add");
   if (btnCompra) btnCompra.onclick = openCompraForm;
 
+  const searchEl = el("fornecedores-search");
+  if (searchEl) {
+    searchEl.value = _fornSearchQuery;
+    searchEl.oninput = () => {
+      _fornSearchQuery = searchEl.value;
+      renderFornecedores();
+    };
+  }
+
   await renderFornecedores();
+}
+
+function _fornStatCard({label, value, sub, color, icon}) {
+  return `<div class="prod-stat-card" style="cursor:default">` +
+    `<div class="prod-stat-icon" style="background:${color}20;color:${color}"><i data-lucide="${icon}"></i></div>` +
+    `<div class="prod-stat-val2${String(value).length>=13?" prod-stat-val2--xs":String(value).length>9?" prod-stat-val2--sm":""}" style="color:${color}">${value}</div>` +
+    `<div class="prod-stat-label2">${label}</div>` +
+    `<div class="prod-stat-sub">${sub}</div>` +
+    `</div>`;
 }
 
 async function renderFornecedores() {
@@ -31,22 +51,33 @@ async function renderFornecedores() {
     db.getAll("suppliers"),
     db.getAll("purchases"),
   ]);
-  const suppliers = allSuppliers.filter(function(s){ return s.active !== false; });
+  const q = (_fornSearchQuery || "").trim().toLowerCase();
+  const suppliers = allSuppliers.filter(function(s){
+    if (s.active === false) return false;
+    if (!q) return true;
+    return s.name.toLowerCase().includes(q) || (s.phone||"").includes(q) || (s.contact||"").toLowerCase().includes(q);
+  });
+  const matchedSupplierIds = suppliers.map(function(s){ return s.id; });
 
-  const comprasAtivas = purchases.filter(function(p){ return p.archived !== true; });
+  let comprasAtivas = purchases.filter(function(p){ return p.archived !== true; });
+  if (q) comprasAtivas = comprasAtivas.filter(function(p){ return matchedSupplierIds.indexOf(p.supplierId) !== -1; });
   const mesAtual      = new Date().toISOString().slice(0,7);
   const comprasMes    = comprasAtivas.filter(p => (p.date || "").startsWith(mesAtual)).reduce((a,p) => a+(p.total||0), 0);
 
+  const saldoTotal = comprasAtivas.reduce(function(a,p){ return a + Math.max((p.total||0)-(p.amountPaid||0), 0); }, 0);
+
   el("fornecedores-content").innerHTML =
-    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-      <div class="stat-card" style="border-left:3px solid #5b21b6">
-        <div class="stat-label" style="color:#5b21b6">Fornecedores</div>
-        <div class="stat-val" style="color:#5b21b6">${suppliers.length}</div>
+    `<div class="hist-hero" style="margin-bottom:10px">
+      <div class="hist-hero-label">Saldo em aberto</div>
+      <div class="hist-hero-val${String(fmt(saldoTotal)).length>=16?" hist-hero-val--xs":String(fmt(saldoTotal)).length>=13?" hist-hero-val--sm":""}">${fmt(saldoTotal)}</div>
+      <div class="hist-hero-sub" style="margin-top:10px;display:flex;gap:18px">
+        <span><strong>${suppliers.length}</strong> fornecedores</span>
+        <span><strong>${fmt(comprasMes)}</strong> este mês</span>
       </div>
-      <div class="stat-card" style="border-left:3px solid #dc2626">
-        <div class="stat-label" style="color:#dc2626">Compras este mês</div>
-        <div class="stat-val" style="color:#dc2626;font-size:14px">${fmt(comprasMes)}</div>
-      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      ${_fornStatCard({ label:"Fornecedores", value:suppliers.length, sub:"activos", color:"var(--primary)", icon:"truck" })}
+      ${_fornStatCard({ label:"Compras (mês)", value:fmt(comprasMes), sub:"total gasto", color:"var(--info)", icon:"shopping-bag" })}
     </div>` +
 
     // Lista fornecedores
@@ -100,9 +131,10 @@ async function renderFornecedores() {
               ${saldo > 0 ? `<div style="font-size:11px;color:#dc2626;font-weight:700;margin-top:2px">Falta pagar: ${fmt(saldo)}</div>` : `<div style="font-size:11px;color:#16a34a;font-weight:700;margin-top:2px">Pago</div>`}
             </div>
             <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-              <div style="font-size:14px;font-weight:700;color:#dc2626">${fmt(p.total)}</div>
-              ${getUser().role === "admin" ? `<button onclick="window._editCompra(${p.id})" style="background:none;border:none;color:#5b21b6;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Editar</button>` : ""}
-              <button onclick="window._archivePurchase(${p.id})" style="background:none;border:none;color:#71717a;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Arquivar</button>
+              <div style="font-size:14px;font-weight:700;color:${saldo>0?"#dc2626":"var(--primary)"}">${fmt(p.total)}</div>
+              <button class="produto-menu-btn" onclick="window._openCompraMenu(${p.id})" title="Mais opções" style="margin-top:2px">
+                <i data-lucide="more-vertical"></i>
+              </button>
             </div>
           </div>
         </div>`;
@@ -236,8 +268,8 @@ window._openSupplierDetail = async (id) => {
         <i data-lucide="edit-3"></i> Editar
       </button>
       <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>
-      <button onclick="window._deleteSupplier(${id})" style="width:100%;padding:10px;background:none;border:none;color:#dc2626;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-        <i data-lucide="trash-2" style="width:14px;height:14px"></i> Eliminar fornecedor
+      <button onclick="window._deleteSupplier(${id})" style="width:100%;background:none;border:none;color:var(--danger);font-size:var(--text-xs);cursor:pointer;font-family:inherit;padding:var(--space-1);text-align:center">
+        Eliminar fornecedor
       </button>
     </div>`);
   refreshIcons(el("modal-box"));
@@ -662,6 +694,31 @@ window._deactivateSupplier = async (id) => {
   toast("Fornecedor desactivado.", "success");
   closeModal();
   renderFornecedores();
+};
+
+window._openCompraMenu = (purchaseId) => {
+  const isAdmin = getUser().role === "admin";
+  const items = [];
+  if (isAdmin) {
+    items.push({ icon: "edit-3", label: "Editar", desc: "Alterar quantidades e custos desta compra", iconClass: "hist-export-icon--edit", action: "window._editCompra(" + purchaseId + ")" });
+  }
+  items.push({ icon: "archive", label: "Arquivar", desc: "Sai da lista activa, fica guardada para auditoria", iconClass: "hist-export-icon--cancel", action: "window._archivePurchase(" + purchaseId + ")" });
+
+  openModal("Mais opções",
+    '<div class="hist-export-options">' +
+    items.map(function(it) {
+      return '<button class="hist-export-option" onclick="window._closeModal();' + it.action + '">' +
+        '<div class="hist-export-icon ' + it.iconClass + '"><i data-lucide="' + it.icon + '"></i></div>' +
+        '<div class="hist-export-info">' +
+        '<div class="hist-export-title">' + it.label + '</div>' +
+        '<div class="hist-export-desc">' + it.desc + '</div>' +
+        '</div>' +
+        '<i data-lucide="chevron-right" class="hist-export-arrow"></i>' +
+        '</button>';
+    }).join("") +
+    '</div>'
+  );
+  refreshIcons(document.getElementById("modal-box") || document.body);
 };
 
 window._archivePurchase = async (purchaseId) => {

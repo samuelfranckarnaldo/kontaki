@@ -1518,49 +1518,75 @@
 
 /* ── CONTABILIDADE ──────────────────────────────────────────────────────────── */
 .conta-hero {
-  border-radius: 16px; padding: 20px 16px;
-  margin-bottom: 16px; text-align: center;
-  color: #fff;
+  border-radius: var(--radius-lg); padding: 20px;
+  margin-bottom: 14px; color: #fff; position: relative;
 }
-.conta-hero-label { font-size: 11px; font-weight: 700; opacity: .8; text-transform: uppercase; letter-spacing: .5px; }
-.conta-hero-val   { font-size: 32px; font-weight: 800; margin: 6px 0; letter-spacing: -.5px; }
-.conta-hero-sub   { font-size: 12px; opacity: .8; }
+.conta-hero-label { font-size: 12px; font-weight: 600; opacity: .85; margin-bottom: 4px; }
+.conta-hero-val   { font-size: 32px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.conta-hero-sub   { font-size: 12px; opacity: .8; margin-top: 6px; }
+.conta-hero-trend {
+  position: absolute; top: 18px; right: 18px;
+  font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+  background: rgba(255,255,255,.18); white-space: nowrap;
+}
+.conta-hero-trend--up { color: #bbf7d0; }
+.conta-hero-trend--down { color: #fecaca; }
 
 .conta-section-label {
-  font-size: 11px; font-weight: 700; color: var(--text4);
+  font-size: 11px; font-weight: 700; color: var(--text3);
   text-transform: uppercase; letter-spacing: .6px;
   margin: 16px 0 8px;
 }
 .conta-grid {
   display: grid; grid-template-columns: 1fr 1fr;
-  gap: 8px; margin-bottom: 4px;
+  gap: 12px; margin-bottom: 4px;
 }
 .conta-kpi {
-  background: var(--bg2); border-radius: 12px;
-  border: 1px solid var(--border2); padding: 12px;
-  box-shadow: var(--shadow-sm);
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+  display: flex; flex-direction: column; gap: 6px;
 }
+.conta-kpi--accent { border-left: 3px solid var(--primary); }
 .conta-kpi-icon {
-  width: 28px; height: 28px; border-radius: 8px;
+  width: 26px; height: 26px; border-radius: 7px;
   display: flex; align-items: center; justify-content: center;
-  margin-bottom: 8px;
+  color: var(--text3); background: var(--border2);
 }
-.conta-kpi-val   { font-size: 16px; font-weight: 800; line-height: 1; }
-.conta-kpi-label { font-size: 10px; color: var(--text4); margin-top: 4px; font-weight: 600; }
+.conta-kpi-val   { font-size: 18px; font-weight: 800; line-height: 1.1; color: var(--text); font-variant-numeric: tabular-nums; word-break: break-word; }
+.conta-kpi-label { font-size: 11.5px; color: var(--text3); font-weight: 600; }
 
 .conta-card {
-  background: var(--bg2); border-radius: 14px;
-  border: 1px solid var(--border2); overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  background: var(--bg2); border-radius: var(--radius);
+  border: 1px solid var(--border); overflow: hidden;
 }
 .conta-row {
   display: flex; justify-content: space-between; align-items: center;
   padding: 12px 14px; border-bottom: 1px solid var(--border2);
 }
 .conta-row:last-child { border-bottom: none; }
-.conta-row-label { font-size: 13px; color: var(--text2); font-weight: 500; }
-.conta-row-sub   { font-size: 10px; color: var(--text4); margin-top: 2px; }
-.conta-row-val   { font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.conta-row-label { font-size: 13px; color: var(--text); font-weight: 600; }
+.conta-row-sub   { font-size: 11px; color: var(--text4); margin-top: 2px; }
+.conta-row-val   { font-size: 14px; font-weight: 700; flex-shrink: 0; color: var(--text); font-variant-numeric: tabular-nums; }
+
+.conta-waterfall {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+}
+.conta-wf-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 14px; border-bottom: 1px solid var(--border2);
+}
+.conta-wf-row:last-child { border-bottom: none; }
+.conta-wf-label { font-size: 13px; color: var(--text2); font-weight: 500; }
+.conta-wf-val   { font-size: 14px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.conta-wf-row--sub .conta-wf-label { padding-left: 14px; color: var(--text3); font-weight: 400; }
+.conta-wf-row--sub .conta-wf-val   { color: var(--text3); font-weight: 600; }
+.conta-wf-row--subtotal { background: var(--border2); }
+.conta-wf-row--subtotal .conta-wf-label,
+.conta-wf-row--subtotal .conta-wf-val { font-weight: 800; color: var(--text); }
+.conta-wf-row--total { background: var(--primary-light); }
+.conta-wf-row--total .conta-wf-label,
+.conta-wf-row--total .conta-wf-val { font-weight: 800; font-size: 15px; color: var(--primary); }
 
 /* ── Despesas ──────────────────────────────────────────────────────────────── */
 .desp-hero { background: #fff; border: 1px solid var(--border2); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; }

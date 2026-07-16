@@ -536,18 +536,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
       <div id="subpage-fornecedores" style="display:none">
         <div class="page-inner">
-          <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
             <button class="btn btn-ghost btn-sm" id="btn-back-fornecedores">← Voltar</button>
-            <div style="display:flex;gap:8px">
-              <button class="btn btn-ghost btn-sm" id="btn-fornecedor-add">
-                <i data-lucide="user-plus"></i> Fornecedor
-              </button>
-              <button class="btn btn-primary btn-sm" id="btn-compra-add">
-                <i data-lucide="package-plus"></i> Compra
-              </button>
-            </div>
+            <button class="btn btn-ghost btn-sm" id="btn-fornecedor-add">
+              <i data-lucide="user-plus"></i> Fornecedor
+            </button>
           </div>
-          <div style="font-size:17px;font-weight:700;margin:8px 0 14px">Fornecedores</div>
+          <div style="background:#f4f4f5;border-radius:10px;padding:4px;display:flex;gap:2px;margin-bottom:12px" id="fornecedores-tabs"></div>
           <div id="fornecedores-content"></div>
         </div>
       </div>
