@@ -57,9 +57,26 @@ async function generateKtkHashV21(ktk) {
   return hmacSha256(payload);
 }
 
+// v2.2 — Bug 1: fiados passam a entrar no payload assinado, resolvidos por
+// clientUuid (identidade global de cliente, ADR-0005) em vez de clientName solto.
+async function generateKtkHashV22(ktk) {
+  const payload=JSON.stringify({
+    versao:ktk.versao, id_sessao:ktk.id_sessao,
+    loja_id:ktk.loja_id, loja_nome:ktk.loja_nome,
+    funcionario_id:ktk.funcionario_id,
+    data_abertura:ktk.data_abertura, data_fecho:ktk.data_fecho,
+    total_vendas:ktk.total_vendas, n_vendas:ktk.n_vendas,
+    vendas:(ktk.vendas||[]).map(v=>({id:v.id,total:v.total,date:v.date})),
+    stock_esperado:ktk.stock_esperado,
+    stock_movements:(ktk.stock_movements||[]).map(m=>({type:m.type,productId:m.productId,catalogId:m.catalogId||null,qty:m.qty,createdAt:m.createdAt})),
+    fiados:(ktk.fiados||[]).map(f=>({clientUuid:f.clientUuid||null,clientName:f.clientName,amount:f.amount,amountPaid:f.amountPaid||0,date:f.date,status:f.status})),
+  });
+  return hmacSha256(payload);
+}
+
 // Fórmula atual — usada sempre que um novo .ktk é gerado.
 export async function generateKtkHash(ktk) {
-  return generateKtkHashV21(ktk);
+  return generateKtkHashV22(ktk);
 }
 
 export async function validateKtkHash(ktk) {
@@ -69,6 +86,7 @@ export async function validateKtkHash(ktk) {
     let expected;
     if (ktk.versao === "2.0") expected = await generateKtkHashV20(ktk);
     else if (ktk.versao === "2.1") expected = await generateKtkHashV21(ktk);
+    else if (ktk.versao === "2.2") expected = await generateKtkHashV22(ktk);
     else return {valid:false,reason:"versao_nao_suportada",legacy:false};
     return expected===ktk.hash ? {valid:true,reason:"ok",legacy:false} : {valid:false,reason:"hash_invalido",legacy:false};
   } catch { return {valid:false,reason:"chave_em_falta",legacy:false}; }
@@ -472,18 +490,20 @@ export const ktkService = {
     const user=requireAuth();
     const session=await db.get("sessions",sessionId);
     if(!session) throw new Error("Sessão não encontrada.");
-    const [sales,fiados,incidents,movements,store,products]=await Promise.all([
+    const [sales,fiados,incidents,movements,store,products,clients]=await Promise.all([
       db.getAll("sales"),db.getAll("fiado"),db.getAll("incidents"),
-      db.getAll("stockMovements"),db.get("settings","store").then(s=>s||{}),db.getAll("products"),
+      db.getAll("stockMovements"),db.get("settings","store").then(s=>s||{}),db.getAll("products"),db.getAll("clients"),
     ]);
     const catalogIdByProductId={};
     products.forEach(p=>{ if(p.catalogId) catalogIdByProductId[p.id]=p.catalogId; });
+    const clientUuidById={};
+    clients.forEach(c=>{ if(c.uuid) clientUuidById[c.id]=c.uuid; });
     const sessionSales=sales.filter(s=>s.sessionId===sessionId);
     const sessionFiados=fiados.filter(f=>f.sessionId===sessionId);
     const sessionIncidents=incidents.filter(i=>i.sessionId===sessionId);
     const sessionMoves=movements.filter(m=>m.sessionId===sessionId&&m.imported!==true);
     const ktk={
-      versao:"2.1", app:"Kontaki", empresa:"Introxeer Technology",
+      versao:"2.2", app:"Kontaki", empresa:"Introxeer Technology",
       loja_id:store.id||"kontaki-loja-default",
       loja_nome:store.name||"Loja Kontaki",
       id_sessao:session.uuid, id_sessao_local:sessionId,
@@ -494,7 +514,7 @@ export const ktkService = {
       stock_esperado:session.stockEsperado||{},
       stock_movements:sessionMoves.map(m=>({type:m.type,productId:m.productId,catalogId:catalogIdByProductId[m.productId]||null,productName:m.productName,location:m.location,qty:m.qty,qtyBefore:m.qtyBefore,qtyAfter:m.qtyAfter,reference:m.reference,createdAt:m.createdAt})),
       vendas:sessionSales.map(s=>({id:s.id,total:s.total,payMethod:s.payMethod,date:s.date,items:s.items||[],clientName:s.clientName||"",hash:s.hash})),
-      fiados:sessionFiados.map(f=>({clientName:f.clientName,amount:f.amount,amountPaid:f.amountPaid||0,date:f.date,status:f.status})),
+      fiados:sessionFiados.map(f=>({clientUuid:f.clientId?(clientUuidById[f.clientId]||null):null,clientName:f.clientName,clientPhone:f.clientPhone||"",amount:f.amount,amountPaid:f.amountPaid||0,date:f.date,status:f.status})),
       incidentes:sessionIncidents.map(i=>({productName:i.productName,expected:i.expected,found:i.found,diff:i.diff,date:i.createdAt})),
       total_vendas:session.totalVendas||0, n_vendas:session.nVendas||0, hash:null,
     };
@@ -505,7 +525,10 @@ export const ktkService = {
   },
   // Importa o .ktk para a área pendente — NÃO toca em sessions/incidents/stock ainda.
   async stageImport(ktk) {
-    requireAuth();
+    // V1: 1 caixa por loja — só admin importa/confirma .ktk (ver decisão
+    // de produto "Kontaki V1 suporta apenas 1 caixa"; escritorio.js já
+    // esconde o botão do caixa, isto reforça a regra no backend).
+    requireRole("admin");
     if(!ktk.id_sessao||!ktk.funcionario||!ktk.loja_id||!ktk.versao) throw new Error("INVALID_FORMAT");
 
     const dup=await sessionService.checkDuplicate(ktk.id_sessao);
@@ -541,6 +564,12 @@ export const ktkService = {
     const productByCatalogId={};
     localProducts.forEach(p=>{ if(p.catalogId) productByCatalogId[p.catalogId]=p; });
 
+    const localClients=await db.getAll("clients");
+    const clientByUuid={};
+    localClients.forEach(c=>{ if(c.uuid) clientByUuid[c.uuid]=c; });
+    const clientByNameLower={};
+    localClients.forEach(c=>{ clientByNameLower[(c.name||"").toLowerCase()]=c; });
+
     const sessionId=await db.add("sessions",{
       uuid:ktk.id_sessao, userId:ktk.funcionario_id, userName:ktk.funcionario,
       status:"validated", openedAt:ktk.data_abertura, closedAt:ktk.data_fecho,
@@ -563,6 +592,28 @@ export const ktkService = {
         status:"open",importedFrom:ktk.id_sessao,
         note:`Importado de ${ktk.funcionario}`,
         createdAt:inc.date||new Date().toISOString(),
+      });
+    }
+
+    // Bug 1 / ADR-0005: fiados do .ktk. Resolve cliente por clientUuid (identidade
+    // global); se ausente (.ktk antigo, ou cliente ainda não sincronizado), tenta
+    // por clientName (compatibilidade); se nenhum bater, cria o cliente
+    // automaticamente — nunca descartar uma dívida real por falta de correspondência.
+    for (const f of (ktk.fiados||[])) {
+      let localClient = f.clientUuid ? clientByUuid[f.clientUuid] : null;
+      if (!localClient && f.clientName) localClient = clientByNameLower[f.clientName.toLowerCase()];
+      let clientId;
+      if (localClient) {
+        clientId = localClient.id;
+      } else {
+        clientId = await clientService.create({ name: f.clientName||"Desconhecido", phone: f.clientPhone||"", address:"", notes:"" });
+      }
+      await db.add("fiado", {
+        clientName: f.clientName||"", clientPhone: f.clientPhone||"", clientId,
+        amount: f.amount||0, amountPaid: f.amountPaid||0,
+        saleId: null, sessionId, userId: ktk.funcionario_id,
+        date: f.date||new Date().toISOString(), status: f.status||"open",
+        note: "Importado do turno de "+ktk.funcionario, importedFrom: ktk.id_sessao,
       });
     }
 

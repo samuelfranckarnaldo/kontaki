@@ -12,14 +12,17 @@ export async function loadEscritorio() {
 
   var user = getUser();
 
+  // V1: só admin importa/confirma .ktk (1 caixa por loja, sem sincronização
+  // caixa-caixa). Caixa apenas exporta o próprio turno e recebe catálogo.
   var importSection = document.createElement("div");
   importSection.className = "esc-import-section";
   importSection.innerHTML =
     '<div class="planos-section-title">Importar ficheiro</div>' +
-    '<label class="esc-import-btn">' +
-    '<input type="file" accept=".ktk,application/json" style="display:none" onchange="window._handleKtkImport(this)"/>' +
-    '<i data-lucide="upload"></i> Importar turno (.ktk)' +
-    '</label>' +
+    (user.role === "admin" ?
+      '<label class="esc-import-btn">' +
+      '<input type="file" accept=".ktk,application/json" style="display:none" onchange="window._handleKtkImport(this)"/>' +
+      '<i data-lucide="upload"></i> Importar turno (.ktk)' +
+      '</label>' : '') +
     '<label class="esc-import-btn">' +
     '<input type="file" accept=".ktkcat,.json,application/json" style="display:none" onchange="window._handleKtkcatImport(this)"/>' +
     '<i data-lucide="package"></i> Importar catálogo (.ktkcat)' +
