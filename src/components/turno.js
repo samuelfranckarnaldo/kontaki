@@ -108,7 +108,8 @@ async function renderTurno() {
 
   // ── Turnos anteriores ──
   if (closedSessions.length) {
-    html += '<div><div style="font-size:11px;font-weight:700;color:#a1a1aa;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Turnos anteriores</div>';
+    html += '<div><div style="font-size:11px;font-weight:700;color:#a1a1aa;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Turnos anteriores</div>' +
+      '<div style="font-size:12px;color:#a1a1aa;margin-bottom:10px">Toca num turno para gerar novamente o ficheiro .ktk.</div>';
     closedSessions.forEach(function(s) {
       var isValidated  = s.validated;
       var hasIncidents = s.hasIncidents;
@@ -117,7 +118,7 @@ async function renderTurno() {
       var bgPill = isValidated?"#dcfce7":hasIncidents?"#fee2e2":"#ede9fe";
       var label  = isValidated?"Validado":hasIncidents?"Com incidentes":isImported?"Importado":"Fechado";
       html +=
-        '<div style="background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:8px;border:1px solid #f4f4f5;box-shadow:0 1px 3px rgba(0,0,0,.05);display:flex;align-items:center;gap:12px">' +
+        '<div onclick="window._reexportarTurno(' + s.id + ')" style="background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:8px;border:1px solid #f4f4f5;box-shadow:0 1px 3px rgba(0,0,0,.05);display:flex;align-items:center;gap:12px;cursor:pointer">' +
           '<div style="width:36px;height:36px;border-radius:10px;background:' + bgPill + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
             '<i data-lucide="' + (isValidated?"shield-check":hasIncidents?"alert-circle":"clock") + '" style="width:16px;height:16px;color:' + color + '"></i>' +
           '</div>' +
@@ -486,6 +487,7 @@ window._confirmarFecho = async function() {
     var blob   = new Blob([ktkStr],{type:"application/json"});
     var url    = URL.createObjectURL(blob);
     var fname  = "turno_" + user.name.replace(/\s+/g,"_") + "_" + today() + ".ktk";
+    window._prepShareKtk = function() { window._pendingKtkExport = { fname: fname, ktkStr: ktkStr }; };
 
     closeModal();
     openModal("Turno fechado!",
@@ -501,7 +503,7 @@ window._confirmarFecho = async function() {
       '<div style="display:flex;flex-direction:column;gap:8px">' +
       '<a href="'+url+'" download="'+fname+'" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:#5b21b6;color:#fff;border-radius:12px;text-decoration:none;font-size:14px;font-weight:700;font-family:inherit">' +
       '<i data-lucide="download" style="width:18px;height:18px"></i>Guardar '+fname+'</a>' +
-      '<button onclick="window._shareKtkFile(\''+encodeURIComponent(fname)+'\','+JSON.stringify(encodeURIComponent(ktkStr))+')" style="padding:14px;background:#25D366;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
+      '<button onclick="window._prepShareKtk();window._shareKtkFile()" style="padding:14px;background:#25D366;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
       '<i data-lucide="share-2" style="width:18px;height:18px"></i>Partilhar WhatsApp</button>' +
       '<button onclick="window._closeModal()" style="padding:12px;background:#f4f4f5;color:#71717a;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Fechar</button>' +
       '</div>');
@@ -514,10 +516,46 @@ window._confirmarFecho = async function() {
   }
 };
 
-window._shareKtkFile = async function(encodedFname, encodedKtk) {
+window._reexportarTurno = async function(sessionId) {
   try {
-    var fname = decodeURIComponent(encodedFname);
-    var ktkStr = decodeURIComponent(encodedKtk);
+    var session = await db.get("sessions", sessionId);
+    if (!session) { toast("Sessão não encontrada.","error"); return; }
+    var user   = getUser();
+    var ktk    = await ktkService.generate(sessionId);
+    var ktkStr = JSON.stringify(ktk, null, 2);
+    var blob   = new Blob([ktkStr],{type:"application/json"});
+    var url    = URL.createObjectURL(blob);
+    var fname  = "turno_" + (session.userName||user.name).replace(/\s+/g,"_") + "_" + today() + "_reexportado.ktk";
+    window._prepShareKtk = function() { window._pendingKtkExport = { fname: fname, ktkStr: ktkStr }; };
+
+    openModal("Ficheiro gerado novamente",
+      '<div style="text-align:center;padding:10px 0 16px">' +
+      '<div style="width:64px;height:64px;background:#ede9fe;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px">' +
+      '<i data-lucide="refresh-cw" style="width:32px;height:32px;color:#5b21b6"></i></div>' +
+      '<div style="font-size:16px;font-weight:700;margin-bottom:6px">Turno de ' + (session.userName||"") + '</div>' +
+      '<div style="font-size:13px;color:#71717a;margin-bottom:6px">Partilha o ficheiro .ktk com o patrão. Se este turno já foi confirmado por um administrador, a reimportação será rejeitada como duplicada — o que é o comportamento esperado.</div>' +
+      (!ktk.hash?'<div style="background:#fef3c7;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#92400e">⚠ Sem assinatura HMAC.</div>':"") +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:8px">' +
+      '<a href="'+url+'" download="'+fname+'" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:#5b21b6;color:#fff;border-radius:12px;text-decoration:none;font-size:14px;font-weight:700;font-family:inherit">' +
+      '<i data-lucide="download" style="width:18px;height:18px"></i>Guardar '+fname+'</a>' +
+      '<button onclick="window._prepShareKtk();window._shareKtkFile()" style="padding:14px;background:#25D366;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
+      '<i data-lucide="share-2" style="width:18px;height:18px"></i>Partilhar WhatsApp</button>' +
+      '<button onclick="window._closeModal()" style="padding:12px;background:#f4f4f5;color:#71717a;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Fechar</button>' +
+      '</div>');
+    refreshIcons(el("modal-box"));
+  } catch(err) {
+    toast("Erro ao gerar ficheiro: "+err.message,"error");
+    console.error(err);
+  }
+};
+
+window._shareKtkFile = async function() {
+  try {
+    var pending = window._pendingKtkExport;
+    if (!pending) { toast("Nada para partilhar.","error"); return; }
+    var fname  = pending.fname;
+    var ktkStr = pending.ktkStr;
     var blob = new Blob([ktkStr],{type:"application/json"});
     var file = new File([blob], fname, {type:"application/json"});
     if (navigator.canShare && navigator.canShare({files:[file]})) {

@@ -92,7 +92,14 @@ export async function validateKtkHash(ktk) {
   } catch { return {valid:false,reason:"chave_em_falta",legacy:false}; }
 }
 
-export async function generateKtkcatHash(cat) {
+// v1.0 — fórmula original do .ktkcat, preservada tal como está para nunca
+// invalidar catálogos já distribuídos a clientes. Só nome, preço e categoria
+// viajam neste formato (V1 da app: 1 caixa por loja, .ktkcat é só catálogo —
+// ver decisão "V1 suporta apenas 1 caixa" e ADR de evolução do .ktkcat,
+// deliberadamente adiado). Versionar agora, mesmo sem mudar o conteúdo,
+// evita repetir o mesmo esforço de migração que foi necessário no .ktk
+// (ver ADR-0005, generateKtkHashV20/V21/V22) numa futura evolução do formato.
+async function generateKtkcatHashV10(cat) {
   const payload=JSON.stringify({
     versao:cat.versao, loja_id:cat.loja_id, loja_nome:cat.loja_nome,
     produtos:(cat.produtos||[]).map(p=>({catalogId:p.catalogId,name:p.name,price:p.price})),
@@ -100,10 +107,17 @@ export async function generateKtkcatHash(cat) {
   return hmacSha256(payload);
 }
 
+// Fórmula atual — usada sempre que um novo .ktkcat é gerado.
+export async function generateKtkcatHash(cat) {
+  return generateKtkcatHashV10(cat);
+}
+
 export async function validateKtkcatHash(cat) {
   if(!cat.hash) return {valid:false,reason:"sem_hash",legacy:false};
   try {
-    const expected=await generateKtkcatHash(cat);
+    let expected;
+    if (cat.versao === "1.0") expected = await generateKtkcatHashV10(cat);
+    else return {valid:false,reason:"versao_nao_suportada",legacy:false};
     return expected===cat.hash ? {valid:true,reason:"ok",legacy:false} : {valid:false,reason:"hash_invalido",legacy:false};
   } catch { return {valid:false,reason:"chave_em_falta",legacy:false}; }
 }
