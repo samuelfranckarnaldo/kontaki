@@ -369,6 +369,30 @@ window._openExpiryPicker = () => {
   });
 };
 
+function _prodAbbrevQty(n) {
+  function fmtAbbrev(v) {
+    var s = v.toFixed(1);
+    return s.endsWith(".0") ? s.slice(0, -2) : s;
+  }
+  var abs = Math.abs(n);
+  var sign = n < 0 ? "-" : "";
+  if (abs < 1000) return sign + abs;
+  if (abs < 1e6)  return sign + fmtAbbrev(abs/1e3) + "K";
+  if (abs < 1e9)  return sign + fmtAbbrev(abs/1e6) + "M";
+  return sign + fmtAbbrev(abs/1e9) + "B";
+}
+
+function _prodAbbrevUnit(unit) {
+  if (!unit) return "un";
+  const map = {
+    "Unidade": "un", "Litro": "L", "Mililitro": "ml", "Quilograma": "kg",
+    "Grama": "g", "Caixa": "cx", "Pacote": "pct", "Fardo": "fd",
+    "Grade": "gd", "Garrafa": "gf", "Saco": "sc", "Rolo": "rl",
+  };
+  if (map[unit]) return map[unit];
+  return unit.length > 4 ? unit.slice(0, 3) + "." : unit;
+}
+
 function categoryColor(cat) {
   return {"Alimentacao":"#f97316","Bebidas":"#3b82f6","Higiene":"#ec4899","Limpeza":"#10b981","Outro":"#6b7280"}[cat] || "#6b7280";
 }
@@ -495,10 +519,10 @@ function renderList() {
       (tag ? `<span class="produto-badge ${badgeClass}">${tag}</span>` : "") +
       `</div>` +
       `<div class="produto-meta">${p.barcode?p.barcode+" · ":""}${p.category}</div>` +
-      `<div class="produto-stock-line">` +
-      `<span><span class="produto-stock-label">Loja</span> ${qty}</span>` +
-      `<span><span class="produto-stock-label">Arm.</span> ${arm}</span>` +
-      `<span><strong>${qty+arm} ${p.unit}</strong></span>` +
+      `<div class="produto-stock-line" style="white-space:normal;overflow:visible;text-overflow:clip">` +
+      `<span><span class="produto-stock-label">Loja</span> ${_prodAbbrevQty(qty)}</span>` +
+      `<span><span class="produto-stock-label">Arm.</span> ${_prodAbbrevQty(arm)}</span>` +
+      `<span><strong>${_prodAbbrevQty(qty+arm)} ${_prodAbbrevUnit(p.unit)}</strong></span>` +
       `</div>` +
       `<div class="produto-price" style="margin-top:4px">${fmt(p.price)}</div>` +
       `</div>` +
@@ -539,20 +563,20 @@ window._openProdMenu = (id) => {
 
     // Stock cards
     `<div class="prod-modal-stock stagger-item" style="margin-bottom:var(--space-5);animation-delay:40ms">
-      <div class="prod-modal-stock-card" style="background:var(--primary-light);border-radius:10px">
+      <div class="prod-modal-stock-card" style="background:var(--primary-light);border-radius:10px;min-width:0">
         <div class="prod-modal-stock-label">Loja</div>
-        <div class="prod-modal-stock-val" style="color:var(--primary)">${shopS}</div>
-        <div class="prod-modal-stock-unit">${p.unit||"un"}</div>
+        <div class="prod-modal-stock-val" style="color:var(--primary);font-size:${String(shopS).length>5?"13px":"22px"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${shopS}">${shopS}</div>
+        <div class="prod-modal-stock-unit">${_prodAbbrevUnit(p.unit)}</div>
       </div>
-      <div class="prod-modal-stock-card" style="background:var(--info-light);border-radius:10px">
+      <div class="prod-modal-stock-card" style="background:var(--info-light);border-radius:10px;min-width:0">
         <div class="prod-modal-stock-label">Armazém</div>
-        <div class="prod-modal-stock-val" style="color:var(--info)">${whS}</div>
-        <div class="prod-modal-stock-unit">${p.unit||"un"}</div>
+        <div class="prod-modal-stock-val" style="color:var(--info);font-size:${String(whS).length>5?"13px":"22px"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${whS}">${whS}</div>
+        <div class="prod-modal-stock-unit">${_prodAbbrevUnit(p.unit)}</div>
       </div>
-      <div class="prod-modal-stock-card" style="background:var(--border2);border-radius:10px">
+      <div class="prod-modal-stock-card" style="background:var(--border2);border-radius:10px;min-width:0">
         <div class="prod-modal-stock-label">Total</div>
-        <div class="prod-modal-stock-val" style="color:var(--text)">${shopS+whS}</div>
-        <div class="prod-modal-stock-unit">${p.unit||"un"}</div>
+        <div class="prod-modal-stock-val" style="color:var(--text);font-size:${String(shopS+whS).length>5?"13px":"22px"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${shopS+whS}">${shopS+whS}</div>
+        <div class="prod-modal-stock-unit">${_prodAbbrevUnit(p.unit)}</div>
       </div>
     </div>` +
 
@@ -567,17 +591,6 @@ window._openProdMenu = (id) => {
     // Acções
     (user.role==="admin" ?
       `<div class="prod-modal-actions stagger-item" style="display:flex;flex-direction:column;gap:var(--space-2);animation-delay:120ms">
-        <button class="btn btn-full" style="background:var(--success);color:#fff;border-radius:var(--radius);padding:var(--space-4);font-size:var(--text-base);font-weight:var(--weight-strong);box-shadow:none" onclick="window._openRegistarCompra(${p.id})">
-          <i data-lucide="shopping-cart" style="width:16px;height:16px"></i> Registar Compra
-        </button>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
-          <button class="btn btn-full" style="background:#fff;border:1px solid var(--border2);color:var(--text);border-radius:var(--radius);padding:var(--space-3);font-size:var(--text-sm);font-weight:var(--weight-medium)" onclick="window._openTransfer(${p.id})">
-            <i data-lucide="arrow-right-left" style="width:15px;height:15px"></i> Transferir
-          </button>
-          <button class="btn btn-full" style="background:#fff;border:1px solid var(--border2);color:var(--text);border-radius:var(--radius);padding:var(--space-3);font-size:var(--text-sm);font-weight:var(--weight-medium)" onclick="window._openAdjustProd(${p.id})">
-            <i data-lucide="refresh-cw" style="width:15px;height:15px"></i> Ajustar
-          </button>
-        </div>
         <div style="display:flex;justify-content:center;gap:var(--space-5);padding:var(--space-2) 0">
           <button onclick="window._editProd(${p.id})" style="background:none;border:none;color:var(--text3);font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:var(--space-1)">
             <i data-lucide="edit-3" style="width:14px;height:14px"></i> Editar
