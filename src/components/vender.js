@@ -211,6 +211,11 @@ function categoryColorVender(cat) {
   return {"Alimentacao":"#f97316","Bebidas":"#3b82f6","Higiene":"#ec4899","Limpeza":"#10b981","Outro":"#6b7280"}[cat] || "#6b7280";
 }
 
+// Ícone universal ("tag") garante fallback seguro para categorias customizadas desconhecidas
+function categoryIconVender(cat) {
+  return {"Alimentacao":"utensils","Bebidas":"cup-soda","Higiene":"droplets","Limpeza":"spray-can","Outro":"tag"}[cat] || "tag";
+}
+
 async function renderRecentProducts() {
   const sales  = await db.getAll("sales");
   const recent = sales.slice(-30).reverse();
@@ -473,44 +478,71 @@ async function guardarPedido() {
 }
 window._guardarPedido = guardarPedido;
 
-window._toggleVenderFab = () => {
-  const pop = el("vender-fab-popover");
-  const btn = el("btn-vender-fab");
-  if (!pop) return;
-  const opening = pop.style.display === "none";
-  pop.style.display = opening ? "flex" : "none";
-  pop.style.flexDirection = "column";
-  if (btn) btn.classList.toggle("open", opening);
+window._openGuardarModal = () => {
+  const body =
+    '<div class="hist-export-options">' +
+      '<button class="hist-export-option" onclick="window._guardarPedido(); window._closeGuardarModal();">' +
+        '<div class="hist-export-icon hist-export-icon--edit"><i data-lucide="bookmark"></i></div>' +
+        '<div class="hist-export-info">' +
+          '<div class="hist-export-title">Guardar pedido</div>' +
+          '<div class="hist-export-desc">Guarda o carrinho atual para retomar depois</div>' +
+        '</div>' +
+        '<i data-lucide="chevron-right" class="hist-export-arrow"></i>' +
+      '</button>' +
+      '<button class="hist-export-option" onclick="window._openCategoryFilter()">' +
+        '<div class="hist-export-icon hist-export-icon--edit"><i data-lucide="tag"></i></div>' +
+        '<div class="hist-export-info">' +
+          '<div class="hist-export-title">Filtrar por categoria</div>' +
+          '<div class="hist-export-desc">Mostra apenas produtos de uma categoria</div>' +
+        '</div>' +
+        '<i data-lucide="chevron-right" class="hist-export-arrow"></i>' +
+      '</button>' +
+    '</div>';
+  openModal("Opções", body);
 };
 
+window._closeGuardarModal = () => { closeModal(); };
+
 window._openCategoryFilter = async () => {
-  window._toggleVenderFab();
+  closeModal();
   const { openPicker } = await import("../picker.js");
   const savedCats = await db.get("settings", "customCategories");
   const customCategories = (savedCats && savedCats.value) ? savedCats.value : [];
   const categories = ["Alimentacao","Bebidas","Higiene","Limpeza", ...customCategories, "Outro"];
   openPicker("Filtrar por categoria", categories, "", (cat) => {
-    const filtered = products.filter(p => p.active && p.stock > 0 && p.category === cat);
-    const recentWrap = el("recent-products");
-    if (recentWrap) recentWrap.style.display = "none";
-    const wrap = el("search-results");
-    if (wrap) {
-      wrap.style.display = "block";
-      if (!filtered.length) {
-        wrap.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text4);font-size:13px">Nenhum produto em ${cat}</div>`;
-      } else {
-        wrap.innerHTML = filtered.map(p =>
-          `<div class="search-result-item" onclick="window._addProd(${p.id})">
-            <div>
-              <div style="font-size:14px;font-weight:600">${p.name}</div>
-              <div style="font-size:11px;color:#71717a">${p.category||""} · ${p.stock} ${p.unit||"unid"} em stock</div>
-            </div>
-            <div style="font-size:14px;font-weight:700;color:#5b21b6">${fmt(p.price)}</div>
-          </div>`
-        ).join("");
-      }
-    }
+    window._showCategoryProducts(cat);
+  }, {
+    getIcon: (opt) => ({ icon: categoryIconVender(opt), color: categoryColorVender(opt) })
   });
+};
+
+window._showCategoryProducts = (cat) => {
+  const filtered = products.filter(p => p.active && p.stock > 0 && p.category === cat);
+  let body;
+  if (!filtered.length) {
+    body = `<div style="padding:24px 4px;text-align:center;color:var(--text4);font-size:13px">Nenhum produto em ${cat}</div>`;
+  } else {
+    body = '<div class="catmodal-grid">' + filtered.map(p => {
+      const cColor = categoryColorVender(p.category);
+      const avatarHTML = p.imageData
+        ? `<div class="recente-chip-avatar" style="background-image:url(${p.imageData});background-size:cover;background-position:center"></div>`
+        : `<div class="recente-chip-avatar" style="background:linear-gradient(135deg, ${cColor}, ${cColor}cc)">${(p.name||"P").charAt(0).toUpperCase()}</div>`;
+      return `<button onclick="window._addProdFromCat(${p.id})" class="catmodal-item">` +
+        avatarHTML +
+        `<div class="recente-chip-info">` +
+          `<div class="recente-chip-name">${p.name}</div>` +
+          `<div class="recente-chip-price">${fmt(p.price)}</div>` +
+          `<div class="recente-chip-stock" style="color:${p.stock<=5?"rgba(251,191,36,.9)":"rgba(255,255,255,.75)"}">${p.stock} em stock</div>` +
+        `</div>` +
+      `</button>`;
+    }).join("") + '</div>';
+  }
+  openModal(cat, body);
+};
+
+window._addProdFromCat = (id) => {
+  window._addProd(id);
+  closeModal();
 };
 
 window._abrirPedidosGuardados = async function() {

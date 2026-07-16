@@ -33,11 +33,20 @@ export function openPicker(title, options, currentValue, onSelect, config) {
     listEl.innerHTML = options.map(function (opt, idx) {
       var active = opt.toLowerCase() === (currentValue || "").toLowerCase();
       var delay = Math.min(idx * 30, 240);
+      var iconInfo = config.getIcon ? config.getIcon(opt) : null;
+      var labelHTML = iconInfo
+        ? '<span style="display:flex;align-items:center;gap:10px;min-width:0;overflow:hidden">' +
+            '<span style="width:32px;height:32px;border-radius:9px;flex-shrink:0;background:' + iconInfo.color + '22;color:' + iconInfo.color + ';display:flex;align-items:center;justify-content:center">' +
+              '<i data-lucide="' + iconInfo.icon + '" style="width:16px;height:16px"></i>' +
+            '</span>' +
+            '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + opt + '</span>' +
+          '</span>'
+        : opt;
       return '<button data-val="' + opt.replace(/"/g, "&quot;") + '" class="stagger-item" style="display:flex;align-items:center;' +
         'justify-content:space-between;width:100%;text-align:left;background:' + (active ? "var(--primary-light)" : "none") +
         ';border:none;padding:14px 12px;border-radius:10px;font-size:15px;color:' + (active ? "var(--primary)" : "#18181b") +
         ';font-weight:' + (active ? "700" : "400") + ';cursor:pointer;font-family:inherit;animation-delay:' + delay + 'ms">' +
-        opt + (active ? '<i data-lucide="check" style="width:18px;height:18px"></i>' : "") +
+        labelHTML + (active ? '<i data-lucide="check" style="width:18px;height:18px;flex-shrink:0"></i>' : "") +
         '</button>';
     }).join("");
     Array.from(listEl.querySelectorAll("button")).forEach(function (btn) {

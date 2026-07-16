@@ -151,17 +151,9 @@ document.addEventListener("DOMContentLoaded", function() {
           <span class="vender-total-label">Total</span>
           <span class="vender-total-value" id="total-val">0,00 Kz</span>
         </div>
-        <button class="vender-fab" id="btn-vender-fab" onclick="window._toggleVenderFab()">
-          <i data-lucide="plus"></i>
+        <button class="vender-guardar-btn" id="btn-vender-guardar" onclick="window._openGuardarModal()">
+          <i data-lucide="bookmark"></i>
         </button>
-        <div class="vender-fab-popover" id="vender-fab-popover" style="display:none">
-          <button class="vender-fab-action" onclick="window._guardarPedido(); window._toggleVenderFab();">
-            <i data-lucide="bookmark"></i> Guardar pedido
-          </button>
-          <button class="vender-fab-action" onclick="window._openCategoryFilter()">
-            <i data-lucide="tag"></i> Filtrar por categoria
-          </button>
-        </div>
         <button class="vender-finalizar-btn" id="btn-finalizar">
           Finalizar
           <i data-lucide="arrow-right"></i>
