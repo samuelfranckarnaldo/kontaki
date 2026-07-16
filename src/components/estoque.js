@@ -46,6 +46,17 @@ function abbrevQty(n) {
 let allProducts = [];
 let filterMode = "all";
 
+function _abbrevUnit(unit) {
+  if (!unit) return "un";
+  const map = {
+    "Unidade": "un", "Litro": "L", "Mililitro": "ml", "Quilograma": "kg",
+    "Grama": "g", "Caixa": "cx", "Pacote": "pct", "Fardo": "fd",
+    "Grade": "gd", "Garrafa": "gf", "Saco": "sc", "Rolo": "rl",
+  };
+  if (map[unit]) return map[unit];
+  return unit.length > 4 ? unit.slice(0, 3) + "." : unit;
+}
+
 function categoryColor(cat) {
   return {"Alimentacao":"#f97316","Bebidas":"#3b82f6","Higiene":"#ec4899","Limpeza":"#10b981","Outro":"#6b7280"}[cat] || "#6b7280";
 }
@@ -101,7 +112,7 @@ function renderEstoqueStats() {
   s.innerHTML =
     `<div class="hist-hero" style="grid-column:span 3">` +
     `<div class="hist-hero-label">Valor total em stock</div>` +
-    `<div class="hist-hero-val">${fmt(lojaVal+armVal)}</div>` +
+    `<div class="hist-hero-val${String(fmt(lojaVal+armVal)).length>=16?" hist-hero-val--xs":String(fmt(lojaVal+armVal)).length>=13?" hist-hero-val--sm":""}">${fmt(lojaVal+armVal)}</div>` +
     `<div class="hist-hero-sub" style="margin-top:10px;display:flex;gap:18px">` +
       `<span><strong>${lojaQty.toLocaleString("pt-AO")}</strong> un na loja</span>` +
       `<span><strong>${armQty.toLocaleString("pt-AO")}</strong> un no armazém</span>` +
@@ -199,16 +210,21 @@ function renderEstoqueList() {
       (expiryTag ? `<span class="produto-badge ${expiryBadgeClass}">${expiryTag}</span>` : "") +
       `</div>` +
       `<div class="produto-meta">${p.barcode?p.barcode+" · ":""}${p.category}${batchMeta}</div>` +
-      `<div class="produto-stock-line">` +
-      `<span><span class="produto-stock-label">Loja</span> ${qty}</span>` +
-      `<span><span class="produto-stock-label">Arm.</span> ${arm}</span>` +
-      `<span><strong>${qty+arm} ${p.unit}</strong></span>` +
+      `<div class="produto-stock-line" style="white-space:normal;overflow:visible;text-overflow:clip">` +
+      `<span><span class="produto-stock-label">Loja</span> ${abbrevQty(qty)}</span>` +
+      `<span><span class="produto-stock-label">Arm.</span> ${abbrevQty(arm)}</span>` +
+      `<span><strong>${abbrevQty(qty+arm)} ${_abbrevUnit(p.unit)}</strong></span>` +
       `</div>` +
       `<div class="produto-price" style="margin-top:4px">${fmt(p.price)}</div>` +
       `</div>` +
+      `<div style="display:flex;gap:2px;align-self:flex-start;flex-shrink:0">` +
+      `<button class="produto-menu-btn" onclick="window._estViewInfo(${p.id})" title="Ver informação">` +
+      `<i data-lucide="info"></i>` +
+      `</button>` +
       `<button class="produto-menu-btn" onclick="window._openEstoqueItem(${p.id})" title="Editar produto">` +
       `<i data-lucide="pencil"></i>` +
       `</button>` +
+      `</div>` +
       `</div>` +
       _estActionsBar(p) +
       `</div>`;
@@ -255,21 +271,49 @@ window._estRepor = async (id) => {
 window._estAdjust = (id) => {
   const p = allProducts.find(x => x.id === id);
   if (!p) return;
+  const curShop = p.stock || 0;
+  const curWh   = p.warehouseStock || 0;
+
   openModal("Ajustar Stock — " + p.name,
-    `<div style="display:flex;gap:10px;margin-bottom:14px">
-      <div style="flex:1">
-        <label style="font-size:12px;color:var(--text3);font-weight:700">Loja</label>
-        <input type="number" id="est-adj-shop" value="${p.stock||0}" min="0" class="input"/>
+    `<div style="display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-4)">
+      <div style="display:flex;align-items:center;gap:var(--space-3);background:var(--bg);border-radius:var(--radius);padding:var(--space-3) var(--space-4)">
+        <div style="flex:1;text-align:center">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Loja — Atual</div>
+          <div style="font-size:22px;font-weight:800;color:var(--text3)">${curShop}</div>
+        </div>
+        <i data-lucide="arrow-right" style="width:18px;height:18px;color:var(--text4);flex-shrink:0"></i>
+        <div style="flex:1">
+          <div style="font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;text-align:center">Novo</div>
+          <input type="number" id="est-adj-shop" value="${curShop}" min="0"
+            style="font-size:22px;font-weight:800;text-align:center;padding:10px;color:var(--primary);border-color:var(--primary)"/>
+        </div>
       </div>
-      <div style="flex:1">
-        <label style="font-size:12px;color:var(--text3);font-weight:700">Armazém</label>
-        <input type="number" id="est-adj-wh" value="${p.warehouseStock||0}" min="0" class="input"/>
+      <div style="display:flex;align-items:center;gap:var(--space-3);background:var(--bg);border-radius:var(--radius);padding:var(--space-3) var(--space-4)">
+        <div style="flex:1;text-align:center">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Armazém — Atual</div>
+          <div style="font-size:22px;font-weight:800;color:var(--text3)">${curWh}</div>
+        </div>
+        <i data-lucide="arrow-right" style="width:18px;height:18px;color:var(--text4);flex-shrink:0"></i>
+        <div style="flex:1">
+          <div style="font-size:10px;font-weight:700;color:var(--info);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;text-align:center">Novo</div>
+          <input type="number" id="est-adj-wh" value="${curWh}" min="0"
+            style="font-size:22px;font-weight:800;text-align:center;padding:10px;color:var(--info);border-color:var(--info)"/>
+        </div>
       </div>
     </div>
-    <label style="font-size:12px;color:var(--text3);font-weight:700">Motivo</label>
-    <input type="text" id="est-adj-reason" placeholder="Ex: contagem física, quebra..." class="input" style="margin-bottom:14px"/>
-    <button class="btn btn-primary btn-full" onclick="window._estAdjustSave(${id})">Guardar Ajuste</button>`
-  );
+    <div class="field" style="margin-bottom:16px">
+      <label style="text-transform:none;font-weight:600;letter-spacing:0;font-size:12px;color:var(--text2)">Razão do ajuste *</label>
+      <input id="est-adj-reason" placeholder="Ex: contagem física, quebra..."/>
+    </div>
+    <div style="margin-top:var(--space-3);display:flex;flex-direction:column;gap:var(--space-1)">
+      <button class="btn btn-primary btn-full" onclick="window._estAdjustSave(${id})">
+        <i data-lucide="check"></i> Aplicar
+      </button>
+      <button onclick="window._closeModal()" style="width:100%;padding:10px;background:none;border:none;color:var(--text3);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+        Cancelar
+      </button>
+    </div>`);
+  refreshIcons(document.getElementById("modal-box") || document.body);
 }
 
 window._estAdjustSave = async (id) => {
@@ -292,16 +336,45 @@ window._estAdjustSave = async (id) => {
 window._estTransfer = (id) => {
   const p = allProducts.find(x => x.id === id);
   if (!p) return;
+  const shopStock = p.stock || 0;
+  const whStock = p.warehouseStock || 0;
+
   openModal("Transferir Stock — " + p.name,
-    `<div style="display:flex;gap:10px;margin-bottom:14px">
-      <button class="btn btn-outline btn-sm" style="flex:1" id="est-tr-dir-lw" onclick="window._estTrDir('lw')">Loja → Armazém</button>
-      <button class="btn btn-outline btn-sm" style="flex:1" id="est-tr-dir-wl" onclick="window._estTrDir('wl')">Armazém → Loja</button>
+    `<div style="margin-bottom:var(--space-4)">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-4)">
+        <div class="stat-card" style="border-left:3px solid #5b21b6;text-align:center">
+          <div style="font-size:var(--text-xs);color:#5b21b6;font-weight:var(--weight-strong)">LOJA</div>
+          <div style="font-size:var(--text-lg);font-weight:var(--weight-strong);color:#5b21b6">${shopStock}</div>
+          <div style="font-size:var(--text-xs);color:#71717a">${_abbrevUnit(p.unit)}</div>
+        </div>
+        <div class="stat-card" style="border-left:3px solid #d97706;text-align:center">
+          <div style="font-size:var(--text-xs);color:#d97706;font-weight:var(--weight-strong)">ARMAZÉM</div>
+          <div style="font-size:var(--text-lg);font-weight:var(--weight-strong);color:#d97706">${whStock}</div>
+          <div style="font-size:var(--text-xs);color:#71717a">${_abbrevUnit(p.unit)}</div>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:var(--space-3)">
+        <label style="text-transform:none;font-weight:600;letter-spacing:0;font-size:12px;color:var(--text2)">Direcção da transferência</label>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn btn-outline btn-sm" style="flex:1" id="est-tr-dir-lw" onclick="window._estTrDir('lw')">Loja → Armazém</button>
+          <button type="button" class="btn btn-outline btn-sm" style="flex:1" id="est-tr-dir-wl" onclick="window._estTrDir('wl')">Armazém → Loja</button>
+        </div>
+      </div>
+      <div class="field">
+        <label style="text-transform:none;font-weight:600;letter-spacing:0;font-size:12px;color:var(--text2)">Quantidade</label>
+        <input type="number" id="est-tr-qty" min="1" value="1" style="width:100%;padding:10px;border:1.5px solid #e4e4e7;border-radius:8px;font-family:inherit;font-size:14px;box-sizing:border-box"/>
+      </div>
     </div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:6px">Loja: ${p.stock||0} · Armazém: ${p.warehouseStock||0}</div>
-    <label style="font-size:12px;color:var(--text3);font-weight:700">Quantidade a transferir</label>
-    <input type="number" id="est-tr-qty" value="0" min="0" class="input" style="margin-bottom:14px"/>
-    <button class="btn btn-primary btn-full" onclick="window._estTransferSave(${id})">Confirmar Transferência</button>`
+    <div style="margin-top:var(--space-3);display:flex;flex-direction:column;gap:var(--space-1)">
+      <button class="btn btn-primary btn-full" onclick="window._estTransferSave(${id})">
+        <i data-lucide="check"></i> Transferir
+      </button>
+      <button onclick="window._closeModal()" style="width:100%;padding:10px;background:none;border:none;color:var(--text3);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+        Cancelar
+      </button>
+    </div>`
   );
+  refreshIcons(document.getElementById("modal-box") || document.body);
   window._estTrDirection = "lw";
 }
 
@@ -365,6 +438,63 @@ window._estHistory = async (id) => {
   refreshIcons(document.querySelector(".modal-body") || document.body);
 }
 
+window._estViewInfo = (id) => {
+  const p = allProducts.find(x => x.id === id);
+  if (!p) return;
+  const user = getUser();
+  const cColor = categoryColor(p.category);
+  const shopS = p.stock || 0;
+  const whS   = p.warehouseStock || 0;
+  const margin = (user.role === "admin" && p.costPrice) ? Math.round(((p.price-p.costPrice)/p.price)*100) : null;
+
+  openModal("",
+    `<div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+      <div style="width:52px;height:52px;border-radius:14px;flex-shrink:0;
+        background:linear-gradient(135deg, ${cColor}, ${cColor}cc);
+        display:flex;align-items:center;justify-content:center;
+        font-size:20px;font-weight:800;color:#fff;box-shadow:0 4px 12px ${cColor}40">
+        ${(p.name||"P").charAt(0).toUpperCase()}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:17px;font-weight:800;color:var(--text);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">${p.category||"Outro"}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:19px;font-weight:800;color:var(--primary)">${fmt(p.price)}</div>
+      </div>
+    </div>` +
+
+    `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px">
+      <div style="background:var(--primary-light);border-radius:10px;padding:12px;text-align:center;min-width:0">
+        <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Loja</div>
+        <div style="font-size:${String(shopS).length>5?"13px":"18px"};font-weight:800;color:var(--primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${shopS}">${shopS}</div>
+        <div style="font-size:10.5px;color:var(--text3)">${_abbrevUnit(p.unit)}</div>
+      </div>
+      <div style="background:var(--info-light);border-radius:10px;padding:12px;text-align:center;min-width:0">
+        <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Armazém</div>
+        <div style="font-size:${String(whS).length>5?"13px":"18px"};font-weight:800;color:var(--info);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${whS}">${whS}</div>
+        <div style="font-size:10.5px;color:var(--text3)">${_abbrevUnit(p.unit)}</div>
+      </div>
+      <div style="background:var(--border2);border-radius:10px;padding:12px;text-align:center;min-width:0">
+        <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Total</div>
+        <div style="font-size:${String(shopS+whS).length>5?"13px":"18px"};font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${shopS+whS}">${shopS+whS}</div>
+        <div style="font-size:10.5px;color:var(--text3)">${_abbrevUnit(p.unit)}</div>
+      </div>
+    </div>` +
+
+    `<div style="background:var(--bg);border-radius:12px;padding:2px 16px">` +
+    (user.role==="admin" && p.costPrice ? `<div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Preço custo</span><span style="font-weight:700;color:var(--text)">${fmt(p.costPrice)}</span></div>` : "") +
+    (margin!==null ? `<div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Margem</span><span style="font-weight:700;color:${margin<0?"var(--danger)":"var(--success)"}">${fmt(p.price-p.costPrice)} (${margin}%)</span></div>` : "") +
+    `<div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Stock mínimo</span><span style="font-weight:700;color:var(--text)">${p.minStock||5} ${p.unit||"un"}</span></div>` +
+    (p.barcode ? `<div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Código de barras</span><span style="font-family:monospace;font-weight:700;color:var(--text)">${p.barcode}</span></div>` : "") +
+    (p.purchaseUnit ? `<div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Unidade de compra</span><span style="font-weight:700;color:var(--text)">${p.purchaseUnit}${p.conversionFactor?" ("+p.conversionFactor+"x)":""}</span></div>` : "") +
+    (p.expiryDate ? `<div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Validade</span><span style="font-weight:700;color:var(--text)">${new Date(p.expiryDate+"T00:00:00").toLocaleDateString("pt-AO",{day:"2-digit",month:"long",year:"numeric"})}</span></div>` : "") +
+    (p.batchNumber ? `<div style="display:flex;justify-content:space-between;padding:11px 0;font-size:13px"><span style="color:var(--text3)">Lote</span><span style="font-weight:700;color:var(--text)">${p.batchNumber}</span></div>` : "") +
+    `</div>`
+  );
+  refreshIcons(document.getElementById("modal-box") || document.body);
+};
+
 window._openEstoqueItem = async (id) => {
   const p = allProducts.find(x => x.id === id);
   if (!p) return;
@@ -382,27 +512,49 @@ window._estComprar = async () => {
   mod.openCompraForm();
 };
 
+let _invDraft = {};
+
 window._estInventario = async () => {
   const active = allProducts.filter(p => p.active);
+  const hasDraft = Object.keys(_invDraft).length > 0;
+
   const rowsHtml = active.map(function(p) {
-    const esperado = p.stock || 0;
-    return '<div class="est-inv-row" data-product-id="' + p.id + '" data-expected="' + esperado + '" ' +
-      'style="display:flex;align-items:center;gap:8px;padding:10px 8px;border-bottom:1px solid var(--border2);border-left:3px solid transparent;transition:background .15s">' +
-      '<div style="flex:1;min-width:0">' +
-      '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + p.name + '</div>' +
-      '<div style="font-size:11px;color:var(--text3)">Esperado: <strong>' + esperado + '</strong> ' + (p.unit||"un") + '</div>' +
-      '</div>' +
-      '<input type="number" class="est-inv-input" min="0" value="' + esperado + '" data-default="' + esperado + '" ' +
+    const espLoja = p.stock || 0;
+    const espArm  = p.warehouseStock || 0;
+    const draft = _invDraft[p.id];
+    const valLoja = draft && draft.loja != null ? draft.loja : espLoja;
+    const valArm  = draft && draft.arm  != null ? draft.arm  : espArm;
+    const rowChanged = (valLoja !== espLoja) || (valArm !== espArm);
+    return '<div class="est-inv-row" data-product-id="' + p.id + '" data-exp-loja="' + espLoja + '" data-exp-arm="' + espArm + '" ' +
+      'style="padding:10px 8px;border-bottom:1px solid var(--border2);border-left:3px solid ' + (rowChanged?"var(--primary)":"transparent") + ';background:' + (rowChanged?"var(--primary-light)":"transparent") + ';transition:background .15s">' +
+      '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px">' + p.name + '</div>' +
+      '<div style="display:flex;gap:8px">' +
+      '<div style="flex:1">' +
+      '<div style="font-size:10.5px;color:var(--text3);margin-bottom:3px">Loja (esp. ' + espLoja + ' ' + _abbrevUnit(p.unit) + ')</div>' +
+      '<input type="number" class="est-inv-input-loja" min="0" value="' + valLoja + '" data-default="' + espLoja + '" ' +
       'oninput="window._estInvRowChanged(this)" ' +
-      'style="width:70px;padding:7px;border:1.5px solid var(--border2);border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
+      'style="width:100%;padding:7px;border:1.5px solid var(--border2);border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
+      '</div>' +
+      '<div style="flex:1">' +
+      '<div style="font-size:10.5px;color:var(--text3);margin-bottom:3px">Armazém (esp. ' + espArm + ' ' + _abbrevUnit(p.unit) + ')</div>' +
+      '<input type="number" class="est-inv-input-arm" min="0" value="' + valArm + '" data-default="' + espArm + '" ' +
+      'oninput="window._estInvRowChanged(this)" ' +
+      'style="width:100%;padding:7px;border:1.5px solid var(--border2);border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
+      '</div>' +
+      '</div>' +
       '</div>';
   }).join("");
 
   openModal("Inventário Periódico",
-    '<div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">Confirma a contagem física de cada produto. Divergências criam um incidente para revisão de admin — o stock só muda depois de resolvido.</div>' +
+    (hasDraft ?
+      '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--primary-light);border-radius:8px;padding:8px 12px;margin-bottom:10px">' +
+      '<span style="font-size:11.5px;color:var(--primary);font-weight:600">A continuar contagem anterior</span>' +
+      '<button onclick="window._estInvReset()" style="background:none;border:none;color:var(--primary);font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit">Recomeçar</button>' +
+      '</div>' : "") +
+    '<div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">Confirma a contagem física de loja e armazém para cada produto. Divergências criam um incidente para revisão de admin — o stock só muda depois de resolvido. Podes fechar e continuar mais tarde — o progresso fica guardado.</div>' +
     '<div style="max-height:60vh;overflow-y:auto">' + rowsHtml + '</div>' +
     '<div style="display:flex;gap:8px;margin-top:14px">' +
-    '<button class="btn btn-ghost btn-full" onclick="window._closeModal ? window._closeModal() : null">Cancelar</button>' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal ? window._closeModal() : null">Fechar (guarda progresso)</button>' +
     '<button class="btn btn-primary btn-full" onclick="window._estInvConfirm()"><i data-lucide="check"></i> Confirmar Contagem</button>' +
     '</div>'
   );
@@ -411,9 +563,19 @@ window._estInventario = async () => {
 
 window._estInvRowChanged = function(input) {
   const row = input.closest(".est-inv-row");
-  const changed = input.value !== input.getAttribute("data-default");
+  const pid = Number(row.getAttribute("data-product-id"));
+  const loja = row.querySelector(".est-inv-input-loja");
+  const arm  = row.querySelector(".est-inv-input-arm");
+  const changed = loja.value !== loja.getAttribute("data-default") || arm.value !== arm.getAttribute("data-default");
   row.style.background = changed ? "var(--primary-light)" : "transparent";
   row.style.borderLeftColor = changed ? "var(--primary)" : "transparent";
+
+  _invDraft[pid] = { loja: Number(loja.value || 0), arm: Number(arm.value || 0) };
+};
+
+window._estInvReset = () => {
+  _invDraft = {};
+  window._estInventario();
 };
 
 window._estInvConfirm = async () => {
@@ -422,14 +584,17 @@ window._estInvConfirm = async () => {
   let diffs = [];
   rows.forEach(function(row) {
     const pid = Number(row.getAttribute("data-product-id"));
-    const expected = Number(row.getAttribute("data-expected"));
-    const input = row.querySelector(".est-inv-input");
-    const found = Number(input.value || 0);
-    if (found !== expected) diffs.push({ pid, expected, found });
+    const expLoja = Number(row.getAttribute("data-exp-loja"));
+    const expArm  = Number(row.getAttribute("data-exp-arm"));
+    const foundLoja = Number(row.querySelector(".est-inv-input-loja").value || 0);
+    const foundArm  = Number(row.querySelector(".est-inv-input-arm").value || 0);
+    if (foundLoja !== expLoja) diffs.push({ pid, location: "shop", locationLabel: "Loja", expected: expLoja, found: foundLoja });
+    if (foundArm !== expArm)  diffs.push({ pid, location: "warehouse", locationLabel: "Armazém", expected: expArm, found: foundArm });
   });
 
   if (!diffs.length) {
     toast("Sem divergências — contagem confere.", "success");
+    _invDraft = {};
     closeModal();
     return;
   }
@@ -439,14 +604,16 @@ window._estInvConfirm = async () => {
     await db.add("incidents", {
       productId: d.pid, productName: p ? p.name : "",
       expected: d.expected, found: d.found, diff: d.found - d.expected,
+      location: d.location,
       sessionId: user && user.sessionId || null, responsibleSessionId: null,
       foundBy: user ? user.id : null, responsible: null,
       status: "open", type: "stock",
-      note: "Divergência no Inventário Periódico",
+      note: "Divergência no Inventário Periódico (" + d.locationLabel + ")",
       createdAt: new Date().toISOString(),
     });
   }
 
+  _invDraft = {};
   closeModal();
   toast(diffs.length + " divergência(s) registada(s) como incidente.", "success");
 };
@@ -460,18 +627,24 @@ window._estGoToIncidents = () => {
 
 window._estOpenMoreMenu = () => {
   const items = [
-    { icon: "package-plus", label: "Comprar", action: "window._estComprar()" },
-    { icon: "clipboard-list", label: "Inventário Periódico", action: "window._estInventario()" },
-    { icon: "alert-triangle", label: "Incidentes de Stock", action: "window._estGoToIncidents()" },
-    { icon: "bar-chart-3", label: "Relatórios", action: "window._estOpenReports()" },
+    { icon: "package-plus", label: "Comprar", desc: "Registar nova compra e actualizar stock", iconClass: "hist-export-icon--csv", action: "window._estComprar()" },
+    { icon: "clipboard-list", label: "Inventário Periódico", desc: "Recontar o catálogo e apanhar divergências", iconClass: "hist-export-icon--edit", action: "window._estInventario()" },
+    { icon: "alert-triangle", label: "Incidentes de Stock", desc: "Divergências à espera de revisão de admin", iconClass: "hist-export-icon--pdf", action: "window._estGoToIncidents()" },
+    { icon: "bar-chart-3", label: "Relatórios", desc: "Parados, rotatividade e análise ABC", iconClass: "hist-export-icon--cancel", action: "window._estOpenReports()" },
   ];
   openModal("Mais opções",
+    '<div class="hist-export-options">' +
     items.map(function(it) {
-      return '<button class="perfil-menu-item" style="width:100%;text-align:left" onclick="window._closeModal();' + it.action + '">' +
-        '<i data-lucide="' + it.icon + '"></i><span>' + it.label + '</span>' +
-        '<span class="perfil-menu-chevron">›</span>' +
+      return '<button class="hist-export-option" onclick="window._closeModal();' + it.action + '">' +
+        '<div class="hist-export-icon ' + it.iconClass + '"><i data-lucide="' + it.icon + '"></i></div>' +
+        '<div class="hist-export-info">' +
+        '<div class="hist-export-title">' + it.label + '</div>' +
+        '<div class="hist-export-desc">' + it.desc + '</div>' +
+        '</div>' +
+        '<i data-lucide="chevron-right" class="hist-export-arrow"></i>' +
         '</button>';
-    }).join("")
+    }).join("") +
+    '</div>'
   );
   refreshIcons(document.getElementById("modal-box") || document.body);
 };

@@ -538,12 +538,13 @@ window._confirmResolveInc = async function(id) {
     if (novoStock != null) {
       const p = await db.get("products", i.productId);
       if (p) {
-        const actual = await getStock(i.productId, "shop");
+        const loc = i.location || "shop";
+        const actual = await getStock(i.productId, loc);
         const delta = novoStock - actual;
         if (delta !== 0) {
           await addStockMovement({
             productId: i.productId, productName: p.name,
-            type: "incident_resolution", location: "shop", qty: delta,
+            type: "incident_resolution", location: loc, qty: delta,
             reference: "incident#" + id, note: note,
             userId: getUser().id, createdAt: new Date().toISOString(),
           });
@@ -936,82 +937,96 @@ async function loadContabilidade() {
   if (activeContaTab === "demonstracoes")  return loadContaDemonstracoes(wrap);
 }
 
+function accountBalance(entries, code) {
+  var acc = CHART_OF_ACCOUNTS.find(function(c){ return c.code === code; });
+  if (!acc) return 0;
+  var d = 0, c = 0;
+  entries.forEach(function(e) {
+    (e.lines||[]).forEach(function(l) {
+      if (l.account === code) { d += l.debit||0; c += l.credit||0; }
+    });
+  });
+  return acc.natureza === "devedora" ? (d - c) : (c - d);
+}
+
 async function loadContaResumo(wrap) {
-  var sales    = await db.getAll("sales");
-  var purchases= await db.getAll("purchases");
-  var products = await db.getAll("products");
-  var fiados   = await db.getAll("fiado");
-  var archive  = await db.getAll("accountingArchive");
+  var sales     = await db.getAll("sales");
+  var purchases = await db.getAll("purchases");
+  var products  = await db.getAll("products");
+  var allExpenses = await db.getAll("expenses");
+  var entries   = await db.getAll("journalEntries");
 
-  var now   = new Date();
-  var mes   = now.toISOString().slice(0,7);
-  var hoje  = now.toISOString().slice(0,10);
-  var ano   = now.getFullYear().toString();
+  var now       = new Date();
+  var mes       = now.toISOString().slice(0,7);
+  var hoje      = now.toISOString().slice(0,10);
+  var mesAnteriorDate = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  var mesAnterior = mesAnteriorDate.toISOString().slice(0,7);
 
-  // Receitas
-  var vendasMes  = sales.filter(function(s){ return (s.date||"").startsWith(mes); });
-  var vendasAno  = sales.filter(function(s){ return (s.date||"").startsWith(ano); });
-  var vendasHoje = sales.filter(function(s){ return (s.date||"").startsWith(hoje); });
+  function calcMes(mesStr) {
+    var vendasM  = sales.filter(function(s){ return (s.date||"").startsWith(mesStr); });
+    var receitaM = vendasM.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+    var prodMap = {};
+    products.forEach(function(p){ prodMap[p.id]=p; });
+    var cogsM = vendasM.reduce(function(a,s){
+      var custoVenda = (s.items||[]).reduce(function(b,i){
+        var p = prodMap[i.id];
+        return b + (p ? (p.costPrice||0)*i.qty : 0);
+      },0);
+      var propDev = s.total > 0 ? (s.totalDevolvido||0)/s.total : 0;
+      return a + custoVenda * (1 - propDev);
+    },0);
+    var despesasM = allExpenses.filter(function(e){ return (e.date||"").startsWith(mesStr) && e.countsInAccounting !== false; })
+      .reduce(function(a,e){ return a+(e.amount||0); },0);
+    return { vendas:vendasM, receita:receitaM, cogs:cogsM, despesas:despesasM, lucroBruto:receitaM-cogsM, lucroLiquido:receitaM-cogsM-despesasM };
+  }
 
-  // Receita = só vendas pagas (exclui fiados em aberto)
-  // Receita total = todas as vendas (fiado é receita pendente)
-  var receitaMes  = vendasMes.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
-  var receitaAno  = vendasAno.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
+  var atual    = calcMes(mes);
+  var anterior = calcMes(mesAnterior);
+  var vendasHoje  = sales.filter(function(s){ return (s.date||"").startsWith(hoje); });
   var receitaHoje = vendasHoje.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
-  // Fiado recebido = fiados pagos no mês
-  var receitaFiadoMes = fiados.filter(function(f){ return f.status==="paid" && (f.paidAt||"").startsWith(mes); })
-    .reduce(function(a,f){ return a+(f.amount||0); },0);
-  // Fiado pendente = fiados em aberto
-  var fiadoPendenteMes = fiados.filter(function(f){ return f.status==="open"; })
-    .reduce(function(a,f){ return a+(f.amount||0); },0);
 
-  // Custo das vendas (COGS)
-  var prodMap = {};
-  products.forEach(function(p){ prodMap[p.id]=p; });
+  var margemLiquidaMes = atual.receita > 0 ? ((atual.lucroLiquido/atual.receita)*100).toFixed(1) : "0.0";
 
-  // COGS = custo dos produtos vendidos menos devoluções
-  var cogsMes = vendasMes.reduce(function(a,s){
-    var custoVenda = (s.items||[]).reduce(function(b,i){
-      var p = prodMap[i.id];
-      return b + (p ? (p.costPrice||0)*i.qty : 0);
-    },0);
-    // Desconto proporcional de devoluções
-    var propDev = s.total > 0 ? (s.totalDevolvido||0)/s.total : 0;
-    return a + custoVenda * (1 - propDev);
-  },0);
+  var trendPct = anterior.lucroLiquido !== 0
+    ? Math.round(((atual.lucroLiquido - anterior.lucroLiquido) / Math.abs(anterior.lucroLiquido)) * 100)
+    : null;
 
-  var cogsAno = vendasAno.reduce(function(a,s){
-    var custoVenda = (s.items||[]).reduce(function(b,i){
-      var p = prodMap[i.id];
-      return b + (p ? (p.costPrice||0)*i.qty : 0);
-    },0);
-    var propDev = s.total > 0 ? (s.totalDevolvido||0)/s.total : 0;
-    return a + custoVenda * (1 - propDev);
-  },0);
+  // Contexto vs mês anterior (mesmo padrão do Histórico)
+  var contextPhrase = "";
+  if (atual.vendas.length === 0) {
+    contextPhrase = "Sem vendas neste mês";
+  } else if (trendPct !== null) {
+    if (trendPct > 20)        contextPhrase = "Muito acima do mês passado";
+    else if (trendPct > 2)    contextPhrase = "Melhor que o mês passado";
+    else if (trendPct >= -2)  contextPhrase = "Igual ao mês passado";
+    else if (trendPct >= -20) contextPhrase = "Abaixo do mês passado";
+    else                       contextPhrase = "Muito abaixo do mês passado";
+  }
 
-  // Lucro bruto
-  var lucroMes = receitaMes - cogsMes;
-  var lucroAno = receitaAno - cogsAno;
-  var margemMes = receitaMes > 0 ? ((lucroMes/receitaMes)*100).toFixed(1) : "0.0";
+  // Recorde — melhor resultado líquido dos últimos 6 meses
+  var melhorDosUltimos6 = true;
+  for (var mi = 1; mi <= 5; mi++) {
+    var dPast = new Date(now.getFullYear(), now.getMonth()-mi, 1);
+    var mesPast = dPast.toISOString().slice(0,7);
+    var resPast = calcMes(mesPast).lucroLiquido;
+    if (resPast > atual.lucroLiquido) { melhorDosUltimos6 = false; break; }
+  }
+  var isRecord = melhorDosUltimos6 && atual.vendas.length > 0 && atual.lucroLiquido > 0;
+  var recordHtml = isRecord ? '<div class="hist-hero-record"><i data-lucide="award"></i>Melhor mês dos últimos 6 meses!</div>' : '';
 
-  // Compras a fornecedores
   var comprasMes = purchases.filter(function(p){ return (p.date||"").startsWith(mes); })
     .reduce(function(a,p){ return a+(p.total||0); },0);
+  var devMes = atual.vendas.reduce(function(a,s){ return a+(s.totalDevolvido||0); },0);
 
-  var allExpenses = await db.getAll("expenses");
-  var despesasMes = allExpenses.filter(function(e){ return (e.date||"").startsWith(mes); })
-    .reduce(function(a,e){ return a+(e.amount||0); },0);
-  var lucroLiquido = lucroMes - despesasMes;
+  // ── Posição financeira (fonte: livro razão) ──
+  var saldoCaixaBanco = accountBalance(entries, "45") + accountBalance(entries, "43") + accountBalance(entries, "44") + accountBalance(entries, "42") + accountBalance(entries, "41");
+  var contasAReceber  = accountBalance(entries, "31");
+  var contasAPagar    = accountBalance(entries, "32");
+  var ivaAPagar       = accountBalance(entries, "34");
 
-  // Fiados em aberto
-  var fiadoAberto = fiados.filter(function(f){ return f.status==="open"; })
-    .reduce(function(a,f){ return a+(f.amount||0); },0);
-  var fiadoRecebido = fiados.filter(function(f){ return f.status==="paid"; })
-    .reduce(function(a,f){ return a+(f.amount||0); },0);
-
-  // Top produtos por receita
+  // Top produtos
   var prodReceita = {};
-  vendasMes.forEach(function(s){
+  atual.vendas.forEach(function(s){
     (s.items||[]).forEach(function(i){
       prodReceita[i.id] = (prodReceita[i.id]||{name:i.name,total:0,qty:0});
       prodReceita[i.id].total += i.price*i.qty;
@@ -1020,49 +1035,62 @@ async function loadContaResumo(wrap) {
   });
   var topProd = Object.values(prodReceita).sort(function(a,b){ return b.total-a.total; }).slice(0,5);
 
-  // Vendas por método de pagamento
+  // Por método de pagamento
   var porMetodo = {};
-  vendasMes.forEach(function(s){
+  atual.vendas.forEach(function(s){
     porMetodo[s.payMethod] = (porMetodo[s.payMethod]||0) + s.total;
   });
+  var metodoLabels = { dinheiro:"Dinheiro", transferencia:"Transferência", multicaixa:"Multicaixa", fiado:"Venda a Crédito" };
 
-  // Devoluções do mês
-  var devMes = vendasMes.reduce(function(a,s){ return a+(s.totalDevolvido||0); },0);
+  var trendHtml = trendPct === null ? "" :
+    '<div class="conta-hero-trend conta-hero-trend--corner conta-hero-trend--' + (trendPct>=0?'up':'down') + '">' +
+    (trendPct>=0?'▲ ':'▼ ') + Math.abs(trendPct) + '%</div>';
+
+  function wfRow(label, value, variant) {
+    var cls = "conta-wf-row" + (variant ? " conta-wf-row--" + variant : "");
+    return '<div class="' + cls + '"><div class="conta-wf-label">' + label + '</div><div class="conta-wf-val">' + value + '</div></div>';
+  }
 
   wrap.innerHTML =
-    // ── HERO — resultado do mês ──
-    '<div class="conta-hero" style="background:' + (lucroLiquido>=0?'linear-gradient(135deg,#059669,#10b981)':'linear-gradient(135deg,#dc2626,#ef4444)') + '">' +
-    '<div class="conta-hero-label">Resultado do mês</div>' +
-    '<div class="conta-hero-val">' + fmt(lucroLiquido) + '</div>' +
-    '<div class="conta-hero-sub">' + (lucroLiquido>=0?'▲ Lucro':'▼ Prejuízo') + ' · ' + vendasMes.length + ' vendas · margem ' + margemMes + '%</div>' +
+    // ── HERO ──
+    '<div class="conta-hero" style="background:' + (atual.lucroLiquido>=0?'linear-gradient(135deg,var(--primary),var(--primary-mid))':'linear-gradient(135deg,#dc2626,#ef4444)') + '">' +
+    trendHtml +
+    '<div class="conta-hero-label">Resultado líquido do mês</div>' +
+    '<div class="hist-hero-row"><div class="conta-hero-val">' + fmt(atual.lucroLiquido) + '</div></div>' +
+    recordHtml +
+    (contextPhrase ? '<div class="hist-hero-context">' + contextPhrase + '</div>' : '') +
+    '<div class="conta-hero-sub">' + (atual.lucroLiquido>=0?'Lucro':'Prejuízo') + ' · ' + atual.vendas.length + ' vendas · margem líquida ' + margemLiquidaMes + '%</div>' +
     '</div>' +
 
-    // ── KPIs em grid ──
-    '<div class="conta-section-label">Resumo do mês</div>' +
-    '<div class="conta-grid">' +
-    contaKpi("Receita", fmt(receitaMes), "#16a34a", "trending-up") +
-    contaKpi("Custo vendas", fmt(cogsMes), "#d97706", "package") +
-    contaKpi("Lucro bruto", fmt(lucroMes), lucroMes>=0?"#16a34a":"#dc2626", "dollar-sign") +
-    contaKpi("Despesas", fmt(despesasMes), "#dc2626", "receipt") +
-    contaKpi("Compras", fmt(comprasMes), "#6b7280", "shopping-cart") +
-    contaKpi("Devoluções", fmt(devMes), devMes>0?"#d97706":"#16a34a", "rotate-ccw") +
+    '<div class="conta-card" style="margin-bottom:14px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center">' +
+    '<span style="font-size:12px;color:var(--text3);font-weight:600">Receita de hoje</span>' +
+    '<span style="font-size:14px;font-weight:700;color:var(--text)">' + fmt(receitaHoje) + '</span>' +
     '</div>' +
 
-    // ── Fiados ──
-    '<div class="conta-section-label">Fiados</div>' +
+    // ── Posição financeira ──
+    '<div class="conta-section-label">Posição financeira</div>' +
     '<div class="conta-card">' +
-    contaRow("Fiado recebido este mês", fmt(receitaFiadoMes), "#16a34a") +
-    contaRow("Fiado pendente total", fmt(fiadoPendenteMes||0), "#d97706") +
-    contaRow("Fiado em aberto", fmt(fiadoAberto), "#dc2626") +
+    contaRow("Caixa + Banco", fmt(saldoCaixaBanco), "var(--text)", "Dinheiro disponível agora") +
+    contaRow("A receber (vendas a crédito)", fmt(contasAReceber), contasAReceber>0?"var(--warning)":"var(--text)") +
+    contaRow("A pagar (fornecedores)", fmt(contasAPagar), contasAPagar>0?"var(--danger)":"var(--text)") +
+    contaRow("IVA a pagar ao Estado", fmt(ivaAPagar), ivaAPagar>0?"var(--danger)":"var(--text)") +
     '</div>' +
 
-    // Receitas por período
-    '<div class="conta-section-label">Receitas por período</div>' +
+    // ── Composição do resultado (waterfall) ──
+    '<div class="conta-section-label">Composição do resultado</div>' +
+    '<div class="conta-waterfall">' +
+    wfRow("Receita", fmt(atual.receita)) +
+    wfRow("Custo das vendas", "−" + fmt(atual.cogs), "sub") +
+    wfRow("Lucro bruto", fmt(atual.lucroBruto), "subtotal") +
+    wfRow("Despesas operacionais", "−" + fmt(atual.despesas), "sub") +
+    wfRow("Resultado líquido", fmt(atual.lucroLiquido), "total") +
+    '</div>' +
+
+    // ── Outros indicadores ──
+    '<div class="conta-section-label">Outros indicadores</div>' +
     '<div class="conta-card">' +
-    contaRow("Hoje", fmt(receitaHoje), "#16a34a", vendasHoje.length+" "+(vendasHoje.length===1?"venda":"vendas")) +
-    contaRow("Este mês", fmt(receitaMes), "#16a34a", vendasMes.length+" vendas") +
-    contaRow("Este ano", fmt(receitaAno), "#16a34a", vendasAno.length+" vendas") +
-    contaRow("Fiado recebido", fmt(receitaFiadoMes), "#5b21b6", fiados.filter(function(f){return f.status==="paid";}).length+" pagos") +
+    contaRow("Compras do mês", fmt(comprasMes), "var(--text)") +
+    contaRow("Devoluções do mês", fmt(devMes), devMes>0?"var(--warning)":"var(--text)") +
     '</div>' +
 
     // Top produtos
@@ -1070,15 +1098,14 @@ async function loadContaResumo(wrap) {
     '<div class="conta-section-label">Top produtos do mês</div>' +
     '<div class="conta-card" style="padding:14px">' +
     topProd.map(function(p,i){
-      var pct = receitaMes>0?Math.round((p.total/receitaMes)*100):0;
-      var medals = ["🥇","🥈","🥉","4.","5."];
+      var pct = atual.receita>0?Math.round((p.total/atual.receita)*100):0;
       return '<div style="margin-bottom:12px">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">' +
         '<div style="display:flex;align-items:center;gap:6px">' +
-        '<span style="font-size:16px">' + medals[i] + '</span>' +
+        '<span style="font-size:11px;font-weight:700;color:var(--text4);width:14px">' + (i+1) + '</span>' +
         '<span style="font-size:13px;font-weight:700;color:var(--text)">' + p.name + '</span>' +
         '</div>' +
-        '<span style="font-size:13px;font-weight:700;color:var(--success)">' + fmt(p.total) + '</span>' +
+        '<span style="font-size:13px;font-weight:700;color:var(--text)">' + fmt(p.total) + '</span>' +
         '</div>' +
         '<div style="height:5px;background:var(--border2);border-radius:3px;overflow:hidden">' +
         '<div style="height:100%;width:' + pct + '%;background:var(--primary);border-radius:3px;transition:width .5s"></div>' +
@@ -1089,20 +1116,16 @@ async function loadContaResumo(wrap) {
     '</div>' : "") +
 
     // Por método de pagamento
-    '<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid #f4f4f5">' +
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Por método de pagamento</div>' +
+    '<div class="conta-section-label">Por método de pagamento</div>' +
+    '<div class="conta-card" style="padding:14px">' +
     Object.entries(porMetodo).map(function(e){
-      var pct = receitaMes>0?Math.round((e[1]/receitaMes)*100):0;
-      var colors = {dinheiro:"#16a34a",transferencia:"#2563eb",multicaixa:"#d97706",fiado:"#dc2626"};
-      var color  = colors[e[0]]||"#71717a";
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f4f4f5">' +
-        '<div style="display:flex;align-items:center;gap:8px">' +
-        '<div style="width:10px;height:10px;border-radius:50%;background:'+color+'"></div>' +
-        '<span style="font-size:13px;font-weight:600;text-transform:capitalize">'+e[0]+'</span>' +
-        '</div>' +
+      var pct = atual.receita>0?Math.round((e[1]/atual.receita)*100):0;
+      var label = metodoLabels[e[0]] || e[0];
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border2)">' +
+        '<span style="font-size:13px;font-weight:600;color:var(--text)">'+label+'</span>' +
         '<div style="text-align:right">' +
-        '<div style="font-size:13px;font-weight:700;color:'+color+'">'+fmt(e[1])+'</div>' +
-        '<div style="font-size:11px;color:#a1a1aa">'+pct+'%</div>' +
+        '<div style="font-size:13px;font-weight:700;color:var(--text)">'+fmt(e[1])+'</div>' +
+        '<div style="font-size:11px;color:var(--text4)">'+pct+'%</div>' +
         '</div></div>';
     }).join("") +
     '</div>';
@@ -1110,44 +1133,49 @@ async function loadContaResumo(wrap) {
   // Relatorio por funcionario
   var users = await db.getAll("users");
   var funcSection = document.createElement("div");
-  funcSection.style.cssText = "margin-bottom:14px";
+  funcSection.style.cssText = "margin-top:16px";
   funcSection.innerHTML =
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Relatório por funcionário</div>' +
-    '<div class="vender-card" style="display:flex;flex-direction:column;gap:10px">' +
-    '<select id="func-select" style="width:100%;padding:10px;border:1.5px solid #e4e4e7;border-radius:8px;font-family:inherit;font-size:14px">' +
+    '<div class="conta-section-label" style="margin-top:0">Relatório por funcionário</div>' +
+    '<div class="conta-card" style="padding:14px;display:flex;flex-direction:column;gap:10px">' +
+    '<select id="func-select" style="width:100%;padding:10px;border:1.5px solid var(--border2);border-radius:8px;font-family:inherit;font-size:14px;background:var(--bg)">' +
     users.map(function(u){ return '<option value="'+u.id+'">'+u.name+'</option>'; }).join("") +
     '</select>' +
-    '<button onclick="window._gerarRelatorioFuncionario()" style="width:100%;padding:12px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px"><i data-lucide="user-check" style="width:15px;height:15px"></i> Gerar relatório do funcionário</button>' +
+    '<button onclick="window._gerarRelatorioFuncionario()" class="btn btn-primary btn-full"><i data-lucide="user-check" style="width:15px;height:15px"></i> Gerar relatório do funcionário</button>' +
     '</div>';
   wrap.appendChild(funcSection);
   refreshIcons(funcSection);
 
   // Botão exportar PDF
   var pdfBtn = document.createElement("button");
-  pdfBtn.style.cssText = "width:100%;padding:14px;background:#dc2626;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px";
+  pdfBtn.className = "btn btn-full";
+  pdfBtn.style.cssText = "background:var(--danger);color:#fff;margin-top:12px";
   pdfBtn.innerHTML = '<i data-lucide="file-text" style="width:16px;height:16px"></i> Exportar Relatório PDF';
   pdfBtn.onclick = gerarRelatorioPDF;
   wrap.appendChild(pdfBtn);
 
   refreshIcons(wrap);
 }
-
 function contaKpi(label, value, color, icon) {
+  var isAccent = color && color !== "var(--text)";
+  var iconStyle = isAccent ? ('style="color:' + color + ';background:' + color + '20"') : '';
+  var valStyle  = isAccent ? (' style="color:' + color + '"') : '';
   return '<div class="conta-kpi">' +
-    '<div class="conta-kpi-icon" style="color:' + color + ';background:' + color + '20">' +
+    '<div class="conta-kpi-icon" ' + iconStyle + '>' +
     '<i data-lucide="' + icon + '" style="width:14px;height:14px"></i></div>' +
-    '<div class="conta-kpi-val" style="color:' + color + '">' + value + '</div>' +
+    '<div class="conta-kpi-val"' + valStyle + '>' + value + '</div>' +
     '<div class="conta-kpi-label">' + label + '</div>' +
     '</div>';
 }
 
 function contaRow(label, value, color, sub) {
+  var isAccent = color && color !== "var(--text)";
+  var valStyle = isAccent ? (' style="color:' + color + '"') : '';
   return '<div class="conta-row">' +
     '<div>' +
     '<div class="conta-row-label">' + label + '</div>' +
     (sub ? '<div class="conta-row-sub">' + sub + '</div>' : '') +
     '</div>' +
-    '<div class="conta-row-val" style="color:' + color + '">' + value + '</div>' +
+    '<div class="conta-row-val"' + valStyle + '>' + value + '</div>' +
     '</div>';
 }
 
