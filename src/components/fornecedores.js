@@ -14,6 +14,61 @@ async function _refreshStockIfVisible() {
 }
 
 let _fornSearchQuery = "";
+let _fornActiveTab = "fornecedores";
+let _fornCompraFilter = "all";
+
+window._fornSetPaymentFilter = (filter) => {
+  _fornCompraFilter = filter;
+  if (_fornActiveTab !== "compras") {
+    _fornActiveTab = "compras";
+    _fornRenderTabs();
+    renderFornecedores();
+  } else {
+    _fornRenderList();
+  }
+};
+
+window._fornOpenPaymentFilterMenu = () => {
+  const options = [
+    { key: "all", label: "Todas" },
+    { key: "vencido", label: "Vencidas" },
+    { key: "pendente", label: "Por pagar (dentro do prazo)" },
+    { key: "pago", label: "Pagas" },
+  ];
+  openModal("Filtrar Compras",
+    '<div class="hist-export-options">' +
+    options.map(function(o) {
+      const active = _fornCompraFilter === o.key;
+      return '<button class="hist-export-option" onclick="window._closeModal();window._fornSetPaymentFilter(\'' + o.key + '\')" style="' + (active ? 'border-color:var(--primary);background:var(--primary-light)' : '') + '">' +
+        '<div class="hist-export-info"><div class="hist-export-title">' + o.label + '</div></div>' +
+        (active ? '<i data-lucide="check" style="width:16px;height:16px;color:var(--primary)"></i>' : '') +
+        '</button>';
+    }).join("") +
+    '</div>'
+  );
+  refreshIcons(document.getElementById("modal-box") || document.body);
+};
+
+function _fornRenderTabs() {
+  const wrap = el("fornecedores-tabs");
+  if (!wrap) return;
+  const tabs = [
+    { key: "fornecedores", label: "Fornecedores" },
+    { key: "compras", label: "Compras" },
+  ];
+  wrap.innerHTML = tabs.map(function(t) {
+    const active = _fornActiveTab === t.key;
+    return `<button onclick="window._fornSwitchTab('${t.key}')" style="flex:1;padding:9px;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;background:${active?"#fff":"transparent"};color:${active?"#5b21b6":"#71717a"};box-shadow:${active?"0 1px 3px rgba(0,0,0,.08)":"none"}">${t.label}</button>`;
+  }).join("");
+}
+
+window._fornSwitchTab = (tab) => {
+  _fornActiveTab = tab;
+  _fornSearchQuery = "";
+  _fornCompraFilter = "all";
+  _fornRenderTabs();
+  renderFornecedores();
+};
 
 export async function loadFornecedores() {
   const btn = el("btn-back-fornecedores");
@@ -22,18 +77,7 @@ export async function loadFornecedores() {
   const btnAdd = el("btn-fornecedor-add");
   if (btnAdd) btnAdd.onclick = openFornecedorForm;
 
-  const btnCompra = el("btn-compra-add");
-  if (btnCompra) btnCompra.onclick = openCompraForm;
-
-  const searchEl = el("fornecedores-search");
-  if (searchEl) {
-    searchEl.value = _fornSearchQuery;
-    searchEl.oninput = () => {
-      _fornSearchQuery = searchEl.value;
-      renderFornecedores();
-    };
-  }
-
+  _fornRenderTabs();
   await renderFornecedores();
 }
 
@@ -47,101 +91,181 @@ function _fornStatCard({label, value, sub, color, icon}) {
 }
 
 async function renderFornecedores() {
+  await _fornRenderShell();
+  await _fornRenderList();
+}
+
+async function _fornRenderShell() {
   const [allSuppliers, purchases] = await Promise.all([
     db.getAll("suppliers"),
     db.getAll("purchases"),
   ]);
-  const q = (_fornSearchQuery || "").trim().toLowerCase();
-  const suppliers = allSuppliers.filter(function(s){
-    if (s.active === false) return false;
-    if (!q) return true;
-    return s.name.toLowerCase().includes(q) || (s.phone||"").includes(q) || (s.contact||"").toLowerCase().includes(q);
-  });
-  const matchedSupplierIds = suppliers.map(function(s){ return s.id; });
+  const activeSuppliers = allSuppliers.filter(function(s){ return s.active !== false; });
+  const comprasAllAtivas = purchases.filter(function(p){ return p.archived !== true; });
 
-  let comprasAtivas = purchases.filter(function(p){ return p.archived !== true; });
-  if (q) comprasAtivas = comprasAtivas.filter(function(p){ return matchedSupplierIds.indexOf(p.supplierId) !== -1; });
-  const mesAtual      = new Date().toISOString().slice(0,7);
-  const comprasMes    = comprasAtivas.filter(p => (p.date || "").startsWith(mesAtual)).reduce((a,p) => a+(p.total||0), 0);
+  const mesAtual   = new Date().toISOString().slice(0,7);
+  const comprasMes = comprasAllAtivas.filter(p => (p.date || "").startsWith(mesAtual)).reduce((a,p) => a+(p.total||0), 0);
+  const saldoTotal = comprasAllAtivas.reduce(function(a,p){ return a + Math.max((p.total||0)-(p.amountPaid||0), 0); }, 0);
 
-  const saldoTotal = comprasAtivas.reduce(function(a,p){ return a + Math.max((p.total||0)-(p.amountPaid||0), 0); }, 0);
-
-  el("fornecedores-content").innerHTML =
+  const heroKpis =
     `<div class="hist-hero" style="margin-bottom:10px">
       <div class="hist-hero-label">Saldo em aberto</div>
       <div class="hist-hero-val${String(fmt(saldoTotal)).length>=16?" hist-hero-val--xs":String(fmt(saldoTotal)).length>=13?" hist-hero-val--sm":""}">${fmt(saldoTotal)}</div>
       <div class="hist-hero-sub" style="margin-top:10px;display:flex;gap:18px">
-        <span><strong>${suppliers.length}</strong> fornecedores</span>
+        <span><strong>${activeSuppliers.length}</strong> fornecedores</span>
         <span><strong>${fmt(comprasMes)}</strong> este mês</span>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-      ${_fornStatCard({ label:"Fornecedores", value:suppliers.length, sub:"activos", color:"var(--primary)", icon:"truck" })}
+      ${_fornStatCard({ label:"Fornecedores", value:activeSuppliers.length, sub:"activos", color:"var(--primary)", icon:"truck" })}
       ${_fornStatCard({ label:"Compras (mês)", value:fmt(comprasMes), sub:"total gasto", color:"var(--info)", icon:"shopping-bag" })}
-    </div>` +
+    </div>`;
 
-    // Lista fornecedores
-    `<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;
-                 letter-spacing:.4px;margin-bottom:8px">Fornecedores</div>` +
-    (suppliers.length === 0 ?
+  const searchPlaceholder = _fornActiveTab === "compras" ? "Pesquisar por fornecedor ou produto..." : "Pesquisar fornecedor...";
+  const filterActive = _fornCompraFilter !== "all";
+  const filterBtnHtml = _fornActiveTab === "compras"
+    ? `<button class="btn btn-outline btn-sm" onclick="window._fornOpenPaymentFilterMenu()" style="flex-shrink:0;${filterActive?"border-color:var(--primary);color:var(--primary)":""}">
+        <i data-lucide="filter" style="width:16px;height:16px"></i>
+      </button>`
+    : "";
+
+  const searchHtml =
+    `<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+      <div class="search-wrap" style="flex:1;margin-bottom:0">
+        <i data-lucide="search" class="search-icon"></i>
+        <input id="fornecedores-search" placeholder="${searchPlaceholder}" value="${_fornSearchQuery.replace(/"/g,"&quot;")}"/>
+      </div>
+      ${filterBtnHtml}
+    </div>`;
+
+  el("fornecedores-content").innerHTML = heroKpis + searchHtml + '<div id="forn-list-area"></div>';
+  refreshIcons(el("fornecedores-content"));
+
+  const searchEl = el("fornecedores-search");
+  if (searchEl) {
+    searchEl.oninput = () => {
+      _fornSearchQuery = searchEl.value;
+      _fornRenderList();
+    };
+  }
+}
+
+async function _fornRenderList() {
+  const [allSuppliers, purchases] = await Promise.all([
+    db.getAll("suppliers"),
+    db.getAll("purchases"),
+  ]);
+  const activeSuppliers = allSuppliers.filter(function(s){ return s.active !== false; });
+  const comprasAllAtivas = purchases.filter(function(p){ return p.archived !== true; });
+  const q = (_fornSearchQuery || "").trim().toLowerCase();
+
+  let listHtml = "";
+
+  if (_fornActiveTab === "fornecedores") {
+    const suppliersFiltered = activeSuppliers.filter(function(s){
+      if (!q) return true;
+      return s.name.toLowerCase().includes(q) || (s.phone||"").includes(q) || (s.contact||"").toLowerCase().includes(q);
+    });
+
+    listHtml = suppliersFiltered.length === 0 ?
       `<div class="empty-state">
         <div class="empty-state-title">Nenhum fornecedor</div>
-        <div class="empty-state-sub">Adiciona o primeiro fornecedor.</div>
+        <div class="empty-state-sub">${q ? "Nada encontrado para a busca." : "Adiciona o primeiro fornecedor."}</div>
       </div>` :
-      `<div class="list-card" style="margin-bottom:10px">` +
-      suppliers.map(s => {
-        const comprasSupp = comprasAtivas.filter(p => p.supplierId === s.id);
+      `<div class="list-card">` +
+      suppliersFiltered.map(s => {
+        const comprasSupp = comprasAllAtivas.filter(p => p.supplierId === s.id);
         const totalSupp   = comprasSupp.reduce((a,p) => a+(p.total||0), 0);
         const saldoSupp   = comprasSupp.reduce((a,p) => a+((p.total||0)-(p.amountPaid||0)), 0);
-        return `<div style="padding:13px 14px;border-bottom:1px solid #f4f4f5;
-                             display:flex;justify-content:space-between;align-items:center"
-                     onclick="window._openSupplierDetail(${s.id})">
-          <div>
-            <div style="font-size:14px;font-weight:600">${s.name}</div>
-            <div style="font-size:11px;color:#71717a;margin-top:2px">
-              ${s.phone||""} ${s.contact ? " · "+s.contact : ""}
+        const initial = (s.name||"F").charAt(0).toUpperCase();
+        return `<div class="produto-item" onclick="window._openSupplierDetail(${s.id})">
+          <div class="produto-avatar">${initial}</div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <div class="produto-name">${s.name}</div>
+              ${saldoSupp > 0 ? `<span class="produto-badge produto-badge-low">Deve ${fmt(saldoSupp)}</span>` : ""}
             </div>
-            ${saldoSupp > 0 ? `<div style="font-size:11px;color:#dc2626;font-weight:700;margin-top:2px">Deves ${fmt(saldoSupp)}</div>` : ""}
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:13px;font-weight:700;color:#5b21b6">${fmt(totalSupp)}</div>
-            <div style="font-size:10px;color:#71717a">${comprasSupp.length} compras</div>
+            <div class="produto-meta">${s.phone||""}${s.contact ? " · "+s.contact : ""}</div>
+            <div class="produto-stock-line" style="white-space:normal;overflow:visible">
+              <span><strong>${comprasSupp.length}</strong> compra${comprasSupp.length===1?"":"s"}</span>
+            </div>
+            <div class="produto-price" style="margin-top:4px">${fmt(totalSupp)}</div>
           </div>
         </div>`;
       }).join("") +
-      `</div>`) +
+      `</div>`;
+  } else {
+    function _fornCompraStatus(p) {
+      const saldo = (p.total||0) - (p.amountPaid||0);
+      if (saldo <= 0) return { key: "pago", label: "Pago", color: "#16a34a" };
+      const supp = activeSuppliers.find(s => s.id === p.supplierId);
+      if (supp && supp.paymentTermDays) {
+        const due = new Date(p.date);
+        due.setDate(due.getDate() + supp.paymentTermDays);
+        if (new Date() > due) {
+          const daysOverdue = Math.floor((new Date() - due) / 86400000);
+          return { key: "vencido", label: "Vencido há " + daysOverdue + (daysOverdue===1?" dia":" dias"), color: "#dc2626" };
+        }
+      }
+      return { key: "pendente", label: "Falta pagar: " + fmt(saldo), color: "#d97706" };
+    }
+    const statusPriority = { vencido: 0, pendente: 1, pago: 2 };
 
-    // Últimas compras
-    `<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;
-                 letter-spacing:.4px;margin:10px 0 8px">Últimas compras</div>` +
-    (comprasAtivas.length === 0 ?
-      `<div style="font-size:13px;color:#a1a1aa;text-align:center;padding:20px">Nenhuma compra registada.</div>` :
+    let comprasFiltered = comprasAllAtivas.filter(function(p){
+      if (!q) return true;
+      const supp = activeSuppliers.find(s => s.id === p.supplierId);
+      const suppName = supp ? supp.name.toLowerCase() : "";
+      const itemsMatch = (p.items||[]).some(i => (i.productName||"").toLowerCase().includes(q));
+      return suppName.includes(q) || itemsMatch;
+    });
+
+    if (_fornCompraFilter !== "all") {
+      comprasFiltered = comprasFiltered.filter(function(p){ return _fornCompraStatus(p).key === _fornCompraFilter; });
+    }
+
+    comprasFiltered = comprasFiltered.slice().sort(function(a, b) {
+      const pa = statusPriority[_fornCompraStatus(a).key];
+      const pb = statusPriority[_fornCompraStatus(b).key];
+      if (pa !== pb) return pa - pb;
+      return new Date(b.date) - new Date(a.date);
+    });
+
+    listHtml = comprasFiltered.length === 0 ?
+      `<div class="empty-state">
+        <div class="empty-state-title">Nenhuma compra</div>
+        <div class="empty-state-sub">${q || _fornCompraFilter!=="all" ? "Nada encontrado com este filtro." : "As compras registadas aparecem aqui."}</div>
+      </div>` :
       `<div class="list-card">` +
-      comprasAtivas.slice(-10).reverse().map(p => {
-        const supp = suppliers.find(s => s.id === p.supplierId);
-        const saldo = (p.total||0) - (p.amountPaid||0);
-        return `<div style="padding:12px 14px;border-bottom:1px solid #f4f4f5">
+      comprasFiltered.map(p => {
+        const supp = activeSuppliers.find(s => s.id === p.supplierId);
+        const status = _fornCompraStatus(p);
+        return `<div style="padding:12px 14px;border-bottom:1px solid #f4f4f5;cursor:pointer" onclick="window._openCompraDetail(${p.id})">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div>
+            <div style="flex:1;min-width:0">
               <div style="font-size:13px;font-weight:600">${(supp&&supp.name)||"Fornecedor"}</div>
               <div style="font-size:11px;color:#71717a;margin-top:2px">${fmtDate(p.date)}</div>
               <div style="font-size:11px;color:#71717a;margin-top:2px">
                 ${(p.items||[]).map(i => i.productName+"×"+i.qty).join(", ")}
               </div>
-              ${saldo > 0 ? `<div style="font-size:11px;color:#dc2626;font-weight:700;margin-top:2px">Falta pagar: ${fmt(saldo)}</div>` : `<div style="font-size:11px;color:#16a34a;font-weight:700;margin-top:2px">Pago</div>`}
+              <div style="font-size:11px;color:${status.color};font-weight:700;margin-top:2px">${status.label}</div>
             </div>
             <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-              <div style="font-size:14px;font-weight:700;color:${saldo>0?"#dc2626":"var(--primary)"}">${fmt(p.total)}</div>
-              <button class="produto-menu-btn" onclick="window._openCompraMenu(${p.id})" title="Mais opções" style="margin-top:2px">
+              <div style="font-size:14px;font-weight:700;color:${status.key==="pago"?"var(--primary)":"#dc2626"}">${fmt(p.total)}</div>
+              <button class="produto-menu-btn" onclick="event.stopPropagation();window._openCompraMenu(${p.id})" title="Mais opções" style="margin-top:2px">
                 <i data-lucide="more-vertical"></i>
               </button>
             </div>
           </div>
         </div>`;
       }).join("") +
-      `</div>`);
+      `</div>`;
+  }
 
-  refreshIcons(el("fornecedores-content"));
+  const area = el("forn-list-area");
+  if (area) {
+    area.innerHTML = listHtml;
+    refreshIcons(area);
+  }
 }
 
 // ── COMPONENTE: SELECT CUSTOMIZADO (bottom sheet) ────────────────────────────
@@ -154,7 +278,7 @@ function ensureCselStyle() {
     "@keyframes cselSlideUp { from { transform:translateY(100%) } to { transform:translateY(0) } }" +
     ".csel-trigger { width:100%; display:flex; align-items:center; justify-content:space-between; " +
     "padding:11px 14px; border:1.5px solid #e4e4e7; border-radius:10px; background:#fff; " +
-    "font-family:inherit; font-size:14px; color:#18181b; cursor:pointer; text-align:left; }" +
+    "font-family:inherit; font-size:14px; color:var(--text); cursor:pointer; text-align:left; }" +
     ".csel-trigger:active { border-color:#5b21b6; background:#fafafa; }" +
     ".csel-trigger .csel-placeholder { color:#a1a1aa; }" +
     ".csel-option:active { background:#f5f3ff !important; }";
@@ -181,7 +305,7 @@ function openCselSheet(title, options, onPick) {
                 display:flex;flex-direction:column;animation:cselSlideUp .25s ease">
       <div style="padding:16px 20px;border-bottom:1px solid #f4f4f5;display:flex;
                   justify-content:space-between;align-items:center;flex-shrink:0">
-        <div style="font-size:15px;font-weight:700;color:#18181b">${title}</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text)">${title}</div>
         <button id="csel-close" style="background:#f4f4f5;border:none;width:30px;height:30px;
                 border-radius:50%;cursor:pointer;color:#71717a;display:flex;align-items:center;
                 justify-content:center">
@@ -193,7 +317,7 @@ function openCselSheet(title, options, onPick) {
           return `<button type="button" class="csel-option" data-value="${o.value}"
                   style="width:100%;display:flex;align-items:center;justify-content:space-between;
                   padding:13px 20px;background:none;border:none;cursor:pointer;font-family:inherit;
-                  text-align:left;font-size:14px;color:#18181b">
+                  text-align:left;font-size:14px;color:var(--text)">
             <span>${o.label}${o.sub ? `<span style="display:block;font-size:11px;color:#a1a1aa;margin-top:1px">${o.sub}</span>` : ""}</span>
           </button>`;
         }).join("")}
@@ -218,17 +342,28 @@ function openFornecedorForm(s = {}) {
   openModal(s.id ? "Editar Fornecedor" : "Novo Fornecedor",
     `<div style="display:flex;flex-direction:column;gap:14px">
       <div class="field"><label>Nome *</label><input id="sf-name" value="${s.name||""}" placeholder="Ex: Distribuidora ABC"/></div>
-      <div class="field"><label>Telefone</label><input id="sf-phone" value="${s.phone||""}" placeholder="923 000 000"/></div>
+      <div class="field-row">
+        <div class="field"><label>Telefone</label><input id="sf-phone" value="${s.phone||""}" placeholder="923 000 000"/></div>
+        <div class="field"><label>Email</label><input id="sf-email" type="email" value="${s.email||""}" placeholder="fornecedor@exemplo.com"/></div>
+      </div>
       <div class="field"><label>Pessoa de Contacto</label><input id="sf-contact" value="${s.contact||""}" placeholder="Ex: João, gerente de vendas"/></div>
+      <div class="field"><label>Endereço</label><input id="sf-address" value="${s.address||""}" placeholder="Ex: Rua X, Luanda"/></div>
+      <div class="field-row">
+        <div class="field"><label>NIF</label><input id="sf-nif" value="${s.nif||""}" placeholder="Número de Identificação Fiscal"/></div>
+        <div class="field"><label>Prazo pagamento (dias)</label><input id="sf-payment-term" type="number" min="0" value="${s.paymentTermDays||""}" placeholder="Ex: 30"/></div>
+      </div>
+      <div class="field"><label>Categoria / Tipo de fornecimento</label><input id="sf-category" value="${s.category||""}" placeholder="Ex: Bebidas, Grãos, Embalagens..."/></div>
       <div class="field"><label>Notas</label><input id="sf-notes" value="${s.notes||""}" placeholder="Opcional..."/></div>
     </div>
-    <div class="form-actions">
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
+    <div style="margin-top:var(--space-3);display:flex;flex-direction:column;gap:var(--space-1)">
       <button class="btn btn-primary btn-full" onclick="window._saveSupplier(${s.id||0})">
         <i data-lucide="save"></i> Guardar
       </button>
+      <button onclick="window._closeModal()" style="width:100%;padding:10px;background:none;border:none;color:var(--text3);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+        Cancelar
+      </button>
     </div>`);
-  refreshIcons(el("modal-box"));
+  refreshIcons(document.getElementById("modal-box") || document.body);
 }
 
 window._openSupplierDetail = async (id) => {
@@ -243,18 +378,33 @@ window._openSupplierDetail = async (id) => {
     ? `<div style="max-height:180px;overflow-y:auto;margin-top:4px">` +
         despesasLigadas.slice(0,20).map(e =>
           `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f4f4f5;font-size:12.5px">
-            <span style="color:#3f3f46">${e.description} <span style="color:#a1a1aa">· ${fmtDate(e.date)}</span></span>
-            <strong style="color:#3f3f46;flex-shrink:0;margin-left:8px">${fmt(e.amount)}</strong>
+            <span style="color:var(--text2)">${e.description} <span style="color:#a1a1aa">· ${fmtDate(e.date)}</span></span>
+            <strong style="color:var(--text2);flex-shrink:0;margin-left:8px">${fmt(e.amount)}</strong>
           </div>`
         ).join("") +
       `</div>`
     : `<div style="font-size:12.5px;color:#a1a1aa;padding:8px 0">Nenhuma despesa ligada a este fornecedor ainda.</div>`;
 
-  openModal(s.name,
-    `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
-      ${s.phone   ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f4f4f5"><span style="color:#71717a;font-size:13px">Telefone</span><span style="font-weight:600">${s.phone}</span></div>` : ""}
-      ${s.contact ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f4f4f5"><span style="color:#71717a;font-size:13px">Pessoa de Contacto</span><span style="font-weight:600">${s.contact}</span></div>` : ""}
-      ${s.notes   ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f4f4f5"><span style="color:#71717a;font-size:13px">Notas</span><span style="font-weight:600">${s.notes}</span></div>` : ""}
+  const infoRow = function(label, value) {
+    return value ? `<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f4f4f5"><span style="color:#71717a;font-size:13px">${label}</span><span style="font-weight:600;text-align:right;margin-left:12px">${value}</span></div>` : "";
+  };
+
+  openModal("",
+    `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:18px;font-weight:800;color:var(--text)">${s.name}</div>
+      <button class="produto-menu-btn" onclick="window._editSupplier(${id})" title="Editar fornecedor">
+        <i data-lucide="pencil"></i>
+      </button>
+    </div>
+    <div style="display:flex;flex-direction:column;margin-bottom:16px">
+      ${infoRow("Telefone", s.phone)}
+      ${infoRow("Email", s.email)}
+      ${infoRow("Pessoa de Contacto", s.contact)}
+      ${infoRow("Endereço", s.address)}
+      ${infoRow("NIF", s.nif)}
+      ${infoRow("Categoria", s.category)}
+      ${infoRow("Prazo de pagamento", s.paymentTermDays ? s.paymentTermDays + (s.paymentTermDays===1?" dia":" dias") : "")}
+      ${infoRow("Notas", s.notes)}
     </div>
     <div style="background:#fafafa;border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
@@ -264,15 +414,12 @@ window._openSupplierDetail = async (id) => {
       ${despesasHtml}
     </div>
     <div class="form-actions">
-      <button class="btn btn-primary btn-full" onclick="window._editSupplier(${id})">
-        <i data-lucide="edit-3"></i> Editar
-      </button>
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>
+      <button class="btn btn-primary btn-full" onclick="window._closeModal()">Fechar</button>
       <button onclick="window._deleteSupplier(${id})" style="width:100%;background:none;border:none;color:var(--danger);font-size:var(--text-xs);cursor:pointer;font-family:inherit;padding:var(--space-1);text-align:center">
         Eliminar fornecedor
       </button>
     </div>`);
-  refreshIcons(el("modal-box"));
+  refreshIcons(document.getElementById("modal-box") || document.body);
 };
 
 window._editSupplier = async (id) => {
@@ -287,7 +434,12 @@ window._saveSupplier = async (id) => {
   const data = {
     name,
     phone:   (el("sf-phone") ? el("sf-phone").value.trim() : "")   || "",
+    email:   (el("sf-email") ? el("sf-email").value.trim() : "")   || "",
     contact: (el("sf-contact") ? el("sf-contact").value.trim() : "") || "",
+    address: (el("sf-address") ? el("sf-address").value.trim() : "") || "",
+    nif:     (el("sf-nif") ? el("sf-nif").value.trim() : "")   || "",
+    paymentTermDays: (el("sf-payment-term") ? Number(el("sf-payment-term").value) : 0) || 0,
+    category: (el("sf-category") ? el("sf-category").value.trim() : "") || "",
     notes:   (el("sf-notes") ? el("sf-notes").value.trim() : "")   || "",
   };
   if (id) { const ex = await db.get("suppliers",id); await db.put("suppliers",{...ex,...data}); toast("Fornecedor actualizado.","success"); }
@@ -696,6 +848,67 @@ window._deactivateSupplier = async (id) => {
   renderFornecedores();
 };
 
+window._openCompraDetail = async (purchaseId) => {
+  const p = await db.get("purchases", purchaseId);
+  if (!p) return;
+  const supplier = p.supplierId ? await db.get("suppliers", p.supplierId) : null;
+  const users = await db.getAll("users");
+  const registeredBy = (p.userId != null) ? users.find(u => u.id === p.userId) : null;
+
+  const items = p.items || [];
+  const saldo = (p.total||0) - (p.amountPaid||0);
+  const statusLabel = saldo > 0 ? (p.amountPaid > 0 ? "Parcialmente pago" : "Por pagar") : "Pago";
+  const statusColor = saldo > 0 ? "#dc2626" : "#16a34a";
+
+  const itemsHtml = items.map(function(it) {
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border2);font-size:13px">' +
+      '<div style="flex:1;min-width:0">' +
+      '<div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + it.productName + '</div>' +
+      '<div style="font-size:11px;color:var(--text3)">' + it.qty + ' × ' + fmt(it.unitCost) + '</div>' +
+      '</div>' +
+      '<div style="font-weight:700;flex-shrink:0;margin-left:8px">' + fmt(it.qty * it.unitCost) + '</div>' +
+      '</div>';
+  }).join("");
+
+  const infoRow = function(label, value) {
+    return value ? '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">' + label + '</span><span style="font-weight:700;color:var(--text)">' + value + '</span></div>' : "";
+  };
+
+  openModal("Detalhe da Compra",
+    `<div style="background:var(--bg);border-radius:10px;padding:2px 14px;margin-bottom:16px">
+      ${infoRow("Fornecedor", supplier ? supplier.name : "Sem fornecedor (avulsa)")}
+      ${infoRow("Data", fmtDate(p.date))}
+      ${infoRow("Referência", p.invoiceRef)}
+      ${infoRow("Destino", p.dest === "shop" ? "Loja" : "Armazém")}
+      ${infoRow("Registado por", registeredBy ? registeredBy.name : null)}
+    </div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Produtos</div>
+    <div style="background:var(--bg);border-radius:10px;padding:2px 14px;margin-bottom:16px">
+      ${itemsHtml}
+    </div>
+
+    <div style="background:var(--bg);border-radius:10px;padding:2px 14px;margin-bottom:16px">
+      ${infoRow("Total", fmt(p.total))}
+      ${infoRow("Pago", fmt(p.amountPaid||0))}
+      <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px"><span style="color:var(--text3)">Estado</span><span style="font-weight:700;color:${statusColor}">${statusLabel}${saldo>0?" · "+fmt(saldo):""}</span></div>
+    </div>
+
+    ${p.notes ? `<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Notas</div>
+    <div style="background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--text2)">${p.notes}</div>` : ""}
+
+    ${p.editedAt ? `<div style="font-size:11px;color:var(--text4);margin-bottom:16px">Editada em ${fmtDate(p.editedAt)}</div>` : ""}
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-outline btn-full" onclick="window._closeModal();window._openCompraMenu(${p.id})">
+        <i data-lucide="more-horizontal"></i> Mais opções
+      </button>
+      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>
+    </div>`
+  );
+  refreshIcons(document.getElementById("modal-box") || document.body);
+};
+
 window._openCompraMenu = (purchaseId) => {
   const isAdmin = getUser().role === "admin";
   const items = [];
@@ -756,13 +969,15 @@ window._editCompra = async (purchaseId) => {
       ${rowsHtml}
       <div class="field"><label>Notas</label><input id="ec-notes" value="${p.notes||""}"/></div>
     </div>
-    <div class="form-actions">
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
+    <div style="margin-top:var(--space-3);display:flex;flex-direction:column;gap:var(--space-1)">
       <button class="btn btn-primary btn-full" onclick="window._saveEditCompra(${purchaseId})">
         <i data-lucide="save"></i> Guardar alterações
       </button>
+      <button onclick="window._closeModal()" style="width:100%;padding:10px;background:none;border:none;color:var(--text3);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+        Cancelar
+      </button>
     </div>`);
-  refreshIcons(el("modal-box"));
+  refreshIcons(document.getElementById("modal-box") || document.body);
 };
 
 window._saveEditCompra = async (purchaseId) => {

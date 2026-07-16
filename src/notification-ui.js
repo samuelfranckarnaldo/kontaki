@@ -80,7 +80,13 @@ window._handleNotificationAction = function(id) {
   window._closeNotificationCenter();
   if (n.action.page === "perfil" && n.action.subpage) {
     if (window.router) window.router.go("perfil");
-    setTimeout(function() { if (window._perfilNav) window._perfilNav(n.action.subpage); }, 150);
+    setTimeout(function() {
+      if (window._perfilNav) window._perfilNav(n.action.subpage);
+      setTimeout(function() {
+        if (n.action.tab && window._fornSwitchTab) window._fornSwitchTab(n.action.tab);
+        if (n.action.filter && window._fornSetPaymentFilter) window._fornSetPaymentFilter(n.action.filter);
+      }, 150);
+    }, 150);
     return;
   }
   if (window.router) window.router.go(n.action.page);

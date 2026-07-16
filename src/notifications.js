@@ -94,6 +94,42 @@ export async function getCashAlerts() {
   }];
 }
 
+export async function getSupplierAlerts() {
+  var [purchases, suppliers] = await Promise.all([
+    db.getAll("purchases"),
+    db.getAll("suppliers"),
+  ]);
+  var suppliersById = {};
+  suppliers.forEach(function(s){ suppliersById[s.id] = s; });
+
+  var vencidas = [];
+  purchases.forEach(function(p) {
+    if (p.archived === true) return;
+    var saldo = (p.total||0) - (p.amountPaid||0);
+    if (saldo <= 0) return;
+    var supp = suppliersById[p.supplierId];
+    if (!supp || !supp.paymentTermDays) return;
+    var dueDate = new Date(p.date);
+    dueDate.setDate(dueDate.getDate() + supp.paymentTermDays);
+    if (new Date() > dueDate) {
+      vencidas.push({ purchase: p, supplier: supp, dueDate: dueDate });
+    }
+  });
+
+  var alerts = [];
+  if (vencidas.length) {
+    alerts.push({
+      id: "supplier-overdue", type: "supplier", category: "overdue_payment", severity: "danger",
+      title: vencidas.length + " conta" + (vencidas.length>1?"s":"") + " a fornecedor" + (vencidas.length>1?"es":"") + " vencida" + (vencidas.length>1?"s":""),
+      description: vencidas.slice(0,3).map(function(v){return v.supplier.name;}).join(", ") + (vencidas.length>3?" e mais...":""),
+      action: { page:"perfil", subpage:"fornecedores", tab:"compras", filter:"vencido" },
+      createdAt: latestTimestamp(vencidas.map(function(v){return v.purchase;}), "date"),
+      actionable: true,
+    });
+  }
+  return alerts;
+}
+
 export async function getSystemAlerts() {
   // Preparado para o futuro: sincronização, backups, licença, atualizações.
   return [];
@@ -102,15 +138,16 @@ export async function getSystemAlerts() {
 // ── AGREGAÇÃO E ESTADO ───────────────────────────────────────────────────────
 
 export async function buildNotificationState() {
-  var [productAlerts, cashAlerts, systemAlerts, lastSeen] = await Promise.all([
+  var [productAlerts, cashAlerts, systemAlerts, supplierAlerts, lastSeen] = await Promise.all([
     getProductAlerts(),
     getCashAlerts(),
     getSystemAlerts(),
+    getSupplierAlerts(),
     db.get("settings", "notificationsLastSeenAt"),
   ]);
 
   var lastSeenAt = (lastSeen && lastSeen.value) ? lastSeen.value : null;
-  var all = productAlerts.concat(cashAlerts, systemAlerts);
+  var all = productAlerts.concat(cashAlerts, systemAlerts, supplierAlerts);
 
   all.forEach(function(n) {
     n.actionable = n.actionable !== false;

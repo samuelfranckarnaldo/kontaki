@@ -613,7 +613,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
 <!-- MODAL -->
 <div id="modal-overlay">
-  <div id="modal-box">
+  <div id="modal-box" style="position:relative">
+    <button id="modal-close-x" onclick="window._closeModal()" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;background:var(--border2);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:1">
+      <i data-lucide="x" style="width:16px;height:16px;color:var(--text3)"></i>
+    </button>
     <div id="modal-title"></div>
     <div id="modal-body"></div>
   </div>

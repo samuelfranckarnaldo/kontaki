@@ -28,6 +28,8 @@ export function closeModal() {
   if (bEl) bEl.innerHTML    = "";
 }
 
+window._closeModal = closeModal;
+
 export function initModal() {
   if (!document.getElementById("kontaki-focus-style")) {
     var style = document.createElement("style");
@@ -42,18 +44,8 @@ export function initModal() {
   var ov = document.getElementById("modal-overlay");
   if (!ov) { console.error("Modal overlay nao encontrado"); return; }
 
-  var pointerDownOnBackdrop = false;
-  ov.addEventListener("pointerdown", function(e) {
-    pointerDownOnBackdrop = (e.target === ov);
-  });
-  ov.addEventListener("pointerup", function(e) {
-    var openedAt = Number(ov.dataset.openedAt || 0);
-    var justOpened = (Date.now() - openedAt) < 250;
-    if (pointerDownOnBackdrop && e.target === ov && !justOpened) {
-      closeModal();
-    }
-    pointerDownOnBackdrop = false;
-  });
+  // Toque fora do modal (backdrop) ja nao fecha — so o X ou botoes explicitos
+  // de Cancelar/Fechar, para evitar fecho acidental.
 }
 
 // ── CONFIRMAÇÃO CUSTOMIZADA (substitui confirm() nativo) ────────────────────
