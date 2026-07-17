@@ -3,6 +3,7 @@ import { refreshIcons } from "./utils.js";
 import { hashPassword, verifyPassword } from "./crypto.js";
 import { toast } from "./toast.js";
 import { confirmDialog } from "./modal.js";
+import { getTurnoDuration } from "./utils.js";
 
 let currentUser    = null;
 let currentSession = null;
@@ -102,6 +103,11 @@ export function initAuth() {
 async function _renderLoginUsers() {
   const users = await db.getAll("users");
   const store = await db.get("settings", "store");
+  const sessions = await db.getAll("sessions");
+  const openSessionByUserId = {};
+  sessions.forEach(function(s) {
+    if (s.status === "open") openSessionByUserId[s.userId] = s;
+  });
 
   const storeName = document.getElementById("login-store-name");
   if (storeName && store) storeName.textContent = store.name || "Kontaki";
@@ -142,6 +148,11 @@ async function _renderLoginUsers() {
       ";border:2px solid " + border + ";border-radius:14px;cursor:pointer;" +
       "font-family:inherit;text-align:left;width:100%;margin-bottom:8px;transition:all 0.2s";
 
+    const openSession = openSessionByUserId[u.id];
+    const turnoBadge = openSession
+      ? '<div style="font-size:11px;color:#d97706;margin-top:3px;font-weight:600;display:flex;align-items:center;gap:4px"><i data-lucide="clock" style="width:11px;height:11px"></i>Turno activo · ' + getTurnoDuration(openSession.openedAt).str + '</div>'
+      : '';
+
     btn.innerHTML =
       '<div style="width:48px;height:48px;background:' + color +
       ';border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;font-weight:700;color:#fff">' +
@@ -149,7 +160,7 @@ async function _renderLoginUsers() {
       '</div>' +
       '<div><div style="font-size:16px;font-weight:700;color:#18181b">' + u.name +
       '</div><div style="font-size:12px;color:' + color + ';margin-top:2px">' + label +
-      '</div></div>';
+      '</div>' + turnoBadge + '</div>';
 
     btn.onclick = () => _selectUserHandler(u.id);
     list.appendChild(btn);

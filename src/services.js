@@ -1,5 +1,6 @@
 import { db } from "./db.js";
 import { getUser } from "./auth.js";
+import { getTurnoDuration as _getTurnoDurationUtil } from "./utils.js";
 import { verifyPassword } from "./crypto.js";
 import { logger } from "./logger.js";
 
@@ -476,9 +477,7 @@ export const sessionService = {
     return [...prev,current];
   },
   getTurnoDuration(openedAt) {
-    const mins=Math.round((Date.now()-new Date(openedAt))/60000);
-    const hrs=Math.floor(mins/60);
-    return {str:hrs>0?`${hrs}h ${mins%60}min`:`${mins}min`,warn:hrs>=12,hrs};
+    return _getTurnoDurationUtil(openedAt);
   },
 };
 

@@ -97,3 +97,9 @@ export function generateQR(text, container, size) {
       Verificar na app<br/>Kontaki</div>`;
   container.appendChild(box);
 }
+
+export function getTurnoDuration(openedAt) {
+  const mins = Math.round((Date.now() - new Date(openedAt)) / 60000);
+  const hrs  = Math.floor(mins / 60);
+  return { str: hrs > 0 ? `${hrs}h ${mins % 60}min` : `${mins}min`, warn: hrs >= 12, hrs };
+}
