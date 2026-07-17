@@ -278,6 +278,7 @@ function ensureCselStyle() {
     "@keyframes cselSlideUp { from { transform:translateY(100%) } to { transform:translateY(0) } }" +
     ".csel-trigger { width:100%; display:flex; align-items:center; justify-content:space-between; " +
     "padding:11px 14px; border:1.5px solid #e4e4e7; border-radius:10px; background:#fff; " +
+    "-webkit-appearance:none; appearance:none; " +
     "font-family:inherit; font-size:14px; color:var(--text); cursor:pointer; text-align:left; }" +
     ".csel-trigger:active { border-color:#5b21b6; background:#fafafa; }" +
     ".csel-trigger .csel-placeholder { color:#a1a1aa; }" +
@@ -498,6 +499,7 @@ export async function openCompraForm(prefill) {
 }
 
 function _cpRenderForm() {
+  ensureCselStyle();
   const suppliers = _cpSuppliers;
   const products  = _cpProducts;
 

@@ -79,6 +79,14 @@ export async function loadEstoquePage() {
   renderEstoqueList();
 }
 
+// Actualiza dados sem reiniciar busca/filtro — usar apos accoes rapidas
+// (ajustar/transferir) para nao perder o contexto em que o utilizador estava.
+async function _estRefreshData() {
+  allProducts = await db.getAll("products");
+  renderEstoqueStats();
+  renderEstoqueList();
+}
+
 function _estStatCard({label, value, sub, color, icon, filter, clickable, isAlert}) {
   const active = isAlert && value > 0;
   const style = active ? `border-color:${color};background:${color}0d` : "";
@@ -327,7 +335,7 @@ window._estAdjustSave = async (id) => {
     await productService.adjustStock(id, newShop, newWh, reason);
     closeModal();
     toast("Stock ajustado.", "success");
-    await loadEstoquePage();
+    await _estRefreshData();
   } catch (e) {
     toast(e.message || "Erro ao ajustar stock.", "error");
   }
@@ -394,7 +402,7 @@ window._estTransferSave = async (id) => {
     await productService.transfer(id, qty, from, to);
     closeModal();
     toast("Transferência concluída.", "success");
-    await loadEstoquePage();
+    await _estRefreshData();
   } catch (e) {
     toast(e.message || "Erro na transferência.", "error");
   }
@@ -656,11 +664,7 @@ window._estOpenReports = async () => {
   ]);
 
   openModal("Relatórios de Stock",
-    `<div style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto">
-      <button class="produto-filter-chip produto-filter-chip--active" id="rep-tab-parados" onclick="window._estRepTab('parados')">Parados</button>
-      <button class="produto-filter-chip" id="rep-tab-rotatividade" onclick="window._estRepTab('rotatividade')">Rotatividade</button>
-      <button class="produto-filter-chip" id="rep-tab-abc" onclick="window._estRepTab('abc')">Análise ABC</button>
-    </div>
+    `<div id="rep-tabs" style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto"></div>
     <div id="rep-content"></div>`
   );
   refreshIcons(document.getElementById("modal-box") || document.body);
@@ -669,11 +673,23 @@ window._estOpenReports = async () => {
   window._estRepTab("parados");
 };
 
+function _estRenderRepTabs(activeTab) {
+  const tabs = [
+    { key: "parados", label: "Parados" },
+    { key: "rotatividade", label: "Rotatividade" },
+    { key: "abc", label: "Análise ABC" },
+  ];
+  const wrap = document.getElementById("rep-tabs");
+  if (!wrap) return;
+  wrap.innerHTML = tabs.map(function(t) {
+    const active = t.key === activeTab;
+    return '<button class="produto-filter-chip' + (active?" produto-filter-chip--active":"") + '" onclick="window._estRepTab(\'' + t.key + '\')">' + t.label + '</button>';
+  }).join("");
+}
+
 window._estRepTab = (tab) => {
-  ["parados","rotatividade","abc"].forEach(function(t) {
-    const btn = document.getElementById("rep-tab-" + t);
-    if (btn) btn.classList.toggle("produto-filter-chip--active", t === tab);
-  });
+  _estRenderRepTabs(tab);
+
   const content = document.getElementById("rep-content");
   if (!content) return;
 
@@ -681,7 +697,7 @@ window._estRepTab = (tab) => {
   else if (tab === "rotatividade") content.innerHTML = _estRenderRotatividade();
   else if (tab === "abc") content.innerHTML = _estRenderABC();
 
-  refreshIcons(content);
+  refreshIcons(document.getElementById("modal-box") || document.body);
 };
 
 function _estRenderParados() {

@@ -15,6 +15,14 @@ export function openModal(title, bodyHTML) {
     void box.offsetHeight; // forca reflow para a animacao disparar sempre, nao so na 1a vez
     box.style.animation = "slideUp .25s ease";
     refreshIcons(box);
+
+    // Forca repintura de bordas/sombras de elementos recem-inseridos —
+    // alguns WebView Android so pintam certos estilos apos um toque/reflow.
+    requestAnimationFrame(function() {
+      box.style.transform = "translateZ(0)";
+      void box.offsetHeight;
+      box.style.transform = "";
+    });
   }
   void ov.offsetHeight;
   ov.style.animation = "modalBackdropIn .2s ease";
