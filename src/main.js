@@ -7,6 +7,7 @@ import { initAuth, restoreSession } from "./auth.js";
 import { initModal } from "./modal.js";
 import { logger } from "./logger.js";
 import { router } from "./router.js";
+import { initMessagesOnBoot } from "./message-ui.js";
 
 // Expõe o router globalmente
 window.router = router;
@@ -55,6 +56,7 @@ async function boot() {
       if (m.loadDashboard) m.loadDashboard();
     }).catch(() => {});
     if (window.lucide) window.lucide.createIcons();
+    initMessagesOnBoot().catch(() => {});
     return;
   }
 

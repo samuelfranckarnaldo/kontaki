@@ -1,4 +1,5 @@
 import { db } from "./db.js";
+import { getMessageAlerts } from "./messages.js";
 
 // ── MODELO DE NOTIFICAÇÃO ────────────────────────────────────────────────────
 // { id, type, category, severity, title, description, action, createdAt, isNew }
@@ -131,8 +132,11 @@ export async function getSupplierAlerts() {
 }
 
 export async function getSystemAlerts() {
-  // Preparado para o futuro: sincronização, backups, licença, atualizações.
-  return [];
+  try {
+    return await getMessageAlerts();
+  } catch (e) {
+    return [];
+  }
 }
 
 // ── AGREGAÇÃO E ESTADO ───────────────────────────────────────────────────────

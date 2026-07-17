@@ -1,4 +1,5 @@
 import { buildNotificationState, markNotificationsSeen } from "./notifications.js";
+import { markMessagesSeen } from "./messages.js";
 import { el, refreshIcons } from "./utils.js";
 
 var _prevBadgeCount = null;
@@ -77,6 +78,20 @@ window._closeNotificationCenter = function() {
 window._handleNotificationAction = function(id) {
   var n = window._notificationsCache.find(function(x){ return x.id === id; });
   if (!n || !n.action) return;
+
+  // Ações vindas de mensagens do Console (url/download/page) têm forma
+  // { type, value } — distinto do formato { page, filter, subpage } usado
+  // pelos alertas internos (stock, caixa), tratado mais abaixo.
+  if (n.action.type === "url" || n.action.type === "download") {
+    window.open(n.action.value, "_blank", "noopener");
+    return;
+  }
+  if (n.action.type === "page") {
+    window._closeNotificationCenter();
+    if (window.router) window.router.go(n.action.value);
+    return;
+  }
+
   window._closeNotificationCenter();
   if (n.action.page === "perfil" && n.action.subpage) {
     if (window.router) window.router.go("perfil");
@@ -142,6 +157,11 @@ export async function openNotificationCenter() {
 
   var closeBtn = document.getElementById("btn-notif-close");
   if (closeBtn) closeBtn.onclick = window._closeNotificationCenter;
+
+  var msgIds = state.alerts
+    .filter(function(n) { return n._rawId; })
+    .map(function(n) { return n._rawId; });
+  await markMessagesSeen(msgIds);
 
   await markNotificationsSeen();
   await updateNotificationBadge();

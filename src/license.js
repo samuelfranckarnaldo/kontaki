@@ -145,6 +145,12 @@ if (typeof window !== "undefined") {
       const recMod = await import("./recovery-codes.js");
       await recMod.triggerPendingSync();
     } catch (e) {}
+    try {
+      const msgMod = await import("./messages.js");
+      await msgMod.syncConsoleMessages();
+      const uiMod = await import("./message-ui.js");
+      await uiMod.checkAndShowMessages();
+    } catch (e) {}
   });
 }
 

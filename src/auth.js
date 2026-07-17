@@ -379,6 +379,8 @@ async function _verifyPin() {
 
     if (window.lucide) window.lucide.createIcons();
 
+    import("./message-ui.js").then(m => m.initMessagesOnBoot()).catch(() => {});
+
   } catch (err) {
     console.error("Erro PIN:", err);
     _pinBuffer = "";
