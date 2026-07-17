@@ -5,14 +5,14 @@ import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
 import { initCamera } from "./camera.js";
 import { addStockMovement, getStock, getOpenIncidentForProduct, getStockIncidentPolicy, verifyAdminPin, clientService } from "../services.js";
-import { gerarReciboPDF, partilharReciboPDF, printReciboHTML, payMethodLabel } from "./recibo-pdf.js";
+import { gerarReciboPDF, partilharReciboPDF, printReciboHTML, payMethodLabel, totalExtenso } from "./recibo-pdf.js";
 import { printRecibo } from "../print.js";
 import { postSaleJournal } from "../pgc.js";
 
 let products  = [];
 let cart      = [];
 let payMethod = "dinheiro";
-let discType  = "pct";
+let discType  = "kz";
 let lastRemoved = null;
 let pedidoEmRetomaId = null;
 
@@ -343,7 +343,7 @@ function pushToCart(p, incidentAuth) {
   renderSummary();
 }
 
-function showIncidentBlockedModal(p, incident) {
+export function showIncidentBlockedModal(p, incident) {
   openModal("Venda bloqueada",
     '<div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:16px">' +
     'O produto <strong>' + p.name + '</strong> tem um incidente de inventário em aberto (esperado ' + incident.expected + ', encontrado ' + incident.found + ').' +
@@ -369,7 +369,7 @@ window._goToConfigInventario = function() {
   setTimeout(function() { if (window._perfilNav) window._perfilNav("configuracoes"); }, 60);
 };
 
-function showIncidentAuthModal(p, incident, onSuccess) {
+export function showIncidentAuthModal(p, incident, onSuccess) {
   openModal("Autorização necessária",
     '<div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:16px">' +
     'O produto <strong>' + p.name + '</strong> tem um incidente de inventário em aberto. É necessário o PIN de um administrador para continuar.' +
@@ -798,7 +798,7 @@ function limpar() {
   try { localStorage.removeItem("kontaki-cart"); } catch(e){}
   var old = document.getElementById("undo-toast");
   if (old) old.remove();
-  payMethod = "dinheiro"; discType = "pct";
+  payMethod = "dinheiro"; discType = "kz";
   renderCart(); renderSummary();
 }
 
@@ -822,7 +822,7 @@ async function openCheckout() {
 
   openModal("",
     `<div class="ck-header">
-      <div class="ck-header-total">${fmt(total)}</div>
+      <div class="ck-header-total" id="ck-header-total-val">${fmt(total)}</div>
       <div class="ck-header-label">${cart.length} ${cart.length===1?"produto":"produtos"} · Total a pagar</div>
     </div>
 
@@ -915,13 +915,26 @@ async function openCheckout() {
           <span class="ck-item-name">${i.name} <span class="ck-item-qty">×${i.qty}</span></span>
           <span class="ck-item-total">${fmt(itemTotal(i))}</span>
         </div>`).join("")}
-        ${da>0?`<div class="ck-item-row" style="color:var(--success)"><span>Desconto</span><span>− ${fmt(da)}</span></div>`:""}
+        <div class="ck-item-row" id="ck-resumo-disc-row" style="color:var(--success);display:${da>0?"flex":"none"}"><span>Desconto</span><span id="ck-resumo-disc-val">− ${fmt(da)}</span></div>
         <div class="ck-item-row ck-item-total-row">
           <span>Total</span>
           <span id="ck-summary-total">${fmt(total)}</span>
         </div>
       </div>
     </details>
+
+    <div class="ck-notes-wrap">
+      <button type="button" class="ck-notes-toggle" onclick="window._ckToggleDiscUI()" id="ck-disc-toggle">
+        <i data-lucide="percent"></i> Aplicar desconto
+      </button>
+      <div id="ck-disc-row" style="display:none" class="ck-input-row">
+        <input id="disc-input" type="number" placeholder="0" autocomplete="off"
+          oninput="window._ckApplyDiscount()"
+          style="flex:1;border:none;outline:none;font-size:15px;font-family:inherit;background:transparent;color:var(--text)"/>
+        <button type="button" id="btn-disc-type" onclick="window._ckToggleDiscType()"
+          style="background:var(--border2);border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--text)">Kz</button>
+      </div>
+    </div>
 
     <div class="ck-notes-wrap">
       <button type="button" class="ck-notes-toggle" onclick="window._ckToggleNotes()" id="ck-notes-toggle">
@@ -932,7 +945,7 @@ async function openCheckout() {
 
     <button class="ck-confirm-btn" onclick="window._confirmarVenda()">
       <i data-lucide="check"></i>
-      Confirmar venda · ${fmt(total)}
+      Confirmar venda · <span id="ck-confirm-total-val">${fmt(total)}</span>
     </button>
     <button class="ck-cancel-btn" onclick="window._closeModal()">Cancelar</button>
     <div id="ck-summary-iva" style="display:none"></div>
@@ -996,9 +1009,10 @@ async function openCheckout() {
     if (inp) inp.value = name;
     if (res) res.style.display = "none";
     if (clr) clr.style.display = "flex";
-    // Guardar telefone do cliente seleccionado
+    // Guardar telefone e morada do cliente seleccionado
     var client = (window._ckClients||[]).find(function(c) { return c.name === name; });
-    window._ckSelectedPhone = client ? (client.phone || "") : "";
+    window._ckSelectedPhone   = client ? (client.phone   || "") : "";
+    window._ckSelectedAddress = client ? (client.address || "") : "";
     // Mostrar telefone se existir
     var phoneRow = document.getElementById("ck-client-phone-row");
     if (phoneRow) {
@@ -1107,6 +1121,52 @@ async function openCheckout() {
       bar.style.display = "none";
     }
   };
+
+  window._ckToggleDiscUI = function() {
+    var row = document.getElementById("ck-disc-row");
+    var btn = document.getElementById("ck-disc-toggle");
+    if (!row) return;
+    var isHidden = row.style.display === "none";
+    row.style.display = isHidden ? "flex" : "none";
+    if (isHidden) {
+      if (btn) btn.style.display = "none";
+      setTimeout(function() { var inp = document.getElementById("disc-input"); if (inp) inp.focus(); }, 100);
+    }
+  };
+
+  window._ckToggleDiscType = function() {
+    discType = discType === "pct" ? "kz" : "pct";
+    var btn = document.getElementById("btn-disc-type");
+    if (btn) btn.textContent = discType === "pct" ? "%" : "Kz";
+    setVal("disc-input", "");
+    window._ckApplyDiscount();
+  };
+
+  // Recalcula com o desconto atual e sincroniza os totais fixados na
+  // abertura do checkout (_confirmarVenda e _ckCalcTroco lêem daí, não
+  // recalculam sozinhos — sem isto a venda seria gravada sem o desconto).
+  window._ckApplyDiscount = function() {
+    var r = calcTotal();
+    window._checkoutSub    = r.sub;
+    window._checkoutDa     = r.da;
+    window._checkoutTotal  = r.total;
+    window._checkoutIvaPct = r.ivaPct;
+    window._checkoutIvaVal = r.valorIva;
+
+    var headerTotal = document.getElementById("ck-header-total-val");
+    if (headerTotal) headerTotal.textContent = fmt(r.total);
+    var summaryTotal = document.getElementById("ck-summary-total");
+    if (summaryTotal) summaryTotal.textContent = fmt(r.total);
+    var confirmTotal = document.getElementById("ck-confirm-total-val");
+    if (confirmTotal) confirmTotal.textContent = fmt(r.total);
+
+    var discRow = document.getElementById("ck-resumo-disc-row");
+    var discVal = document.getElementById("ck-resumo-disc-val");
+    if (discRow) discRow.style.display = r.da > 0 ? "flex" : "none";
+    if (discVal) discVal.textContent = "− " + fmt(r.da);
+
+    window._ckCalcTroco();
+  };
 }
 
 window._confirmarVenda = async () => {
@@ -1121,7 +1181,9 @@ window._confirmarVenda = async () => {
     var phoneOptEl = document.getElementById("ck-phone-opt");
     if (phoneOptEl) clientPhone = phoneOptEl.value.trim();
   }
-  window._ckSelectedPhone = null;
+  var clientAddress = window._ckSelectedAddress || "";
+  window._ckSelectedPhone   = null;
+  window._ckSelectedAddress = null;
   const method       = window._ckPayMethod || "dinheiro";
 
   if (method === "fiado" && !clientName) {
@@ -1172,7 +1234,8 @@ window._confirmarVenda = async () => {
       notes,
       total, payMethod:method, date:saleDate,
       userId:user.id, sessionId:user.sessionId||null,
-      clientName, clientPhone, clientId,
+      operatorName: user.name || "",
+      clientName, clientPhone, clientAddress, clientId,
       fiadoClient: method==="fiado" ? clientName : null,
       recebido, troco,
       hash:null,
@@ -1237,7 +1300,7 @@ window._confirmarVenda = async () => {
     products = await db.getAll("products").then(p => p.filter(x => x.active));
     renderRecentProducts();
 
-    showReceipt({ sid, items:cartSnap, sub:subtotal, da, ivaPct, ivaVal, total, clientName, clientPhone, store, payMethod:method, saleDate, hash:finalHash, recebido, troco, operatorName: (getUser()||{}).name });
+    showReceipt({ sid, items:cartSnap, sub:subtotal, da, ivaPct, ivaVal, total, clientName, clientPhone, clientAddress, store, payMethod:method, saleDate, hash:finalHash, recebido, troco, operatorName: (getUser()||{}).name });
 
   } catch (err) {
     toast("Erro: " + err.message, "error");
@@ -1296,19 +1359,25 @@ function showReceipt(d) {
           <div>
             <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;font-weight:700">Cliente</div>
             <div style="font-size:13px;font-weight:700;color:#111827;margin-top:1px">${d.clientName}</div>
-            ${d.clientPhone ? `<div style="font-size:11px;color:#9ca3af;margin-top:1px">${d.clientPhone}</div>` : ""}
+            ${d.clientPhone   ? `<div style="font-size:11px;color:#9ca3af;margin-top:1px">${d.clientPhone}</div>`   : ""}
+            ${d.clientAddress ? `<div style="font-size:11px;color:#9ca3af;margin-top:1px">${d.clientAddress}</div>` : ""}
           </div>
         </div>` : ""}
 
         <div style="padding:12px 16px;background:#fff">
-          ${d.items.map(i=>`
+          ${d.items.map(i=>{
+            const skuProd = products.find(p => p.id === i.id);
+            const skuHTML = (skuProd && skuProd.sku) ? `<div style="font-size:10px;color:#9ca3af;margin-top:1px">Ref: ${skuProd.sku}</div>` : "";
+            return `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0">
             <div style="flex:1;min-width:0">
               <span style="font-size:13px;color:#374151;font-weight:600">${i.name}</span>
               <span style="font-size:11px;color:#9ca3af;margin-left:6px">×${i.qty}</span>
+              ${skuHTML}
             </div>
             <span style="font-size:13px;font-weight:700;color:#111827;flex-shrink:0">${fmt(i.price*i.qty)}</span>
-          </div>`).join("")}
+          </div>`;
+          }).join("")}
         </div>
 
         <div style="padding:12px 16px;background:#fafafa;border-top:1px solid #e5e7eb">
@@ -1322,6 +1391,7 @@ function showReceipt(d) {
             <span style="font-size:14px;font-weight:700;color:#ddd6fe">Total</span>
             <span style="font-size:20px;font-weight:800;color:#fff">${fmt(d.total)}</span>
           </div>
+          <div style="font-size:10px;font-style:italic;color:#9ca3af;text-align:center;margin-top:6px;line-height:1.4">${totalExtenso(d.total)}</div>
           <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:8px;color:#6b7280">
             <span style="font-weight:600">${payMethodLabel(d.payMethod)}</span>
             ${d.recebido>0?`<span>Recebido: ${fmt(d.recebido)} · Troco: <strong style="color:#059669">${fmt(d.troco)}</strong></span>`:""}
@@ -1363,13 +1433,13 @@ function showReceipt(d) {
             style="padding:13px 6px;background:#f0fdf4;color:#16a34a;border:none;
                    border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;
                    font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px">
-            <i data-lucide="share-2" style="width:14px;height:14px"></i> WhatsApp
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="flex-shrink:0"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.72.45 3.4 1.3 4.87L2 22l5.35-1.4c1.42.78 3.02 1.19 4.66 1.19h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.87 9.87 0 0012.05 2zm5.8 14.06c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.81-.12-.42-.13-.96-.31-1.65-.6-2.9-1.25-4.79-4.17-4.94-4.36-.14-.19-1.18-1.57-1.18-3 0-1.42.75-2.12 1.02-2.41.26-.28.58-.35.77-.35h.55c.18 0 .42-.02.65.5.24.55.82 1.9.89 2.03.07.14.12.3.02.48-.1.19-.15.3-.29.46-.15.17-.31.37-.44.5-.15.14-.3.3-.13.58.17.28.76 1.25 1.63 2.02 1.12.99 2.06 1.3 2.34 1.45.28.14.44.12.6-.07.17-.19.72-.83.91-1.11.19-.28.38-.24.64-.14.26.09 1.65.78 1.94.92.28.14.47.21.54.32.07.12.07.68-.17 1.36z"/></svg> WhatsApp
           </button>
           <button onclick="window._gerarReciboPDF(${d.sid})"
             style="padding:13px 6px;background:#ede9fe;color:#5b21b6;border:none;
                    border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;
                    font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px">
-            <i data-lucide="download" style="width:14px;height:14px"></i> PDF
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" style="flex-shrink:0"><path d="M6 2h9l5 5v13a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z" fill="currentColor" opacity=".15"/><path d="M6 2h9l5 5v13a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M15 2v5h5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><text x="12" y="16.5" font-size="6.5" font-weight="800" text-anchor="middle" fill="currentColor">PDF</text></svg> PDF
           </button>
           <button onclick="window._closeModal()"
             style="padding:13px 6px;background:#f4f4f5;color:#6b7280;border:none;
@@ -1386,8 +1456,45 @@ function showReceipt(d) {
   if (qrContainer) generateQR("K|" + d.sid + "|" + d.hash, qrContainer, 72);
 }
 
-window._gerarReciboPDF     = gerarReciboPDF;
-window._partilharReciboPDF = partilharReciboPDF;
-window._printRecibo        = printReciboHTML;
+function showBusyOverlay(msg) {
+  var ov = document.createElement("div");
+  ov.id = "busy-overlay";
+  ov.className = "busy-overlay";
+  ov.innerHTML = '<div class="busy-overlay-box"><div class="busy-spinner"></div><div class="busy-overlay-msg">' + msg + '</div></div>';
+  document.body.appendChild(ov);
+}
+function hideBusyOverlay() {
+  var ov = document.getElementById("busy-overlay");
+  if (ov) ov.remove();
+}
+// Garante que o browser pinta o overlay antes de iniciar trabalho síncrono
+// pesado (canvas/jsPDF), que de outra forma bloquearia a thread antes do
+// spinner sequer aparecer na tela.
+function waitPaint() {
+  // setTimeout força uma volta completa do event loop (macrotask), mais
+  // fiável que só requestAnimationFrame em alguns WebViews Android onde o
+  // rAF por si só não garante que a repintura já aconteceu.
+  return new Promise(function(resolve) {
+    setTimeout(function() {
+      requestAnimationFrame(function() { requestAnimationFrame(resolve); });
+    }, 60);
+  });
+}
+
+window._gerarReciboPDF = async function(saleId) {
+  showBusyOverlay("A gerar PDF...");
+  try { await waitPaint(); await gerarReciboPDF(saleId); }
+  finally { hideBusyOverlay(); }
+};
+window._partilharReciboPDF = async function(saleId) {
+  showBusyOverlay("A preparar imagem...");
+  try { await waitPaint(); await partilharReciboPDF(saleId); }
+  finally { hideBusyOverlay(); }
+};
+window._printRecibo = async function(saleId) {
+  showBusyOverlay("A preparar impressão...");
+  try { await waitPaint(); await printReciboHTML(saleId); }
+  finally { hideBusyOverlay(); }
+};
 
 window._closeModal = closeModal;

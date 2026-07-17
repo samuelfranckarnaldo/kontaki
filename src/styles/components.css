@@ -20,6 +20,15 @@
 .btn-success { background: var(--success); color: #fff; box-shadow: 0 4px 12px rgba(22,163,74,.25); }
 .btn-danger  { background: var(--danger);  color: #fff; box-shadow: 0 4px 12px rgba(220,38,38,.25); }
 .btn-ghost   { background: var(--border2); color: var(--text2); border: 1.5px solid var(--border); }
+
+.form-actions {
+  display: flex; flex-direction: column; gap: 8px; margin-top: 4px;
+}
+.form-actions .btn-ghost {
+  background: none; border: none; color: var(--text3);
+  box-shadow: none; font-weight: 600;
+}
+.form-actions .btn-ghost:active { background: var(--border2); }
 .btn-outline { background: transparent; color: var(--primary); border: 1.5px solid var(--primary); }
 .btn-full    { width: 100%; }
 .btn:disabled { opacity: .45; box-shadow: none; pointer-events: none; }
@@ -762,6 +771,25 @@
   transition: transform .15s;
 }
 .catmodal-item:active { transform: scale(.96); }
+
+/* Overlay de progresso (geração de PDF/PNG/impressão) */
+.busy-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .15s ease;
+}
+.busy-overlay-box {
+  background: #fff; border-radius: 16px; padding: 28px 32px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  box-shadow: var(--shadow-lg);
+}
+.busy-spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid var(--border2); border-top-color: var(--primary);
+  animation: spin .7s linear infinite;
+}
+.busy-overlay-msg { font-size: 13.5px; font-weight: 600; color: var(--text2); }
 
 /* Carrinho */
 .vender-cart-wrap {
@@ -2953,13 +2981,15 @@
 .ct-stat-primary { border-left-color: var(--primary); }
 
 .ct-section-label {
+  display: flex; align-items: center; gap: 6px;
   font-size: 11px; font-weight: 600; color: var(--text3);
   margin-bottom: 8px;
 }
+.ct-section-label i, .ct-section-label svg { width: 13px; height: 13px; flex-shrink: 0; }
 
 .ct-devedor-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 16px; border-bottom: 1px solid var(--border2);
+  display: flex; align-items: center; gap: 14px;
+  padding: 19px 18px; border-bottom: 1px solid var(--border2);
   cursor: pointer; transition: background .15s;
 }
 .ct-devedor-row:last-child { border-bottom: none; }

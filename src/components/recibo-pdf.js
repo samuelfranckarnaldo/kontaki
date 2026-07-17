@@ -3,6 +3,79 @@ import { fmt, fmtDate }  from "../utils.js";
 import { toast }        from "../toast.js";
 
 // ── PDF 80mm ─────────────────────────────────────────────────────────────────
+function payMethodLabel(m) {
+  return { dinheiro: "Dinheiro", transferencia: "Transferência", multicaixa: "Multicaixa", fiado: "Crédito" }[m] || m;
+}
+
+async function getSkuMap() {
+  var all = await db.getAll("products");
+  var map = {};
+  (all || []).forEach(function(p) { if (p.sku) map[p.id] = p.sku; });
+  return map;
+}
+
+// ── TOTAL POR EXTENSO (Português) ──────────────────────────────────────────────
+function trioExtenso(num) {
+  var units    = ["","um","dois","três","quatro","cinco","seis","sete","oito","nove"];
+  var teens    = ["dez","onze","doze","treze","catorze","quinze","dezasseis","dezassete","dezoito","dezanove"];
+  var tens     = ["","dez","vinte","trinta","quarenta","cinquenta","sessenta","setenta","oitenta","noventa"];
+  var hundreds = ["","cento","duzentos","trezentos","quatrocentos","quinhentos","seiscentos","setecentos","oitocentos","novecentos"];
+  if (num === 0) return "";
+  if (num === 100) return "cem";
+  var parts = [];
+  var h = Math.floor(num / 100), r = num % 100;
+  if (h > 0) parts.push(hundreds[h]);
+  if (r > 0) {
+    if (r < 10) parts.push(units[r]);
+    else if (r < 20) parts.push(teens[r - 10]);
+    else {
+      var t = Math.floor(r / 10), u = r % 10;
+      parts.push(u > 0 ? tens[t] + " e " + units[u] : tens[t]);
+    }
+  }
+  return parts.join(" e ");
+}
+
+function numeroExtenso(num) {
+  if (num === 0) return "zero";
+  var groupsArr = [];
+  var temp = num;
+  while (temp > 0) { groupsArr.unshift(temp % 1000); temp = Math.floor(temp / 1000); }
+  var nGroups = groupsArr.length;
+  // Guarda pares {palavra, valor} só dos grupos não-zero, para nunca
+  // referenciar por engano um grupo final igual a 0 (ex: 1.234.000).
+  var entries = [];
+  for (var i = 0; i < nGroups; i++) {
+    var g = groupsArr[i];
+    var power = nGroups - 1 - i;
+    if (g === 0) continue;
+    var w = trioExtenso(g);
+    if (power === 1) w = (g === 1) ? "mil" : w + " mil";
+    else if (power === 2) w += (g === 1) ? " milhão" : " milhões";
+    entries.push({ word: w, val: g });
+  }
+  if (entries.length === 0) return "zero";
+  if (entries.length === 1) return entries[0].word;
+  var lastEntry = entries[entries.length - 1];
+  var rest = entries.slice(0, -1).map(function(e) { return e.word; });
+  // "e" antes do último grupo se ele for < 100 OU for uma centena exacta
+  // (100, 200, ..., 900); vírgula nos outros casos.
+  var joiner = (lastEntry.val < 100 || lastEntry.val % 100 === 0) ? " e " : ", ";
+  return rest.join(", ") + joiner + lastEntry.word;
+}
+
+function totalExtenso(valor) {
+  var n = Math.round((valor || 0) * 100) / 100;
+  var intPart  = Math.floor(n);
+  var centPart = Math.round((n - intPart) * 100);
+  var intWords = numeroExtenso(intPart);
+  var result = intWords.charAt(0).toUpperCase() + intWords.slice(1) + " " + (intPart === 1 ? "Kwanza" : "Kwanzas");
+  if (centPart > 0) {
+    result += " e " + numeroExtenso(centPart) + (centPart === 1 ? " cêntimo" : " cêntimos");
+  }
+  return result;
+}
+
 function getQrDataUrl(text) {
   return new Promise(function(resolve) {
     try {
@@ -41,9 +114,10 @@ async function buildPdfDoc(sale, store) {
   var cX     = pageW / 2;
   var items  = sale.items || [];
   var total  = (sale.total || 0) - (sale.totalDevolvido || 0);
+  var skuMap = await getSkuMap();
 
   // Estimar altura da página
-  var estHeight = 60 + items.length * 6 + 60 + 28;
+  var estHeight = 60 + items.length * 11 + 60 + 28 + 14;
   var doc = new jsPDFLib({ unit: "mm", format: [pageW, estHeight] });
   var y = margin;
 
@@ -74,7 +148,7 @@ async function buildPdfDoc(sale, store) {
 
   // ── CABEÇALHO ──
   if (store.logo) {
-    try { doc.addImage(store.logo, "PNG", cX - 8, y, 16, 16); y += 18; }
+    try { doc.addImage(store.logo, "PNG", cX - 8, y, 16, 16); y += 21; }
     catch(e) {}
   }
 
@@ -84,7 +158,7 @@ async function buildPdfDoc(sale, store) {
   if (store.nif)     { text("NIF: " + store.nif, cX, "center", 7); }
   y += 2;
 
-  line(true);
+  line(false);
 
   text("Recibo Nº " + String(sale.id).padStart(6, "0"), margin, "left", 7.5, true);
   y -= 1;
@@ -93,19 +167,20 @@ async function buildPdfDoc(sale, store) {
   y += 1;
   if (sale.clientName) {
     text("Cliente: " + sale.clientName, margin, "left", 7.5, true);
-    if (sale.clientPhone) text("Tel: " + sale.clientPhone, margin, "left", 7);
+    if (sale.clientPhone)   text("Tel: " + sale.clientPhone, margin, "left", 7);
+    if (sale.clientAddress) text(sale.clientAddress, margin, "left", 7);
   }
   y += 1;
 
-  line(true);
+  line(false);
 
   // ── ITENS ──
   items.forEach(function(i) {
     var name = i.name.length > 28 ? i.name.slice(0, 25) + "..." : i.name;
     text(name, margin, "left", 7.5, true);
-    y -= 1;
+    if (skuMap[i.id]) text("Ref: " + skuMap[i.id], margin, "left", 6);
     row(i.qty + " x " + fmt(i.price), fmt(i.price * i.qty), 7.5);
-    y += 1;
+    y += 2.5;
   });
 
   y += 1;
@@ -113,9 +188,6 @@ async function buildPdfDoc(sale, store) {
   // ── TOTAIS ──
   if (sale.discount > 0) {
     row("Desconto", "- " + fmt(sale.discount), 8);
-  }
-  if (sale.ivaPct > 0) {
-    row("IVA " + sale.ivaPct + "%", "+ " + fmt(sale.ivaValor || 0), 8);
   }
   y += 1;
   doc.setFillColor(91, 33, 182);
@@ -127,10 +199,16 @@ async function buildPdfDoc(sale, store) {
   doc.text(fmt(total), pageW - margin - 3, y + 1.5, { align: "right" });
   y += 9;
 
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(6.5);
+  doc.setTextColor(120, 120, 120);
+  var extensoLines = doc.splitTextToSize(totalExtenso(total), cW);
+  doc.text(extensoLines, cX, y, { align: "center" });
+  y += extensoLines.length * 3 + 2;
+
   doc.setTextColor(60, 60, 60);
   y += 2;
-  var payLabel = (sale.payMethod || "").charAt(0).toUpperCase() + (sale.payMethod || "").slice(1);
-  text("Pagamento: " + payLabel, margin, "left", 7.5);
+  text("Pagamento: " + payMethodLabel(sale.payMethod), margin, "left", 7.5);
   if (sale.recebido > 0) row("Recebido", fmt(sale.recebido), 7.5);
   if (sale.troco > 0)    row("Troco",    fmt(sale.troco),    7.5, true);
 
@@ -173,7 +251,7 @@ async function buildPdfDoc(sale, store) {
   doc.setFontSize(6);
   doc.setTextColor(180, 180, 180);
   doc.text("Documento de gestão interna · Sem validade fiscal AGT", cX, y, { align: "center" }); y += 3;
-  doc.text("Powered by Kontaki · Introxeer", cX, y, { align: "center" });
+  doc.text("Kontaki · Introxeer", cX, y, { align: "center" });
 
   return doc;
 }
@@ -185,6 +263,8 @@ async function printReciboHTML(saleId) {
   var store = (await db.get("settings", "store")) || {};
   var items = sale.items || [];
   var total = (sale.total || 0) - (sale.totalDevolvido || 0);
+  var qrDataUrl = await getQrDataUrl(sale.hash || "");
+  var skuMap = await getSkuMap();
 
   var html = [
     "<!DOCTYPE html><html><head><meta charset='UTF-8'>",
@@ -198,7 +278,7 @@ async function printReciboHTML(saleId) {
     "  .lg     { font-size: 14px; }",
     "  .xl     { font-size: 18px; font-weight: bold; }",
     "  .sm     { font-size: 9px; color: #666; }",
-    "  .divider-dash { border: none; border-top: 1px dashed #999; margin: 6px 0; }",
+    "  .divider-dash { border: none; border-top: 1px solid #999; margin: 6px 0; }",
     "  .divider-solid{ border: none; border-top: 1px solid #333; margin: 6px 0; }",
     "  .row    { display:flex; justify-content:space-between; padding: 2px 0; }",
     "  .total-box { background:#5b21b6; color:#fff; padding:6px 8px;",
@@ -228,14 +308,17 @@ async function printReciboHTML(saleId) {
     "<span class='sm'>" + fmtDate(sale.date) + "</span>",
     "</div>",
 
+    sale.operatorName ? "<div class='sm'>Atendido por " + sale.operatorName + "</div>" : "",
     sale.clientName ? "<div class='row'><span class='bold'>Cliente: " + sale.clientName + "</span></div>" : "",
-    sale.clientPhone ? "<div class='sm'>Tel: " + sale.clientPhone + "</div>" : "",
+    sale.clientPhone   ? "<div class='sm'>Tel: " + sale.clientPhone + "</div>" : "",
+    sale.clientAddress ? "<div class='sm'>" + sale.clientAddress + "</div>" : "",
 
     "<hr class='divider-dash'/>",
 
     // Itens
     items.map(function(i) {
       return "<div><div class='bold'>" + i.name + "</div>" +
+             (skuMap[i.id] ? "<div class='sm'>Ref: " + skuMap[i.id] + "</div>" : "") +
              "<div class='row sm'><span>" + i.qty + " x " + fmt(i.price) + "</span>" +
              "<span class='bold' style='color:#111'>" + fmt(i.price * i.qty) + "</span></div></div>";
     }).join(""),
@@ -243,24 +326,26 @@ async function printReciboHTML(saleId) {
     "<hr class='divider-solid'/>",
 
     sale.discount > 0 ? "<div class='row'><span>Desconto</span><span>- " + fmt(sale.discount) + "</span></div>" : "",
-    sale.ivaPct > 0   ? "<div class='row'><span>IVA " + sale.ivaPct + "%</span><span>+ " + fmt(sale.ivaValor||0) + "</span></div>" : "",
 
     "<div class='total-box'><span>TOTAL</span><span>" + fmt(total) + "</span></div>",
+    "<div style='text-align:center;font-size:8.5px;font-style:italic;color:#888;margin:3px 0 6px'>" + totalExtenso(total) + "</div>",
 
     "<div class='row sm'>",
-    "<span>Pagamento: " + (sale.payMethod||"") + "</span>",
+    "<span>Pagamento: " + payMethodLabel(sale.payMethod) + "</span>",
     sale.recebido > 0 ? "<span>Recebido: " + fmt(sale.recebido) + "</span>" : "",
     "</div>",
     sale.troco > 0 ? "<div class='row'><span>Troco</span><span class='bold'>" + fmt(sale.troco) + "</span></div>" : "",
 
     "<hr class='divider-dash'/>",
 
+    qrDataUrl ? "<div class='center'><img src='" + qrDataUrl + "' style='width:90px;height:90px;margin:4px auto'/></div>" : "",
+
     "<div class='hash'>" + (sale.hash||"") + "</div>",
 
     "<div class='center sm'>",
     "<div>Documento de gestão interna</div>",
     "<div>Sem validade fiscal perante a AGT</div>",
-    "<div style='margin-top:4px;color:#5b21b6;font-weight:bold'>Kontaki · Introxeer Technology</div>",
+    "<div style='margin-top:4px;color:#5b21b6;font-weight:bold'>Kontaki · Introxeer</div>",
     "</div>",
 
     "<br/><br/>",
@@ -273,6 +358,126 @@ async function printReciboHTML(saleId) {
   win.document.close();
   win.focus();
   setTimeout(function() { win.print(); }, 500);
+}
+
+function loadImageEl(src) {
+  return new Promise(function(resolve, reject) {
+    var img = new Image();
+    img.onload  = function(){ resolve(img); };
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+// ── PNG (partilha via WhatsApp) ────────────────────────────────────────────────
+async function buildReciboPNG(sale, store) {
+  var items = sale.items || [];
+  var total = (sale.total || 0) - (sale.totalDevolvido || 0);
+  var skuMap = await getSkuMap();
+  var W = 600, pad = 28, cX = W / 2;
+
+  // Canvas de trabalho com altura generosa; será recortado no final
+  var estH = 700 + items.length * 46;
+  var canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = estH;
+  var ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, estH);
+
+  var y = pad + 10;
+
+  function center(str, size, bold, color) {
+    ctx.fillStyle = color || "#111827";
+    ctx.font = (bold ? "bold " : "") + size + "px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(str, cX, y);
+    y += size * 1.5;
+  }
+  function row(left, right, size, bold, color) {
+    ctx.fillStyle = color || "#374151";
+    ctx.font = (bold ? "bold " : "") + size + "px 'Courier New', monospace";
+    ctx.textAlign = "left";
+    ctx.fillText(left, pad, y);
+    if (right) { ctx.textAlign = "right"; ctx.fillText(right, W - pad, y); }
+    y += size * 1.6;
+  }
+  function divider() {
+    y += 6;
+    ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+    y += 20;
+  }
+
+  if (store.logo) {
+    try { var logo = await loadImageEl(store.logo); var ls = 64;
+      ctx.drawImage(logo, cX - ls/2, y, ls, ls); y += ls + 26;
+    } catch(e) {}
+  }
+
+  center(store.name || "Kontaki", 20, true);
+  if (store.address) center(store.address, 12, false, "#6b7280");
+  if (store.phone)   center(store.phone,   12, false, "#6b7280");
+  if (store.nif)     center("NIF: " + store.nif, 12, false, "#6b7280");
+
+  divider();
+
+  row("Recibo Nº " + String(sale.id).padStart(6,"0"), fmtDate(sale.date), 13, true);
+  if (sale.operatorName) row("Atendido por " + sale.operatorName, "", 11, false, "#9ca3af");
+  if (sale.clientName) {
+    row("Cliente: " + sale.clientName, "", 13, true);
+    if (sale.clientPhone)   row("Tel: " + sale.clientPhone, "", 12, false, "#6b7280");
+    if (sale.clientAddress) row(sale.clientAddress, "", 12, false, "#6b7280");
+  }
+
+  divider();
+
+  items.forEach(function(i) {
+    row(i.name, "", 14, true);
+    if (skuMap[i.id]) row("Ref: " + skuMap[i.id], "", 11, false, "#9ca3af");
+    row(i.qty + " x " + fmt(i.price), fmt(i.price * i.qty), 12.5, false, "#6b7280");
+    y += 4;
+  });
+
+  divider();
+
+  if (sale.discount > 0) row("Desconto", "- " + fmt(sale.discount), 13);
+
+  y += 4;
+  ctx.fillStyle = "#5b21b6";
+  ctx.fillRect(pad, y - 22, W - pad*2, 46);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 18px 'Courier New', monospace";
+  ctx.textAlign = "left";  ctx.fillText("TOTAL", pad + 14, y + 6);
+  ctx.textAlign = "right"; ctx.fillText(fmt(total), W - pad - 14, y + 6);
+  y += 56;
+
+  row("Pagamento: " + payMethodLabel(sale.payMethod), "", 13);
+  if (sale.recebido > 0) row("Recebido", fmt(sale.recebido), 13);
+  if (sale.troco > 0)    row("Troco", fmt(sale.troco), 13, true);
+
+  divider();
+
+  var qrDataUrl = await getQrDataUrl(sale.hash || "");
+  if (qrDataUrl) {
+    try {
+      var qrImg = await loadImageEl(qrDataUrl);
+      var qs = 140;
+      ctx.drawImage(qrImg, cX - qs/2, y, qs, qs);
+      y += qs + 26;
+    } catch(e) {}
+  }
+  center(sale.hash || "", 18, true, "#5b21b6");
+
+  y += 6;
+  center("Documento de gestão interna", 11, false, "#9ca3af");
+  center("Sem validade fiscal perante a AGT", 11, false, "#9ca3af");
+  center("Kontaki · Introxeer", 12, true, "#5b21b6");
+
+  var finalCanvas = document.createElement("canvas");
+  finalCanvas.width = W;
+  finalCanvas.height = y + pad;
+  finalCanvas.getContext("2d").drawImage(canvas, 0, 0);
+  return finalCanvas;
 }
 
 // ── EXPORTS ───────────────────────────────────────────────────────────────────
@@ -289,22 +494,24 @@ export async function partilharReciboPDF(saleId) {
   var sale  = await db.get("sales", saleId);
   if (!sale) return;
   var store = (await db.get("settings","store")) || {};
-  var doc = await buildPdfDoc(sale, store);
-  if (!doc) return;
+  var canvas = await buildReciboPNG(sale, store);
+  if (!canvas) return;
 
-  var blob  = doc.output("blob");
-  var fname = "recibo_" + String(saleId).padStart(6,"0") + ".pdf";
-  var file  = new File([blob], fname, { type:"application/pdf" });
+  canvas.toBlob(async function(blob) {
+    if (!blob) { toast("Falha ao gerar imagem.", "error"); return; }
+    var fname = "recibo_" + String(saleId).padStart(6,"0") + ".png";
+    var file  = new File([blob], fname, { type:"image/png" });
 
-  if (navigator.canShare && navigator.canShare({ files:[file] })) {
-    try { await navigator.share({ files:[file], title:"Recibo Kontaki" }); return; }
-    catch(e) {}
-  }
+    if (navigator.canShare && navigator.canShare({ files:[file] })) {
+      try { await navigator.share({ files:[file], title:"Recibo Kontaki" }); return; }
+      catch(e) {}
+    }
 
-  var url = URL.createObjectURL(blob);
-  var a   = document.createElement("a");
-  a.href = url; a.download = fname; a.click();
-  URL.revokeObjectURL(url);
+    var url = URL.createObjectURL(blob);
+    var a   = document.createElement("a");
+    a.href = url; a.download = fname; a.click();
+    URL.revokeObjectURL(url);
+  }, "image/png");
 }
 
-export { printReciboHTML };
+export { printReciboHTML, payMethodLabel, totalExtenso };
