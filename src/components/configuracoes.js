@@ -13,17 +13,18 @@ export async function loadConfiguracoes() {
   await renderConfiguracoes();
 }
 
+function sectionLabel(text) {
+  return '<div style="font-size:12.5px;font-weight:600;color:var(--text3);margin-bottom:8px;margin-top:4px">' + text + '</div>';
+}
+
 async function renderConfiguracoes() {
   const wrap = document.getElementById("configuracoes-content");
   if (!wrap) return;
 
-  // Configurações expõe operações sensíveis (backup completo, incluindo
-  // credenciais de utilizadores; limpeza de histórico de vendas) — só
-  // admin. Ver docs/architecture/03-threat-model.md, Cenário 3.
   const user = getUser();
   if (!user || user.role !== "admin") {
     wrap.innerHTML =
-      '<div style="text-align:center;padding:48px 20px;color:#a1a1aa">' +
+      '<div style="text-align:center;padding:48px 20px;color:var(--text4)">' +
       '<div style="font-size:14px;font-weight:600">Acesso restrito</div>' +
       '<div style="font-size:13px;margin-top:6px">Esta secção está disponível apenas para administradores.</div>' +
       '</div>';
@@ -34,142 +35,63 @@ async function renderConfiguracoes() {
   const logs  = await getLogs(5);
 
   wrap.innerHTML =
-    // Dados da loja
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Dados da loja</div>' +
-    '<div class="vender-card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:12px">' +
-    '<div class="field"><label>Nome da loja</label><input id="cfg-name" value="' + (store.name||"") + '"/></div>' +
-    '<div class="field"><label>Endereço</label><input id="cfg-addr" value="' + (store.address||"") + '"/></div>' +
-    '<div class="field"><label>Telefone</label><input id="cfg-phone" value="' + (store.phone||"") + '"/></div>' +
-    '<div class="field"><label>Moeda</label><input id="cfg-currency" value="' + (store.currency||"Kz") + '"/></div>' +
-    '<button onclick="window._saveConfiguracoes()" style="width:100%;padding:13px;background:#5b21b6;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Guardar configurações</button>' +
-    '</div>' +
-
-    // Backup
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Backup</div>' +
-    '<div class="vender-card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px">' +
-    '<div style="font-size:13px;color:#71717a;margin-bottom:4px;line-height:1.5">Exporta todos os dados da app para um ficheiro JSON. Usa para fazer backup ou transferir dados.</div>' +
-    '<button onclick="window._exportBackup()" style="width:100%;padding:13px;background:#16a34a;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
+    sectionLabel("Backup") +
+    '<div class="vender-card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
+    '<div style="font-size:13px;color:var(--text3);margin-bottom:4px;line-height:1.5">Exporta todos os dados da app para um ficheiro JSON. Usa para fazer backup ou transferir dados.</div>' +
+    '<button onclick="window._exportBackup()" style="width:100%;padding:13px;background:var(--success);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
     '<i data-lucide="download" style="width:16px;height:16px"></i> Exportar backup</button>' +
-    '<label style="display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border:2px dashed #e4e4e7;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;color:#5b21b6">' +
+    '<label style="display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border:2px dashed var(--border2);border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;color:var(--primary)">' +
     '<i data-lucide="upload" style="width:16px;height:16px"></i> Importar backup' +
     '<input type="file" accept=".json" style="display:none" onchange="window._importBackup(this)"/>' +
     '</label>' +
     '</div>' +
 
-    // Logs
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Últimos erros (' + logs.length + ')</div>' +
-    '<div class="vender-card" style="margin-bottom:14px">' +
+    sectionLabel("Inventário") +
+    '<div class="vender-card" style="margin-bottom:14px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
+    '<div style="font-size:13px;color:var(--text3);margin-bottom:12px;line-height:1.5">Define o que acontece quando alguém tenta vender um produto com um incidente de stock em aberto.</div>' +
+    _incidentPolicyOption("block", store, "lock", "Bloquear vendas (recomendado)", "Produtos com incidente em aberto não podem ser vendidos até o incidente ser resolvido.") +
+    _incidentPolicyOption("allow_with_auth", store, "alert-triangle", "Permitir com autorização", "A venda é permitida após confirmação com PIN de administrador. A decisão fica registada na auditoria.") +
+    '</div>' +
+
+    sectionLabel("Últimos erros (" + logs.length + ")") +
+    '<div class="vender-card" style="margin-bottom:14px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
     (logs.length === 0
-      ? '<div style="font-size:13px;color:#a1a1aa;text-align:center;padding:16px">Sem erros registados</div>'
+      ? '<div style="font-size:13px;color:var(--text4);text-align:center;padding:16px">Sem erros registados</div>'
       : logs.map(l =>
-          '<div style="padding:8px 0;border-bottom:1px solid #f4f4f5;font-size:12px">' +
+          '<div style="padding:8px 0;border-bottom:1px solid var(--border2);font-size:12px">' +
           '<div style="display:flex;justify-content:space-between;margin-bottom:2px">' +
-          '<span style="font-weight:700;color:' + (l.level==="error"?"#dc2626":l.level==="warn"?"#d97706":"#71717a") + '">' + l.level.toUpperCase() + '</span>' +
-          '<span style="color:#a1a1aa">' + new Date(l.date).toLocaleString("pt-AO") + '</span>' +
+          '<span style="font-weight:700;color:' + (l.level==="error"?"var(--danger)":l.level==="warn"?"var(--warning)":"var(--text3)") + '">' + l.level.toUpperCase() + '</span>' +
+          '<span style="color:var(--text4)">' + new Date(l.date).toLocaleString("pt-AO") + '</span>' +
           '</div>' +
-          '<div style="color:#71717a">' + l.message + '</div>' +
+          '<div style="color:var(--text3)">' + l.message + '</div>' +
           '</div>'
         ).join("")
     ) +
     (logs.length > 0
-      ? '<button onclick="window._clearLogs()" style="width:100%;padding:10px;background:none;border:none;color:#dc2626;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px">Limpar logs</button>'
+      ? '<button onclick="window._clearLogs()" style="width:100%;padding:10px;background:none;border:none;color:var(--danger);font-size:13px;font-weight:600;cursor:pointer;margin-top:8px">Limpar logs</button>'
       : "") +
-    '</div>';
-
-  // Inventário
-  const policy = store.stockIncidentPolicy || "block";
-  wrap.innerHTML +=
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;margin-top:8px">Inventário</div>' +
-    '<div class="vender-card" style="margin-bottom:14px">' +
-    '<div style="font-size:13px;color:#71717a;margin-bottom:12px;line-height:1.5">Define o que acontece quando alguém tenta vender um produto com um incidente de stock em aberto.</div>' +
-    '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;border:1.5px solid ' + (policy==="block"?"#5b21b6":"#e4e4e7") + ';border-radius:10px;margin-bottom:8px;cursor:pointer;background:' + (policy==="block"?"#faf5ff":"#fff") + '">' +
-    '<input type="radio" name="inc-policy" value="block" ' + (policy==="block"?"checked":"") + ' onchange="window._setIncidentPolicy(\'block\')" style="margin-top:2px"/>' +
-    '<div><div style="font-size:14px;font-weight:700;color:#18181b">🔒 Bloquear vendas (recomendado)</div>' +
-    '<div style="font-size:12px;color:#71717a;margin-top:2px">Produtos com incidente em aberto não podem ser vendidos até o incidente ser resolvido.</div></div>' +
-    '</label>' +
-    '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;border:1.5px solid ' + (policy==="allow_with_auth"?"#5b21b6":"#e4e4e7") + ';border-radius:10px;cursor:pointer;background:' + (policy==="allow_with_auth"?"#faf5ff":"#fff") + '">' +
-    '<input type="radio" name="inc-policy" value="allow_with_auth" ' + (policy==="allow_with_auth"?"checked":"") + ' onchange="window._setIncidentPolicy(\'allow_with_auth\')" style="margin-top:2px"/>' +
-    '<div><div style="font-size:14px;font-weight:700;color:#18181b">⚠️ Permitir com autorização</div>' +
-    '<div style="font-size:12px;color:#71717a;margin-top:2px">A venda é permitida após confirmação com PIN de administrador. A decisão fica registada na auditoria.</div></div>' +
-    '</label>' +
-    '</div>';
-
-  // Diagnóstico temporário (remover depois de confirmar incidentOverride)
-  wrap.innerHTML +=
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;margin-top:8px">Diagnóstico</div>' +
-    '<div class="vender-card" style="margin-bottom:14px">' +
-    '<button onclick="window._debugStockMovements()" style="width:100%;padding:12px;background:#f4f4f5;color:#18181b;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Ver últimos 5 movimentos de stock (bruto)</button>' +
-    '</div>';
-
-  // Migração: identidade global de clientes (ADR-0005)
-  wrap.innerHTML +=
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;margin-top:8px">Migração de dados</div>' +
-    '<div class="vender-card" style="margin-bottom:14px">' +
-    '<div style="font-size:13px;color:#71717a;margin-bottom:10px;line-height:1.5">Atribui um identificador global (uuid) a clientes criados antes desta funcionalidade existir. Necessário para fiados sincronizarem corretamente entre dispositivos. Corre uma única vez por dispositivo — clientes já com uuid não são alterados.</div>' +
-    '<button onclick="window._migrarClientesUUID()" style="width:100%;padding:12px;background:#f4f4f5;color:#18181b;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Atribuir identidade a clientes existentes</button>' +
-    '</div>';
-
-  // Limpeza de histórico
-  wrap.innerHTML +=
-    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;margin-top:8px">Limpar histórico de vendas</div>' +
-    '<div class="vender-card" style="margin-bottom:14px">' +
-    '<div style="font-size:13px;color:#71717a;margin-bottom:10px;line-height:1.5">Exporta e remove vendas de um período. O ficheiro JSON fica guardado antes de apagar.</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
-    '<div class="field"><label>De</label><input type="date" id="clear-from"/></div>' +
-    '<div class="field"><label>Até</label><input type="date" id="clear-to"/></div>' +
-    '</div>' +
-    '<button onclick="window._limparHistorico()" style="width:100%;padding:13px;background:#dc2626;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Exportar e limpar período</button>' +
     '</div>';
 
   refreshIcons(wrap);
 }
 
-window._saveConfiguracoes = async () => {
-  const store = (await db.get("settings","store")) || {};
-  await db.put("settings", {
-    ...store,
-    key:      "store",
-    name:     el("cfg-name").value.trim()     || store.name,
-    address:  el("cfg-addr").value.trim()     || store.address,
-    phone:    el("cfg-phone").value.trim()    || store.phone,
-    currency: el("cfg-currency").value.trim() || "Kz",
-  });
-  toast("Configurações guardadas.", "success");
-};
+function _incidentPolicyOption(value, store, icon, title, desc) {
+  const policy = store.stockIncidentPolicy || "block";
+  const active = policy === value;
+  return '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;border:1.5px solid ' + (active?"var(--primary)":"var(--border2)") + ';border-radius:10px;margin-bottom:8px;cursor:pointer;background:' + (active?"var(--primary-light)":"var(--bg2)") + '">' +
+    '<input type="radio" name="inc-policy" value="' + value + '" ' + (active?"checked":"") + ' onchange="window._setIncidentPolicy(&#39;' + value + '&#39;)" style="margin-top:2px"/>' +
+    '<div style="width:32px;height:32px;border-radius:9px;background:' + (active?"#fff":"var(--border2)") + ';color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+    '<i data-lucide="' + icon + '" style="width:16px;height:16px"></i></div>' +
+    '<div><div style="font-size:14px;font-weight:700;color:var(--text)">' + title + '</div>' +
+    '<div style="font-size:12px;color:var(--text3);margin-top:2px">' + desc + '</div></div>' +
+    '</label>';
+}
 
 window._setIncidentPolicy = async (policy) => {
   const store = (await db.get("settings","store")) || {};
   await db.put("settings", { ...store, key:"store", stockIncidentPolicy: policy });
   toast("Política de inventário actualizada.", "success");
   await renderConfiguracoes();
-};
-
-window._migrarClientesUUID = async () => {
-  const user = getUser();
-  if (!user || user.role !== "admin") {
-    toast("Apenas administradores podem executar esta migração.", "error");
-    return;
-  }
-  const clients = await db.getAll("clients");
-  const semUuid = clients.filter(function(c){ return !c.uuid; });
-  if (!semUuid.length) {
-    toast("Todos os clientes já têm identidade global. Nada a fazer.", "success");
-    return;
-  }
-  for (const c of semUuid) {
-    await db.put("clients", { ...c, uuid: generateUUID() });
-  }
-  toast(semUuid.length + " cliente(s) atualizado(s) com identidade global.", "success");
-};
-
-window._debugStockMovements = async () => {
-  const moves = await db.getAll("stockMovements");
-  const last5 = moves.slice(-5).reverse();
-  const json = JSON.stringify(last5, null, 2).replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  openModal("Últimos 5 movimentos (bruto)",
-    '<pre style="font-size:11px;white-space:pre-wrap;word-break:break-all;background:#f4f4f5;padding:10px;border-radius:8px;max-height:55vh;overflow-y:auto">' + json + '</pre>' +
-    '<button class="btn btn-ghost btn-full" style="margin-top:10px" onclick="window._closeModal()">Fechar</button>');
-  refreshIcons(el("modal-box"));
 };
 
 window._exportBackup = async () => {
@@ -193,14 +115,15 @@ window._importBackup = async (input) => {
   const text = await file.text();
 
   openModal("Importar Backup",
-    '<div style="background:#fef3c7;border:1.5px solid #fde68a;border-radius:12px;padding:14px;margin-bottom:16px">' +
-    '<div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:6px">⚠ Atenção</div>' +
-    '<div style="font-size:13px;color:#92400e;line-height:1.5">Importar um backup substitui os dados existentes. Esta acção não pode ser desfeita.</div>' +
+    '<div style="background:var(--warning-muted-light);border:1.5px solid var(--warning-muted);border-radius:12px;padding:14px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">' +
+    '<i data-lucide="alert-triangle" style="width:18px;height:18px;color:var(--warning-muted);flex-shrink:0;margin-top:1px"></i>' +
+    '<div><div style="font-size:13px;font-weight:700;color:var(--warning-muted);margin-bottom:4px">Atenção</div>' +
+    '<div style="font-size:13px;color:var(--warning-muted);line-height:1.5">Importar um backup substitui os dados existentes. Esta acção não pode ser desfeita.</div></div>' +
     '</div>' +
-    '<div style="font-size:13px;color:#71717a;margin-bottom:16px">Ficheiro: <strong>' + file.name + '</strong></div>' +
+    '<div style="font-size:13px;color:var(--text3);margin-bottom:16px">Ficheiro: <strong>' + file.name + '</strong></div>' +
     '<div class="form-actions">' +
     '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
-    '<button class="btn btn-primary btn-full" onclick="window._confirmImportBackup(\'' + encodeURIComponent(text) + '\')" style="background:#dc2626">' +
+    '<button class="btn btn-primary btn-full" onclick="window._confirmImportBackup(&#39;' + encodeURIComponent(text) + '&#39;)" style="background:var(--danger)">' +
     '<i data-lucide="upload"></i> Confirmar importação</button>' +
     '</div>');
   refreshIcons(el("modal-box"));
@@ -226,70 +149,3 @@ window._clearLogs = async () => {
 };
 
 window._closeModal = closeModal;
-
-window._limparHistorico = async function() {
-  var from = document.getElementById("clear-from").value;
-  var to   = document.getElementById("clear-to").value;
-  if (!from || !to) { toast("Selecciona o período.", "error"); return; }
-
-  var sales    = await db.getAll("sales");
-  var saleItems= await db.getAll("saleItems");
-  var movements= await db.getAll("stockMovements");
-
-  var toDelete = sales.filter(function(s){ return s.date && s.date.slice(0,10)>=from && s.date.slice(0,10)<=to; });
-  var toDeleteIds = toDelete.map(function(s){ return s.id; });
-  var toDeleteItems = saleItems.filter(function(i){ return toDeleteIds.includes(i.saleId); });
-  var toDeleteMoves = movements.filter(function(m){
-    return m.type==="sale" && m.reference && toDeleteIds.some(function(id){ return m.reference==="sale#"+id; });
-  });
-
-  if (!toDelete.length) { toast("Nenhuma venda no período seleccionado.", "info"); return; }
-
-  // ARQUIVA totais antes de apagar — protege a contabilidade para sempre
-  const products = await db.getAll("products");
-  const prodMap = {};
-  products.forEach(function(p){ prodMap[p.id] = p; });
-
-  const receitaPeriodo = toDelete.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
-  const cogsPeriodo = toDelete.reduce(function(a,s){
-    return a + (s.items||[]).reduce(function(b,i){
-      var p = prodMap[i.id];
-      return b + (p ? (p.costPrice||0)*i.qty : 0);
-    },0);
-  },0);
-
-  const periodKey = from + "_a_" + to;
-  const existing = await db.get("accountingArchive", periodKey).catch(function(){ return null; });
-
-  await db.put("accountingArchive", {
-    period: periodKey,
-    from, to,
-    nVendas: (existing?existing.nVendas:0) + toDelete.length,
-    receita: (existing?existing.receita:0) + receitaPeriodo,
-    cogs:    (existing?existing.cogs:0) + cogsPeriodo,
-    lucro:   (existing?existing.lucro:0) + (receitaPeriodo - cogsPeriodo),
-    archivedAt: new Date().toISOString(),
-  });
-
-  // Exporta antes de apagar
-  var data = {
-    exportedAt: new Date().toISOString(),
-    periodo: from + " a " + to,
-    vendas: toDelete,
-    items: toDeleteItems,
-    movimentos: toDeleteMoves,
-  };
-  var blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
-  var url  = URL.createObjectURL(blob);
-  var a    = document.createElement("a");
-  a.href=url; a.download="historico_"+from+"_"+to+".json"; a.click();
-  URL.revokeObjectURL(url);
-
-  // Apaga
-  for (var i=0;i<toDelete.length;i++) await db.delete("sales", toDelete[i].id);
-  for (var i=0;i<toDeleteItems.length;i++) await db.delete("saleItems", toDeleteItems[i].id);
-  for (var i=0;i<toDeleteMoves.length;i++) await db.delete("stockMovements", toDeleteMoves[i].id);
-
-  toast(toDelete.length + " vendas exportadas e removidas.", "success");
-  await renderConfiguracoes();
-};

@@ -5,7 +5,7 @@ import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
 import { initCamera } from "./camera.js";
 import { addStockMovement, getStock, getOpenIncidentForProduct, getStockIncidentPolicy, verifyAdminPin, clientService } from "../services.js";
-import { gerarReciboPDF, partilharReciboPDF, printReciboHTML } from "./recibo-pdf.js";
+import { gerarReciboPDF, partilharReciboPDF, printReciboHTML, payMethodLabel } from "./recibo-pdf.js";
 import { printRecibo } from "../print.js";
 import { postSaleJournal } from "../pgc.js";
 
@@ -107,7 +107,13 @@ export async function initVender() {
 
   const qrBtn = document.getElementById("btn-topbar-qr");
   if (qrBtn) {
-    qrBtn.onclick = () => {
+    qrBtn.onclick = async () => {
+      const { hasFeature } = await import("../license.js");
+      if (!hasFeature("scanner")) {
+        const { showUpgradeBanner } = await import("../license.js");
+        showUpgradeBanner("Esta função requer um plano superior. Contacta a Introxeer para fazer upgrade.");
+        return;
+      }
       var ov = document.getElementById("verify-overlay");
       if (ov) ov.style.display = "flex";
     };
@@ -506,9 +512,21 @@ window._closeGuardarModal = () => { closeModal(); };
 window._openCategoryFilter = async () => {
   closeModal();
   const { openPicker } = await import("../picker.js");
-  const savedCats = await db.get("settings", "customCategories");
-  const customCategories = (savedCats && savedCats.value) ? savedCats.value : [];
-  const categories = ["Alimentacao","Bebidas","Higiene","Limpeza", ...customCategories, "Outro"];
+  // Lista dinâmica: só categorias com pelo menos 1 produto ativo cadastrado,
+  // ordenadas pela mais usada primeiro. Resolve o caso de lojistas cujo
+  // negócio não usa as categorias-padrão (ex: farmácia) — nunca ficam
+  // enterrados atrás de categorias genéricas sem produtos.
+  const counts = {};
+  products.forEach(p => {
+    if (!p.active) return;
+    const cat = p.category || "Outro";
+    counts[cat] = (counts[cat] || 0) + 1;
+  });
+  const categories = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  if (!categories.length) {
+    toast("Ainda não há produtos cadastrados.", "error");
+    return;
+  }
   openPicker("Filtrar por categoria", categories, "", (cat) => {
     window._showCategoryProducts(cat);
   }, {
@@ -552,14 +570,21 @@ window._abrirPedidosGuardados = async function() {
 
   var rowsHtml = pending.length ? pending.map(function(p) {
     var itemCount = p.items.reduce(function(a,i){ return a+i.qty; }, 0);
-    return '<button class="esc-pending-item" onclick="window._retomarPedido(' + p.id + ')">' +
-      '<div>' +
-      '<div class="esc-pending-name">' + itemCount + ' ' + (itemCount===1?"produto":"produtos") + ' · ' + fmt(p.total) + '</div>' +
+    var big = p.total >= 500000;
+    var color = big ? "var(--warning)" : "var(--primary)";
+    var bg    = big ? "#fef3c7" : "var(--primary-light)";
+    return '<button class="esc-pending-card" style="border-left:3px solid ' + color + '" onclick="window._retomarPedido(' + p.id + ')">' +
+      '<div class="esc-pending-icon" style="background:' + bg + ';color:' + color + '"><i data-lucide="shopping-bag" style="width:18px;height:18px"></i></div>' +
+      '<div class="esc-pending-info">' +
+      '<div class="esc-pending-name">' + itemCount + ' ' + (itemCount===1?"produto":"produtos") + '</div>' +
       '<div class="esc-pending-meta">' + fmtDate(p.createdAt) + '</div>' +
       '</div>' +
-      '<span class="perfil-menu-chevron">›</span>' +
+      '<div class="esc-pending-right">' +
+      '<div class="esc-pending-val" style="color:' + color + '">' + fmt(p.total) + '</div>' +
+      '<i data-lucide="chevron-right" class="hist-export-arrow"></i>' +
+      '</div>' +
       '</button>';
-  }).join("") : '<div class="empty-state"><div class="empty-state-title">Nenhum pedido guardado</div></div>';
+  }).join("") : '<div class="empty-state"><i data-lucide="shopping-bag"></i><div class="empty-state-title">Nenhum pedido guardado</div></div>';
 
   openModal("Pedidos guardados", '<div class="esc-pending-list">' + rowsHtml + '</div>');
   refreshIcons(el("modal-box"));
@@ -621,7 +646,15 @@ window._undoRemove = () => {
 function renderCart() {
   const count = cart.reduce((a, i) => a + i.qty, 0);
   var countEl = el("cart-count");
-  if (countEl) countEl.textContent = count;
+  if (countEl) {
+    var changed = countEl.textContent !== String(count);
+    countEl.textContent = count;
+    if (changed) {
+      countEl.classList.remove("bump");
+      void countEl.offsetWidth; // força reflow para reanimar sempre
+      countEl.classList.add("bump");
+    }
+  }
   var itemsEl = el("cart-items");
   if (!itemsEl) return;
 
@@ -805,7 +838,7 @@ async function openCheckout() {
         <i data-lucide="credit-card"></i> Multicaixa
       </button>
       <button class="ck-pay-btn" data-method="fiado" onclick="window._ckSetPay(this,'fiado')">
-        <i data-lucide="hand-coins"></i> Fiado
+        <i data-lucide="hand-coins"></i> Crédito
       </button>
     </div>
 
@@ -1051,6 +1084,15 @@ async function openCheckout() {
     if (fiadoWrap) fiadoWrap.style.display = method === "fiado" ? "block" : "none";
     var troco = document.getElementById("ck-troco-bar");
     if (troco && method !== "dinheiro") troco.style.display = "none";
+    // Fiado já tem o seu próprio campo de cliente (obrigatório) — a secção
+    // "Cliente (opcional)" fica redundante e o seu valor é ignorado em
+    // _confirmarVenda quando isFiado. Escondê-la evita a falsa impressão
+    // de que preencher os dois campos tem algum efeito.
+    var clientSection = document.getElementById("ck-client-section");
+    if (clientSection) {
+      clientSection.style.display = method === "fiado" ? "none" : "";
+      if (method === "fiado" && window._ckClearClient) window._ckClearClient();
+    }
   };
 
   window._ckCalcTroco = function() {
@@ -1083,7 +1125,7 @@ window._confirmarVenda = async () => {
   const method       = window._ckPayMethod || "dinheiro";
 
   if (method === "fiado" && !clientName) {
-    toast("Insere o nome do cliente para venda a fiado.", "error"); return;
+    toast("Insere o nome do cliente para venda a crédito.", "error"); return;
   }
 
   try {
@@ -1239,7 +1281,7 @@ function showReceipt(d) {
           ${storeAddr  ? `<div style="font-size:11px;color:#6b7280;margin-top:3px">${storeAddr}</div>`  : ""}
           ${storePhone ? `<div style="font-size:11px;color:#6b7280;margin-top:1px">${storePhone}</div>`                : ""}
           ${nif        ? `<div style="font-size:11px;color:#6b7280;margin-top:1px">NIF: ${nif}</div>`                  : ""}
-          <div style="font-size:10px;color:#9ca3af;margin-top:8px;font-weight:600;padding-top:8px;border-top:1px dashed #d1d5db">
+          <div style="font-size:10px;color:#9ca3af;margin-top:8px;font-weight:600;padding-top:8px;border-top:1px solid #e5e7eb">
             Nº ${String(d.sid).padStart(6,"0")} · ${fmtDate(d.saleDate)}${d.operatorName ? ` · Atendido por ${d.operatorName}` : ""}
           </div>
         </div>
@@ -1281,7 +1323,7 @@ function showReceipt(d) {
             <span style="font-size:20px;font-weight:800;color:#fff">${fmt(d.total)}</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:8px;color:#6b7280">
-            <span style="text-transform:capitalize;font-weight:600">${d.payMethod}</span>
+            <span style="font-weight:600">${payMethodLabel(d.payMethod)}</span>
             ${d.recebido>0?`<span>Recebido: ${fmt(d.recebido)} · Troco: <strong style="color:#059669">${fmt(d.troco)}</strong></span>`:""}
           </div>
         </div>
@@ -1301,7 +1343,7 @@ function showReceipt(d) {
         <div style="padding:14px 16px;text-align:center;background:#fafafa;border-top:1px solid #e5e7eb">
           <div style="font-size:13px;font-weight:700;color:#374151">Obrigado pela preferência!</div>
           <div style="font-size:11px;color:#9ca3af;margin-top:2px;margin-bottom:10px">Volte sempre</div>
-          <div style="font-size:9px;color:#c4c4c8;line-height:1.7;padding-top:8px;border-top:1px dashed #e5e7eb">
+          <div style="font-size:9px;color:#c4c4c8;line-height:1.7;padding-top:8px;border-top:1px solid #e5e7eb">
             Documento de gestão interna · Sem validade fiscal perante a AGT<br/>
             Powered by Kontaki · Introxeer
           </div>

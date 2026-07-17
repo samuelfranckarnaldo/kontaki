@@ -10,6 +10,7 @@ import { CHART_OF_ACCOUNTS } from "../pgc.js";
 import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
+import { openPicker } from "../picker.js";
 import { generateInvite } from "../invite.js";
 import { getUser, logout, changePasswordAuth, createUser } from "../auth.js";
 import { generateCodesForUser } from "../recovery-codes.js";
@@ -232,6 +233,15 @@ window._perfilNav = async (page) => {
   if (page === "notificacoes") await loadNotificacoesPage();
 };
 
+var SUBPAGE_TITLES = {
+  stock: "Stock", incidentes: "Incidentes", equipa: "Equipa", loja: "Loja",
+  senha: "Senha", dashboard: "Dashboard", fornecedores: "Fornecedores",
+  turno: "Turno", seguranca: "Segurança", configuracoes: "Configurações",
+  contabilidade: "Contabilidade", despesas: "Despesas", assinatura: "Assinatura",
+  contactos: "Contactos", escritorio: "Escritório", sobre: "Sobre",
+  ajuda: "Ajuda", notificacoes: "Notificações",
+};
+
 function showSubpage(name) {
   const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","despesas","assinatura","contactos","escritorio","sobre","ajuda","notificacoes"];
   subpages.forEach(s => {
@@ -245,6 +255,10 @@ function showSubpage(name) {
   if (name) {
     const node = el("subpage-" + name);
     if (node) node.style.display = "block";
+  }
+  const titleEl = el("topbar-title");
+  if (titleEl) {
+    titleEl.textContent = name ? (SUBPAGE_TITLES[name] || name) : "Perfil";
   }
 }
 
@@ -893,18 +907,90 @@ async function loadContactosPage() {
 
 var activeContaTab = "resumo";
 
+var CONTA_TAB_ORDER = ["resumo", "razao", "balancete", "demonstracoes"];
+var CONTA_TAB_LABELS = { resumo:"Resumo", razao:"Razão", balancete:"Balancete", demonstracoes:"Demonstrações" };
+
 function renderContaTabs() {
-  var tabs = [
-    { id:"resumo",         label:"Resumo"         },
-    { id:"razao",          label:"Livro Razão"    },
-    { id:"balancete",      label:"Balancete"      },
-    { id:"demonstracoes",  label:"Demonstrações"  },
-  ];
   var wrap = document.getElementById("contabilidade-tabs");
   if (!wrap) return;
-  wrap.innerHTML = tabs.map(function(t) {
-    return '<button class="hist-tab' + (activeContaTab===t.id?" active":"") + '" onclick="window._contaTab(\'' + t.id + '\')">' + t.label + '</button>';
-  }).join("");
+  wrap.innerHTML = CONTA_TAB_ORDER.map(function(id) {
+    return '<button class="ct-tab' + (activeContaTab===id?" active":"") + '" data-tab="' + id + '" onclick="window._contaTab(\'' + id + '\')">' + CONTA_TAB_LABELS[id] + '</button>';
+  }).join("") + '<div class="ct-tab-indicator" id="conta-tab-indicator"></div>';
+  setupContaSwipe();
+}
+
+function setupContaSwipe() {
+  var container = document.querySelector("#subpage-contabilidade .page-inner");
+  var tabbar = document.getElementById("contabilidade-tabs");
+  var indicator = document.getElementById("conta-tab-indicator");
+  if (!container || !tabbar || !indicator) return;
+
+  // Largura base fixa de 1px — o tamanho real vem de scaleX (só transform, sem reflow)
+  indicator.style.width = "1px";
+  indicator.style.transformOrigin = "left center";
+  indicator.style.willChange = "transform";
+
+  function computeRects() {
+    return CONTA_TAB_ORDER.map(function(t) {
+      var btn = tabbar.querySelector('.ct-tab[data-tab="' + t + '"]');
+      return btn ? { left: btn.offsetLeft, width: btn.offsetWidth } : { left:0, width:0 };
+    });
+  }
+  var rects = computeRects();
+
+  function setIndicator(idx, animate) {
+    var r = rects[idx];
+    if (!r) return;
+    indicator.style.transition = animate ? "transform .25s ease" : "none";
+    indicator.style.transform = "translateX(" + r.left + "px) scaleX(" + r.width + ")";
+  }
+  setIndicator(CONTA_TAB_ORDER.indexOf(activeContaTab), false);
+
+  if (container.dataset.ctaSwipeBound) return;
+  container.dataset.ctaSwipeBound = "1";
+
+  var startX = 0, startY = 0, tracking = false, curIdx = 0;
+
+  container.addEventListener("touchstart", function(e) {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+    curIdx = CONTA_TAB_ORDER.indexOf(activeContaTab);
+    rects = computeRects();
+  }, { passive: true });
+
+  container.addEventListener("touchmove", function(e) {
+    if (!tracking) return;
+    var dx = e.touches[0].clientX - startX;
+    var dy = e.touches[0].clientY - startY;
+    if (Math.abs(dx) < Math.abs(dy) * 1.2) return;
+    var targetIdx = dx < 0 ? curIdx + 1 : curIdx - 1;
+    if (targetIdx < 0 || targetIdx > CONTA_TAB_ORDER.length - 1) targetIdx = curIdx;
+    var cur = rects[curIdx], tgt = rects[targetIdx];
+    var tabWidth = cur.width || 100;
+    var progress = Math.min(Math.abs(dx) / tabWidth, 1);
+    var interpLeft  = cur.left + (tgt.left - cur.left) * progress;
+    var interpWidth = cur.width + (tgt.width - cur.width) * progress;
+    indicator.style.transition = "none";
+    indicator.style.transform = "translateX(" + interpLeft + "px) scaleX(" + interpWidth + ")";
+  }, { passive: true });
+
+  container.addEventListener("touchend", function(e) {
+    if (!tracking) return;
+    tracking = false;
+    var dx = e.changedTouches[0].clientX - startX;
+    var dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) >= 60 && Math.abs(dx) >= Math.abs(dy) * 1.2) {
+      if (dx < 0 && curIdx < CONTA_TAB_ORDER.length - 1) {
+        window._contaTab(CONTA_TAB_ORDER[curIdx + 1]);
+        return;
+      } else if (dx > 0 && curIdx > 0) {
+        window._contaTab(CONTA_TAB_ORDER[curIdx - 1]);
+        return;
+      }
+    }
+    setIndicator(curIdx, true);
+  }, { passive: true });
 }
 
 window._contaTab = async function(tab) {
@@ -916,6 +1002,8 @@ window._contaTab = async function(tab) {
 async function loadContabilidade() {
   var wrap = document.getElementById("contabilidade-content");
   if (!wrap) return;
+  wrap.classList.add("ct-fade-panel");
+  wrap.classList.remove("ct-fade-in");
 
   // Contabilidade expõe COGS, margens e accountingArchive — dados
   // operacional-confidenciais (ver docs/architecture/
@@ -931,10 +1019,20 @@ async function loadContabilidade() {
   }
 
   renderContaTabs();
-  if (activeContaTab === "resumo")     return loadContaResumo(wrap);
-  if (activeContaTab === "razao")      return loadContaRazao(wrap);
-  if (activeContaTab === "balancete")      return loadContaBalancete(wrap);
-  if (activeContaTab === "demonstracoes")  return loadContaDemonstracoes(wrap);
+
+  // Skeleton instantâneo — a troca de aba nunca fica "congelada" esperando dados
+  wrap.innerHTML =
+    '<div class="conta-skel-block"></div><div class="conta-skel-block"></div>' +
+    '<div class="conta-skel-block"></div><div class="conta-skel-block"></div>';
+  void wrap.offsetWidth;
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() { wrap.classList.add("ct-fade-in"); });
+  });
+
+  if (activeContaTab === "resumo")     await loadContaResumo(wrap);
+  else if (activeContaTab === "razao")      await loadContaRazao(wrap);
+  else if (activeContaTab === "balancete")      await loadContaBalancete(wrap);
+  else if (activeContaTab === "demonstracoes")  await loadContaDemonstracoes(wrap);
 }
 
 function accountBalance(entries, code) {
@@ -1043,7 +1141,7 @@ async function loadContaResumo(wrap) {
   var metodoLabels = { dinheiro:"Dinheiro", transferencia:"Transferência", multicaixa:"Multicaixa", fiado:"Venda a Crédito" };
 
   var trendHtml = trendPct === null ? "" :
-    '<div class="conta-hero-trend conta-hero-trend--corner conta-hero-trend--' + (trendPct>=0?'up':'down') + '">' +
+    '<div class="hist-hero-trend hist-hero-trend--corner ' + (trendPct>=0?'hist-hero-trend--up':'hist-hero-trend--down') + '">' +
     (trendPct>=0?'▲ ':'▼ ') + Math.abs(trendPct) + '%</div>';
 
   function wfRow(label, value, variant) {
@@ -1051,9 +1149,22 @@ async function loadContaResumo(wrap) {
     return '<div class="' + cls + '"><div class="conta-wf-label">' + label + '</div><div class="conta-wf-val">' + value + '</div></div>';
   }
 
+  function iconRow(icon, color, bg, label, sub, valueFmt, valColor) {
+    return '<div class="hist-mov-item hist-mov-item--compact" style="border-left:3px solid ' + color + '">' +
+      '<div class="hist-mov-icon" style="background:' + bg + ';color:' + color + '">' +
+      '<i data-lucide="' + icon + '" style="width:18px;height:18px"></i></div>' +
+      '<div style="flex:1;min-width:0">' +
+      '<div class="hist-mov-name">' + label + '</div>' +
+      (sub ? '<div class="hist-mov-meta">' + sub + '</div>' : '') +
+      '</div>' +
+      '<div style="text-align:right;flex-shrink:0">' +
+      '<div class="hist-mov-qty" style="color:' + (valColor||"var(--text)") + '">' + valueFmt + '</div>' +
+      '</div></div>';
+  }
+
   wrap.innerHTML =
     // ── HERO ──
-    '<div class="conta-hero" style="background:' + (atual.lucroLiquido>=0?'linear-gradient(135deg,var(--primary),var(--primary-mid))':'linear-gradient(135deg,#dc2626,#ef4444)') + '">' +
+    '<div class="conta-hero" style="background:' + (atual.lucroLiquido>=0?'linear-gradient(135deg,var(--primary),var(--primary-mid))':'var(--gradient-danger)') + '">' +
     trendHtml +
     '<div class="conta-hero-label">Resultado líquido do mês</div>' +
     '<div class="hist-hero-row"><div class="conta-hero-val">' + fmt(atual.lucroLiquido) + '</div></div>' +
@@ -1068,13 +1179,12 @@ async function loadContaResumo(wrap) {
     '</div>' +
 
     // ── Posição financeira ──
-    '<div class="conta-section-label">Posição financeira</div>' +
-    '<div class="conta-card">' +
-    contaRow("Caixa + Banco", fmt(saldoCaixaBanco), "var(--text)", "Dinheiro disponível agora") +
-    contaRow("A receber (vendas a crédito)", fmt(contasAReceber), contasAReceber>0?"var(--warning)":"var(--text)") +
-    contaRow("A pagar (fornecedores)", fmt(contasAPagar), contasAPagar>0?"var(--danger)":"var(--text)") +
-    contaRow("IVA a pagar ao Estado", fmt(ivaAPagar), ivaAPagar>0?"var(--danger)":"var(--text)") +
-    '</div>' +
+    '<div class="hist-mov-card">' +
+    '<div class="hist-day-label--inset"><i data-lucide="landmark" style="width:13px;height:13px"></i>Posição financeira</div>' +
+    iconRow("wallet", "var(--info)", "var(--info-light)", "Caixa + Banco", "Dinheiro disponível agora", fmt(saldoCaixaBanco), "var(--text)") +
+    iconRow("arrow-down-left", "var(--warning)", "var(--warning-light)", "A receber (vendas a crédito)", null, fmt(contasAReceber), contasAReceber>0?"var(--warning)":"var(--text)") +
+    iconRow("arrow-up-right", "var(--danger-muted)", "var(--danger-muted-light)", "A pagar (fornecedores)", null, fmt(contasAPagar), contasAPagar>0?"var(--danger)":"var(--text)") +
+    iconRow("landmark", "var(--danger-muted)", "var(--danger-muted-light)", "IVA a pagar ao Estado", null, fmt(ivaAPagar), ivaAPagar>0?"var(--danger)":"var(--text)") +
 
     // ── Composição do resultado (waterfall) ──
     '<div class="conta-section-label">Composição do resultado</div>' +
@@ -1087,46 +1197,39 @@ async function loadContaResumo(wrap) {
     '</div>' +
 
     // ── Outros indicadores ──
-    '<div class="conta-section-label">Outros indicadores</div>' +
-    '<div class="conta-card">' +
-    contaRow("Compras do mês", fmt(comprasMes), "var(--text)") +
-    contaRow("Devoluções do mês", fmt(devMes), devMes>0?"var(--warning)":"var(--text)") +
-    '</div>' +
+    '<div class="hist-day-label--inset"><i data-lucide="list-checks" style="width:13px;height:13px"></i>Outros indicadores</div>' +
+    iconRow("package-plus", "var(--success)", "var(--success-light)", "Compras do mês", null, fmt(comprasMes), "var(--text)") +
+    iconRow("rotate-ccw", "var(--warning)", "var(--warning-light)", "Devoluções do mês", null, fmt(devMes), devMes>0?"var(--warning)":"var(--text)") +
 
     // Top produtos
     (topProd.length ?
-    '<div class="conta-section-label">Top produtos do mês</div>' +
-    '<div class="conta-card" style="padding:14px">' +
+    '<div class="hist-day-label--inset"><i data-lucide="trophy" style="width:13px;height:13px"></i>Top produtos do mês</div>' +
     topProd.map(function(p,i){
       var pct = atual.receita>0?Math.round((p.total/atual.receita)*100):0;
-      return '<div style="margin-bottom:12px">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">' +
-        '<div style="display:flex;align-items:center;gap:6px">' +
-        '<span style="font-size:11px;font-weight:700;color:var(--text4);width:14px">' + (i+1) + '</span>' +
-        '<span style="font-size:13px;font-weight:700;color:var(--text)">' + p.name + '</span>' +
-        '</div>' +
-        '<span style="font-size:13px;font-weight:700;color:var(--text)">' + fmt(p.total) + '</span>' +
-        '</div>' +
-        '<div style="height:5px;background:var(--border2);border-radius:3px;overflow:hidden">' +
+      return '<div class="hist-mov-item hist-mov-item--compact" style="border-left:3px solid var(--primary);align-items:center">' +
+        '<div class="hist-mov-icon" style="background:var(--primary-light);color:var(--primary);font-weight:800;font-size:13px">' + (i+1) + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+        '<div class="hist-mov-name">' + p.name + '</div>' +
+        '<div style="height:5px;background:var(--border2);border-radius:3px;overflow:hidden;margin-top:6px">' +
         '<div style="height:100%;width:' + pct + '%;background:var(--primary);border-radius:3px;transition:width .5s"></div>' +
         '</div>' +
-        '<div style="font-size:10px;color:var(--text4);margin-top:3px">' + p.qty + ' un · ' + pct + '% da receita</div>' +
-        '</div>';
-    }).join("") +
-    '</div>' : "") +
+        '<div class="hist-mov-meta" style="margin-top:4px">' + p.qty + ' un · ' + pct + '% da receita</div>' +
+        '</div>' +
+        '<div style="text-align:right;flex-shrink:0">' +
+        '<div class="hist-mov-qty">' + fmt(p.total) + '</div>' +
+        '</div></div>';
+    }).join("") : "") +
 
     // Por método de pagamento
-    '<div class="conta-section-label">Por método de pagamento</div>' +
-    '<div class="conta-card" style="padding:14px">' +
+    '<div class="hist-day-label--inset"><i data-lucide="credit-card" style="width:13px;height:13px"></i>Por método de pagamento</div>' +
     Object.entries(porMetodo).map(function(e){
       var pct = atual.receita>0?Math.round((e[1]/atual.receita)*100):0;
       var label = metodoLabels[e[0]] || e[0];
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border2)">' +
-        '<span style="font-size:13px;font-weight:600;color:var(--text)">'+label+'</span>' +
-        '<div style="text-align:right">' +
-        '<div style="font-size:13px;font-weight:700;color:var(--text)">'+fmt(e[1])+'</div>' +
-        '<div style="font-size:11px;color:var(--text4)">'+pct+'%</div>' +
-        '</div></div>';
+      var metodoIcon  = { dinheiro:"banknote", transferencia:"arrow-left-right", multicaixa:"credit-card", fiado:"users" };
+      var metodoColor = { dinheiro:"var(--success)", transferencia:"var(--info)", multicaixa:"var(--primary-mid)", fiado:"var(--warning)" };
+      var icon  = metodoIcon[e[0]] || "circle";
+      var color = metodoColor[e[0]] || "var(--text3)";
+      return iconRow(icon, color, color.replace("var(--","var(--").replace(")","-light)"), label, pct + "% da receita", fmt(e[1]), "var(--text)");
     }).join("") +
     '</div>';
 
@@ -1137,19 +1240,42 @@ async function loadContaResumo(wrap) {
   funcSection.innerHTML =
     '<div class="conta-section-label" style="margin-top:0">Relatório por funcionário</div>' +
     '<div class="conta-card" style="padding:14px;display:flex;flex-direction:column;gap:10px">' +
-    '<select id="func-select" style="width:100%;padding:10px;border:1.5px solid var(--border2);border-radius:8px;font-family:inherit;font-size:14px;background:var(--bg)">' +
+    '<select id="func-select" style="display:none">' +
     users.map(function(u){ return '<option value="'+u.id+'">'+u.name+'</option>'; }).join("") +
     '</select>' +
+    '<button id="func-picker-btn" class="conta-picker-btn" type="button">' +
+    '<span id="func-picker-label">' + (users[0] ? users[0].name : "Selecionar funcionário") + '</span>' +
+    '<i data-lucide="chevron-down" style="width:16px;height:16px;flex-shrink:0;color:var(--text3)"></i>' +
+    '</button>' +
     '<button onclick="window._gerarRelatorioFuncionario()" class="btn btn-primary btn-full"><i data-lucide="user-check" style="width:15px;height:15px"></i> Gerar relatório do funcionário</button>' +
     '</div>';
   wrap.appendChild(funcSection);
   refreshIcons(funcSection);
 
-  // Botão exportar PDF
+  var funcSel = funcSection.querySelector("#func-select");
+  var funcBtn = funcSection.querySelector("#func-picker-btn");
+  var funcLabel = funcSection.querySelector("#func-picker-label");
+  var userLabels = users.map(function(u){ return u.name; });
+  funcBtn.onclick = function() {
+    openPicker(
+      "Selecionar funcionário",
+      userLabels,
+      funcLabel.textContent,
+      function(chosenLabel) {
+        var chosenUser = users.find(function(u){ return u.name === chosenLabel; });
+        if (chosenUser) {
+          funcSel.value = chosenUser.id;
+          funcLabel.textContent = chosenUser.name;
+        }
+      }
+    );
+  };
+
+  // Botão exportar PDF — ação neutra, não usa vermelho (reservado para perigo/exclusão)
   var pdfBtn = document.createElement("button");
   pdfBtn.className = "btn btn-full";
-  pdfBtn.style.cssText = "background:var(--danger);color:#fff;margin-top:12px";
-  pdfBtn.innerHTML = '<i data-lucide="file-text" style="width:16px;height:16px"></i> Exportar Relatório PDF';
+  pdfBtn.style.cssText = "background:var(--bg2);color:var(--text);border:1.5px solid var(--border);margin-top:12px";
+  pdfBtn.innerHTML = '<i data-lucide="file-text" style="width:16px;height:16px;color:var(--primary)"></i> Exportar Relatório PDF';
   pdfBtn.onclick = gerarRelatorioPDF;
   wrap.appendChild(pdfBtn);
 
@@ -1227,18 +1353,29 @@ async function loadContaRazao(wrap) {
     _razaoContaSel = contasComMov[0].code;
   }
 
-  var options = contasComMov.map(function(c) {
-    return '<option value="' + c.code + '"' + (c.code===_razaoContaSel?' selected':'') + '>' +
-      c.code + ' — ' + c.name + '</option>';
-  }).join("");
+  var contaAtual = contasComMov.find(function(c) { return c.code === _razaoContaSel; });
 
   wrap.innerHTML =
-    '<select id="razao-conta-select" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;margin-bottom:14px">' +
-    options + '</select>' +
+    '<button id="razao-conta-btn" class="conta-picker-btn">' +
+    '<span>' + contaAtual.code + ' — ' + contaAtual.name + '</span>' +
+    '<i data-lucide="chevron-down" style="width:16px;height:16px;flex-shrink:0;color:var(--text3)"></i>' +
+    '</button>' +
     '<div id="razao-lancamentos"></div>';
 
-  var sel = document.getElementById("razao-conta-select");
-  sel.onchange = function() { _razaoContaSel = sel.value; renderRazaoLancamentos(entries); };
+  refreshIcons();
+
+  var contaLabels = contasComMov.map(function(c) { return c.code + ' — ' + c.name; });
+  document.getElementById("razao-conta-btn").onclick = function() {
+    openPicker(
+      "Selecionar conta",
+      contaLabels,
+      contaAtual.code + ' — ' + contaAtual.name,
+      function(chosenLabel) {
+        _razaoContaSel = chosenLabel.split(' — ')[0];
+        loadContaRazao(wrap);
+      }
+    );
+  };
   renderRazaoLancamentos(entries);
 }
 
@@ -1258,14 +1395,30 @@ function renderRazaoLancamentos(entries) {
   });
   linhas.sort(function(a,b){ return new Date(a.date) - new Date(b.date); });
 
+  var razaoTypeColor = { debito: "var(--info)",       credito: "var(--primary-mid)"  };
+  var razaoTypeBg     = { debito: "var(--info-light)", credito: "var(--primary-light)" };
+  var razaoTypeIcon   = { debito: "arrow-down-left",   credito: "arrow-up-right"       };
+  var razaoTypeLabel  = { debito: "Débito",            credito: "Crédito"              };
+
   var saldo = 0;
   var rows = linhas.map(function(l) {
     saldo += conta.natureza === "devedora" ? (l.debit - l.credit) : (l.credit - l.debit);
-    return '<div class="conta-row">' +
-      '<div><div class="conta-row-label">' + l.description + '</div>' +
-      '<div class="conta-row-sub">' + fmtDate(l.date) + (l.debit?' · Débito '+fmt(l.debit):'') + (l.credit?' · Crédito '+fmt(l.credit):'') + '</div></div>' +
-      '<div class="conta-row-val">' + fmt(saldo) + '</div>' +
-      '</div>';
+    var tipo  = l.debit ? "debito" : "credito";
+    var valor = l.debit ? l.debit : l.credit;
+    var color = razaoTypeColor[tipo];
+    var bg    = razaoTypeBg[tipo];
+    return '<div class="hist-mov-item hist-mov-item--compact" style="border-left:3px solid ' + color + '">' +
+      '<div class="hist-mov-icon" style="background:' + bg + ';color:' + color + '">' +
+      '<i data-lucide="' + razaoTypeIcon[tipo] + '" style="width:18px;height:18px"></i></div>' +
+      '<div style="flex:1;min-width:0">' +
+      '<div class="hist-mov-name">' + l.description + '</div>' +
+      '<span class="hist-mov-tag" style="background:' + bg + ';color:' + color + '">' + razaoTypeLabel[tipo] + '</span>' +
+      '<div class="hist-mov-meta">' + fmtDate(l.date) + '</div>' +
+      '</div>' +
+      '<div style="text-align:right;flex-shrink:0">' +
+      '<div class="hist-mov-qty" style="color:' + color + '">' + fmt(valor) + '</div>' +
+      '<div class="hist-mov-range"><span class="hist-mov-range-label">Saldo</span> <strong style="color:' + (saldo>=0?"var(--text2)":"var(--danger)") + '">' + fmt(saldo) + '</strong></div>' +
+      '</div></div>';
   }).join("");
 
   wrap.innerHTML =
@@ -1275,6 +1428,7 @@ function renderRazaoLancamentos(entries) {
     '<div class="conta-hero-label">Saldo atual</div>' +
     '<div class="conta-hero-val" style="font-size:26px">' + fmt(saldo) + '</div>' +
     '</div>';
+  refreshIcons();
 }
 
 function fmtDate(iso) {
@@ -1323,29 +1477,59 @@ async function loadContaBalancete(wrap) {
     5:"Capital e Reservas", 6:"Proveitos por Natureza", 7:"Custos por Natureza", 8:"Resultados",
   };
 
-  var html = Object.keys(porClasse).sort().map(function(classe) {
+  var tipoColor = {
+    activo:"var(--info)", passivo:"var(--primary-mid)", capital:"var(--primary-mid)",
+    proveito:"var(--success)", custo:"var(--danger-muted)", resultado:"var(--primary)"
+  };
+  var tipoBg = {
+    activo:"var(--info-light)", passivo:"var(--primary-light)", capital:"var(--primary-light)",
+    proveito:"var(--success-light)", custo:"var(--danger-muted-light)", resultado:"var(--primary-light)"
+  };
+  var tipoIcon = {
+    activo:"wallet", passivo:"receipt", capital:"landmark",
+    proveito:"trending-up", custo:"trending-down", resultado:"bar-chart-2"
+  };
+
+  var html = '<div class="hist-mov-card">' + Object.keys(porClasse).sort().map(function(classe) {
     var rows = porClasse[classe].map(function(c) {
       var t = totals[c.code];
-      var saldo = c.natureza === "devedora" ? (t.debit - t.credit) : (t.credit - t.debit);
-      return '<div class="conta-row">' +
-        '<div><div class="conta-row-label">' + c.code + ' — ' + c.name + '</div>' +
-        '<div class="conta-row-sub">D: ' + fmt(t.debit) + ' · C: ' + fmt(t.credit) + '</div></div>' +
-        '<div class="conta-row-val">' + fmt(saldo) + '</div>' +
-        '</div>';
+      var saldo = c.natureza === "devedora" ? (t.debit - t.credit) : (t.credit - t.credit ? 0 : 0) || (c.natureza === "devedora" ? (t.debit - t.credit) : (t.credit - t.debit));
+      saldo = c.natureza === "devedora" ? (t.debit - t.credit) : (t.credit - t.debit);
+      var borderColor = tipoColor[c.tipo] || "var(--text3)";
+      var bg           = tipoBg[c.tipo] || "var(--border2)";
+      var icon         = tipoIcon[c.tipo] || "circle";
+      var valColor     = saldo < 0 ? "var(--danger)" : "var(--text)";
+      return '<div class="hist-mov-item hist-mov-item--compact" style="border-left:3px solid ' + borderColor + '">' +
+        '<div class="hist-mov-icon" style="background:' + bg + ';color:' + borderColor + '">' +
+        '<i data-lucide="' + icon + '" style="width:18px;height:18px"></i></div>' +
+        '<div style="flex:1;min-width:0">' +
+        '<div class="hist-mov-name">' + c.code + ' — ' + c.name + '</div>' +
+        '<div class="hist-mov-meta">D: ' + fmt(t.debit) + ' · C: ' + fmt(t.credit) + '</div>' +
+        '</div>' +
+        '<div style="text-align:right;flex-shrink:0">' +
+        '<div class="hist-mov-qty" style="color:' + valColor + '">' + fmt(saldo) + '</div>' +
+        '</div></div>';
     }).join("");
-    return '<div class="conta-section-label">Classe ' + classe + ' — ' + classeNomes[classe] + '</div>' +
-      '<div class="conta-card">' + rows + '</div>';
-  }).join("");
+    return '<div class="hist-day-label--inset"><i data-lucide="folder" style="width:13px;height:13px"></i>Classe ' + classe + ' — ' + classeNomes[classe] + '</div>' + rows;
+  }).join("") + '</div>';
 
   var diff = Math.round((totalDebitGeral - totalCreditGeral) * 100) / 100;
   var bateOK = diff === 0;
 
+  var balanceteStatusBadge =
+    '<span class="hist-hero-trend hist-hero-trend--corner ' + (bateOK?'hist-hero-trend--up':'hist-hero-trend--down') + '">' +
+    '<i data-lucide="' + (bateOK?'check':'alert-triangle') + '" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"></i>' +
+    (bateOK?'Bate certo':'Diferença') + '</span>';
+
   wrap.innerHTML =
-    '<div class="conta-hero" style="background:' + (bateOK?'linear-gradient(135deg,#059669,#10b981)':'linear-gradient(135deg,#dc2626,#ef4444)') + '">' +
+    '<div class="conta-hero" style="background:linear-gradient(135deg, var(--primary), var(--primary-mid))">' +
+    balanceteStatusBadge +
     '<div class="conta-hero-label">' + (bateOK?'Balancete equilibrado':'Balancete desequilibrado') + '</div>' +
     '<div class="conta-hero-val" style="font-size:22px">D: ' + fmt(totalDebitGeral) + '</div>' +
-    '<div class="conta-hero-sub">C: ' + fmt(totalCreditGeral) + (bateOK?' · ✓ bate certo':' · diferença: '+fmt(diff)) + '</div>' +
+    '<div class="conta-hero-sub">C: ' + fmt(totalCreditGeral) + (bateOK?'':' · diferença: '+fmt(diff)) + '</div>' +
     '</div>' + html;
+  refreshIcons();
+  refreshIcons();
 }
 
 
@@ -1388,10 +1572,43 @@ async function loadContaDemonstracoes(wrap) {
   var totalCustos    = custos.reduce(function(a,c){ return a + saldoConta(c); }, 0);
   var resultado = totalProveitos - totalCustos;
 
+  var tipoColor = {
+    activo:"var(--info)", passivo:"var(--primary-mid)", capital:"var(--primary-mid)",
+    proveito:"var(--success)", custo:"var(--danger-muted)", resultado:"var(--primary)"
+  };
+  var tipoBg = {
+    activo:"var(--info-light)", passivo:"var(--primary-light)", capital:"var(--primary-light)",
+    proveito:"var(--success-light)", custo:"var(--danger-muted-light)", resultado:"var(--primary-light)"
+  };
+  var tipoIcon = {
+    activo:"wallet", passivo:"receipt", capital:"landmark",
+    proveito:"trending-up", custo:"trending-down", resultado:"bar-chart-2"
+  };
+
+  var classeIcon = {
+    1:"factory", 2:"package", 3:"users", 4:"wallet",
+    5:"landmark", 6:"trending-up", 7:"trending-down", 8:"bar-chart-2"
+  };
+
+  function movRow(c, valorFmt, valColor) {
+    var borderColor = tipoColor[c.tipo] || "var(--text3)";
+    var bg = tipoBg[c.tipo] || "var(--border2)";
+    var icon = classeIcon[c.classe] || tipoIcon[c.tipo] || "circle";
+    return '<div class="hist-mov-item hist-mov-item--compact" style="border-left:3px solid ' + borderColor + '">' +
+      '<div class="hist-mov-icon" style="background:' + bg + ';color:' + borderColor + '">' +
+      '<i data-lucide="' + icon + '" style="width:18px;height:18px"></i></div>' +
+      '<div style="flex:1;min-width:0">' +
+      '<div class="hist-mov-name">' + c.code + ' — ' + c.name + '</div>' +
+      '</div>' +
+      '<div style="text-align:right;flex-shrink:0">' +
+      '<div class="hist-mov-qty" style="color:' + valColor + '">' + valorFmt + '</div>' +
+      '</div></div>';
+  }
+
   var drRows = proveitos.map(function(c) {
-    return contaRow(c.code + " — " + c.name, fmt(saldoConta(c)), "#16a34a");
+    return movRow(c, fmt(saldoConta(c)), "var(--text)");
   }).join("") + custos.map(function(c) {
-    return contaRow(c.code + " — " + c.name, "-" + fmt(saldoConta(c)), "#dc2626");
+    return movRow(c, "-" + fmt(saldoConta(c)), "var(--text)");
   }).join("");
 
   // ── Balanço ──
@@ -1405,43 +1622,53 @@ async function loadContaDemonstracoes(wrap) {
   var totalPassivoCapital = totalPassivo + totalCapital + resultado;
 
   var ativoRows = ativos.map(function(c) {
-    return contaRow(c.code + " — " + c.name, fmt(saldoConta(c)), "#111827");
+    var v = saldoConta(c);
+    return movRow(c, fmt(v), v>=0?"var(--text)":"var(--danger)");
   }).join("");
   var passivoRows = passivos.map(function(c) {
-    return contaRow(c.code + " — " + c.name, fmt(saldoConta(c)), "#111827");
+    var v = saldoConta(c);
+    return movRow(c, fmt(v), v>=0?"var(--text)":"var(--danger)");
   }).join("") + capitais.map(function(c) {
-    return contaRow(c.code + " — " + c.name, fmt(saldoConta(c)), "#111827");
-  }).join("") + contaRow("Resultado do período (não encerrado)", fmt(resultado), resultado>=0?"#16a34a":"#dc2626");
+    var v = saldoConta(c);
+    return movRow(c, fmt(v), v>=0?"var(--text)":"var(--danger)");
+  }).join("") + contaRow("Resultado do período (não encerrado)", fmt(resultado), resultado>=0?"var(--success)":"var(--danger)");
 
   var diff = Math.round((totalAtivo - totalPassivoCapital) * 100) / 100;
   var bateOK = diff === 0;
 
+  var balancoStatusBadge =
+    '<span class="hist-hero-trend hist-hero-trend--corner ' + (bateOK?'hist-hero-trend--up':'hist-hero-trend--down') + '">' +
+    '<i data-lucide="' + (bateOK?'check':'alert-triangle') + '" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"></i>' +
+    (bateOK?'Bate certo':'Diferença') + '</span>';
+
   wrap.innerHTML =
-    '<div class="conta-hero" style="background:' + (resultado>=0?'linear-gradient(135deg,#059669,#10b981)':'linear-gradient(135deg,#dc2626,#ef4444)') + '">' +
+    '<div class="conta-hero" style="background:' + (resultado>=0?'var(--gradient-success)':'var(--gradient-danger)') + '">' +
     '<div class="conta-hero-label">Resultado líquido do período</div>' +
     '<div class="conta-hero-val">' + fmt(resultado) + '</div>' +
     '<div class="conta-hero-sub">' + (resultado>=0?'▲ Lucro':'▼ Prejuízo') + '</div>' +
     '</div>' +
 
-    '<div class="conta-section-label">Demonstração de Resultados</div>' +
-    '<div class="conta-card">' + drRows + '</div>' +
-    '<div class="conta-card" style="margin-top:8px">' +
-    contaRow("Total Proveitos", fmt(totalProveitos), "#16a34a") +
-    contaRow("Total Custos", fmt(totalCustos), "#dc2626") +
-    contaRow("Resultado líquido", fmt(resultado), resultado>=0?"#16a34a":"#dc2626") +
+    '<div class="hist-mov-card">' +
+    '<div class="hist-day-label--inset"><i data-lucide="file-text" style="width:13px;height:13px"></i>Demonstração de Resultados</div>' +
+    drRows +
+    '<div class="conta-wf-row conta-wf-row--subtotal"><span class="conta-wf-label">Total Proveitos</span><span class="conta-wf-val" style="color:var(--success)">' + fmt(totalProveitos) + '</span></div>' +
+    '<div class="conta-wf-row conta-wf-row--subtotal"><span class="conta-wf-label">Total Custos</span><span class="conta-wf-val" style="color:var(--danger)">' + fmt(totalCustos) + '</span></div>' +
+    '<div class="conta-wf-row conta-wf-row--total"><span class="conta-wf-label">Resultado líquido</span><span class="conta-wf-val" style="color:' + (resultado>=0?"var(--success)":"var(--danger)") + '">' + fmt(resultado) + '</span></div>' +
+
+    '<div class="hist-day-label--inset"><i data-lucide="landmark" style="width:13px;height:13px"></i>Balanço — Ativo</div>' +
+    (ativoRows||contaRow("Sem contas de ativo com movimento","","#a1a1aa")) +
+
+    '<div class="hist-day-label--inset"><i data-lucide="landmark" style="width:13px;height:13px"></i>Balanço — Passivo + Capital</div>' +
+    passivoRows +
     '</div>' +
 
-    '<div class="conta-section-label" style="margin-top:18px">Balanço — Ativo</div>' +
-    '<div class="conta-card">' + (ativoRows||contaRow("Sem contas de ativo com movimento","","#a1a1aa")) + '</div>' +
-
-    '<div class="conta-section-label" style="margin-top:14px">Balanço — Passivo + Capital</div>' +
-    '<div class="conta-card">' + passivoRows + '</div>' +
-
-    '<div class="conta-hero" style="margin-top:14px;background:' + (bateOK?'linear-gradient(135deg,#059669,#10b981)':'linear-gradient(135deg,#dc2626,#ef4444)') + '">' +
+    '<div class="conta-hero" style="margin-top:14px;background:linear-gradient(135deg, var(--primary), var(--primary-mid))">' +
+    balancoStatusBadge +
     '<div class="conta-hero-label">' + (bateOK?'Balanço equilibrado':'Balanço desequilibrado') + '</div>' +
     '<div class="conta-hero-val" style="font-size:22px">Ativo: ' + fmt(totalAtivo) + '</div>' +
-    '<div class="conta-hero-sub">Passivo+Capital: ' + fmt(totalPassivoCapital) + (bateOK?' · ✓ bate certo':' · diferença: '+fmt(diff)) + '</div>' +
+    '<div class="conta-hero-sub">Passivo+Capital: ' + fmt(totalPassivoCapital) + (bateOK?'':' · diferença: '+fmt(diff)) + '</div>' +
     '</div>';
+  refreshIcons();
 }
 
 async function loadAssinatura() {

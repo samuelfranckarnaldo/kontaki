@@ -50,18 +50,6 @@ export async function loadDashboard() {
   var saldoCaixa  = vendasHoje.filter(function(s){ return s.payMethod==="dinheiro"; })
     .reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
 
-  var dias7 = [];
-  for (var i=6; i>=0; i--) {
-    var dd = new Date();
-    dd.setDate(dd.getDate()-i);
-    var ds  = dd.toISOString().slice(0,10);
-    var lbl = i===0?"Hoje":i===1?"Ont.":dd.toLocaleDateString("pt-AO",{weekday:"short"});
-    var v   = sales.filter(function(s){ return (s.date||"").startsWith(ds); })
-      .reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
-    dias7.push({label:lbl,val:v,date:ds});
-  }
-  var maxVal = Math.max.apply(null, dias7.map(function(d){return d.val;})) || 1;
-
   var hora     = new Date().getHours();
   var saudacao = hora<12?"Bom dia":hora<18?"Boa tarde":"Boa noite";
   var nome     = user ? user.name.split(" ")[0] : "";
@@ -145,36 +133,6 @@ export async function loadDashboard() {
     alertWrap.appendChild(alertCard);
     sheet.appendChild(alertWrap);
   }
-
-  // ── Gráfico ──
-  var chartWrap = document.createElement("div");
-  chartWrap.style.cssText = "margin:12px 12px 0";
-  var chartCard = document.createElement("div");
-  chartCard.style.cssText = "background:var(--bg2);border-radius:14px;padding:14px;border:1px solid var(--border2)";
-
-  var chartTitle = document.createElement("div");
-  chartTitle.style.cssText = "font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px";
-  chartTitle.textContent = "Vendas — últimos 7 dias";
-  chartCard.appendChild(chartTitle);
-
-  var barsWrap = document.createElement("div");
-  barsWrap.style.cssText = "display:flex;align-items:flex-end;gap:6px;height:80px";
-  dias7.forEach(function(dia) {
-    var pct     = Math.max(4, Math.round((dia.val/maxVal)*76));
-    var isToday = dia.date === hoje;
-    var col     = document.createElement("div");
-    col.style.cssText = "flex:1;display:flex;flex-direction:column;align-items:center;gap:4px";
-    col.innerHTML =
-      "<div style='width:100%;border-radius:6px 6px 0 0;background:" +
-      (isToday?"var(--primary)":dia.val>0?"var(--primary-light)":"var(--border2)") +
-      ";height:"+pct+"px;transition:height .3s'></div>" +
-      "<div style='font-size:9px;color:"+(isToday?"var(--primary)":"var(--text4)")+
-      ";font-weight:"+(isToday?"700":"400")+";white-space:nowrap'>"+dia.label+"</div>";
-    barsWrap.appendChild(col);
-  });
-  chartCard.appendChild(barsWrap);
-  chartWrap.appendChild(chartCard);
-  sheet.appendChild(chartWrap);
 
   // ── Botão começar ──
   var btnWrap = document.createElement("div");
