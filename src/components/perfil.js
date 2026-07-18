@@ -126,9 +126,11 @@ function renderMenu() {
   const items = [...(user.role === "admin" ? adminItems : caixaItems), ...commonItems];
 
   function renderGridItem(item) {
-    return '<button class="perfil-grid-item" id="' + (item.page==="incidentes"?"perfil-menu-incidentes":"") + '" onclick="window._perfilNav(\'' + item.page + '\')">' +
-      '<div class="perfil-grid-icon" style="background:' + item.color + '">' +
+    var isIncidentes = item.page === "incidentes";
+    return '<button class="perfil-grid-item" id="' + (isIncidentes?"perfil-menu-incidentes":"") + '" onclick="window._perfilNav(\'' + item.page + '\')">' +
+      '<div class="perfil-grid-icon" style="background:' + item.color + ';position:relative">' +
       '<i data-lucide="' + item.icon + '" style="color:' + item.iconColor + '"></i>' +
+      (isIncidentes ? '<span id="inc-count-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;min-width:17px;height:17px;border-radius:9px;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff"></span>' : '') +
       '</div>' +
       '<div class="perfil-grid-label">' + item.label + '</div>' +
       '</button>';
@@ -393,6 +395,13 @@ async function loadIncidentes() {
       '</div>';
   }
 
+  var typeOptions = [
+    { value:"all",   label:"Todos os tipos" },
+    { value:"stock", label:"Stock" },
+    { value:"caixa", label:"Caixa" },
+  ];
+  var currentTypeLabel = (typeOptions.find(function(o){ return o.value===_incFilterType; }) || typeOptions[0]).label;
+
   var filtersHtml =
     segmentedControl("status", _incFilterStatus, [
       { value:"open",     label:"Abertos (" + openCount + ")" },
@@ -400,11 +409,12 @@ async function loadIncidentes() {
       { value:"archived", label:"Arquivados (" + archivedCount + ")" },
       { value:"all",      label:"Todos" },
     ]) +
-    chipRow("type", _incFilterType, [
-      { value:"all",   label:"Todos os tipos" },
-      { value:"stock", label:"Stock" },
-      { value:"caixa", label:"Caixa" },
-    ]);
+    '<button id="inc-type-filter-btn" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:9px 12px;margin-bottom:12px;background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-sm);cursor:pointer;font-family:inherit">' +
+      '<span style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--text2)">' +
+        '<i data-lucide="filter" style="width:13px;height:13px;color:var(--text3)"></i>' + currentTypeLabel +
+      '</span>' +
+      '<i data-lucide="chevron-down" style="width:14px;height:14px;color:var(--text3)"></i>' +
+    '</button>';
 
   var filtersWrap = document.getElementById("inc-filters");
   if (!filtersWrap) {
@@ -417,7 +427,24 @@ async function loadIncidentes() {
       header0.insertBefore(filtersWrap, listEl0);
     }
   }
-  if (filtersWrap) { filtersWrap.innerHTML = filtersHtml; refreshIcons(filtersWrap); }
+  if (filtersWrap) {
+    filtersWrap.innerHTML = filtersHtml;
+    refreshIcons(filtersWrap);
+    var typeBtn = document.getElementById("inc-type-filter-btn");
+    if (typeBtn) {
+      typeBtn.onclick = function() {
+        openPicker(
+          "Filtrar por tipo",
+          typeOptions.map(function(o){ return o.label; }),
+          currentTypeLabel,
+          function(chosenLabel) {
+            var chosen = typeOptions.find(function(o){ return o.label === chosenLabel; });
+            if (chosen) window._setIncFilter("type", chosen.value);
+          }
+        );
+      };
+    }
+  }
 
   var clearBtn = document.getElementById("btn-clear-resolved-inc");
   if (!clearBtn) {
@@ -426,14 +453,21 @@ async function loadIncidentes() {
     if (header) {
       clearBtn = document.createElement("button");
       clearBtn.id = "btn-clear-resolved-inc";
-      clearBtn.style.cssText = "width:100%;padding:11px;background:var(--primary-light);color:var(--primary);border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px";
+      clearBtn.style.cssText = "width:100%;padding:12px 14px;background:#fff;border:1.5px solid var(--primary-light);border-radius:var(--radius-lg);cursor:pointer;font-family:inherit;margin-bottom:12px;display:flex;align-items:center;gap:10px;text-align:left";
       clearBtn.onclick = window._clearResolvedIncidents;
       var listEl = document.getElementById("inc-list");
       if (listEl) header.insertBefore(clearBtn, listEl);
     }
   }
   if (clearBtn) {
-    clearBtn.innerHTML = '<i data-lucide="archive" style="width:14px;height:14px"></i> Arquivar ' + resolvedCount + ' incidente(s) resolvido(s)';
+    clearBtn.innerHTML =
+      '<div style="width:32px;height:32px;border-radius:9px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+      '<i data-lucide="archive" style="width:15px;height:15px;color:var(--primary)"></i></div>' +
+      '<div style="flex:1;min-width:0">' +
+      '<div style="font-size:13.5px;font-weight:700;color:var(--text)">Arquivar incidentes resolvidos</div>' +
+      '<div style="font-size:11.5px;color:var(--text3)">' + resolvedCount + ' saem desta lista, continuam na auditoria</div>' +
+      '</div>' +
+      '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text4);flex-shrink:0"></i>';
     clearBtn.style.display = resolvedCount > 0 ? "flex" : "none";
     refreshIcons(clearBtn);
   }
@@ -455,6 +489,19 @@ async function loadIncidentes() {
     return 'Sem turno associado';
   }
 
+  function relTime(iso) {
+    if (!iso) return "";
+    var diffMs = Date.now() - new Date(iso).getTime();
+    var mins = Math.floor(diffMs/60000);
+    if (mins < 1) return "agora mesmo";
+    if (mins < 60) return "há " + mins + " min";
+    var hours = Math.floor(mins/60);
+    if (hours < 24) return "há " + hours + (hours===1?" hora":" horas");
+    var days = Math.floor(hours/24);
+    if (days < 30) return "há " + days + (days===1?" dia":" dias");
+    return _fmtDateLocal(iso);
+  }
+
   el("inc-list").innerHTML = !filtered.length
     ? '<div class="empty-state"><div class="empty-state-title">Sem incidentes' + ((_incFilterStatus!=="all"||_incFilterType!=="all") ? " com este filtro" : "") + '</div></div>'
     : filtered.map(function(i) {
@@ -463,65 +510,54 @@ async function loadIncidentes() {
         var resolverName   = (i.resolvedBy != null && usersById[i.resolvedBy]) ? usersById[i.resolvedBy].name : null;
         var diff           = i.diff||0;
         var diffColor      = diff < 0 ? "var(--danger)" : diff > 0 ? "var(--success)" : "var(--text3)";
-        var diffSub        = diff < 0 ? "Stock inferior ao esperado" : diff > 0 ? "Stock superior ao esperado" : "Sem diferença";
         var accentColor    = isOpen ? "var(--danger)" : "#d4d4d8";
+        var timeLabel      = isOpen ? "Detectado " + relTime(i.createdAt) : "Resolvido " + relTime(i.resolvedAt||i.createdAt);
 
-        return '<div style="display:flex;background:#fff;border-radius:var(--radius-lg);margin-bottom:10px;box-shadow:var(--shadow-sm);overflow:hidden">' +
-          '<div style="width:4px;flex-shrink:0;background:' + accentColor + '"></div>' +
-          '<div style="flex:1;padding:14px 16px;min-width:0">' +
+        return '<div class="inc-card" onclick="window._toggleIncDetails(' + i.id + ')" style="background:#fff;border-radius:var(--radius-lg);margin-bottom:9px;box-shadow:var(--shadow-sm);padding:12px 14px;cursor:pointer">' +
 
-            '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px">' +
-              '<div style="display:flex;align-items:center;gap:9px;min-width:0">' +
-                '<div style="width:30px;height:30px;border-radius:50%;background:' + typeBg(i._type) + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
-                  '<i data-lucide="' + typeIcon(i._type) + '" style="width:14px;height:14px;color:' + typeColor(i._type) + '"></i>' +
-                '</div>' +
-                '<div style="min-width:0">' +
-                  '<div style="font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:' + typeColor(i._type) + '">' + typeLabel(i._type) + '</div>' +
-                  '<div style="font-weight:700;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + i.productName + '</div>' +
-                '</div>' +
-              '</div>' +
-              (canResolve
-                ? '<button onclick="window._openResolveModal(' + i.id + ')" style="flex-shrink:0;display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:var(--radius-sm);border:1px solid var(--success);background:var(--success-light);color:var(--success);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">' +
-                    '<i data-lucide="check-circle" style="width:13px;height:13px"></i>Resolver</button>'
-                : (isOpen
-                    ? '<span style="flex-shrink:0;font-size:10.5px;color:var(--danger);font-weight:700;background:var(--danger-light);padding:4px 10px;border-radius:var(--radius-sm)">Pendente</span>'
-                    : '<span style="flex-shrink:0;display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--success);font-weight:700"><i data-lucide="check" style="width:12px;height:12px"></i>Resolvido</span>')) +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">' +
+            '<div style="display:flex;align-items:center;gap:7px;min-width:0">' +
+              '<span style="width:7px;height:7px;border-radius:50%;background:' + accentColor + ';flex-shrink:0"></span>' +
+              '<i data-lucide="' + typeIcon(i._type) + '" style="width:13px;height:13px;color:' + typeColor(i._type) + ';flex-shrink:0"></i>' +
+              '<span style="font-weight:700;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + i.productName + '</span>' +
             '</div>' +
-
-            '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:12px">' +
-              '<div style="font-size:22px;font-weight:800;color:' + diffColor + '">' + (diff > 0 ? "+" : "") + diff + '</div>' +
-              '<div style="font-size:12px;color:var(--text3)">' + diffSub + '</div>' +
-            '</div>' +
-
-            '<button onclick="window._toggleIncDetails(' + i.id + ')" id="inc-toggle-' + i.id + '" style="display:flex;align-items:center;gap:4px;background:none;border:none;padding:0;margin-bottom:2px;font-size:11.5px;font-weight:700;color:var(--text3);cursor:pointer;font-family:inherit">' +
-              'Ver detalhes<i data-lucide="chevron-down" style="width:13px;height:13px;transition:transform .2s"></i>' +
-            '</button>' +
-
-            '<div id="inc-details-' + i.id + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2)">' +
-
-              '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#fafafa;border-radius:var(--radius-sm);padding:10px 4px;margin-bottom:10px">' +
-                '<div style="text-align:center"><div style="font-size:9.5px;color:var(--text4);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Esperado</div><div style="font-size:13px;font-weight:700;color:var(--text2)">' + (i.expected||0) + '</div></div>' +
-                '<div style="text-align:center;border-left:1px solid #ececee"><div style="font-size:9.5px;color:var(--text4);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Encontrado</div><div style="font-size:13px;font-weight:700;color:var(--text2)">' + (i.found||0) + '</div></div>' +
-              '</div>' +
-
-              '<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:3px">' +
-                '<i data-lucide="user" style="width:12px;height:12px;color:var(--text4);flex-shrink:0;margin-top:1px"></i>' +
-                '<span style="font-size:11.5px;color:var(--text3);line-height:1.4">' + turnoInfo(i) + '</span>' +
-              '</div>' +
-              '<div style="display:flex;align-items:flex-start;gap:6px">' +
-                '<i data-lucide="clock" style="width:12px;height:12px;color:var(--text4);flex-shrink:0;margin-top:1px"></i>' +
-                '<span style="font-size:11.5px;color:var(--text3);line-height:1.4">' + _fmtDateLocal(i.createdAt) + (i.note ? " · " + i.note : "") + '</span>' +
-              '</div>' +
-
-              (!isOpen && i.resolvedNote
-                ? '<div style="display:flex;align-items:flex-start;gap:6px;margin-top:3px">' +
-                    '<i data-lucide="check-circle" style="width:12px;height:12px;color:var(--success);flex-shrink:0;margin-top:1px"></i>' +
-                    '<span style="font-size:11.5px;color:var(--text3);line-height:1.4">Resolvido por <strong style="color:var(--text2)">' + (resolverName||"Admin") + '</strong>: ' + i.resolvedNote + '</span>' +
-                  '</div>'
-                : '') +
-            '</div>' +
-
+            '<i id="inc-chevron-' + i.id + '" data-lucide="chevron-down" style="width:15px;height:15px;color:var(--text4);flex-shrink:0;transition:transform .2s"></i>' +
           '</div>' +
+
+          '<div style="font-size:12.5px;color:var(--text3);margin-top:7px">' +
+            'Diferença: <strong style="color:' + diffColor + '">' + (diff > 0 ? "+" : "") + diff + ' unidade' + (Math.abs(diff)===1?"":"s") + '</strong>' +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--text4);margin-top:2px">' +
+            'Esperado: <strong style="color:var(--text2)">' + (i.expected||0) + '</strong> → Encontrado: <strong style="color:var(--text2)">' + (i.found||0) + '</strong>' +
+          '</div>' +
+
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:9px">' +
+            '<span style="font-size:11px;color:var(--text4)">' + timeLabel + '</span>' +
+            (canResolve
+              ? '<button onclick="event.stopPropagation();window._openResolveModal(' + i.id + ')" style="flex-shrink:0;display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:var(--radius-sm);border:1px solid var(--success);background:var(--success-light);color:var(--success);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">' +
+                  '<i data-lucide="check-circle" style="width:11px;height:11px"></i>Resolver</button>'
+              : (isOpen
+                  ? '<span style="flex-shrink:0;font-size:10px;color:var(--danger);font-weight:700">Pendente</span>'
+                  : '<span style="flex-shrink:0;display:flex;align-items:center;gap:3px;font-size:10px;color:var(--success);font-weight:700"><i data-lucide="check" style="width:11px;height:11px"></i>Resolvido</span>')) +
+          '</div>' +
+
+          '<div id="inc-details-' + i.id + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2)" onclick="event.stopPropagation()">' +
+            '<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:3px">' +
+              '<i data-lucide="user" style="width:12px;height:12px;color:var(--text4);flex-shrink:0;margin-top:1px"></i>' +
+              '<span style="font-size:11.5px;color:var(--text3);line-height:1.4">' + turnoInfo(i) + '</span>' +
+            '</div>' +
+            '<div style="display:flex;align-items:flex-start;gap:6px">' +
+              '<i data-lucide="clock" style="width:12px;height:12px;color:var(--text4);flex-shrink:0;margin-top:1px"></i>' +
+              '<span style="font-size:11.5px;color:var(--text3);line-height:1.4">' + _fmtDateLocal(i.createdAt) + (i.note ? " · " + i.note : "") + '</span>' +
+            '</div>' +
+            (!isOpen && i.resolvedNote
+              ? '<div style="display:flex;align-items:flex-start;gap:6px;margin-top:3px">' +
+                  '<i data-lucide="check-circle" style="width:12px;height:12px;color:var(--success);flex-shrink:0;margin-top:1px"></i>' +
+                  '<span style="font-size:11.5px;color:var(--text3);line-height:1.4">Resolvido por <strong style="color:var(--text2)">' + (resolverName||"Admin") + '</strong>: ' + i.resolvedNote + '</span>' +
+                '</div>'
+              : '') +
+          '</div>' +
+
         '</div>';
       }).join("");
   refreshIcons(el("inc-list"));
@@ -529,13 +565,11 @@ async function loadIncidentes() {
 
 window._toggleIncDetails = function(id) {
   var details = document.getElementById("inc-details-" + id);
-  var btn = document.getElementById("inc-toggle-" + id);
-  if (!details || !btn) return;
+  var chevron = document.getElementById("inc-chevron-" + id);
+  if (!details) return;
   var isOpen = details.style.display !== "none";
   details.style.display = isOpen ? "none" : "block";
-  var icon = btn.querySelector("i");
-  if (icon) icon.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
-  btn.childNodes[0].textContent = isOpen ? "Ver detalhes" : "Ocultar detalhes";
+  if (chevron) chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
 };
 
 window._clearResolvedIncidents = function() {
@@ -684,7 +718,7 @@ function openInviteDevice() {
 
     '<div class="field"><label>Código de Convite *</label><input id="inv-code" placeholder="Ex: MERC2026" style="text-transform:uppercase"/></div>' +
     '<button class="btn btn-primary btn-full" onclick="window._generateInviteQR()">' +
-    '<i data-lucide="qr-code"></i> Gerar QR</button>' +
+    '<i data-lucide="qr-code"></i> Gerar Convite</button>' +
     '<div id="inv-qr-wrap" style="display:none;flex-direction:column;align-items:center;gap:12px;padding-top:8px">' +
     '<div id="inv-qr-box" style="padding:12px;background:#fff;border-radius:14px;border:1.5px solid #e4e4e7"></div>' +
     '<div id="inv-code-display" style="font-size:13px;color:#71717a;text-align:center"></div>' +
@@ -834,6 +868,25 @@ async function loadLoja() {
     if (el2) el2.value = val;
   });
   if (s.logo) renderLogoPreview(s.logo);
+
+  var PROVINCIAS = ["Bengo","Benguela","Bié","Cabinda","Cuando Cubango","Cuanza Norte","Cuanza Sul","Cunene","Huambo","Huíla","Luanda","Lunda Norte","Lunda Sul","Malanje","Moxico","Namibe","Uíge","Zaire"];
+  var provSel = document.getElementById("ss-province");
+  var provBtn = document.getElementById("ss-province-btn");
+  var provLabel = document.getElementById("ss-province-label");
+  if (provSel && provBtn && provLabel) {
+    provLabel.textContent = provSel.value || "Seleccionar...";
+    provBtn.onclick = function() {
+      openPicker(
+        "Selecionar província",
+        PROVINCIAS,
+        provSel.value,
+        function(chosen) {
+          provSel.value = chosen;
+          provLabel.textContent = chosen;
+        }
+      );
+    };
+  }
 
   var upload = document.getElementById("logo-upload");
   if (upload) {
@@ -1254,6 +1307,14 @@ async function loadContaResumo(wrap) {
         '</div>';
     })() +
 
+    '<div class="hist-mov-card" style="margin-bottom:14px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+    '<div class="hist-chart-title" style="margin-bottom:0">Resultado líquido</div>' +
+    '<div id="conta-chart-tabs" style="display:flex;gap:4px;background:var(--bg);border-radius:8px;padding:3px"></div>' +
+    '</div>' +
+    '<div style="position:relative;height:150px"><canvas id="conta-chart-canvas"></canvas></div>' +
+    '</div>' +
+
     // ── Posição financeira ──
     '<div class="hist-mov-card">' +
     '<div class="hist-day-label--inset"><i data-lucide="landmark" style="width:13px;height:13px"></i>Posição financeira</div>' +
@@ -1355,6 +1416,19 @@ async function loadContaResumo(wrap) {
   pdfBtn.onclick = gerarRelatorioPDF;
   wrap.appendChild(pdfBtn);
 
+  // ── Gráfico: Resultado líquido, período seleccionável ──
+  var chartTabsWrap = document.getElementById("conta-chart-tabs");
+  if (chartTabsWrap) {
+    var periodos = [3, 6, 12];
+    chartTabsWrap.innerHTML = periodos.map(function(p) {
+      var active = p === _contaChartMeses;
+      return '<button onclick="window._contaSetChartPeriod(' + p + ')" style="padding:5px 10px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;background:' + (active?"#fff":"transparent") + ';color:' + (active?"var(--primary)":"var(--text3)") + ';box-shadow:' + (active?"0 1px 3px rgba(0,0,0,.08)":"none") + '">' + p + 'M</button>';
+    }).join("");
+  }
+
+  window._contaCalcMes = calcMes;
+  window._contaRenderChart(_contaChartMeses);
+
   refreshIcons(wrap);
 }
 function contaKpi(label, value, color, icon) {
@@ -1407,6 +1481,89 @@ function fmt(v) {
 
 // ── LIVRO RAZÃO ────────────────────────────────────────────────────────────────
 var _razaoContaSel = null;
+var _contaChartMeses = 6;
+var _contaChartInstance = null;
+
+window._contaSetChartPeriod = function(meses) {
+  _contaChartMeses = meses;
+  var chartTabsWrap = document.getElementById("conta-chart-tabs");
+  if (chartTabsWrap) {
+    [3,6,12].forEach(function(p) {
+      var btn = chartTabsWrap.children[[3,6,12].indexOf(p)];
+      if (!btn) return;
+      var active = p === meses;
+      btn.style.background = active ? "#fff" : "transparent";
+      btn.style.color = active ? "var(--primary)" : "var(--text3)";
+      btn.style.boxShadow = active ? "0 1px 3px rgba(0,0,0,.08)" : "none";
+    });
+  }
+  window._contaRenderChart(meses);
+};
+
+window._contaRenderChart = function(meses) {
+  if (!window._contaCalcMes) return;
+  var now = new Date();
+  var chartMonths = [];
+  var chartValues = [];
+  for (var cmi = meses-1; cmi >= 0; cmi--) {
+    var dChart = new Date(now.getFullYear(), now.getMonth()-cmi, 1);
+    var mesChart = dChart.toISOString().slice(0,7);
+    chartMonths.push(dChart.toLocaleDateString("pt-AO", { month: "short" }));
+    chartValues.push(window._contaCalcMes(mesChart).lucroLiquido);
+  }
+
+  console.log("[DEBUG grafico] meses:", chartMonths);
+  console.log("[DEBUG grafico] valores:", chartValues);
+  if (window.toast) window.toast(chartMonths.map(function(m,i){ return m+":"+Math.round(chartValues[i]/1000)+"K"; }).join(" | "), "info");
+
+  var contaChartCanvas = document.getElementById("conta-chart-canvas");
+  if (!contaChartCanvas || typeof Chart === "undefined") return;
+
+  if (_contaChartInstance) {
+    _contaChartInstance.data.labels = chartMonths;
+    _contaChartInstance.data.datasets[0].data = chartValues;
+    _contaChartInstance.update();
+    return;
+  }
+
+  var ctxConta = contaChartCanvas.getContext("2d");
+  var gradientConta = ctxConta.createLinearGradient(0, 0, 0, 140);
+  gradientConta.addColorStop(0, "rgba(124,58,237,0.28)");
+  gradientConta.addColorStop(1, "rgba(124,58,237,0)");
+
+  _contaChartInstance = new Chart(ctxConta, {
+    type: "line",
+    data: {
+      labels: chartMonths,
+      datasets: [{
+        data: chartValues,
+        borderColor: "#5b21b6",
+        backgroundColor: gradientConta,
+        borderWidth: 2.5,
+        pointBackgroundColor: "#7c3aed",
+        pointBorderColor: "#fff",
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        tension: 0.3,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500, easing: "easeOutQuart" },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: function(c) { return fmt(c.parsed.y); } } }
+      },
+      scales: {
+        y: { display: false },
+        x: { grid: { display: false }, ticks: { font: { size: 10 }, color: "#a1a1aa" } }
+      }
+    }
+  });
+};
 
 async function loadContaRazao(wrap) {
   var entries = await db.getAll("journalEntries");
@@ -1735,13 +1892,25 @@ async function loadContaDemonstracoes(wrap) {
   var ativoStr  = fmt(totalAtivo);
   var passivoStr = fmt(totalPassivoCapital);
   var maxLenBal = Math.max(ativoStr.length, passivoStr.length);
-  var valSizeBal = maxLenBal >= 16 ? "20px" : maxLenBal >= 13 ? "24px" : "28px";
+  var valSizeBal = maxLenBal >= 14 ? "15px" : maxLenBal >= 11 ? "17px" : "19px";
+
+  var badgeInlineColor = bateOK ? "var(--success)" : "var(--danger)";
 
   wrap.innerHTML =
-    '<div class="conta-hero" style="background:' + (resultado>=0?'var(--gradient-success)':'var(--gradient-danger)') + '">' +
-    '<div class="conta-hero-label">Resultado líquido do período</div>' +
-    '<div class="conta-hero-val">' + fmt(resultado) + '</div>' +
-    '<div class="conta-hero-sub">' + (resultado>=0?'▲ Lucro':'▼ Prejuízo') + '</div>' +
+    '<div class="hist-hero" style="margin-bottom:10px;background:' + (resultado>=0?'var(--gradient-success)':'var(--gradient-danger)') + '">' +
+    '<div class="hist-hero-label">Resultado líquido do período</div>' +
+    '<div class="hist-hero-val">' + fmt(resultado) + '</div>' +
+    '<div class="hist-hero-sub">' + (resultado>=0?'▲ Lucro':'▼ Prejuízo') + '</div>' +
+    '</div>' +
+
+    '<div style="margin-bottom:14px;border:1.5px solid var(--primary);background:var(--primary-light);border-radius:var(--radius-lg);padding:16px;position:relative">' +
+    '<div style="position:absolute;top:14px;right:16px;font-size:11px;font-weight:700;color:' + badgeInlineColor + '">' + (bateOK?'✓ Bate certo':'⚠ Diferença') + '</div>' +
+    '<div style="font-size:12px;font-weight:600;color:var(--primary);opacity:.85;margin-bottom:4px">' + (bateOK?'Balanço equilibrado':'Balanço desequilibrado') + '</div>' +
+    '<div style="display:flex;gap:20px;margin-top:6px">' +
+    '<div style="min-width:0"><div style="font-size:11px;color:var(--primary);opacity:.75;margin-bottom:2px">Ativo</div><div style="font-size:' + valSizeBal + ';font-weight:800;font-variant-numeric:tabular-nums;color:var(--primary);white-space:nowrap">' + ativoStr + '</div></div>' +
+    '<div style="min-width:0"><div style="font-size:11px;color:var(--primary);opacity:.75;margin-bottom:2px">Passivo+Capital</div><div style="font-size:' + valSizeBal + ';font-weight:800;font-variant-numeric:tabular-nums;color:var(--primary);white-space:nowrap">' + passivoStr + '</div></div>' +
+    '</div>' +
+    (bateOK?'':'<div style="font-size:12px;color:var(--danger);margin-top:8px">Diferença: '+fmt(diff)+'</div>') +
     '</div>' +
 
     '<div class="conta-card" style="margin-bottom:14px">' +
@@ -1759,16 +1928,6 @@ async function loadContaDemonstracoes(wrap) {
 
     '<div class="hist-day-label--inset"><i data-lucide="landmark" style="width:13px;height:13px"></i>Balanço — Passivo + Capital</div>' +
     passivoRows +
-    '</div>' +
-
-    '<div class="hist-hero" style="margin-top:16px;background:linear-gradient(135deg, var(--primary), var(--primary-mid))">' +
-    balancoStatusBadge +
-    '<div class="hist-hero-label">' + (bateOK?'Balanço equilibrado':'Balanço desequilibrado') + '</div>' +
-    '<div style="display:flex;gap:20px;margin-top:6px">' +
-    '<div><div style="font-size:11px;opacity:.75;margin-bottom:2px">Ativo</div><div style="font-size:' + valSizeBal + ';font-weight:800;font-variant-numeric:tabular-nums">' + ativoStr + '</div></div>' +
-    '<div><div style="font-size:11px;opacity:.75;margin-bottom:2px">Passivo+Capital</div><div style="font-size:' + valSizeBal + ';font-weight:800;font-variant-numeric:tabular-nums">' + passivoStr + '</div></div>' +
-    '</div>' +
-    (bateOK?'':'<div class="hist-hero-sub" style="margin-top:8px">Diferença: '+fmt(diff)+'</div>') +
     '</div>';
   refreshIcons();
 }

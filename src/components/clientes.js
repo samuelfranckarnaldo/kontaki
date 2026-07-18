@@ -532,11 +532,11 @@ async function renderFiadosList(showSkeleton) {
   const uniqueClients = [...new Set(open.map(f => f.clientName))].length;
 
   el("fiados-total-bar").innerHTML =
-    `<div class="ct-inline-summary">
-      <span class="ct-inline-val">${fmt(total)}</span>
-      <span class="ct-inline-label">em aberto</span>
-      <span>·</span>
-      <span>${uniqueClients} ${uniqueClients===1?"cliente":"clientes"}</span>
+    `<div class="ct-inline-summary-card">
+      <div class="ct-inline-summary">
+        <span class="ct-inline-val">${fmt(total)}</span>
+        <span class="ct-inline-label">em aberto · ${uniqueClients} ${uniqueClients===1?"cliente":"clientes"}</span>
+      </div>
     </div>`;
 
   const q = (search ? search.value : "").toLowerCase();
@@ -559,13 +559,14 @@ async function renderFiadosList(showSkeleton) {
 
   const listEl = el("fiados-list");
   listEl.innerHTML = "";
+  listEl.className = groups.length ? "list-card" : "";
 
   if (!groups.length) {
     listEl.innerHTML =
       `<div class="empty-state">
         <i data-lucide="wallet"></i>
-        <div class="empty-state-title">Nenhum fiado</div>
-        <div class="empty-state-sub">Os fiados registados aparecem aqui.</div>
+        <div class="empty-state-title">Nenhum crédito</div>
+        <div class="empty-state-sub">Os créditos registados aparecem aqui.</div>
       </div>`;
     refreshIcons(listEl);
     return;
@@ -581,32 +582,32 @@ async function renderFiadosList(showSkeleton) {
     const maxDays = overdueEntries.reduce((m,e) => Math.max(m, daysOverdue(e)), 0);
     const matchClient = clients.find(c => (c.name||"").toLowerCase() === g.clientName.toLowerCase());
 
-    let avatarStyle, borderColor;
-    if (isSaldado) { avatarStyle = "background:var(--success-light);color:var(--success)"; borderColor = "transparent"; }
-    else if (groupOverdue) { avatarStyle = "background:var(--danger-muted-light);color:var(--danger-muted)"; borderColor = "var(--danger-muted)"; }
-    else { avatarStyle = "background:#fef3c7;color:var(--warning)"; borderColor = "var(--warning)"; }
+    const ac = avatarColor(g.clientName);
+    const avatarBg    = isSaldado ? "var(--success-light)" : groupOverdue ? "var(--danger-muted-light)" : ac.bg;
+    const avatarColor2 = isSaldado ? "var(--success)" : groupOverdue ? "var(--danger-muted)" : ac.color;
+    const metaText = isSaldado ? "Saldado" : groupOverdue ? `Atrasado há ${maxDays} ${maxDays===1?"dia":"dias"}` : "Em aberto";
 
     const row = document.createElement("div");
-    row.className = "fc-row-card";
-    row.style.borderLeft = "3px solid " + borderColor;
+    row.className = "ct-devedor-row";
+    row.style.borderLeft = "3px solid " + avatarColor2;
     row.onclick = () => {
       if (matchClient) window._openClienteProfile(matchClient.id);
       else if (firstOpen) window._openPayModal(firstOpen.id);
     };
 
     row.innerHTML =
-      `<div class="fc-row-avatar" style="${avatarStyle}">${g.clientName.charAt(0).toUpperCase()}</div>
+      `<div class="fc-row-avatar" style="background:${avatarBg};color:${avatarColor2}">${g.clientName.charAt(0).toUpperCase()}</div>
        <div class="fc-row-info">
-         <div class="fc-row-name">${g.clientName}${!matchClient ? ' <span class="ct-nocliente-tag">sem ficha</span>' : ""}</div>
-         <div class="fc-row-meta">${g.entries.length} ${g.entries.length===1?"entrada":"entradas"}${groupOverdue ? " · atrasado há " + maxDays + "d" : ""}</div>
+         <div class="fc-row-name" style="white-space:normal;overflow:visible;text-overflow:clip">${g.clientName}${!matchClient ? ' <span class="ct-nocliente-tag">sem ficha</span>' : ""}</div>
+         <div class="fc-row-meta">${g.entries.length} ${g.entries.length===1?"entrada":"entradas"} · ${metaText}</div>
        </div>
        <div class="fc-row-right">
          ${isSaldado
-           ? `<div class="fc-row-saldo"><i data-lucide="check-circle" style="width:13px;height:13px"></i> Saldado</div>`
-           : `<div class="fc-row-val ${groupOverdue?"overdue":""}">${fmt(g.totalOpen)}</div>
+           ? `<i data-lucide="chevron-right" class="hist-export-arrow"></i>`
+           : `<span class="fc-row-val ${groupOverdue?"overdue":""}${sizeMod("fc-row-val", fmt(g.totalOpen))}">${fmt(g.totalOpen)}</span>
               ${openCount === 1
-                ? `<div class="fc-row-action" onclick="event.stopPropagation();window._openPayModal(${firstOpen.id})">Receber →</div>`
-                : `<div class="fc-row-action">${openCount} por pagar →</div>`
+                ? `<button class="fc-row-icon-btn" onclick="event.stopPropagation();window._openPayModal(${firstOpen.id})"><i data-lucide="check"></i></button>`
+                : `<i data-lucide="chevron-right" class="hist-export-arrow"></i>`
               }`
          }
        </div>`;
@@ -663,15 +664,13 @@ function renderFiadosPanel(myFiados, clientName) {
   }
 
   const sortedSliced = sorted.slice(0,30);
-  const rows = sortedSliced.map((f, idx) => {
+  const rows = sortedSliced.map((f) => {
     const cancelled = f.status === "cancelled";
     const paid = f.status === "paid";
     const overdue = !paid && !cancelled && isOverdue(f);
-    const statusAttr = paid ? "paid" : cancelled ? "cancelled" : overdue ? "overdue" : "open";
-    const amountColor = paid ? "var(--success)" : cancelled ? "var(--text4)" : overdue ? "var(--danger-muted)" : "var(--warning-muted)";
+    const amountColor = paid ? "var(--success)" : cancelled ? "var(--text4)" : overdue ? "var(--danger-muted)" : "var(--warning)";
     const title = paid ? "Pagamento recebido" : cancelled ? "Crédito anulado" : "Crédito";
     const days = overdue ? daysOverdue(f) : 0;
-    const isLast = idx === sortedSliced.length - 1;
 
     const metaParts = [fmtDate(f.date)];
     if (f.notes) metaParts.push(f.notes);
@@ -679,34 +678,33 @@ function renderFiadosPanel(myFiados, clientName) {
     if (cancelled && f.cancelReason) metaParts.push("Motivo: " + f.cancelReason);
 
     const entryIcon = paid ? "check-circle" : cancelled ? "ban" : overdue ? "alert-triangle" : "hand-coins";
-    const entryIconBg = paid ? "var(--success-light)" : cancelled ? "var(--border2)" : overdue ? "var(--danger-muted-light)" : "#fef3c7";
+    const entryIconBg = paid ? "var(--success-light)" : cancelled ? "var(--border2)" : overdue ? "var(--danger-muted-light)" : "var(--warning-light)";
     const entryIconColor = paid ? "var(--success)" : cancelled ? "var(--text4)" : overdue ? "var(--danger-muted)" : "var(--warning)";
+    const borderColor = paid ? "var(--success)" : cancelled ? "var(--border2)" : overdue ? "var(--danger-muted)" : "var(--warning)";
 
-    return `<div class="ct-timeline-item" data-status="${statusAttr}" style="${isLast?"padding-bottom:0;":""}${cancelled?"opacity:.6;":""}">
-      <div class="ct-timeline-marker" style="background:${entryIconBg};color:${entryIconColor}">
-        <i data-lucide="${entryIcon}" style="width:16px;height:16px"></i>
+    return `<div class="fc-credit-card${cancelled?" fc-credit-card--cancelled":""}" style="border-left:3px solid ${borderColor}">
+      <div class="fc-credit-avatar" style="background:${entryIconBg};color:${entryIconColor}">
+        <i data-lucide="${entryIcon}"></i>
       </div>
-      <div class="ct-timeline-content">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-          <div class="fiado-entry-title-wrap">
-            <span class="fiado-entry-title">${title}</span>
-            ${overdue ? `<span class="fiado-overdue-chip">Atrasado há ${days} ${days===1?"dia":"dias"}</span>` : ""}
-          </div>
-          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-            <span class="fiado-entry-amount${sizeMod("fiado-entry-amount", fmt(f.amount))}" style="color:${amountColor};${cancelled?"text-decoration:line-through":""}">${fmt(f.amount)}</span>
-            ${f.status === "open" ? `
-              <button class="fiado-kebab-btn-sm" onclick="window._openFiadoActions(${f.id})">
-                <i data-lucide="more-vertical" style="width:15px;height:15px"></i>
-              </button>` : ""
-            }
-          </div>
+      <div class="fc-credit-info">
+        <div class="fiado-entry-title-wrap">
+          <span class="fiado-entry-title">${title}</span>
+          ${overdue ? `<span class="fiado-overdue-chip">Atrasado há ${days} ${days===1?"dia":"dias"}</span>` : ""}
         </div>
-        <div class="fiado-entry-meta">${metaParts.join(" · ")}</div>
+        <div class="fc-credit-meta">${metaParts.join(" · ")}</div>
+      </div>
+      <div class="fc-credit-right">
+        <span class="fiado-entry-amount${sizeMod("fiado-entry-amount", fmt(f.amount))}" style="color:${amountColor};${cancelled?"text-decoration:line-through":""}">${fmt(f.amount)}</span>
+        ${f.status === "open" ? `
+          <button class="fiado-kebab-btn-sm" onclick="window._openFiadoActions(${f.id})">
+            <i data-lucide="more-vertical" style="width:15px;height:15px"></i>
+          </button>` : ""
+        }
       </div>
     </div>`;
   }).join("");
 
-  return actions + `<div class="ct-timeline">${rows}</div>`;
+  return actions + `<div class="fc-credit-list">${rows}</div>`;
 }
 
 window._openFiadoActions = (id) => {
@@ -716,6 +714,7 @@ window._openFiadoActions = (id) => {
         <div class="hist-export-icon" style="background:var(--success-light);color:var(--success)"><i data-lucide="check"></i></div>
         <div class="hist-export-info">
           <div class="hist-export-title">Receber</div>
+          <div class="hist-export-desc">Regista o pagamento deste crédito</div>
         </div>
         <i data-lucide="chevron-right" class="hist-export-arrow"></i>
       </button>
@@ -723,6 +722,7 @@ window._openFiadoActions = (id) => {
         <div class="hist-export-icon hist-export-icon--edit"><i data-lucide="pencil"></i></div>
         <div class="hist-export-info">
           <div class="hist-export-title">Editar crédito</div>
+          <div class="hist-export-desc">Altera valor, data de vencimento ou notas</div>
         </div>
         <i data-lucide="chevron-right" class="hist-export-arrow"></i>
       </button>
@@ -730,6 +730,7 @@ window._openFiadoActions = (id) => {
         <div class="hist-export-icon hist-export-icon--cancel"><i data-lucide="ban"></i></div>
         <div class="hist-export-info">
           <div class="hist-export-title">Anular crédito</div>
+          <div class="hist-export-desc">Cancela este registo sem cobrar o valor</div>
         </div>
         <i data-lucide="chevron-right" class="hist-export-arrow"></i>
       </button>
@@ -768,6 +769,8 @@ window._openClienteProfile = async (id) => {
   const openFiados = myFiados.filter(f => f.status === "open");
   const totalGasto  = mySales.reduce((a,s) => a + ((s.total||0) - (s.totalDevolvido||0)), 0);
   const fiadoAberto = openFiados.reduce((a,f) => a + (f.amount||0), 0);
+  const ticketMedio = mySales.length ? totalGasto / mySales.length : 0;
+  const ultimaCompra = mySales.length ? fmtDate(mySales[0].date) : "—";
   const paidFiados = myFiados.filter(f => f.status === "paid");
   const trackedPaidFiados = paidFiados.filter(f => typeof f.paidLate === "boolean");
   const onTimeCount = trackedPaidFiados.filter(f => !f.paidLate).length;
@@ -786,36 +789,58 @@ window._openClienteProfile = async (id) => {
       <button class="ct-profile-back" onclick="window._closeClienteProfile()">
         <i data-lucide="arrow-left"></i>
       </button>
-      <div class="ct-profile-header-title">${c.name}</div>
+      <div class="ct-profile-header-title">Ficha do cliente</div>
       <button class="ct-profile-back" onclick="window._openClienteForm(${JSON.stringify(c).replace(/"/g,"&quot;")})">
         <i data-lucide="edit-3"></i>
       </button>
     </div>
     <div class="ct-profile-body">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow-sm)">
-        <div style="width:51px;height:51px;border-radius:15px;background:var(--primary-light);color:var(--primary);
-          font-size:20px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:18px 16px;box-shadow:var(--shadow-sm)">
+        <div style="width:58px;height:58px;border-radius:17px;background:linear-gradient(135deg, var(--primary), var(--primary-mid));color:#fff;
+          font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px rgba(91,33,182,.25)">
           ${c.name.charAt(0).toUpperCase()}
         </div>
-        <div>
-          <div style="font-size:19px;font-weight:700">${c.name}</div>
-          ${c.phone ? `<div style="font-size:13px;color:var(--text3);margin-top:2px">${formatPhone(c.phone)}</div>` : ""}
-          ${c.address ? `<div style="font-size:12px;color:var(--text3)">${c.address}</div>` : ""}
-          ${c.createdAt ? `<div style="font-size:11px;color:var(--text4);margin-top:2px">Cliente desde ${formatMonthYear(c.createdAt)}</div>` : ""}
-          ${trackedPaidFiados.length > 0 ? `<div style="font-size:11px;color:var(--text4);margin-top:2px">${onTimeCount} de ${trackedPaidFiados.length} pagamentos no prazo</div>` : ""}
+        <div style="min-width:0;flex:1">
+          <div style="font-size:19px;font-weight:800;letter-spacing:-.2px">${c.name}</div>
+          <div style="display:flex;flex-direction:column;gap:3px;margin-top:5px">
+            ${c.phone ? `<div style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text3)"><i data-lucide="phone" style="width:12px;height:12px;flex-shrink:0"></i>${formatPhone(c.phone)}</div>` : ""}
+            ${c.address ? `<div style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text3)"><i data-lucide="map-pin" style="width:12px;height:12px;flex-shrink:0"></i>${c.address}</div>` : ""}
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:7px">
+            ${c.createdAt ? `<span style="font-size:10.5px;color:var(--text4);background:var(--border2);padding:2px 8px;border-radius:20px;font-weight:600">Cliente desde ${formatMonthYear(c.createdAt)}</span>` : ""}
+            ${trackedPaidFiados.length > 0 ? `<span style="font-size:10.5px;color:var(--text4);background:var(--border2);padding:2px 8px;border-radius:20px;font-weight:600">${onTimeCount} de ${trackedPaidFiados.length} pagamentos no prazo</span>` : ""}
+          </div>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         ${_statCard({ label:"Compras", value:mySales.length, sub:"total", color:"var(--text)", icon:"shopping-bag" })}
         ${_statCard({ label:"Total gasto", value:fmtStatVal(totalGasto), sub:"todas as compras", color:"var(--success)", icon:"wallet" })}
-        ${_statCard({ label:"Fiado", value:fmtStatVal(fiadoAberto), sub:fiadoAberto>0?"em aberto":"nada em aberto", color:fiadoAberto>0?"var(--warning)":"var(--success)", icon:"hand-coins" })}
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--radius-lg);margin-bottom:8px;
+        background:${fiadoAberto>0?"color-mix(in srgb, var(--warning) 10%, var(--bg2))":"var(--bg2)"};
+        border:1px solid ${fiadoAberto>0?"var(--warning)":"var(--border2)"}">
+        <div style="width:38px;height:38px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+          background:${fiadoAberto>0?"var(--warning)":"var(--success)"}20;color:${fiadoAberto>0?"var(--warning)":"var(--success)"}">
+          <i data-lucide="hand-coins" style="width:18px;height:18px"></i>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Crédito</div>
+          <div style="font-size:19px;font-weight:800;color:${fiadoAberto>0?"var(--warning)":"var(--success)"};margin-top:1px">${fmtStatVal(fiadoAberto)}</div>
+        </div>
+        <div style="font-size:11.5px;font-weight:600;color:var(--text3);text-align:right;flex-shrink:0">${fiadoAberto>0?"em aberto":"nada em aberto"}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        ${_statCard({ label:"Ticket médio", value:fmtStatVal(ticketMedio), sub:"por compra", color:"var(--text)", icon:"receipt" })}
+        ${_statCard({ label:"Última compra", value:ultimaCompra, sub:mySales.length?"":"sem compras", color:"var(--text)", icon:"calendar" })}
       </div>
 
       <div class="fc-tabbar">
         <button class="fc-tab${activeTab==="compras"?" active":""}" data-tab="compras" onclick="window._switchProfileTab('compras')">Compras</button>
         <button class="fc-tab${activeTab==="fiados"?" active":""}" data-tab="fiados" onclick="window._switchProfileTab('fiados')">
-          Fiados${fiadoAberto > 0 ? `<span class="fc-tab-dot"></span>` : ""}
+          Créditos${fiadoAberto > 0 ? `<span class="fc-tab-dot"></span>` : ""}
         </button>
       </div>
 

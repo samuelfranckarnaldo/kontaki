@@ -31,6 +31,8 @@ window._toggleDarkMode = function() {
 };
 
 // ── ALERTAS DE STOCK MÍNIMO ───────────────────────────────────────────────────
+function badgeCount(n) { return n > 9 ? "+9" : String(n); }
+
 export async function checkBadges() {
   try {
     var fiados = await db.getAll("fiado");
@@ -39,7 +41,7 @@ export async function checkBadges() {
     var fb = document.getElementById("fiados-badge");
     if (fb) {
       if (aberto > 0) {
-        fb.textContent = aberto;
+        fb.textContent = badgeCount(aberto);
         fb.style.display = "flex";
         fb.style.background = "#ef4444";
         fb.style.animation = "pulse 1.5s infinite";
@@ -57,6 +59,18 @@ export async function checkBadges() {
       }
     }
     
+    var incidents = await db.getAll("incidents");
+    var incAbertos = incidents.filter(function(i){ return i.status==="open" && !i.archived; }).length;
+    var ib = document.getElementById("inc-count-badge");
+    if (ib) {
+      if (incAbertos > 0) {
+        ib.textContent = badgeCount(incAbertos);
+        ib.style.display = "flex";
+      } else {
+        ib.style.display = "none";
+      }
+    }
+
   } catch(e) {}
 }
 

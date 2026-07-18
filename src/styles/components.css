@@ -2872,11 +2872,18 @@
 .fc-row-info { flex: 1; min-width: 0; }
 .fc-row-name { font-size: 14px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fc-row-meta { font-size: 11px; color: var(--text4); margin-top: 2px; }
-.fc-row-right { text-align: right; flex-shrink: 0; }
-.fc-row-val { font-size: 14px; font-weight: 800; color: var(--warning-muted); }
+.fc-row-right { text-align: right; flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
+.fc-row-val { font-size: 14px; font-weight: 800; color: var(--text2); }
 .fc-row-val.overdue { color: var(--danger-muted); }
 .fc-row-sub { font-size: 10px; color: var(--text4); margin-top: 1px; }
-.fc-row-action { font-size: 11px; font-weight: 700; color: var(--success); margin-top: 3px; }
+.fc-row-icon-btn {
+  width: 32px; height: 32px; border-radius: 50%; border: none; flex-shrink: 0;
+  background: var(--success); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(22,163,74,.25); cursor: pointer; transition: transform .12s;
+}
+.fc-row-icon-btn i, .fc-row-icon-btn svg { width: 15px; height: 15px; }
+.fc-row-icon-btn:active { transform: scale(.9); }
 .fc-row-saldo { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--success); }
 
 .fiados-modal-tip {
@@ -3009,12 +3016,13 @@
 .ct-devedor-row:last-child { border-bottom: none; }
 .ct-devedor-row:active { background: var(--border2); }
 
-.ct-inline-summary {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  font-size: 12px; color: var(--text3); font-weight: 600;
+.ct-inline-summary-card {
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius-lg);
+  padding: 16px; margin-bottom: 4px;
 }
-.ct-inline-val { font-size: 18px; font-weight: 800; color: var(--text); }
-.ct-inline-label { color: var(--text3); }
+.ct-inline-summary { display: flex; flex-direction: column; gap: 3px; }
+.ct-inline-val { font-size: 24px; font-weight: 800; color: var(--text); letter-spacing: -.3px; }
+.ct-inline-label { font-size: 12px; color: var(--text3); font-weight: 600; }
 
 .ct-nocliente-tag {
   font-size: 9px; font-weight: 700; color: var(--text4);
@@ -3028,7 +3036,7 @@
 }
 .ct-profile-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 16px; background: linear-gradient(135deg, var(--primary) 0%, #4c1d95 100%);
+  padding: 16px 16px; background: linear-gradient(135deg, #5b21b6, #7c3aed);
   flex-shrink: 0;
 }
 .ct-profile-header-title { font-size: 16px; font-weight: 700; color: #fff; flex: 1; text-align: center; }
@@ -3239,14 +3247,13 @@
 .ct-fiado-actions-row { display: flex; gap: 8px; margin-bottom: 16px; }
 .ct-action-btn {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 10px 12px; border-radius: 10px; font-size: 12px; font-weight: 700;
+  padding: 12px; border-radius: 12px; font-size: 12.5px; font-weight: 700;
   font-family: var(--font); cursor: pointer; transition: all .15s;
-  box-shadow: none;
 }
 .ct-action-btn i, .ct-action-btn svg { width: 14px; height: 14px; }
-.ct-action-btn-primary { background: var(--success); color: #fff; border: none; }
-.ct-action-btn-primary:active { transform: scale(.97); }
-.ct-action-btn-secondary { background: var(--bg); color: var(--text2); border: 1px solid var(--border2); }
+.ct-action-btn-primary { background: var(--primary); color: #fff; border: none; box-shadow: 0 4px 12px rgba(91,33,182,.25); }
+.ct-action-btn-primary:active { transform: scale(.97); box-shadow: none; }
+.ct-action-btn-secondary { background: var(--bg2); color: var(--text2); border: 1.5px solid var(--border2); }
 .ct-action-btn-secondary:active { background: var(--border2); }
 
 
@@ -3268,27 +3275,24 @@
 #clientes-list .fc-row { padding-left: 13px; }
 
 
-/* Timeline narrativa — Fiados/Pagamentos na ficha do cliente */
-.ct-timeline {
-  position: relative;
-  background: var(--bg2); border: 1px solid var(--border2);
-  border-radius: var(--radius-lg); padding: 16px;
-  box-shadow: var(--shadow-sm);
+/* Cards de crédito — ficha do cliente (consistente com .cp-sale-card de Compras) */
+.fc-credit-list { display: flex; flex-direction: column; gap: 8px; }
+.fc-credit-card {
+  background: var(--bg2); box-shadow: var(--shadow-sm);
+  border-radius: var(--radius); padding: 14px;
+  display: flex; align-items: flex-start; gap: 12px;
+  transition: var(--transition);
 }
-.ct-timeline::before {
-  content: ""; position: absolute; left: 33px; top: 34px; bottom: 34px;
-  width: 2px; background: var(--border2); z-index: 0;
-}
-.ct-timeline-item {
-  display: flex; gap: 14px; align-items: flex-start;
-  position: relative; z-index: 1; padding-bottom: 20px;
-}
-.ct-timeline-marker {
-  width: 36px; height: 36px; border-radius: 50%;
+.fc-credit-card--cancelled { opacity: .6; }
+.fc-credit-avatar {
+  width: 40px; height: 40px; border-radius: var(--radius-sm);
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; position: relative; z-index: 1;
+  flex-shrink: 0;
 }
-.ct-timeline-content { flex: 1; min-width: 0; }
+.fc-credit-avatar i, .fc-credit-avatar svg { width: 18px; height: 18px; }
+.fc-credit-info { flex: 1; min-width: 0; }
+.fc-credit-meta { font-size: 11.5px; color: var(--text3); margin-top: 4px; line-height: 1.5; }
+.fc-credit-right { text-align: right; flex-shrink: 0; display: flex; align-items: flex-start; gap: 2px; }
 
 
 /* ── PERFIL GRID (substitui lista de itens) ──────────────────────────────── */
