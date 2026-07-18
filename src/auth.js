@@ -55,25 +55,22 @@ function renderPinCard() {
   if (!container) return;
 
   container.innerHTML = [
-    '<div style="background:#fafafa;border:1.5px solid #f0f0f2;border-radius:20px;padding:16px 14px 18px;max-width:264px;width:100%;box-sizing:border-box;margin:0 auto;display:flex;flex-direction:column;align-items:center">',
+    '<div id="login-pin-user" style="display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #ede9fe;border-radius:14px;padding:10px 14px;margin-bottom:12px;width:100%;box-sizing:border-box;max-width:320px"></div>',
 
-      '<div id="login-pin-user" style="display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #ede9fe;border-radius:14px;padding:10px 12px;margin-bottom:14px;width:100%;box-sizing:border-box"></div>',
+    '<div style="font-size:12.5px;font-weight:600;color:#71717a;text-align:center;margin-bottom:12px" id="login-pin-label">Introduz o teu PIN</div>',
 
-      '<div style="font-size:12.5px;font-weight:600;color:#71717a;text-align:center;margin-bottom:14px" id="login-pin-label">Introduz o teu PIN</div>',
+    '<div id="pin-dots" style="display:flex;gap:9px;justify-content:center;margin-bottom:12px"></div>',
 
-      '<div id="pin-dots" style="display:flex;gap:8px;justify-content:center;margin-bottom:16px"></div>',
+    '<div id="login-err" class="login-err" style="text-align:center;margin-bottom:4px">',
+      '<span id="login-err-msg">PIN incorrecto</span>',
+    '</div>',
 
-      '<div id="login-err" class="login-err" style="text-align:center">',
-        '<span id="login-err-msg">PIN incorrecto</span>',
-      '</div>',
-
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:228px;margin:0 auto">',
-        [1,2,3,4,5,6,7,8,9,'back','0','del'].map(function(n) {
-          if (n === 'back') return '<button onclick="window._backToRole()" class="login-pin-btn login-pin-btn-ghost" style="width:60px;height:60px;border-radius:50%;background:transparent;border:none;cursor:pointer;color:#a1a1aa;margin:0 auto;display:flex;align-items:center;justify-content:center"><i data-lucide="arrow-left" style="width:19px;height:19px"></i></button>';
-          if (n === 'del')  return '<button onclick="window._pinKey(String.fromCharCode(9003))" class="login-pin-btn login-pin-btn-ghost" style="width:60px;height:60px;border-radius:50%;background:transparent;border:none;cursor:pointer;color:#71717a;margin:0 auto;display:flex;align-items:center;justify-content:center"><i data-lucide="delete" style="width:19px;height:19px"></i></button>';
-          return '<button onclick="window._pinKey(\'' + n + '\')" class="login-pin-btn" style="width:60px;height:60px;border-radius:50%;background:#fff;border:1.5px solid #e4e4e7;font-size:19px;font-weight:500;cursor:pointer;font-family:inherit;color:#18181b;margin:0 auto;display:flex;align-items:center;justify-content:center">' + n + '</button>';
-        }).join(''),
-      '</div>',
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:220px;margin:0 auto">',
+      [1,2,3,4,5,6,7,8,9,'back','0','del'].map(function(n) {
+        if (n === 'back') return '<button onclick="window._backToRole()" class="login-pin-btn login-pin-btn-ghost"><i data-lucide="arrow-left"></i></button>';
+        if (n === 'del') return '<button onclick="window._pinKey(String.fromCharCode(9003))" class="login-pin-btn login-pin-btn-ghost"><i data-lucide="delete"></i></button>';
+        return '<button onclick="window._pinKey(\'' + n + '\')" class="login-pin-btn">' + n + '</button>';
+      }).join(''),
     '</div>',
 
     '<button id="btn-forgot-pw" class="login-forgot-btn">Esqueci o PIN</button>',
@@ -183,31 +180,50 @@ async function _selectUserHandler(userId) {
   const stepPin  = document.getElementById("login-step-pin");
 
   if (stepRole) stepRole.style.display = "none";
+
   if (stepPin) {
     stepPin.style.display = "flex";
     stepPin.classList.add("active");
   }
 
+  const loginPageEl = document.getElementById("login-page");
+  if (loginPageEl) loginPageEl.classList.add("pin-active");
+
   const pinUserEl = document.getElementById("login-pin-user");
+
   if (pinUserEl) {
     pinUserEl.innerHTML =
-      '<div style="width:36px;height:36px;background:#5b21b6;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;flex-shrink:0">' +
+      '<div style="width:42px;height:42px;background:#5b21b6;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:#fff;flex-shrink:0">' +
       (_selectedUser.avatar || _selectedUser.name.charAt(0).toUpperCase()) +
       '</div>' +
-      '<div style="font-size:14px;font-weight:600;color:#18181b">' + _selectedUser.name + '</div>';
+      '<div style="font-size:15px;font-weight:600;color:#18181b">' +
+      _selectedUser.name +
+      '</div>';
   }
 
   const errEl = document.getElementById("login-err");
-  if (errEl) errEl.classList.remove("show");
 
-  const attempts = await _getLoginAttempts(_selectedUser.id);
-  if (attempts.lockedUntil && attempts.lockedUntil > Date.now()) {
-    const errMsg = document.getElementById("login-err-msg");
-    if (errMsg) errMsg.textContent = _formatLockMessage(attempts.lockedUntil);
-    if (errEl) errEl.classList.add("show");
+  if (errEl) {
+    errEl.classList.remove("show");
   }
 
-  if (window.lucide) window.lucide.createIcons();
+  const attempts = await _getLoginAttempts(_selectedUser.id);
+
+  if (attempts.lockedUntil && attempts.lockedUntil > Date.now()) {
+    const errMsg = document.getElementById("login-err-msg");
+
+    if (errMsg) {
+      errMsg.textContent = _formatLockMessage(attempts.lockedUntil);
+    }
+
+    if (errEl) {
+      errEl.classList.add("show");
+    }
+  }
+
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
 }
 
 function _updatePinDots() {
@@ -215,7 +231,7 @@ function _updatePinDots() {
   if (!dotsEl) return;
   dotsEl.innerHTML = [0,1,2,3,4,5].map(function(i) {
     var filled = i < _pinBuffer.length;
-    return '<div class="' + (filled ? 'login-pin-dot-filled' : '') + '" style="width:38px;height:38px;border-radius:50%;border:2px solid ' +
+    return '<div class="' + (filled ? 'login-pin-dot-filled' : '') + '" style="width:28px;height:28px;border-radius:50%;border:2px solid ' +
       (filled ? '#5b21b6' : '#e4e4e7') + ';background:' + (filled ? '#5b21b6' : '#fafafa') +
       ';display:flex;align-items:center;justify-content:center;transition:background .15s ease,border-color .15s ease;flex-shrink:0;' +
       (filled ? 'transform:scale(1.06)' : '') +
@@ -247,10 +263,19 @@ window._backToRole = function() {
   const stepRole = document.getElementById("login-step-role");
   const stepPin  = document.getElementById("login-step-pin");
 
-  if (stepRole) stepRole.style.display = "flex";
+  if (stepRole) {
+    stepRole.style.display = "flex";
+  }
+
   if (stepPin) {
     stepPin.style.display = "none";
     stepPin.classList.remove("active");
+  }
+
+  const loginPageEl = document.getElementById("login-page");
+
+  if (loginPageEl) {
+    loginPageEl.classList.remove("pin-active");
   }
 
   _updatePinDots();
@@ -417,7 +442,8 @@ function showRecoveryScreen(targetUser) {
       '</div>',
       '<div style="font-size:18px;font-weight:800;color:#18181b;margin-bottom:8px">Recuperar PIN</div>',
       '<div style="font-size:13px;color:#71717a;margin-bottom:20px;line-height:1.5">Introduz um dos teus códigos de recuperação de 8 caracteres.</div>',
-      '<input id="recovery-code-input" type="text" placeholder="XXXX-XXXX" maxlength="9" autocapitalize="characters" autocomplete="off" style="width:100%;padding:14px;border:1.5px solid #e4e4e7;border-radius:12px;font-size:18px;font-family:monospace;text-align:center;letter-spacing:2px;box-sizing:border-box;margin-bottom:16px;text-transform:uppercase"/>',
+      '<input id="recovery-code-input" type="text" placeholder="XXXX-XXXX" maxlength="9" inputmode="text" autocapitalize="characters" autocomplete="off" style="width:100%;padding:14px;border:1.5px solid #e4e4e7;border-radius:12px;font-size:18px;font-family:monospace;text-align:center;letter-spacing:2px;box-sizing:border-box;margin-bottom:16px;text-transform:uppercase"/>',
+      '<div style="font-size:12px;color:#a1a1aa;line-height:1.5;margin-bottom:16px">São 10 códigos únicos, gerados na altura da configuração inicial — se não os apontaste nem tens acesso a eles offline, contacta a <strong>Introxeer</strong> pelo <a href="https://wa.me/244900000000" target="_blank" style="color:#5b21b6;font-weight:700;text-decoration:none">WhatsApp</a>.</div>',
       '<div id="recovery-redeem-error" style="display:none;margin-bottom:14px;padding:10px;background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;color:#dc2626;font-size:12px;font-weight:600"></div>',
       '<button id="recovery-redeem-submit" style="width:100%;padding:14px;background:#5b21b6;color:#fff;border:none;border-radius:13px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit">Verificar código</button>',
     '</div>',
@@ -428,10 +454,16 @@ function showRecoveryScreen(targetUser) {
 
   document.getElementById("recovery-redeem-back").onclick = function() { ov.remove(); };
 
+  var recInput = document.getElementById("recovery-code-input");
+  recInput.addEventListener("input", function() {
+    var raw = recInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+    recInput.value = raw.length > 4 ? raw.slice(0,4) + "-" + raw.slice(4) : raw;
+  });
+
   document.getElementById("recovery-redeem-submit").onclick = async function() {
     var input = document.getElementById("recovery-code-input");
     var errEl = document.getElementById("recovery-redeem-error");
-    var code = input.value.trim();
+    var code = input.value.trim().replace(/-/g, "");
     errEl.style.display = "none";
 
     if (!code) return;
