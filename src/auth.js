@@ -586,6 +586,21 @@ export async function changePasswordAuth(currentPassword, newPassword) {
   await _clearLoginAttempts(currentUser.id).catch(() => {});
 }
 
+export async function resetUserPin(targetUserId, newPin, adminPin) {
+  if (!currentUser || currentUser.role !== "admin") {
+    throw new Error("Apenas administradores podem repor o PIN de outro utilizador.");
+  }
+  const validAdmin = await verifyPassword(adminPin, currentUser.passwordHash);
+  if (!validAdmin) throw new Error("PIN de administrador incorrecto.");
+  if (!/^\d{6}$/.test(newPin)) throw new Error("O novo PIN deve ter exactamente 6 dígitos.");
+  const target = await db.get("users", targetUserId);
+  if (!target) throw new Error("Utilizador não encontrado.");
+  if (target.id === currentUser.id) throw new Error("Usa 'Alterar Senha' para o teu próprio PIN.");
+  const newHash = await hashPassword(newPin);
+  await db.put("users", { ...target, passwordHash: newHash });
+  await _clearLoginAttempts(targetUserId).catch(() => {});
+}
+
 export async function createUser(name, username, password, role) {
   if (!currentUser || currentUser.role !== "admin") {
     throw new Error("Apenas administradores podem criar usuários");
@@ -596,6 +611,14 @@ export async function createUser(name, username, password, role) {
     throw new Error("Nome de usuário já existe");
   }
 
+  // V1: só admin único por loja (decisão de produto). createUser nunca cria
+  // outro admin, independentemente do que for pedido — reforço de backend,
+  // já que a UI (Equipa, Convidar) também não oferece essa opção.
+  const activeCaixas = users.filter(u => u.role === "caixa" && u.active !== false);
+  if (activeCaixas.length >= 2) {
+    throw new Error("Limite de 2 operadores de caixa activos neste dispositivo. Desactiva um para criar outro.");
+  }
+
   const passwordHash = await hashPassword(password);
 
   const newUser = {
@@ -603,7 +626,7 @@ export async function createUser(name, username, password, role) {
     username,
     passwordHash,
     password: null,
-    role: role || "caixa",
+    role: "caixa",
     active: true,
     avatar: name.charAt(0).toUpperCase(),
     createdAt: new Date().toISOString(),

@@ -7,6 +7,16 @@ import { getUser }           from "../auth.js";
 import { countAvailableCodes, isLowOnCodes, generateCodesForUser } from "../recovery-codes.js";
 import { showRecoveryCodesScreen } from "../setup.js";
 
+window._togglePwVisibility = function(id) {
+  var input = document.getElementById(id);
+  var icon  = document.getElementById(id + "-eye");
+  if (!input || !icon) return;
+  var isPw = input.type === "password";
+  input.type = isPw ? "text" : "password";
+  icon.setAttribute("data-lucide", isPw ? "eye-off" : "eye");
+  refreshIcons(icon.parentElement);
+};
+
 export async function loadSeguranca() {
   const btn = document.getElementById("btn-back-seguranca");
   if (btn) btn.onclick = () => window._showSubpage(null);
@@ -31,50 +41,56 @@ async function renderSeguranca() {
 
     <!-- Códigos de recuperação -->
     <div style="background:${isLow?"#fffbeb":"#f0fdf4"};border:1.5px solid ${isLow?"#fde68a":"#bbf7d0"};
-                border-radius:12px;padding:14px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:${isLow?"10px":"0"}">
-        <div style="width:36px;height:36px;border-radius:50%;
+                border-radius:12px;padding:10px 12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:${isLow?"8px":"0"}">
+        <div style="width:28px;height:28px;border-radius:50%;
                     background:${isLow?"#fef3c7":"#dcfce7"};
                     display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <i data-lucide="key-round" style="width:18px;height:18px;color:${isLow?"#d97706":"#16a34a"}"></i>
+          <i data-lucide="key-round" style="width:15px;height:15px;color:${isLow?"#d97706":"#16a34a"}"></i>
         </div>
         <div style="flex:1">
-          <div style="font-size:14px;font-weight:700;color:${isLow?"#d97706":"#16a34a"}">
+          <div style="font-size:13px;font-weight:700;color:${isLow?"#d97706":"#16a34a"}">
             ${codesLeft} código${codesLeft===1?"":"s"} de recuperação disponíve${codesLeft===1?"l":"is"}
           </div>
-          <div style="font-size:12px;color:#71717a;margin-top:2px">
+          <div style="font-size:11px;color:#71717a;margin-top:1px">
             Usa-os se esqueceres o teu PIN
           </div>
         </div>
+        ${!isLow ? `
+        <button onclick="window._regenerateRecoveryCodes()"
+                style="background:none;border:none;color:#16a34a;font-size:11px;font-weight:700;
+                       cursor:pointer;font-family:inherit;flex-shrink:0">
+          Gerar novos
+        </button>` : ""}
       </div>
       ${isLow ? `
-      <div style="font-size:12px;color:#92400e;line-height:1.5;margin-bottom:10px">
+      <div style="font-size:12px;color:#92400e;line-height:1.5;margin-bottom:8px">
         Restam poucos códigos. Gera um novo conjunto para não ficares sem acesso de recuperação.
-      </div>` : ""}
+      </div>
       <button onclick="window._regenerateRecoveryCodes()"
-              style="width:100%;padding:11px;background:#fff;border:1.5px solid ${isLow?"#fde68a":"#bbf7d0"};
-                     color:${isLow?"#92400e":"#16a34a"};border-radius:10px;font-size:13px;font-weight:700;
+              style="width:100%;padding:9px;background:#fff;border:1.5px solid #fde68a;
+                     color:#92400e;border-radius:10px;font-size:12.5px;font-weight:700;
                      cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-        <i data-lucide="refresh-cw" style="width:14px;height:14px"></i>
+        <i data-lucide="refresh-cw" style="width:13px;height:13px"></i>
         Gerar novo conjunto de códigos
-      </button>
+      </button>` : ""}
     </div>
 
     <!-- Status da chave -->
     <div style="background:${hasKey?"#f0fdf4":"#fff5f5"};border:1.5px solid ${hasKey?"#bbf7d0":"#fca5a5"};
-                border-radius:12px;padding:14px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <div style="width:36px;height:36px;border-radius:50%;
+                border-radius:12px;padding:10px 12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:28px;height:28px;border-radius:50%;
                     background:${hasKey?"#dcfce7":"#fee2e2"};
                     display:flex;align-items:center;justify-content:center;flex-shrink:0">
           <i data-lucide="${hasKey?"shield-check":"shield-x"}"
-             style="width:18px;height:18px;color:${hasKey?"#16a34a":"#dc2626"}"></i>
+             style="width:15px;height:15px;color:${hasKey?"#16a34a":"#dc2626"}"></i>
         </div>
         <div>
-          <div style="font-size:14px;font-weight:700;color:${hasKey?"#16a34a":"#dc2626"}">
+          <div style="font-size:13px;font-weight:700;color:${hasKey?"#16a34a":"#dc2626"}">
             ${hasKey?"Chave HMAC configurada":"Chave HMAC não configurada"}
           </div>
-          <div style="font-size:12px;color:#71717a;margin-top:2px">
+          <div style="font-size:11px;color:#71717a;margin-top:1px">
             ${hasKey
               ? distributed
                 ? `Importada em ${new Date(importedAt).toLocaleDateString("pt-AO")}`
@@ -84,27 +100,42 @@ async function renderSeguranca() {
         </div>
       </div>
       ${!hasKey ? `
-      <div style="font-size:12px;color:#dc2626;line-height:1.5">
+      <div style="font-size:12px;color:#dc2626;line-height:1.5;margin-top:8px">
         Instala a chave da loja para garantir a autenticidade dos ficheiros .ktk.
       </div>` : ""}
     </div>
 
     <!-- Exportar chave -->
     ${hasKey ? `
-    <div style="margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;
-                  letter-spacing:.4px;margin-bottom:8px">Exportar chave da loja</div>
-      <div style="font-size:13px;color:#71717a;margin-bottom:10px;line-height:1.5">
+    <div class="list-card" style="padding:16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="width:32px;height:32px;border-radius:9px;background:#ede9fe;
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i data-lucide="download" style="width:16px;height:16px;color:#5b21b6"></i>
+        </div>
+        <div style="font-size:14.5px;font-weight:700;color:#18181b">Exportar chave da loja</div>
+      </div>
+      <div style="font-size:13px;color:#71717a;margin-bottom:12px;line-height:1.5">
         Exporta a chave cifrada com uma senha. Envia o ficheiro ao próximo dispositivo
         via WhatsApp, Bluetooth ou cabo.
       </div>
       <div class="field" style="margin-bottom:10px">
         <label>Senha de protecção *</label>
-        <input type="password" id="export-pw" placeholder="Mínimo 6 caracteres"/>
+        <div style="position:relative">
+          <input type="password" id="export-pw" placeholder="Mínimo 6 caracteres" style="padding-right:42px"/>
+          <button type="button" onclick="window._togglePwVisibility('export-pw')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#9ca3af;cursor:pointer;padding:4px;display:flex">
+            <i data-lucide="eye" id="export-pw-eye" style="width:17px;height:17px"></i>
+          </button>
+        </div>
       </div>
       <div class="field" style="margin-bottom:12px">
         <label>Confirmar senha *</label>
-        <input type="password" id="export-pw2" placeholder="Repete a senha"/>
+        <div style="position:relative">
+          <input type="password" id="export-pw2" placeholder="Repete a senha" style="padding-right:42px"/>
+          <button type="button" onclick="window._togglePwVisibility('export-pw2')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#9ca3af;cursor:pointer;padding:4px;display:flex">
+            <i data-lucide="eye" id="export-pw2-eye" style="width:17px;height:17px"></i>
+          </button>
+        </div>
       </div>
       <button onclick="window._exportStoreKey()"
               style="width:100%;padding:13px;background:#5b21b6;color:#fff;border:none;
@@ -116,18 +147,23 @@ async function renderSeguranca() {
     </div>` : ""}
 
     <!-- Importar chave -->
-    <div>
-      <div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;
-                  letter-spacing:.4px;margin-bottom:8px">Importar chave da loja</div>
-      <div style="font-size:13px;color:#71717a;margin-bottom:10px;line-height:1.5">
+    <div class="list-card" style="padding:16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="width:32px;height:32px;border-radius:9px;background:#ede9fe;
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i data-lucide="upload" style="width:16px;height:16px;color:#5b21b6"></i>
+        </div>
+        <div style="font-size:14.5px;font-weight:700;color:#18181b">Importar chave da loja</div>
+      </div>
+      <div style="font-size:13px;color:#71717a;margin-bottom:12px;line-height:1.5">
         Importa a chave recebida do dispositivo principal. Todos os dispositivos
         devem usar a mesma chave para verificar ficheiros .ktk entre si.
       </div>
       <label style="display:flex;align-items:center;justify-content:center;gap:10px;
-                    padding:14px;border:2px dashed #ddd6fe;border-radius:12px;
-                    background:#faf5ff;cursor:pointer;margin-bottom:10px">
-        <i data-lucide="upload" style="width:18px;height:18px;color:#5b21b6"></i>
-        <span style="font-size:14px;font-weight:600;color:#5b21b6">
+                    padding:13px;border:1.5px solid var(--border);border-radius:10px;
+                    background:var(--bg2);cursor:pointer;margin-bottom:10px">
+        <i data-lucide="upload" style="width:16px;height:16px;color:var(--text3)"></i>
+        <span style="font-size:13.5px;font-weight:600;color:var(--text2)">
           Seleccionar ficheiro de chave (.json)
         </span>
         <input type="file" accept=".json" id="import-key-file"
@@ -138,10 +174,15 @@ async function renderSeguranca() {
                                          color:#71717a"></div>
       <div class="field" style="margin-bottom:10px">
         <label>Senha do ficheiro *</label>
-        <input type="password" id="import-pw" placeholder="Senha usada na exportação"/>
+        <div style="position:relative">
+          <input type="password" id="import-pw" placeholder="Senha usada na exportação" style="padding-right:42px"/>
+          <button type="button" onclick="window._togglePwVisibility('import-pw')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#9ca3af;cursor:pointer;padding:4px;display:flex">
+            <i data-lucide="eye" id="import-pw-eye" style="width:17px;height:17px"></i>
+          </button>
+        </div>
       </div>
       <button onclick="window._importStoreKey()"
-              style="width:100%;padding:13px;background:#16a34a;color:#fff;border:none;
+              style="width:100%;padding:13px;background:#5b21b6;color:#fff;border:none;
                      border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;
                      font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
         <i data-lucide="key" style="width:16px;height:16px"></i>

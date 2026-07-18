@@ -417,22 +417,27 @@ export function showRecoveryCodesScreen(codes, onDone) {
 
   ov.innerHTML = [
     '<div style="width:100%;max-width:380px;text-align:center">',
-      '<div style="width:56px;height:56px;background:#fef3c7;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">',
-        '<i data-lucide="key-round" style="width:26px;height:26px;color:#d97706"></i>',
+      '<div style="width:44px;height:44px;background:var(--primary-light);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px">',
+        '<i data-lucide="key-round" style="width:21px;height:21px;color:var(--primary)"></i>',
       '</div>',
-      '<div style="font-size:19px;font-weight:800;color:#18181b;margin-bottom:8px">Guarda os teus códigos de recuperação</div>',
-      '<div style="font-size:13px;color:#71717a;margin-bottom:20px;line-height:1.5">Se esqueceres o PIN, usa um destes códigos para o repor. Cada código só funciona uma vez. <strong>Não vais voltar a vê-los.</strong></div>',
-      '<div style="background:#fafafa;border:1.5px solid #e4e4e7;border-radius:14px;padding:16px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-family:monospace;font-size:14px;font-weight:700;color:#18181b">',
-        codes.map(function(c) { return '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:8px;padding:8px;text-align:center">' + c + '</div>'; }).join(''),
+      '<div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:6px">Guarda os teus códigos de recuperação</div>',
+      '<div style="font-size:13px;color:var(--text3);margin-bottom:18px;line-height:1.5">Se esqueceres o PIN, usa um destes códigos para o repor. Cada código só funciona uma vez. <strong>Não vais voltar a vê-los.</strong></div>',
+      '<div class="list-card" style="padding:14px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:monospace;font-size:13.5px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums">',
+        codes.map(function(c) { return '<div style="background:var(--bg);border-radius:8px;padding:9px;text-align:center">' + c + '</div>'; }).join(''),
       '</div>',
-      '<button id="recovery-codes-copy" style="width:100%;padding:12px;background:#fff;border:1.5px solid #e4e4e7;color:#18181b;border-radius:12px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">',
-        '<i data-lucide="copy" style="width:15px;height:15px"></i> Copiar todos',
-      '</button>',
+      '<div style="display:flex;gap:8px;margin-bottom:14px">',
+        '<button id="recovery-codes-copy" class="btn btn-ghost" style="flex:1;padding:11px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px">',
+          '<i data-lucide="copy" style="width:14px;height:14px"></i> Copiar',
+        '</button>',
+        '<button id="recovery-codes-download" class="btn btn-ghost" style="flex:1;padding:11px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px">',
+          '<i data-lucide="download" style="width:14px;height:14px"></i> Baixar',
+        '</button>',
+      '</div>',
       '<label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:16px;cursor:pointer;text-align:left">',
-        '<input type="checkbox" id="recovery-codes-confirm" style="width:16px;height:16px;margin-top:1px;accent-color:#5b21b6;flex-shrink:0;cursor:pointer"/>',
-        '<span style="font-size:12px;color:#71717a;line-height:1.5">Guardei estes códigos num local seguro (papel, gestor de senhas, etc.)</span>',
+        '<input type="checkbox" id="recovery-codes-confirm" style="width:16px;height:16px;margin-top:1px;accent-color:var(--primary);flex-shrink:0;cursor:pointer"/>',
+        '<span style="font-size:12px;color:var(--text3);line-height:1.5">Guardei estes códigos num local seguro (papel, gestor de senhas, etc.)</span>',
       '</label>',
-      '<button id="recovery-codes-continue" disabled style="width:100%;padding:14px;background:#d4d4d8;color:#fff;border:none;border-radius:13px;font-size:14.5px;font-weight:700;cursor:not-allowed;font-family:inherit">Continuar</button>',
+      '<button id="recovery-codes-continue" class="btn btn-full" disabled style="background:var(--border);color:#fff;cursor:not-allowed">Continuar</button>',
     '</div>',
   ].join('');
 
@@ -443,7 +448,7 @@ export function showRecoveryCodesScreen(codes, onDone) {
   var continueBtn  = document.getElementById("recovery-codes-continue");
   confirmCheck.addEventListener("change", function() {
     continueBtn.disabled = !confirmCheck.checked;
-    continueBtn.style.background = confirmCheck.checked ? "#16a34a" : "#d4d4d8";
+    continueBtn.style.background = confirmCheck.checked ? "var(--success)" : "var(--border)";
     continueBtn.style.cursor = confirmCheck.checked ? "pointer" : "not-allowed";
   });
 
@@ -456,6 +461,28 @@ export function showRecoveryCodesScreen(codes, onDone) {
     } else {
       _fallbackCopy(text);
     }
+  };
+
+  document.getElementById("recovery-codes-download").onclick = function() {
+    const now = new Date();
+    const dataCriacao = now.toLocaleDateString("pt-AO", { day:"2-digit", month:"2-digit", year:"numeric" });
+    const isoDate = now.toISOString().slice(0,10);
+    const conteudo =
+      "KONTAKI — CÓDIGOS DE RECUPERAÇÃO\n" +
+      "Data de criação: " + dataCriacao + "\n" +
+      "Cada código só pode ser usado uma vez. Guarda este ficheiro num local seguro.\n" +
+      "\n" +
+      codes.join("\n") + "\n";
+    const blob = new Blob([conteudo], { type: "text/plain;charset=utf-8" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url;
+    a.download = "Kontaki-recovery-" + isoDate + ".txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast("Ficheiro descarregado.", "success");
   };
 
   continueBtn.onclick = function() {

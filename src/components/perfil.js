@@ -12,7 +12,7 @@ import { toast }                 from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { openPicker } from "../picker.js";
 import { generateInvite } from "../invite.js";
-import { getUser, logout, changePasswordAuth, createUser } from "../auth.js";
+import { getUser, logout, changePasswordAuth, createUser, resetUserPin } from "../auth.js";
 import { generateCodesForUser } from "../recovery-codes.js";
 import { showRecoveryCodesScreen } from "../setup.js";
 import { getLicense, loadLicense, activateLicense, PLANS, showUpgradeBanner } from "../license.js";
@@ -142,12 +142,15 @@ function renderMenu() {
     if (groupOrder.indexOf(i.group) === -1) groupOrder.push(i.group);
   });
 
+  var groupIcons = { "Gestão": "briefcase", "Sistema": "settings", "Sobre": "info" };
+
   var html = groupOrder.map(function(groupName) {
     var groupItems = grouped.filter(function(i) { return i.group === groupName; });
-    return '<div class="perfil-group-label">' + groupName + '</div>' +
-      '<div class="perfil-grid">' +
+    var icon = groupIcons[groupName] || "circle";
+    return '<div class="perfil-group-label"><i data-lucide="' + icon + '"></i>' + groupName + '</div>' +
+      '<div class="perfil-grid-card"><div class="perfil-grid">' +
       groupItems.map(renderGridItem).join("") +
-      '</div>';
+      '</div></div>';
   }).join("");
 
   html += ungrouped.map(function(item) {
@@ -587,6 +590,10 @@ async function loadEquipa() {
       '<div class="team-card-actions">' +
       '<span class="badge-status" style="background:' + (u.active?"#dcfce7":"#fee2e2") + ';color:' + (u.active?"var(--success)":"var(--danger)") + '">' + (u.active?"Activo":"Inactivo") + '</span>' +
       (!isMe ?
+        (u.role === "caixa" ?
+          '<button class="team-card-btn" onclick="window._abrirResetPin(' + u.id + ')" title="Repor PIN">' +
+          '<i data-lucide="key"></i></button>'
+          : '') +
         '<button class="team-card-btn" onclick="window._toggleUser(' + u.id + ')" title="' + (u.active?"Desactivar":"Activar") + '">' +
         '<i data-lucide="' + (u.active?"user-x":"user-check") + '"></i></button>' +
         '<button class="team-card-btn team-card-btn--danger" onclick="window._deleteUser(' + u.id + ')" title="Eliminar">' +
@@ -598,18 +605,55 @@ async function loadEquipa() {
   refreshIcons(el("users-list"));
 }
 
+window._abrirResetPin = function(userId) {
+  window._resetPinTargetId = userId;
+  openModal("Repor PIN",
+    '<div style="font-size:13px;color:#71717a;margin-bottom:14px;line-height:1.5">Define um novo PIN para este funcionário. Ele não precisa de saber o PIN antigo.</div>' +
+    '<div class="field"><label>Novo PIN (6 dígitos)</label>' +
+    '<div class="pin-input-wrap">' +
+    '<input type="password" id="rp-new-pin" inputmode="numeric" maxlength="6" pattern="[0-9]*" placeholder="••••••"/>' +
+    '<button type="button" class="pin-eye-btn" onclick="window._toggleRpPin(this,\'rp-new-pin\')"><i data-lucide="eye"></i></button>' +
+    '</div></div>' +
+    '<div class="field"><label>O teu PIN de administrador (confirmação)</label>' +
+    '<div class="pin-input-wrap">' +
+    '<input type="password" id="rp-admin-pin" inputmode="numeric" maxlength="6" pattern="[0-9]*" placeholder="••••••"/>' +
+    '<button type="button" class="pin-eye-btn" onclick="window._toggleRpPin(this,\'rp-admin-pin\')"><i data-lucide="eye"></i></button>' +
+    '</div></div>' +
+    '<div class="form-actions">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+    '<button class="btn btn-primary btn-full" onclick="window._confirmResetPin()">Repor PIN</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+};
+
+window._toggleRpPin = function(btn, inputId) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  var isHidden = input.type === "password";
+  input.type = isHidden ? "text" : "password";
+  btn.innerHTML = '<i data-lucide="' + (isHidden?"eye-off":"eye") + '"></i>';
+  refreshIcons(btn.parentElement);
+};
+
+window._confirmResetPin = async function() {
+  var newPin   = el("rp-new-pin") ? el("rp-new-pin").value.trim() : "";
+  var adminPin = el("rp-admin-pin") ? el("rp-admin-pin").value.trim() : "";
+  try {
+    await resetUserPin(window._resetPinTargetId, newPin, adminPin);
+    toast("PIN reposto com sucesso.", "success");
+    closeModal();
+    loadEquipa();
+  } catch(err) {
+    toast(err.message, "error");
+  }
+};
+
 function openInviteDevice() {
   window._inviteRole = "caixa";
   openModal("Convidar Operador",
     '<div style="display:flex;flex-direction:column;gap:14px">' +
     '<div style="font-size:13px;color:#71717a;line-height:1.5">Cria um código curto para o teu funcionário usar noutro telemóvel.</div>' +
-    '<div class="field"><label>Função do Operador *</label>' +
-    '<div class="role-toggle">' +
-    '<button type="button" class="role-toggle-btn active" id="inv-role-caixa" onclick="window._setInviteRole(\'caixa\')">' +
-    '<i data-lucide="shopping-bag"></i> Caixa</button>' +
-    '<button type="button" class="role-toggle-btn" id="inv-role-admin" onclick="window._setInviteRole(\'admin\')">' +
-    '<i data-lucide="shield"></i> Admin</button>' +
-    '</div></div>' +
+
     '<div class="field"><label>Código de Convite *</label><input id="inv-code" placeholder="Ex: MERC2026" style="text-transform:uppercase"/></div>' +
     '<button class="btn btn-primary btn-full" onclick="window._generateInviteQR()">' +
     '<i data-lucide="qr-code"></i> Gerar QR</button>' +
@@ -680,13 +724,6 @@ function openUserAdd() {
     '<div class="pin-input-wrap">' +
     '<input type="password" id="uf-pin" inputmode="numeric" maxlength="6" pattern="[0-9]*" placeholder="••••••"/>' +
     '<button type="button" class="pin-eye-btn" onclick="window._toggleUfPin(this)"><i data-lucide="eye"></i></button>' +
-    '</div></div>' +
-    '<div class="field"><label>Perfil</label>' +
-    '<div class="role-toggle">' +
-    '<button type="button" class="role-toggle-btn active" id="uf-role-caixa" onclick="window._setUfRole(\'caixa\')">' +
-    '<i data-lucide="shopping-bag"></i> Caixa</button>' +
-    '<button type="button" class="role-toggle-btn" id="uf-role-admin" onclick="window._setUfRole(\'admin\')">' +
-    '<i data-lucide="shield"></i> Admin</button>' +
     '</div></div>' +
     '</div>' +
     '<div class="form-actions">' +
@@ -1053,6 +1090,19 @@ async function loadContaResumo(wrap) {
   var products  = await db.getAll("products");
   var allExpenses = await db.getAll("expenses");
   var entries   = await db.getAll("journalEntries");
+  var suppliers = await db.getAll("suppliers");
+  var suppliersById = {};
+  suppliers.forEach(function(s){ suppliersById[s.id] = s; });
+  var hasOverduePayable = purchases.some(function(p){
+    if (p.archived === true) return false;
+    var saldo = (p.total||0) - (p.amountPaid||0);
+    if (saldo <= 0) return false;
+    var supp = suppliersById[p.supplierId];
+    if (!supp || !supp.paymentTermDays) return false;
+    var due = new Date(p.date);
+    due.setDate(due.getDate() + supp.paymentTermDays);
+    return new Date() > due;
+  });
 
   var now       = new Date();
   var mes       = now.toISOString().slice(0,7);
@@ -1164,26 +1214,24 @@ async function loadContaResumo(wrap) {
 
   wrap.innerHTML =
     // ── HERO ──
-    '<div class="conta-hero" style="background:' + (atual.lucroLiquido>=0?'linear-gradient(135deg,var(--primary),var(--primary-mid))':'var(--gradient-danger)') + '">' +
-    trendHtml +
-    '<div class="conta-hero-label">Resultado líquido do mês</div>' +
-    '<div class="hist-hero-row"><div class="conta-hero-val">' + fmt(atual.lucroLiquido) + '</div></div>' +
-    recordHtml +
-    (contextPhrase ? '<div class="hist-hero-context">' + contextPhrase + '</div>' : '') +
-    '<div class="conta-hero-sub">' + (atual.lucroLiquido>=0?'Lucro':'Prejuízo') + ' · ' + atual.vendas.length + ' vendas · margem líquida ' + margemLiquidaMes + '%</div>' +
-    '</div>' +
-
-    '<div class="conta-card" style="margin-bottom:14px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center">' +
-    '<span style="font-size:12px;color:var(--text3);font-weight:600">Receita de hoje</span>' +
-    '<span style="font-size:14px;font-weight:700;color:var(--text)">' + fmt(receitaHoje) + '</span>' +
-    '</div>' +
+    (function() {
+      var heroValStr = fmt(atual.lucroLiquido);
+      var sizeClass = heroValStr.length >= 16 ? " hist-hero-val--xs" : heroValStr.length >= 13 ? " hist-hero-val--sm" : "";
+      return '<div class="hist-hero" style="margin-bottom:16px;background:' + (atual.lucroLiquido>=0?'linear-gradient(135deg,var(--primary),var(--primary-mid))':'var(--gradient-danger)') + '">' +
+        trendHtml +
+        '<div class="hist-hero-label">Resultado líquido do mês</div>' +
+        '<div class="hist-hero-val' + sizeClass + '">' + heroValStr + '</div>' +
+        '<div class="hist-hero-sub">' + (atual.lucroLiquido>=0?'Lucro':'Prejuízo') + ' · ' + atual.vendas.length + ' vendas · margem líquida ' + margemLiquidaMes + '%</div>' +
+        '<div class="hist-hero-sub" style="margin-top:4px;opacity:.85">Hoje: ' + fmt(receitaHoje) + '</div>' +
+        '</div>';
+    })() +
 
     // ── Posição financeira ──
     '<div class="hist-mov-card">' +
     '<div class="hist-day-label--inset"><i data-lucide="landmark" style="width:13px;height:13px"></i>Posição financeira</div>' +
     iconRow("wallet", "var(--info)", "var(--info-light)", "Caixa + Banco", "Dinheiro disponível agora", fmt(saldoCaixaBanco), "var(--text)") +
     iconRow("arrow-down-left", "var(--warning)", "var(--warning-light)", "A receber (vendas a crédito)", null, fmt(contasAReceber), contasAReceber>0?"var(--warning)":"var(--text)") +
-    iconRow("arrow-up-right", "var(--danger-muted)", "var(--danger-muted-light)", "A pagar (fornecedores)", null, fmt(contasAPagar), contasAPagar>0?"var(--danger)":"var(--text)") +
+    iconRow("arrow-up-right", "var(--danger-muted)", "var(--danger-muted-light)", "A pagar (fornecedores)", hasOverduePayable?"Há valores vencidos":null, fmt(contasAPagar), hasOverduePayable?"var(--danger)":"var(--text)") +
     iconRow("landmark", "var(--danger-muted)", "var(--danger-muted-light)", "IVA a pagar ao Estado", null, fmt(ivaAPagar), ivaAPagar>0?"var(--danger)":"var(--text)") +
 
     // ── Composição do resultado (waterfall) ──
@@ -1356,7 +1404,8 @@ async function loadContaRazao(wrap) {
   var contaAtual = contasComMov.find(function(c) { return c.code === _razaoContaSel; });
 
   wrap.innerHTML =
-    '<button id="razao-conta-btn" class="conta-picker-btn">' +
+    '<div id="razao-hero"></div>' +
+    '<button id="razao-conta-btn" class="conta-picker-btn" style="margin-bottom:16px">' +
     '<span>' + contaAtual.code + ' — ' + contaAtual.name + '</span>' +
     '<i data-lucide="chevron-down" style="width:16px;height:16px;flex-shrink:0;color:var(--text3)"></i>' +
     '</button>' +
@@ -1421,13 +1470,20 @@ function renderRazaoLancamentos(entries) {
       '</div></div>';
   }).join("");
 
-  wrap.innerHTML =
-    '<div class="conta-section-label">' + conta.code + ' — ' + conta.name + '</div>' +
-    '<div class="conta-card">' + rows + '</div>' +
-    '<div class="conta-hero" style="margin-top:14px;background:linear-gradient(135deg,#4c1d95,#7c3aed)">' +
-    '<div class="conta-hero-label">Saldo atual</div>' +
-    '<div class="conta-hero-val" style="font-size:26px">' + fmt(saldo) + '</div>' +
-    '</div>';
+  var saldoStr = fmt(saldo);
+  var saldoSizeClass = saldoStr.length >= 16 ? " hist-hero-val--xs" : saldoStr.length >= 13 ? " hist-hero-val--sm" : "";
+
+  var heroWrap = document.getElementById("razao-hero");
+  if (heroWrap) {
+    heroWrap.innerHTML =
+      '<div class="hist-hero" style="margin-bottom:16px;background:linear-gradient(135deg,#4c1d95,#7c3aed)">' +
+      '<div class="hist-hero-label">Saldo atual</div>' +
+      '<div class="hist-hero-val' + saldoSizeClass + '">' + saldoStr + '</div>' +
+      '<div class="hist-hero-sub">' + conta.code + ' — ' + conta.name + '</div>' +
+      '</div>';
+  }
+
+  wrap.innerHTML = '<div class="conta-card">' + rows + '</div>';
   refreshIcons();
 }
 
@@ -1517,18 +1573,25 @@ async function loadContaBalancete(wrap) {
   var bateOK = diff === 0;
 
   var balanceteStatusBadge =
-    '<span class="hist-hero-trend hist-hero-trend--corner ' + (bateOK?'hist-hero-trend--up':'hist-hero-trend--down') + '">' +
+    '<div class="hist-hero-trend hist-hero-trend--corner ' + (bateOK?'hist-hero-trend--up':'hist-hero-trend--down') + '">' +
     '<i data-lucide="' + (bateOK?'check':'alert-triangle') + '" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"></i>' +
-    (bateOK?'Bate certo':'Diferença') + '</span>';
+    (bateOK?'Bate certo':'Diferença') + '</div>';
+
+  var debitStr  = fmt(totalDebitGeral);
+  var creditStr = fmt(totalCreditGeral);
+  var maxLen = Math.max(debitStr.length, creditStr.length);
+  var valSize = maxLen >= 16 ? "20px" : maxLen >= 13 ? "24px" : "28px";
 
   wrap.innerHTML =
-    '<div class="conta-hero" style="background:linear-gradient(135deg, var(--primary), var(--primary-mid))">' +
+    '<div class="hist-hero" style="margin-bottom:16px;background:linear-gradient(135deg, var(--primary), var(--primary-mid))">' +
     balanceteStatusBadge +
-    '<div class="conta-hero-label">' + (bateOK?'Balancete equilibrado':'Balancete desequilibrado') + '</div>' +
-    '<div class="conta-hero-val" style="font-size:22px">D: ' + fmt(totalDebitGeral) + '</div>' +
-    '<div class="conta-hero-sub">C: ' + fmt(totalCreditGeral) + (bateOK?'':' · diferença: '+fmt(diff)) + '</div>' +
+    '<div class="hist-hero-label">' + (bateOK?'Balancete equilibrado':'Balancete desequilibrado') + '</div>' +
+    '<div style="display:flex;gap:20px;margin-top:6px">' +
+    '<div><div style="font-size:11px;opacity:.75;margin-bottom:2px">Débito</div><div style="font-size:' + valSize + ';font-weight:800;font-variant-numeric:tabular-nums">' + debitStr + '</div></div>' +
+    '<div><div style="font-size:11px;opacity:.75;margin-bottom:2px">Crédito</div><div style="font-size:' + valSize + ';font-weight:800;font-variant-numeric:tabular-nums">' + creditStr + '</div></div>' +
+    '</div>' +
+    (bateOK?'':'<div class="hist-hero-sub" style="margin-top:8px">Diferença: '+fmt(diff)+'</div>') +
     '</div>' + html;
-  refreshIcons();
   refreshIcons();
 }
 
@@ -1641,6 +1704,11 @@ async function loadContaDemonstracoes(wrap) {
     '<i data-lucide="' + (bateOK?'check':'alert-triangle') + '" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"></i>' +
     (bateOK?'Bate certo':'Diferença') + '</span>';
 
+  var ativoStr  = fmt(totalAtivo);
+  var passivoStr = fmt(totalPassivoCapital);
+  var maxLenBal = Math.max(ativoStr.length, passivoStr.length);
+  var valSizeBal = maxLenBal >= 16 ? "20px" : maxLenBal >= 13 ? "24px" : "28px";
+
   wrap.innerHTML =
     '<div class="conta-hero" style="background:' + (resultado>=0?'var(--gradient-success)':'var(--gradient-danger)') + '">' +
     '<div class="conta-hero-label">Resultado líquido do período</div>' +
@@ -1648,12 +1716,15 @@ async function loadContaDemonstracoes(wrap) {
     '<div class="conta-hero-sub">' + (resultado>=0?'▲ Lucro':'▼ Prejuízo') + '</div>' +
     '</div>' +
 
-    '<div class="hist-mov-card">' +
-    '<div class="hist-day-label--inset"><i data-lucide="file-text" style="width:13px;height:13px"></i>Demonstração de Resultados</div>' +
-    drRows +
+    '<div class="conta-card" style="margin-bottom:14px">' +
     '<div class="conta-wf-row conta-wf-row--subtotal"><span class="conta-wf-label">Total Proveitos</span><span class="conta-wf-val" style="color:var(--success)">' + fmt(totalProveitos) + '</span></div>' +
     '<div class="conta-wf-row conta-wf-row--subtotal"><span class="conta-wf-label">Total Custos</span><span class="conta-wf-val" style="color:var(--danger)">' + fmt(totalCustos) + '</span></div>' +
     '<div class="conta-wf-row conta-wf-row--total"><span class="conta-wf-label">Resultado líquido</span><span class="conta-wf-val" style="color:' + (resultado>=0?"var(--success)":"var(--danger)") + '">' + fmt(resultado) + '</span></div>' +
+    '</div>' +
+
+    '<div class="hist-mov-card">' +
+    '<div class="hist-day-label--inset"><i data-lucide="file-text" style="width:13px;height:13px"></i>Demonstração de Resultados</div>' +
+    drRows +
 
     '<div class="hist-day-label--inset"><i data-lucide="landmark" style="width:13px;height:13px"></i>Balanço — Ativo</div>' +
     (ativoRows||contaRow("Sem contas de ativo com movimento","","#a1a1aa")) +
@@ -1662,11 +1733,14 @@ async function loadContaDemonstracoes(wrap) {
     passivoRows +
     '</div>' +
 
-    '<div class="conta-hero" style="margin-top:14px;background:linear-gradient(135deg, var(--primary), var(--primary-mid))">' +
+    '<div class="hist-hero" style="margin-top:16px;background:linear-gradient(135deg, var(--primary), var(--primary-mid))">' +
     balancoStatusBadge +
-    '<div class="conta-hero-label">' + (bateOK?'Balanço equilibrado':'Balanço desequilibrado') + '</div>' +
-    '<div class="conta-hero-val" style="font-size:22px">Ativo: ' + fmt(totalAtivo) + '</div>' +
-    '<div class="conta-hero-sub">Passivo+Capital: ' + fmt(totalPassivoCapital) + (bateOK?'':' · diferença: '+fmt(diff)) + '</div>' +
+    '<div class="hist-hero-label">' + (bateOK?'Balanço equilibrado':'Balanço desequilibrado') + '</div>' +
+    '<div style="display:flex;gap:20px;margin-top:6px">' +
+    '<div><div style="font-size:11px;opacity:.75;margin-bottom:2px">Ativo</div><div style="font-size:' + valSizeBal + ';font-weight:800;font-variant-numeric:tabular-nums">' + ativoStr + '</div></div>' +
+    '<div><div style="font-size:11px;opacity:.75;margin-bottom:2px">Passivo+Capital</div><div style="font-size:' + valSizeBal + ';font-weight:800;font-variant-numeric:tabular-nums">' + passivoStr + '</div></div>' +
+    '</div>' +
+    (bateOK?'':'<div class="hist-hero-sub" style="margin-top:8px">Diferença: '+fmt(diff)+'</div>') +
     '</div>';
   refreshIcons();
 }

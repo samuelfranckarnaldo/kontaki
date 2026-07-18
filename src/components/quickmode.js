@@ -5,6 +5,8 @@ import { toast } from "../toast.js";
 import { getUser } from "../auth.js";
 import { initCamera } from "./camera.js";
 import { confirmDialog } from "../modal.js";
+import { getOpenIncidentForProduct, getStockIncidentPolicy } from "../services.js";
+import { showIncidentBlockedModal, showIncidentAuthModal } from "./vender.js";
 
 let qmProducts  = [];
 let qmCart      = [];
@@ -76,17 +78,29 @@ async function openQuickMode() {
   });
   newInp.focus();
 
+  bindQmClientAutocomplete();
+
   // Pagamento
+  document.querySelectorAll(".qm-pay-btn").forEach(btn => {
+    const clone = btn.cloneNode(true);
+    btn.parentNode.replaceChild(clone, btn);
+  });
   document.querySelectorAll(".qm-pay-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       qmPayMethod = btn.dataset.method;
-      resetPayBtns();
-      btn.style.borderColor = "#5b21b6";
-      btn.style.background  = "#ede9fe";
-      btn.style.color       = "#5b21b6";
+      selectPayBtn(btn);
       document.getElementById("qm-fiado-wrap").style.display =
         qmPayMethod === "fiado" ? "block" : "none";
     });
+  });
+}
+
+function selectPayBtn(selected) {
+  document.querySelectorAll(".qm-pay-btn").forEach(b => {
+    var isSel = b === selected || b.dataset.method === (selected ? selected.dataset.method : null);
+    b.style.borderColor = isSel ? "#5b21b6" : "#e4e4e7";
+    b.style.background  = isSel ? "#ede9fe" : "#fff";
+    b.style.color       = isSel ? "#5b21b6" : "#71717a";
   });
 }
 
@@ -142,8 +156,25 @@ window._qmAdd = (id) => {
   if (p) addToQmCart(p);
 };
 
-function addToQmCart(p) {
+async function addToQmCart(p) {
   if (p.stock <= 0) { toast("Produto sem stock.", "error"); return; }
+
+  const incident = await getOpenIncidentForProduct(p.id);
+  if (incident) {
+    const policy = await getStockIncidentPolicy();
+    if (policy === "block") {
+      showIncidentBlockedModal(p, incident);
+      return;
+    }
+    showIncidentAuthModal(p, incident, function() {
+      pushToQmCart(p);
+    });
+    return;
+  }
+  pushToQmCart(p);
+}
+
+function pushToQmCart(p) {
   const ex = qmCart.find(i => i.id === p.id);
   if (ex) {
     if (ex.qty >= p.stock) { toast("Stock insuficiente.", "error"); return; }
@@ -254,7 +285,7 @@ async function finalizarQm() {
       subtotal:    sub, discount:0, ivaPct, ivaValor:ivaVal, total,
       payMethod:   qmPayMethod, date:saleDate,
       userId:      getUser().id, sessionId:getUser().sessionId,
-      clientName:  fc, clientPhone:"",
+      clientName:  fc, clientPhone:"", clientId: qmClientSelectedId || null,
       fiadoClient: qmPayMethod === "fiado" ? fc : null,
       quickMode:   true,
     });
@@ -270,7 +301,7 @@ async function finalizarQm() {
 
     if (qmPayMethod === "fiado") {
       await db.add("fiado", {
-        clientName:fc, amount:total, saleId:sid,
+        clientName:fc, clientId: qmClientSelectedId || null, amount:total, saleId:sid,
         date:saleDate, status:"open", userId:getUser().id, notes:"",
       });
     }
@@ -307,14 +338,22 @@ function showQmSuccess({ sid, total, payMethod, itemCount }) {
     <div style="font-size:22px;font-weight:700;color:#fff;margin-bottom:8px">Venda registada!</div>
     <div style="font-size:32px;font-weight:700;color:#ddd6fe;margin-bottom:6px">${fmt(total)}</div>
     <div style="font-size:14px;color:rgba(255,255,255,.7);margin-bottom:32px">
-      #${sid} · ${itemCount} produto(s) · ${payMethod}
+      #${sid} · ${itemCount} produto(s) · ${payMethod === "fiado" ? "crédito" : payMethod}
     </div>
-    <button onclick="this.parentElement.remove();window._qmNewSale()"
+    <div style="display:flex;gap:10px">
+    <button onclick="this.parentElement.parentElement.remove();window._qmNewSale()"
             style="background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.4);
-                   border-radius:12px;color:#fff;padding:16px 36px;font-size:16px;
+                   border-radius:12px;color:#fff;padding:16px 28px;font-size:15px;
                    font-weight:700;cursor:pointer;font-family:inherit">
       Nova venda
-    </button>`;
+    </button>
+    <button onclick="this.parentElement.parentElement.remove();document.getElementById('quick-mode').style.display='none';qmCart=[];"
+            style="background:none;border:2px solid rgba(255,255,255,.4);
+                   border-radius:12px;color:#fff;padding:16px 28px;font-size:15px;
+                   font-weight:700;cursor:pointer;font-family:inherit">
+      Fechar
+    </button>
+    </div>`;
   document.body.appendChild(div);
   if (window.lucide) window.lucide.createIcons({ nodes: [div] });
   setTimeout(() => { if (div.parentElement) { div.remove(); window._qmNewSale(); } }, 3000);
@@ -327,4 +366,52 @@ window._qmNewSale = () => {
   document.getElementById("qm-search").focus();
   const fc = document.getElementById("qm-fiado-client");
   if (fc) fc.value = "";
+  const sug = document.getElementById("qm-fiado-suggestions");
+  if (sug) sug.style.display = "none";
 };
+
+let qmClientSelectedId = null;
+
+function bindQmClientAutocomplete() {
+  const inp = document.getElementById("qm-fiado-client");
+  const sug = document.getElementById("qm-fiado-suggestions");
+  if (!inp || !sug || inp.dataset.autocompleteBound) return;
+  inp.dataset.autocompleteBound = "1";
+
+  inp.addEventListener("input", async () => {
+    qmClientSelectedId = null;
+    const q = inp.value.trim().toLowerCase();
+    if (!q) { sug.style.display = "none"; return; }
+
+    const clients = await db.getAll("clients");
+    const matches = clients.filter(c => (c.name||"").toLowerCase().includes(q)).slice(0, 5);
+
+    if (!matches.length) {
+      sug.innerHTML = '<div style="padding:12px 14px;font-size:12.5px;color:#a1a1aa">Nenhum cliente encontrado — será criado um novo ao finalizar.</div>';
+      sug.style.display = "block";
+      return;
+    }
+
+    sug.innerHTML = matches.map(c =>
+      '<button type="button" class="qm-client-suggestion" data-id="' + c.id + '" data-name="' + c.name.replace(/"/g,"&quot;") + '" ' +
+      'style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;border-bottom:1px solid #f4f4f5;cursor:pointer;text-align:left;font-family:inherit">' +
+      '<div style="width:28px;height:28px;border-radius:8px;background:#ede9fe;color:#5b21b6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">' + c.name.charAt(0).toUpperCase() + '</div>' +
+      '<div><div style="font-size:13px;font-weight:600;color:#18181b">' + c.name + '</div>' +
+      (c.phone ? '<div style="font-size:11px;color:#a1a1aa">' + c.phone + '</div>' : '') + '</div>' +
+      '</button>'
+    ).join("");
+    sug.style.display = "block";
+
+    sug.querySelectorAll(".qm-client-suggestion").forEach(btn => {
+      btn.addEventListener("click", () => {
+        inp.value = btn.dataset.name;
+        qmClientSelectedId = Number(btn.dataset.id);
+        sug.style.display = "none";
+      });
+    });
+  });
+
+  inp.addEventListener("blur", () => {
+    setTimeout(() => { sug.style.display = "none"; }, 150);
+  });
+}

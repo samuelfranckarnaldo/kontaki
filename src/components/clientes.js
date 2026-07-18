@@ -55,6 +55,21 @@ export async function initClientesTab() {
 
 const CT_TAB_ORDER = ["geral", "clientes", "fiados"];
 
+function avatarColor(name) {
+  var palette = [
+    { bg: "#ede9fe", color: "#7c3aed" }, // roxo
+    { bg: "#dbeafe", color: "#2563eb" }, // azul
+    { bg: "#dcfce7", color: "#16a34a" }, // verde
+    { bg: "#fce7f3", color: "#db2777" }, // rosa
+    { bg: "#ccfbf1", color: "#0d9488" }, // teal
+    { bg: "#e0e7ff", color: "#4f46e5" }, // índigo
+  ];
+  var sum = 0;
+  var s = name || "?";
+  for (var i = 0; i < s.length; i++) sum += s.charCodeAt(i);
+  return palette[sum % palette.length];
+}
+
 function setupCtSwipe() {
   const container = document.querySelector("#pg-fiados .page-inner");
   if (!container || container.dataset.swipeBound) return;
@@ -315,7 +330,7 @@ async function renderGeral(showSkeleton) {
       ${_statCard({ label:"Cobrança", value:taxaCobranca+"%", sub:"desde sempre", color:"var(--text)", icon:"percent" })}
     </div>
 
-    <div class="ct-section-label">Maiores dívidas</div>
+    <div class="ct-section-label"><i data-lucide="trending-down"></i>Maiores dívidas</div>
     ${top3.length === 0
       ? `<div class="empty-state" style="padding:24px 12px">
           <i data-lucide="check-circle"></i>
@@ -323,15 +338,15 @@ async function renderGeral(showSkeleton) {
         </div>`
       : `<div class="list-card">
           ${top3.map(({ client: c, totalOpen, overdue, maxDays, firstOpen }, i) => `
-            <div class="ct-devedor-row" style="border-left:3px solid ${overdue ? "var(--danger-muted)" : "var(--warning)"}" onclick="${c.id ? `window._openClienteProfile(${c.id})` : (firstOpen ? `window._openPayModal(${firstOpen.id})` : "")}">
-              <div class="fc-row-avatar" style="background:${overdue ? "var(--danger-muted-light);color:var(--danger-muted)" : "#fef3c7;color:var(--warning)"}">
+            <div class="ct-devedor-row" style="border-left:3px solid ${overdue ? "var(--danger-muted)" : avatarColor(c.name).color}" onclick="${c.id ? `window._openClienteProfile(${c.id})` : (firstOpen ? `window._openPayModal(${firstOpen.id})` : "")}">
+              <div class="fc-row-avatar" style="background:${overdue ? "var(--danger-muted-light);color:var(--danger-muted)" : avatarColor(c.name).bg+";color:"+avatarColor(c.name).color}">
                 ${(c.name||"?").charAt(0).toUpperCase()}
               </div>
               <div class="fc-row-info">
                 <div class="fc-row-name" style="white-space:normal;overflow:visible;text-overflow:clip">${c.name}${!c.id ? ' <span class="ct-nocliente-tag">sem ficha</span>' : ""}</div>
                 <div class="fc-row-meta">${overdue ? `Atrasado há ${maxDays} ${maxDays===1?"dia":"dias"}` : "Em aberto"}</div>
               </div>
-              <div class="fc-row-val ${overdue ? "overdue" : ""}${sizeMod("fc-row-val", fmt(totalOpen))}" style="color:${overdue ? "" : "var(--text)"}">${fmt(totalOpen)}</div>
+              <div class="fc-row-val ${overdue ? "overdue" : ""}${sizeMod("fc-row-val", fmt(totalOpen))}" style="color:${overdue ? "" : "var(--text2)"}">${fmt(totalOpen)}</div>
               <i data-lucide="chevron-right" class="hist-export-arrow"></i>
             </div>`).join("")}
         </div>`
@@ -639,12 +654,12 @@ function renderFiadosPanel(myFiados, clientName) {
            </button>` : ""
       }
       <button class="ct-action-btn ct-action-btn-secondary" onclick="window._openFiadoAdd('${clientName.replace(/'/g,"\\'")}')">
-        <i data-lucide="plus"></i> Novo fiado
+        <i data-lucide="plus"></i> Novo crédito
       </button>
     </div>`;
 
   if (!sorted.length) {
-    return actions + `<div style="text-align:center;color:var(--text4);font-size:13px;padding:24px">Sem fiados registados</div>`;
+    return actions + `<div style="text-align:center;color:var(--text4);font-size:13px;padding:24px">Sem créditos registados</div>`;
   }
 
   const sortedSliced = sorted.slice(0,30);
@@ -654,7 +669,7 @@ function renderFiadosPanel(myFiados, clientName) {
     const overdue = !paid && !cancelled && isOverdue(f);
     const statusAttr = paid ? "paid" : cancelled ? "cancelled" : overdue ? "overdue" : "open";
     const amountColor = paid ? "var(--success)" : cancelled ? "var(--text4)" : overdue ? "var(--danger-muted)" : "var(--warning-muted)";
-    const title = paid ? "Pagamento recebido" : cancelled ? "Fiado anulado" : "Fiado";
+    const title = paid ? "Pagamento recebido" : cancelled ? "Crédito anulado" : "Crédito";
     const days = overdue ? daysOverdue(f) : 0;
     const isLast = idx === sortedSliced.length - 1;
 
@@ -687,13 +702,6 @@ function renderFiadosPanel(myFiados, clientName) {
           </div>
         </div>
         <div class="fiado-entry-meta">${metaParts.join(" · ")}</div>
-        ${f.status === "open" ? `
-          <div style="display:flex;justify-content:flex-end;margin-top:8px">
-            <button class="fiado-receive-pill" onclick="window._openPayModal(${f.id})">
-              <i data-lucide="check" style="width:14px;height:14px"></i> Receber
-            </button>
-          </div>` : ""
-        }
       </div>
     </div>`;
   }).join("");
@@ -704,17 +712,24 @@ function renderFiadosPanel(myFiados, clientName) {
 window._openFiadoActions = (id) => {
   openModal("",
     `<div class="hist-export-options">
+      <button class="hist-export-option" onclick="window._closeModal();window._openPayModal(${id})">
+        <div class="hist-export-icon" style="background:var(--success-light);color:var(--success)"><i data-lucide="check"></i></div>
+        <div class="hist-export-info">
+          <div class="hist-export-title">Receber</div>
+        </div>
+        <i data-lucide="chevron-right" class="hist-export-arrow"></i>
+      </button>
       <button class="hist-export-option" onclick="window._closeModal();window._openEditFiado(${id})">
         <div class="hist-export-icon hist-export-icon--edit"><i data-lucide="pencil"></i></div>
         <div class="hist-export-info">
-          <div class="hist-export-title">Editar fiado</div>
+          <div class="hist-export-title">Editar crédito</div>
         </div>
         <i data-lucide="chevron-right" class="hist-export-arrow"></i>
       </button>
       <button class="hist-export-option" onclick="window._closeModal();window._openCancelFiado(${id})">
         <div class="hist-export-icon hist-export-icon--cancel"><i data-lucide="ban"></i></div>
         <div class="hist-export-info">
-          <div class="hist-export-title">Anular fiado</div>
+          <div class="hist-export-title">Anular crédito</div>
         </div>
         <i data-lucide="chevron-right" class="hist-export-arrow"></i>
       </button>

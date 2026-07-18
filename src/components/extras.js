@@ -1,5 +1,6 @@
 import { db }            from "../db.js";
 import { postReturnJournal } from "../pgc.js";
+import { CHART_OF_ACCOUNTS } from "../pgc.js";
 import { fmt, fmtDate, refreshIcons } from "../utils.js";
 import { toast }         from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
@@ -224,12 +225,13 @@ export async function gerarRelatorioPDF(from, to) {
     ? fromD.toLocaleDateString("pt-AO", { day:"2-digit", month:"long", year:"numeric" })
     : fromD.toLocaleDateString("pt-AO", { day:"2-digit", month:"short" }) + " – " + toD.toLocaleDateString("pt-AO", { day:"2-digit", month:"short", year:"numeric" });
 
-  var [sales, products, purchases, fiados, store] = await Promise.all([
+  var [sales, products, purchases, fiados, store, journalEntries] = await Promise.all([
     db.getAll("sales"),
     db.getAll("products"),
     db.getAll("purchases"),
     db.getAll("fiado"),
     db.get("settings", "store").then(function(s){ return s||{}; }),
+    db.getAll("journalEntries"),
   ]);
 
   var vendasMes = sales.filter(function(s){
@@ -241,21 +243,66 @@ export async function gerarRelatorioPDF(from, to) {
   var prodMap = {};
   products.forEach(function(p){ prodMap[p.id] = p; });
 
-  var cogsMes = vendasMes.reduce(function(a,s){
-    return a + (s.items||[]).reduce(function(b,i){
-      var p = prodMap[i.id];
-      return b + (p?(p.costPrice||0)*i.qty:0);
-    }, 0);
-  }, 0);
-
-  var lucroMes   = receitaMes - cogsMes;
-  var margem     = receitaMes > 0 ? ((lucroMes/receitaMes)*100).toFixed(1) : "0.0";
   var comprasMes = purchases.filter(function(p){
     var d = (p.date||"").split("T")[0];
     return d >= from && d <= to;
   }).reduce(function(a,p){ return a+(p.total||0); }, 0);
   var fiadoAberto = fiados.filter(function(f){ return f.status==="open"; })
     .reduce(function(a,f){ return a+(f.amount||0); }, 0);
+  var devolucoesMes = vendasMes.reduce(function(a,s){ return a+(s.totalDevolvido||0); }, 0);
+
+  // ── Livro Razão: contas de resultado filtradas pelo período; contas de balanço acumuladas até a data final ──
+  var periodEntries  = journalEntries.filter(function(e){ var d=(e.date||"").split("T")[0]; return d>=from && d<=to; });
+  var balanceEntries = journalEntries.filter(function(e){ return (e.date||"").split("T")[0] <= to; });
+
+  function acctBal(entriesArr, code) {
+    var acc = CHART_OF_ACCOUNTS.find(function(c){ return c.code===code; });
+    if (!acc) return 0;
+    var d=0,c=0;
+    entriesArr.forEach(function(e){ (e.lines||[]).forEach(function(l){ if (l.account===code) { d+=l.debit||0; c+=l.credit||0; } }); });
+    return acc.natureza==="devedora" ? d-c : c-d;
+  }
+  function contasComMov(entriesArr, tipo) {
+    var totals = {};
+    entriesArr.forEach(function(e){ (e.lines||[]).forEach(function(l){ totals[l.account]=(totals[l.account]||0)+(l.debit||0)+(l.credit||0); }); });
+    return CHART_OF_ACCOUNTS.filter(function(c){ return c.tipo===tipo && totals[c.code]>0; });
+  }
+
+  var proveitoAccs = contasComMov(periodEntries, "proveito");
+  var custoAccs    = contasComMov(periodEntries, "custo");
+  var totalProveitos = proveitoAccs.reduce(function(a,c){ return a+acctBal(periodEntries,c.code); }, 0);
+  var totalCustos    = custoAccs.reduce(function(a,c){ return a+acctBal(periodEntries,c.code); }, 0);
+  var resultadoLiquido = totalProveitos - totalCustos;
+  var margemLiq = totalProveitos>0 ? ((resultadoLiquido/totalProveitos)*100).toFixed(1) : "0.0";
+
+  var ativoAccs   = contasComMov(balanceEntries, "activo");
+  var passivoAccs = contasComMov(balanceEntries, "passivo");
+  var capitalAccs = contasComMov(balanceEntries, "capital");
+  var totalAtivo   = ativoAccs.reduce(function(a,c){ return a+acctBal(balanceEntries,c.code); }, 0);
+  var totalPassivo = passivoAccs.reduce(function(a,c){ return a+acctBal(balanceEntries,c.code); }, 0);
+  var totalCapital = capitalAccs.reduce(function(a,c){ return a+acctBal(balanceEntries,c.code); }, 0);
+
+  var classeNomes = {
+    1:"Meios Fixos e Investimentos", 2:"Existências", 3:"Terceiros", 4:"Meios Monetários",
+    5:"Capital e Reservas", 6:"Proveitos por Natureza", 7:"Custos por Natureza", 8:"Resultados",
+  };
+  var contasBalancete = CHART_OF_ACCOUNTS.filter(function(c){
+    var mov = 0;
+    balanceEntries.forEach(function(e){ (e.lines||[]).forEach(function(l){ if (l.account===c.code) mov += (l.debit||0)+(l.credit||0); }); });
+    return mov > 0;
+  });
+  var porClasse = {};
+  contasBalancete.forEach(function(c){ porClasse[c.classe] = porClasse[c.classe]||[]; porClasse[c.classe].push(c); });
+
+  var saldoCaixaBanco = acctBal(balanceEntries,"45")+acctBal(balanceEntries,"43")+acctBal(balanceEntries,"44")+acctBal(balanceEntries,"42")+acctBal(balanceEntries,"41");
+  var contasAReceber  = acctBal(balanceEntries,"31");
+  var contasAPagar    = acctBal(balanceEntries,"32");
+  var ivaAPagar       = acctBal(balanceEntries,"34");
+
+  // Por método de pagamento
+  var porMetodo = {};
+  vendasMes.forEach(function(s){ porMetodo[s.payMethod] = (porMetodo[s.payMethod]||0) + s.total; });
+  var metodoLabels = { dinheiro:"Dinheiro", transferencia:"Transferência", multicaixa:"Multicaixa", fiado:"Venda a Crédito" };
 
   // Top produtos
   var prodReceita = {};
@@ -275,6 +322,15 @@ export async function gerarRelatorioPDF(from, to) {
     porDia[d] = (porDia[d]||0) + s.total;
   });
 
+  function acctTable(rows, entriesArr) {
+    return '<table><thead><tr><th>Conta</th><th>Saldo</th></tr></thead><tbody>' +
+      rows.map(function(c) {
+        var v = acctBal(entriesArr, c.code);
+        return '<tr><td>' + c.code + ' — ' + c.name + '</td><td><b>' + fmt(v) + '</b></td></tr>';
+      }).join("") +
+      '</tbody></table>';
+  }
+
   var html =
     '<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"/>' +
     '<title>Relatório ' + label + ' — ' + (store.name||"Kontaki") + '</title>' +
@@ -293,6 +349,7 @@ export async function gerarRelatorioPDF(from, to) {
     'tr:nth-child(even) td{background:#f8f8f8}' +
     '.total-row td{font-weight:700;background:#ede9fe;color:#5b21b6}' +
     '.footer{margin-top:30px;text-align:center;font-size:11px;color:#a1a1aa;border-top:1px solid #eee;padding-top:12px}' +
+    '.page-break{page-break-before:always}' +
     '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}' +
     '</style></head><body><div class="page">' +
 
@@ -308,12 +365,47 @@ export async function gerarRelatorioPDF(from, to) {
 
     '<h2>Resumo Financeiro</h2>' +
     '<div class="kpis">' +
-    kpiBox("Receita Total", fmt(receitaMes), "#16a34a") +
-    kpiBox("Custo das Vendas", fmt(cogsMes), "#d97706") +
-    kpiBox("Lucro Bruto", fmt(lucroMes), lucroMes>=0?"#5b21b6":"#dc2626") +
-    kpiBox("Margem Bruta", margem+"%", "#5b21b6") +
-    kpiBox("Compras", fmt(comprasMes), "#dc2626") +
+    kpiBox("Receita", fmt(totalProveitos), "#16a34a") +
+    kpiBox("Custos", fmt(totalCustos), "#dc2626") +
+    kpiBox("Resultado Líquido", fmt(resultadoLiquido), resultadoLiquido>=0?"#5b21b6":"#dc2626") +
+    kpiBox("Margem Líquida", margemLiq+"%", "#5b21b6") +
+    kpiBox("Compras", fmt(comprasMes), "#d97706") +
     kpiBox("Fiado Aberto", fmt(fiadoAberto), "#d97706") +
+    '</div>' +
+
+    '<h2>Demonstração de Resultados</h2>' +
+    '<table><thead><tr><th>Conta</th><th>Valor</th></tr></thead><tbody>' +
+    proveitoAccs.map(function(c){ return '<tr><td>' + c.code + ' — ' + c.name + '</td><td><b>' + fmt(acctBal(periodEntries,c.code)) + '</b></td></tr>'; }).join("") +
+    custoAccs.map(function(c){ return '<tr><td>' + c.code + ' — ' + c.name + '</td><td><b>-' + fmt(acctBal(periodEntries,c.code)) + '</b></td></tr>'; }).join("") +
+    '<tr class="total-row"><td>Total Proveitos</td><td>' + fmt(totalProveitos) + '</td></tr>' +
+    '<tr class="total-row"><td>Total Custos</td><td>' + fmt(totalCustos) + '</td></tr>' +
+    '<tr class="total-row"><td>Resultado Líquido</td><td>' + fmt(resultadoLiquido) + '</td></tr>' +
+    '</tbody></table>' +
+
+    '<h2>Balanço Patrimonial</h2>' +
+    '<table><thead><tr><th>Ativo</th><th>Saldo</th></tr></thead><tbody>' +
+    ativoAccs.map(function(c){ return '<tr><td>' + c.code + ' — ' + c.name + '</td><td><b>' + fmt(acctBal(balanceEntries,c.code)) + '</b></td></tr>'; }).join("") +
+    '<tr class="total-row"><td>Total Ativo</td><td>' + fmt(totalAtivo) + '</td></tr>' +
+    '</tbody></table>' +
+    '<table><thead><tr><th>Passivo + Capital</th><th>Saldo</th></tr></thead><tbody>' +
+    passivoAccs.map(function(c){ return '<tr><td>' + c.code + ' — ' + c.name + '</td><td><b>' + fmt(acctBal(balanceEntries,c.code)) + '</b></td></tr>'; }).join("") +
+    capitalAccs.map(function(c){ return '<tr><td>' + c.code + ' — ' + c.name + '</td><td><b>' + fmt(acctBal(balanceEntries,c.code)) + '</b></td></tr>'; }).join("") +
+    '<tr class="total-row"><td>Total Passivo + Capital</td><td>' + fmt(totalPassivo+totalCapital) + '</td></tr>' +
+    '</tbody></table>' +
+
+    '<div class="page-break"></div>' +
+    '<h2>Balancete</h2>' +
+    Object.keys(porClasse).sort().map(function(classe) {
+      return '<h2 style="font-size:13px;color:#71717a;border:none;margin-top:14px">Classe ' + classe + ' — ' + classeNomes[classe] + '</h2>' +
+        acctTable(porClasse[classe], balanceEntries);
+    }).join("") +
+
+    '<h2>Posição Financeira</h2>' +
+    '<div class="kpis">' +
+    kpiBox("Caixa + Banco", fmt(saldoCaixaBanco), "#5b21b6") +
+    kpiBox("A Receber", fmt(contasAReceber), "#d97706") +
+    kpiBox("A Pagar", fmt(contasAPagar), "#dc2626") +
+    kpiBox("IVA a Pagar", fmt(ivaAPagar), "#dc2626") +
     '</div>' +
 
     '<h2>Vendas por Dia</h2>' +
@@ -333,6 +425,19 @@ export async function gerarRelatorioPDF(from, to) {
       return '<tr><td>' + (i+1) + '</td><td>' + p.name + '</td><td>' + p.qty + '</td><td><b>' + fmt(p.total) + '</b></td><td>' + pct + '%</td></tr>';
     }).join("") +
     '</tbody></table>' : "") +
+
+    (Object.keys(porMetodo).length ?
+    '<h2>Por Método de Pagamento</h2>' +
+    '<table><thead><tr><th>Método</th><th>Valor</th><th>%</th></tr></thead><tbody>' +
+    Object.entries(porMetodo).map(function(e) {
+      var pct = receitaMes>0?((e[1]/receitaMes)*100).toFixed(1):"0.0";
+      return '<tr><td>' + (metodoLabels[e[0]]||e[0]) + '</td><td><b>' + fmt(e[1]) + '</b></td><td>' + pct + '%</td></tr>';
+    }).join("") +
+    '</tbody></table>' : "") +
+
+    (devolucoesMes>0 ?
+    '<h2>Devoluções do Mês</h2>' +
+    '<div class="kpis"><div style="grid-column:span 3">' + kpiBox("Total Devolvido", fmt(devolucoesMes), "#d97706") + '</div></div>' : "") +
 
     '<div class="footer">' +
     'Documento de gestão interna · Sem validade fiscal perante a AGT · ' +

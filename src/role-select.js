@@ -311,10 +311,22 @@ function showStaffProfile(payload) {
     var pinHash = await hashPassword(_pin);
     var username = name.toLowerCase().replace(/\s+/g, ".");
 
+    // V1: só admin único por loja. Independentemente do que o payload do
+    // convite diga (incluindo convites gerados antes desta restrição), este
+    // fluxo nunca cria admin — fecha a fenda de um .ktkinvite antigo ou
+    // adulterado com role:"admin" ainda em circulação.
+    var existingUsers = await db.getAll("users");
+    var activeCaixas = existingUsers.filter(function(u){ return u.role === "caixa" && u.active !== false; });
+    if (activeCaixas.length >= 2) {
+      errEl.textContent = "Limite de 2 operadores de caixa activos neste dispositivo.";
+      errEl.style.display = 'block';
+      return;
+    }
+
     var newUserId = await db.add("users", {
       name: name, username: username,
       passwordHash: pinHash, password: null,
-      role: payload.role === "admin" ? "admin" : "caixa", active: true,
+      role: "caixa", active: true,
       avatar: name.charAt(0).toUpperCase(),
       createdAt: new Date().toISOString(),
     });

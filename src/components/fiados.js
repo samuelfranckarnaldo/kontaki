@@ -337,10 +337,10 @@ window._openPayModal = async (id) => {
       <button class="fc-pay-quick-btn" onclick="window._setPayAmt(${e.amount},1)">Tudo</button>
     </div>
     <div class="form-actions">
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
-      <button class="btn btn-success btn-full" onclick="window._confirmPay(${id},${e.amount})">
+      <button class="btn btn-primary btn-full" onclick="window._confirmPay(${id},${e.amount})">
         <i data-lucide="check"></i> Confirmar recebimento
       </button>
+      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>
     </div>`);
   refreshIcons(el("modal-box"));
 };
