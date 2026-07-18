@@ -530,8 +530,24 @@ function doLogout() {
   const app = document.getElementById("app");
   const loginPage = document.getElementById("login-page");
 
-  if (app) app.style.display = "none";
-  if (loginPage) loginPage.style.display = "flex";
+  if (app) {
+    app.style.animation = "logoutFadeOut .25s ease forwards";
+    setTimeout(function() {
+      app.style.display = "none";
+      app.style.animation = "";
+      _showLoginAnimated();
+    }, 240);
+  } else {
+    _showLoginAnimated();
+  }
+}
+
+function _showLoginAnimated() {
+  const loginPage = document.getElementById("login-page");
+  if (loginPage) {
+    loginPage.style.display = "flex";
+    loginPage.style.animation = "loginFadeIn .3s ease";
+  }
 
   const stepRole = document.getElementById("login-step-role");
   const stepPin  = document.getElementById("login-step-pin");

@@ -28,8 +28,7 @@
 }
 
 /* ── VENDER — layout flex vertical ─────────────────────────────────────────── */
-#pg-vender {
-  display: flex;
+#pg-vender.active {
   flex-direction: column;
   overflow: hidden;
 }

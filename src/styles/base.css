@@ -140,6 +140,8 @@ button:active, [onclick]:active, .btn:active {
 
 /* ── ANIMAÇÕES ─────────────────────────────────────────────────────────────── */
 @keyframes fadeIn    { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes logoutFadeOut { from { opacity:1; transform:scale(1); } to { opacity:0; transform:scale(.97); } }
+@keyframes loginFadeIn   { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
 @keyframes slideUp   { from { transform:translateY(100%); } to { transform:translateY(0); } }
 @keyframes shake     { 0%,100%{transform:translateX(0);} 25%{transform:translateX(-6px);} 75%{transform:translateX(6px);} }
 @keyframes pulse     { 0%,100%{opacity:1;} 50%{opacity:.5;} }

@@ -461,7 +461,9 @@ async function loadIncidentes() {
         var isOpen        = i.status === "open";
         var canResolve     = isOpen && getUser().role === "admin";
         var resolverName   = (i.resolvedBy != null && usersById[i.resolvedBy]) ? usersById[i.resolvedBy].name : null;
-        var diffColor      = (i.diff||0) < 0 ? "var(--danger)" : "var(--success)";
+        var diff           = i.diff||0;
+        var diffColor      = diff < 0 ? "var(--danger)" : diff > 0 ? "var(--success)" : "var(--text3)";
+        var diffSub        = diff < 0 ? "Stock inferior ao esperado" : diff > 0 ? "Stock superior ao esperado" : "Sem diferença";
         var accentColor    = isOpen ? "var(--danger)" : "#d4d4d8";
 
         return '<div style="display:flex;background:#fff;border-radius:var(--radius-lg);margin-bottom:10px;box-shadow:var(--shadow-sm);overflow:hidden">' +
@@ -486,29 +488,55 @@ async function loadIncidentes() {
                     : '<span style="flex-shrink:0;display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--success);font-weight:700"><i data-lucide="check" style="width:12px;height:12px"></i>Resolvido</span>')) +
             '</div>' +
 
-            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;background:#fafafa;border-radius:var(--radius-sm);padding:10px 4px;margin-bottom:10px">' +
-              '<div style="text-align:center"><div style="font-size:9.5px;color:var(--text4);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Esperado</div><div style="font-size:13px;font-weight:700;color:var(--text2)">' + (i.expected||0) + '</div></div>' +
-              '<div style="text-align:center;border-left:1px solid #ececee;border-right:1px solid #ececee"><div style="font-size:9.5px;color:var(--text4);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Encontrado</div><div style="font-size:13px;font-weight:700;color:var(--text2)">' + (i.found||0) + '</div></div>' +
-              '<div style="text-align:center"><div style="font-size:9.5px;color:var(--text4);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Diferença</div><div style="font-size:13px;font-weight:800;color:' + diffColor + '">' + ((i.diff||0) > 0 ? "+" : "") + (i.diff||0) + '</div></div>' +
+            '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:12px">' +
+              '<div style="font-size:22px;font-weight:800;color:' + diffColor + '">' + (diff > 0 ? "+" : "") + diff + '</div>' +
+              '<div style="font-size:12px;color:var(--text3)">' + diffSub + '</div>' +
             '</div>' +
 
-            '<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:3px">' +
-              '<i data-lucide="user" style="width:12px;height:12px;color:var(--text4);flex-shrink:0;margin-top:1px"></i>' +
-              '<span style="font-size:11.5px;color:var(--text3);line-height:1.4">' + turnoInfo(i) + '</span>' +
-            '</div>' +
-            '<div style="display:flex;align-items:flex-start;gap:6px">' +
-              '<i data-lucide="clock" style="width:12px;height:12px;color:var(--text4);flex-shrink:0;margin-top:1px"></i>' +
-              '<span style="font-size:11.5px;color:var(--text3);line-height:1.4">' + _fmtDateLocal(i.createdAt) + (i.note ? " · " + i.note : "") + '</span>' +
+            '<button onclick="window._toggleIncDetails(' + i.id + ')" id="inc-toggle-' + i.id + '" style="display:flex;align-items:center;gap:4px;background:none;border:none;padding:0;margin-bottom:2px;font-size:11.5px;font-weight:700;color:var(--text3);cursor:pointer;font-family:inherit">' +
+              'Ver detalhes<i data-lucide="chevron-down" style="width:13px;height:13px;transition:transform .2s"></i>' +
+            '</button>' +
+
+            '<div id="inc-details-' + i.id + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2)">' +
+
+              '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#fafafa;border-radius:var(--radius-sm);padding:10px 4px;margin-bottom:10px">' +
+                '<div style="text-align:center"><div style="font-size:9.5px;color:var(--text4);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Esperado</div><div style="font-size:13px;font-weight:700;color:var(--text2)">' + (i.expected||0) + '</div></div>' +
+                '<div style="text-align:center;border-left:1px solid #ececee"><div style="font-size:9.5px;color:var(--text4);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Encontrado</div><div style="font-size:13px;font-weight:700;color:var(--text2)">' + (i.found||0) + '</div></div>' +
+              '</div>' +
+
+              '<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:3px">' +
+                '<i data-lucide="user" style="width:12px;height:12px;color:var(--text4);flex-shrink:0;margin-top:1px"></i>' +
+                '<span style="font-size:11.5px;color:var(--text3);line-height:1.4">' + turnoInfo(i) + '</span>' +
+              '</div>' +
+              '<div style="display:flex;align-items:flex-start;gap:6px">' +
+                '<i data-lucide="clock" style="width:12px;height:12px;color:var(--text4);flex-shrink:0;margin-top:1px"></i>' +
+                '<span style="font-size:11.5px;color:var(--text3);line-height:1.4">' + _fmtDateLocal(i.createdAt) + (i.note ? " · " + i.note : "") + '</span>' +
+              '</div>' +
+
+              (!isOpen && i.resolvedNote
+                ? '<div style="display:flex;align-items:flex-start;gap:6px;margin-top:3px">' +
+                    '<i data-lucide="check-circle" style="width:12px;height:12px;color:var(--success);flex-shrink:0;margin-top:1px"></i>' +
+                    '<span style="font-size:11.5px;color:var(--text3);line-height:1.4">Resolvido por <strong style="color:var(--text2)">' + (resolverName||"Admin") + '</strong>: ' + i.resolvedNote + '</span>' +
+                  '</div>'
+                : '') +
             '</div>' +
 
-            (!isOpen && i.resolvedNote
-              ? '<div style="margin-top:10px;padding:9px 11px;background:var(--success-light);border-radius:var(--radius-sm);font-size:12px;color:var(--text2);line-height:1.4"><strong style="color:var(--success)">' + (resolverName||"Admin") + ':</strong> ' + i.resolvedNote + '</div>'
-              : '') +
           '</div>' +
         '</div>';
       }).join("");
   refreshIcons(el("inc-list"));
 }
+
+window._toggleIncDetails = function(id) {
+  var details = document.getElementById("inc-details-" + id);
+  var btn = document.getElementById("inc-toggle-" + id);
+  if (!details || !btn) return;
+  var isOpen = details.style.display !== "none";
+  details.style.display = isOpen ? "none" : "block";
+  var icon = btn.querySelector("i");
+  if (icon) icon.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
+  btn.childNodes[0].textContent = isOpen ? "Ver detalhes" : "Ocultar detalhes";
+};
 
 window._clearResolvedIncidents = function() {
   confirmDialog(

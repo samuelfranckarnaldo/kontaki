@@ -41,14 +41,34 @@ function openDB() {
       ensure("journalEntries",  { keyPath:"id", autoIncrement:true },
         [["date",false],["sourceType",false],["sourceId",false]]); // lançamentos de partidas dobradas
     };
-    req.onsuccess = () => { _db = req.result; resolve(_db); };
+    req.onsuccess = () => {
+      _db = req.result;
+      _db.onclose = () => { _db = null; };
+      _db.onversionchange = () => {
+        try { _db.close(); } catch (e) {}
+        _db = null;
+      };
+      resolve(_db);
+    };
     req.onerror   = () => reject(req.error);
+    req.onblocked = () => {
+      console.warn("IndexedDB: abertura bloqueada — outra aba pode estar a usar uma versão antiga.");
+    };
   });
 }
 
-function dba(store, mode, fn) {
+function dba(store, mode, fn, _isRetry) {
   return openDB().then(db => new Promise((resolve, reject) => {
-    const tx = db.transaction(store, mode);
+    let tx;
+    try {
+      tx = db.transaction(store, mode);
+    } catch (err) {
+      // Ligação morta (fechada pelo browser em background) — descarta e tenta reabrir, uma vez.
+      _db = null;
+      if (_isRetry) { reject(err); return; }
+      dba(store, mode, fn, true).then(resolve, reject);
+      return;
+    }
     tx.onerror = () => reject(tx.error);
     fn(tx.objectStore(store), resolve, reject);
   }));
