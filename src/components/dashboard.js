@@ -128,7 +128,7 @@ export async function loadDashboard() {
 
     if (stockZero>0) alertCard.appendChild(_alertRow("package-x","var(--danger)",stockZero+" produto"+(stockZero>1?"s":"")+" esgotado"+(stockZero>1?"s":""),"Necessita reposição urgente",true));
     if (stockBaixo>0) alertCard.appendChild(_alertRow("alert-triangle","var(--warning)",stockBaixo+" produto"+(stockBaixo>1?"s":"")+" com stock baixo","Considera repor em breve",stockZero>0||fiadoAberto>0));
-    if (fiadoAberto>0) alertCard.appendChild(_alertRow("wallet","var(--primary)","Fiado em aberto: "+fmt(fiadoAberto),"Clientes com dívida pendente",false));
+    if (fiadoAberto>0) alertCard.appendChild(_alertRow("wallet","var(--primary)","Crédito em aberto: "+fmt(fiadoAberto),"Clientes com dívida pendente",false));
 
     alertWrap.appendChild(alertCard);
     sheet.appendChild(alertWrap);
