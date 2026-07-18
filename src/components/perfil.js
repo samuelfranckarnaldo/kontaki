@@ -1507,17 +1507,21 @@ window._contaRenderChart = function(meses) {
   var chartValues = [];
   for (var cmi = meses-1; cmi >= 0; cmi--) {
     var dChart = new Date(now.getFullYear(), now.getMonth()-cmi, 1);
-    var mesChart = dChart.toISOString().slice(0,7);
+    var mesChart = dChart.getFullYear() + "-" + String(dChart.getMonth()+1).padStart(2, "0");
     chartMonths.push(dChart.toLocaleDateString("pt-AO", { month: "short" }));
     chartValues.push(window._contaCalcMes(mesChart).lucroLiquido);
   }
 
-  console.log("[DEBUG grafico] meses:", chartMonths);
-  console.log("[DEBUG grafico] valores:", chartValues);
-  if (window.toast) window.toast(chartMonths.map(function(m,i){ return m+":"+Math.round(chartValues[i]/1000)+"K"; }).join(" | "), "info");
-
   var contaChartCanvas = document.getElementById("conta-chart-canvas");
   if (!contaChartCanvas || typeof Chart === "undefined") return;
+
+  // Se o canvas guardado ja nao e o mesmo elemento no DOM (pagina foi
+  // recarregada/renderizada de novo sem reload completo), o grafico antigo
+  // ficou orfao e tem de ser destruido antes de criar um novo.
+  if (_contaChartInstance && _contaChartInstance.canvas !== contaChartCanvas) {
+    _contaChartInstance.destroy();
+    _contaChartInstance = null;
+  }
 
   if (_contaChartInstance) {
     _contaChartInstance.data.labels = chartMonths;
