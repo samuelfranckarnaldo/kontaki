@@ -99,6 +99,43 @@ manual, e estados possíveis de um conflito (ex: `pending_resolution`,
 `resolved`). Até lá, permanece como questão aberta dentro deste
 documento, não como documento próprio.
 
+**Causa raiz confirmada (2026-07-18):** `ktkService.generate` copia
+`sessionSales` para `ktk.vendas` sem enriquecer os itens de venda com
+`catalogId` — cada item de venda transporta apenas o `id` (identidade
+local do produto no dispositivo de origem), nunca o `catalogId`
+(identidade global, já resolvido em `ADR-0005` para
+`stock_esperado`/`stock_movements`, mas nunca aplicado a `vendas`).
+Consequentemente, `detectConflicts` agrupa eventos por `it.id` — um
+`productId` local — não por identidade global. Dois dispositivos que
+atribuíram IDs locais diferentes ao mesmo produto (mesmo `catalogId`)
+nunca são reconhecidos como estando a vender o mesmo item, mesmo
+dentro do âmbito restrito (pendente-vs-pendente) que a função já
+cobre hoje.
+
+**Plano de correção, já desenhado, para quando for retomado** (não
+implementado agora — ver decisão de escopo abaixo):
+1. `ktkService.generate` resolve `catalogId` para cada item de
+   `sessionSales` (reaproveitando o mesmo mapa `catalogIdByProductId`
+   já construído para `stock_movements`) antes de os incluir em
+   `ktk.vendas`.
+2. `detectConflicts` agrupa por `it.catalogId || it.id` — identidade
+   global quando presente, `productId` local como fallback para
+   `.ktk` antigos sem o campo.
+3. O payload assinado do `.ktk` muda de novo (itens de venda passam a
+   incluir `catalogId`) — precisaria de nova versão de hash, seguindo
+   o mesmo padrão já estabelecido (`generateKtkHashV2X`), com fallback
+   de leitura para versões anteriores.
+
+**Decisão de escopo (2026-07-18):** esta correção não é implementada
+agora. A V1 do Kontaki suporta apenas 1 caixa por loja — o cenário que
+esta correção resolveria (dois dispositivos-caixa a vender o mesmo
+produto em simultâneo) não existe oficialmente enquanto essa decisão
+estiver em vigor. Corrigir `detectConflicts` sozinho, sem o cenário
+que o justifica, seria introduzir complexidade de uma versão futura
+(multi-caixa, ver `ADR-0006`) dentro do caminho crítico da V1. Fica
+registado aqui, com o plano já pronto, para quando `ADR-0006` for
+retomado.
+
 A implementação atual também utiliza identificadores locais
 (`productId`) para agrupamento de produtos durante a deteção de
 conflitos. Como definido em `01-identity.md`, referências entre
