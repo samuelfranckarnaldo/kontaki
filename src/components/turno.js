@@ -83,9 +83,13 @@ async function renderTurno() {
     // ── Acções ──
     html +=
       '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">' +
-        '<button onclick="window._fecharTurno()" style="width:100%;padding:15px;background:#dc2626;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(220,38,38,.3);letter-spacing:.2px">' +
-          '<i data-lucide="log-out" style="width:17px;height:17px"></i>Fechar turno e exportar .ktk' +
-        '</button>' +
+        (user.role === "admin"
+          ? '<button onclick="window._fecharTurno()" style="width:100%;padding:15px;background:#5b21b6;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(91,33,182,.25);letter-spacing:.2px">' +
+            '<i data-lucide="log-out" style="width:17px;height:17px"></i>Fechar turno' +
+            '</button>'
+          : '<button onclick="window._fecharTurno()" style="width:100%;padding:15px;background:#dc2626;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(220,38,38,.3);letter-spacing:.2px">' +
+            '<i data-lucide="log-out" style="width:17px;height:17px"></i>Fechar turno e exportar .ktk' +
+            '</button>') +
         '<button onclick="window._verVendasTurno()" style="width:100%;padding:13px;background:#fff;color:#5b21b6;border:1.5px solid #ddd6fe;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
           '<i data-lucide="receipt" style="width:16px;height:16px"></i>Ver vendas deste turno (' + sessionSales.length + ')' +
         '</button>' +
@@ -479,6 +483,25 @@ window._confirmarFecho = async function() {
         });
         incCount++;
       }
+    }
+
+    // V1: admin é o próprio destino do .ktk (1 admin por loja) — não faz
+    // sentido gerar/partilhar um ficheiro que ninguém vai importar. Caixa
+    // continua a precisar de exportar e partilhar com o admin, normalmente.
+    if (user.role === "admin") {
+      closeModal();
+      openModal("Turno fechado!",
+        '<div style="text-align:center;padding:10px 0 16px">' +
+        '<div style="width:64px;height:64px;background:#dcfce7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px">' +
+        '<i data-lucide="check-circle" style="width:32px;height:32px;color:#16a34a"></i></div>' +
+        '<div style="font-size:16px;font-weight:700;margin-bottom:6px">Turno fechado!</div>' +
+        (incCount>0?'<div style="background:#fee2e2;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;margin-top:6px">⚠ '+incCount+' incidente(s) gerado(s) por diferença de stock.</div>':"") +
+        (cashDiff!==0?'<div style="background:#fee2e2;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;margin-top:6px">⚠ Diferença de caixa: '+(cashDiff>0?"+":"")+fmt(cashDiff)+'.</div>':"") +
+        '</div>' +
+        '<button class="btn btn-primary btn-full" onclick="window._closeModal()">Fechar</button>');
+      refreshIcons(el("modal-box"));
+      await renderTurno();
+      return;
     }
 
     // Gera KTK
