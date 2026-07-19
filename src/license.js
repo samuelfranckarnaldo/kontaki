@@ -2,28 +2,51 @@ import { db } from "./db.js";
 
 var _license = null;
 
+// v2 (pendente): limite de dispositivos por loja, ficou fora desta
+// ronda por limitação da arquitetura de sincronização atual.
 export var PLANS = {
   basic: {
-    name: "Basic", price: 500,
-    maxProducts: 30, maxUsers: 2, maxDevices: 1,
-    features: ["vendas","stock","fiados","clientes","despesas","pin_recovery","historico","scanner","venda_rapida","dashboard"],
+    name: "Básico", price: 500,
+    maxProducts: 300, maxClients: 200, maxUsers: 1,
+    features: [
+      "vendas","stock","fiados","clientes","despesas","pin_recovery",
+      "historico","scanner","venda_rapida","dashboard",
+      "fatura_pdf","fatura_whatsapp","pedidos_aguardados","filtro_categorias",
+    ],
   },
   standard: {
     name: "Standard", price: 1000,
-    maxProducts: 100, maxUsers: 5, maxDevices: 2,
-    features: ["vendas","stock","fiados","clientes","despesas","pin_recovery","historico","scanner","venda_rapida","dashboard","contabilidade","fornecedores","backup","relatorio_funcionario"],
+    maxProducts: 2000, maxClients: 2000, maxUsers: 1,
+    features: [
+      "vendas","stock","fiados","clientes","despesas","pin_recovery",
+      "historico","scanner","venda_rapida","dashboard",
+      "fatura_pdf","fatura_whatsapp","pedidos_aguardados","filtro_categorias",
+      "contabilidade","exportar_relatorios","inventario_periodico",
+      "relatorios_estoque","fornecedores",
+    ],
   },
   pro: {
-    name: "Pro", price: 5000,
-    maxProducts: 500, maxUsers: 10, maxDevices: 5,
-    features: ["vendas","stock","fiados","clientes","despesas","pin_recovery","historico","scanner","venda_rapida","dashboard","contabilidade","fornecedores","backup","relatorio_funcionario","pdf_contabilidade","recibo_qr","logotipo","equipe"],
-  },
-  enterprise: {
-    name: "Enterprise", price: 10000,
-    maxProducts: 999999, maxUsers: 999999, maxDevices: 10,
-    features: ["all"],
+    name: "Pro", price: 2500,
+    // -1 = ilimitado (serializável; Infinity vira null em JSON.stringify)
+    maxProducts: -1, maxClients: -1, maxUsers: -1,
+    features: [
+      "vendas","stock","fiados","clientes","despesas","pin_recovery",
+      "historico","scanner","venda_rapida","dashboard",
+      "fatura_pdf","fatura_whatsapp","pedidos_aguardados","filtro_categorias",
+      "contabilidade","exportar_relatorios","inventario_periodico",
+      "relatorios_estoque","fornecedores",
+      "relatorio_funcionario","equipe","logotipo","backup",
+    ],
   },
 };
+
+var ALL_FEATURES = Array.from(new Set(
+  Object.keys(PLANS).flatMap(function(k) { return PLANS[k].features; })
+));
+
+function resolveLimit(val) {
+  return val === -1 ? Infinity : val;
+}
 
 var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
@@ -58,17 +81,23 @@ export function getLicense() {
 }
 
 export function hasFeature(feature) {
-  var lic  = getLicense();
+  var lic = getLicense();
   if (lic.status === "expired") return false;
+  if (lic.status === "trial") return ALL_FEATURES.includes(feature);
   var plan = PLANS[lic.plan] || PLANS.basic;
-  if (plan.features.includes("all")) return true;
   return plan.features.includes(feature);
 }
 
 export function getPlanLimit(key) {
-  var lic  = getLicense();
+  var lic = getLicense();
+  if (lic.status === "expired") return 0;
+  // Trial = experiência Pro com prazo, não "ilimitado à parte": herda o
+  // limite do Pro (hoje -1/ilimitado; se o Pro ganhar um teto finito no
+  // futuro, o trial acompanha automaticamente, sem alteração aqui).
+  if (lic.status === "trial") return resolveLimit(PLANS.pro[key]);
   var plan = PLANS[lic.plan] || PLANS.basic;
-  return plan[key] !== undefined ? plan[key] : PLANS.basic[key];
+  var val = plan[key] !== undefined ? plan[key] : PLANS.basic[key];
+  return resolveLimit(val);
 }
 
 async function getDeviceId() {
