@@ -86,12 +86,24 @@ function paymentAccount(method) {
   return "45"; // Caixa (dinheiro / default)
 }
 
+// Verifica se um mes (YYYY-MM) ja foi fechado — periodos fechados sao imutaveis.
+export async function isPeriodClosed(dateStr) {
+  if (!dateStr) return false;
+  var period = String(dateStr).slice(0, 7);
+  var closure = await db.get("accountingArchive", period);
+  return !!closure;
+}
+
 // Cria um lançamento (partidas dobradas) — valida que débito == crédito antes de gravar
-async function createJournalEntry(date, description, sourceType, sourceId, lines) {
+// e que a data não cai num período já fechado.
+async function createJournalEntry(date, description, sourceType, sourceId, lines, _bypassClosedCheck) {
   var totalDebit  = lines.reduce(function(a,l){ return a + (l.debit||0); }, 0);
   var totalCredit = lines.reduce(function(a,l){ return a + (l.credit||0); }, 0);
   if (Math.round(totalDebit*100) !== Math.round(totalCredit*100)) {
     throw new Error("Lançamento desequilibrado: débito " + totalDebit + " != crédito " + totalCredit + " (" + description + ")");
+  }
+  if (!_bypassClosedCheck && await isPeriodClosed(date)) {
+    throw new Error("Período " + String(date).slice(0,7) + " já está fechado — não é possível criar lançamentos nesse mês.");
   }
   return db.add("journalEntries", { date, description, sourceType, sourceId, lines, createdAt: new Date().toISOString() });
 }
@@ -191,13 +203,93 @@ function expenseCostAccount(category) {
   return "75"; // Outros custos e perdas operacionais
 }
 
-// Remove lançamentos anteriores de uma origem (usado antes de re-lançar numa edição)
+// Remove lançamentos anteriores de uma origem (usado antes de re-lançar numa edição).
+// Recusa apagar lançamentos cuja data caia num período já fechado.
 async function deleteJournalEntriesBySource(sourceType, sourceId) {
   var all = await db.getAll("journalEntries");
   var toDelete = all.filter(function(e){ return e.sourceType === sourceType && e.sourceId === sourceId; });
   for (var i = 0; i < toDelete.length; i++) {
-    await db.delete("journalEntries", toDelete[i].id);
+    if (await isPeriodClosed(toDelete[i].date)) {
+      throw new Error("Não é possível alterar — o período " + String(toDelete[i].date).slice(0,7) + " já está fechado.");
+    }
   }
+  for (var j = 0; j < toDelete.length; j++) {
+    await db.delete("journalEntries", toDelete[j].id);
+  }
+}
+
+// ── FECHO DE EXERCÍCIO (mensal) ──────────────────────────────────────────────
+// Fecha um mês (YYYY-MM) já terminado: zera as contas de Proveitos (classe 6)
+// e Custos (classe 7) desse mês, transferindo o saldo líquido para a conta 88
+// (Resultados líquidos do exercício). Grava o registo em accountingArchive,
+// tornando o mês imutável a partir daí (ver isPeriodClosed).
+export async function closeAccountingPeriod(period, closedByUserId) {
+  if (await isPeriodClosed(period)) {
+    throw new Error("O período " + period + " já está fechado.");
+  }
+  var now = new Date();
+  var currentPeriod = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0");
+  if (period >= currentPeriod) {
+    throw new Error("Só é possível fechar meses já terminados.");
+  }
+
+  var entries = await db.getAll("journalEntries");
+  var doMes = entries.filter(function(e){ return String(e.date).slice(0,7) === period; });
+
+  var saldosPorConta = {};
+  doMes.forEach(function(e) {
+    (e.lines||[]).forEach(function(l) {
+      var acc = CHART_OF_ACCOUNTS.find(function(c){ return c.code === l.account; });
+      if (!acc || (acc.tipo !== "proveito" && acc.tipo !== "custo")) return;
+      saldosPorConta[l.account] = saldosPorConta[l.account] || 0;
+      // proveito é credora (credit-debit), custo é devedora (debit-credit)
+      saldosPorConta[l.account] += acc.natureza === "credora" ? (l.credit-l.debit) : (l.debit-l.credit);
+    });
+  });
+
+  var contasComSaldo = Object.keys(saldosPorConta).filter(function(code){ return Math.round(saldosPorConta[code]*100) !== 0; });
+
+  var closingLines = [];
+  var totalProveitos = 0, totalCustos = 0;
+  contasComSaldo.forEach(function(code) {
+    var acc = CHART_OF_ACCOUNTS.find(function(c){ return c.code === code; });
+    var saldo = saldosPorConta[code];
+    if (acc.tipo === "proveito") {
+      totalProveitos += saldo;
+      // zera a conta de proveito (debito) e credita 88
+      closingLines.push({ account: code, debit: saldo, credit: 0 });
+      closingLines.push({ account: "88", debit: 0, credit: saldo });
+    } else {
+      totalCustos += saldo;
+      // zera a conta de custo (credito) e debita 88
+      closingLines.push({ account: code, debit: 0, credit: saldo });
+      closingLines.push({ account: "88", debit: saldo, credit: 0 });
+    }
+  });
+
+  var dataFecho = period + "-28"; // ultimo dia util seguro do mes, evita problemas de dias curtos
+  var closingEntryIds = [];
+  if (closingLines.length) {
+    var entryId = await createJournalEntry(
+      dataFecho, "Fecho do exercício — " + period, "period_closure", period, closingLines, true
+    );
+    closingEntryIds.push(entryId);
+  }
+
+  var resultadoLiquido = totalProveitos - totalCustos;
+
+  await db.put("accountingArchive", {
+    period: period,
+    closedAt: new Date().toISOString(),
+    closedBy: closedByUserId,
+    totalProveitos: totalProveitos,
+    totalCustos: totalCustos,
+    resultadoLiquido: resultadoLiquido,
+    saldosPorConta: saldosPorConta,
+    closingEntryIds: closingEntryIds,
+  });
+
+  return { period, totalProveitos, totalCustos, resultadoLiquido };
 }
 
 // Lançamento de uma despesa: débito conta de custo, crédito Caixa/Depósitos

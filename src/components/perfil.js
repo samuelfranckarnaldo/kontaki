@@ -6,7 +6,7 @@ import { loadTurno } from "./turno.js";
 import { loadFornecedores } from "./fornecedores.js";
 import { loadEscritorio } from "./escritorio.js";
 import { db }                    from "../db.js";
-import { CHART_OF_ACCOUNTS } from "../pgc.js";
+import { CHART_OF_ACCOUNTS, closeAccountingPeriod, isPeriodClosed } from "../pgc.js";
 import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
@@ -1186,10 +1186,10 @@ async function loadContaResumo(wrap) {
   });
 
   var now       = new Date();
-  var mes       = now.toISOString().slice(0,7);
+  var mes       = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0");
   var hoje      = now.toISOString().slice(0,10);
   var mesAnteriorDate = new Date(now.getFullYear(), now.getMonth()-1, 1);
-  var mesAnterior = mesAnteriorDate.toISOString().slice(0,7);
+  var mesAnterior = mesAnteriorDate.getFullYear() + "-" + String(mesAnteriorDate.getMonth()+1).padStart(2,"0");
 
   function calcMes(mesStr) {
     var vendasM  = sales.filter(function(s){ return (s.date||"").startsWith(mesStr); });
@@ -1416,6 +1416,26 @@ async function loadContaResumo(wrap) {
   pdfBtn.onclick = gerarRelatorioPDF;
   wrap.appendChild(pdfBtn);
 
+  // ── Fecho de exercício (mensal, admin, so meses ja terminados) ──
+  var userForClosure = getUser();
+  var nowClosure = new Date();
+  var currentPeriod = nowClosure.getFullYear() + "-" + String(nowClosure.getMonth()+1).padStart(2,"0");
+  if (userForClosure && userForClosure.role === "admin" && mes < currentPeriod) {
+    var jaFechado = await isPeriodClosed(mes);
+    var closureBtn = document.createElement("button");
+    closureBtn.className = "btn btn-full";
+    if (jaFechado) {
+      closureBtn.style.cssText = "background:var(--success-light);color:var(--success);border:1.5px solid transparent;margin-top:8px;cursor:default";
+      closureBtn.innerHTML = '<i data-lucide="lock" style="width:16px;height:16px"></i> Mês fechado';
+      closureBtn.disabled = true;
+    } else {
+      closureBtn.style.cssText = "background:var(--bg2);color:var(--text);border:1.5px solid var(--border);margin-top:8px";
+      closureBtn.innerHTML = '<i data-lucide="lock" style="width:16px;height:16px;color:var(--primary)"></i> Fechar este mês';
+      closureBtn.onclick = function() { window._openFecharMesConfirm(mes, atual.receita, atual.cogs, atual.despesas, atual.lucroLiquido); };
+    }
+    wrap.appendChild(closureBtn);
+  }
+
   // ── Gráfico: Resultado líquido, período seleccionável ──
   var chartTabsWrap = document.getElementById("conta-chart-tabs");
   if (chartTabsWrap) {
@@ -1431,6 +1451,46 @@ async function loadContaResumo(wrap) {
 
   refreshIcons(wrap);
 }
+window._openFecharMesConfirm = function(period, receita, cogs, despesas, resultado) {
+  var lucroBruto = receita - cogs;
+  var mesLabel = new Date(period + "-15").toLocaleDateString("pt-AO", { month: "long", year: "numeric" });
+
+  openModal("Fechar " + mesLabel,
+    '<div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:16px">' +
+    'Isto vai zerar as contas de Proveitos e Custos deste mês, transferindo o resultado para a conta 88 (Resultados líquidos do exercício). ' +
+    '<strong>Depois de fechar, este mês fica bloqueado</strong> — nenhuma venda, despesa ou lançamento poderá ter data dentro dele, nem para editar nem para apagar.' +
+    '</div>' +
+    '<div style="background:var(--bg);border-radius:10px;padding:2px 14px;margin-bottom:16px">' +
+    '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Receita</span><span style="font-weight:700">' + fmt(receita) + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Custo das vendas</span><span style="font-weight:700">-' + fmt(cogs) + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Despesas</span><span style="font-weight:700">-' + fmt(despesas) + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px"><span style="font-weight:700">Resultado líquido</span><span style="font-weight:800;color:' + (resultado>=0?"var(--success)":"var(--danger)") + '">' + fmt(resultado) + '</span></div>' +
+    '</div>' +
+    '<div style="margin-top:var(--space-3);display:flex;flex-direction:column;gap:var(--space-1)">' +
+    '<button class="btn btn-primary btn-full" onclick="window._confirmFecharMes(\'' + period + '\')">' +
+    '<i data-lucide="lock"></i> Confirmar e Fechar (irreversível)' +
+    '</button>' +
+    '<button onclick="window._closeModal()" style="width:100%;padding:10px;background:none;border:none;color:var(--text3);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">' +
+    'Cancelar' +
+    '</button>' +
+    '</div>'
+  );
+  refreshIcons(document.getElementById("modal-box") || document.body);
+};
+
+window._confirmFecharMes = async function(period) {
+  var user = getUser();
+  if (!user || user.role !== "admin") { toast("Apenas administradores podem fechar o mês.", "error"); return; }
+  try {
+    var result = await closeAccountingPeriod(period, user.id);
+    closeModal();
+    toast("Mês " + period + " fechado com sucesso.", "success");
+    await loadContabilidade();
+  } catch (e) {
+    toast(e.message || "Erro ao fechar o mês.", "error");
+  }
+};
+
 function contaKpi(label, value, color, icon) {
   var isAccent = color && color !== "var(--text)";
   var iconStyle = isAccent ? ('style="color:' + color + ';background:' + color + '20"') : '';
@@ -2180,7 +2240,7 @@ window._gerarRelatorioFuncionario = async function() {
   var mySales = sales.filter(function(s){ return s.userId === userId; });
 
   var now = new Date();
-  var mes = now.toISOString().slice(0,7);
+  var mes = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0");
   var mySalesMes = mySales.filter(function(s){ return (s.date||"").startsWith(mes); });
   var totalMes = mySalesMes.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
   var totalGeral = mySales.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); },0);
