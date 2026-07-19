@@ -869,7 +869,7 @@ async function loadLoja() {
   });
   if (s.logo) renderLogoPreview(s.logo);
 
-  var PROVINCIAS = ["Bengo","Benguela","Bié","Cabinda","Cuando Cubango","Cuanza Norte","Cuanza Sul","Cunene","Huambo","Huíla","Luanda","Lunda Norte","Lunda Sul","Malanje","Moxico","Namibe","Uíge","Zaire"];
+  var PROVINCIAS = ["Bengo","Benguela","Bié","Cabinda","Cuando","Cuanza Norte","Cuanza Sul","Cubango","Cunene","Huambo","Huíla","Icolo e Bengo","Luanda","Lunda Norte","Lunda Sul","Malanje","Moxico","Moxico Leste","Namibe","Uíge","Zaire"];
   var provSel = document.getElementById("ss-province");
   var provBtn = document.getElementById("ss-province-btn");
   var provLabel = document.getElementById("ss-province-label");

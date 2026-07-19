@@ -3,32 +3,36 @@ import { showRoleSelect } from "./role-select.js";
 
 const SLIDES = [
   {
-    icon: "receipt",
+    icon: "building-2",
     color: "#5b21b6",
     bg: "#ede9fe",
     title: "Bem-vindo ao Kontaki",
-    text: "Vende, controla o stock e sabe sempre quanto estás a ganhar — tudo no teu telemóvel.",
+    subtitle: "Sistema de gestão empresarial.",
+    text: "Centraliza as operações do teu negócio numa plataforma concebida para desempenho, simplicidade e fiabilidade.",
   },
   {
     icon: "wifi-off",
     color: "#16a34a",
     bg: "#f0fdf4",
-    title: "Funciona sem internet",
-    text: "Os teus dados ficam guardados no dispositivo. Vende mesmo sem rede.",
+    title: "Offline por natureza",
+    subtitle: "Continua a trabalhar em qualquer situação.",
+    text: "O Kontaki foi desenvolvido com arquitetura offline-first, permitindo operar mesmo sem ligação à internet.",
   },
   {
-    icon: "wallet",
+    icon: "layers",
     color: "#d97706",
     bg: "#fffbeb",
-    title: "Fiados organizados",
-    text: "Sabe sempre quem te deve e quanto, sem confusão nem caderno.",
+    title: "Gestão integrada",
+    subtitle: "Mais do que um ponto de venda.",
+    text: "Vendas, stock, compras, clientes, despesas, contabilidade e relatórios trabalham de forma integrada.",
   },
   {
-    icon: "printer",
+    icon: "shield-check",
     color: "#2563eb",
     bg: "#eff6ff",
-    title: "Recibo profissional",
-    text: "Emite recibos para os teus clientes em segundos, prontos a imprimir ou partilhar.",
+    title: "Segurança e evolução contínua",
+    subtitle: "Construído para o presente e preparado para o futuro.",
+    text: "Proteção dos dados, recuperação de acesso, atualizações contínuas e sincronização segura fazem parte da plataforma.",
   },
 ];
 
@@ -68,7 +72,8 @@ export function showOnboarding() {
         '<div style="width:96px;height:96px;background:' + s.bg + ';border-radius:28px;display:flex;align-items:center;justify-content:center;margin-bottom:28px">',
           '<i data-lucide="' + s.icon + '" style="width:44px;height:44px;color:' + s.color + '"></i>',
         '</div>',
-        '<div style="font-size:22px;font-weight:800;color:#18181b;margin-bottom:12px;letter-spacing:-.3px;max-width:300px">' + s.title + '</div>',
+        '<div style="font-size:22px;font-weight:800;color:#18181b;margin-bottom:8px;letter-spacing:-.3px;max-width:300px">' + s.title + '</div>',
+        '<div style="font-size:14.5px;font-weight:700;color:' + s.color + ';margin-bottom:10px;max-width:290px">' + s.subtitle + '</div>',
         '<div style="font-size:14px;color:#71717a;line-height:1.6;max-width:280px">' + s.text + '</div>',
       '</div>',
 

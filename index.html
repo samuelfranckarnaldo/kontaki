@@ -32,14 +32,8 @@
 
     <!-- STEP 1: Selecciona utilizador -->
     <div id="login-step-role">
-      <div class="login-step-label">Quem está a trabalhar agora?</div>
+      <div id="login-rotating-msg" class="login-rotating-msg"></div>
       <div id="login-users-list" class="login-users-list"></div>
-      <div class="login-terms">
-        Ao entrar aceitas os
-        <button onclick="window._showTermos()">Termos</button>
-        e a
-        <button onclick="window._showPrivacidade()">Privacidade</button>
-      </div>
       <div class="login-footer-brand">Introxeer</div>
     </div>
 
@@ -390,10 +384,11 @@ document.addEventListener("DOMContentLoaded", function() {
               <select id="ss-province" style="display:none">
                 <option value="">Seleccionar...</option>
                 <option>Bengo</option><option>Benguela</option><option>Bié</option>
-                <option>Cabinda</option><option>Cuando Cubango</option><option>Cuanza Norte</option>
-                <option>Cuanza Sul</option><option>Cunene</option><option>Huambo</option>
-                <option>Huíla</option><option>Luanda</option><option>Lunda Norte</option>
-                <option>Lunda Sul</option><option>Malanje</option><option>Moxico</option>
+                <option>Cabinda</option><option>Cuando</option><option>Cuanza Norte</option>
+                <option>Cuanza Sul</option><option>Cubango</option><option>Cunene</option>
+                <option>Huambo</option><option>Huíla</option><option>Icolo e Bengo</option>
+                <option>Luanda</option><option>Lunda Norte</option><option>Lunda Sul</option>
+                <option>Malanje</option><option>Moxico</option><option>Moxico Leste</option>
                 <option>Namibe</option><option>Uíge</option><option>Zaire</option>
               </select>
               <button type="button" id="ss-province-btn" class="conta-picker-btn">
@@ -862,14 +857,6 @@ window._showPrivacidade = function() {
     "</div>";
   document.body.appendChild(d);
 };
-</script>
-<script>
-window.addEventListener('error', function(e) {
-  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;color:red;white-space:pre-wrap">ERRO: ' + e.message + '\nFicheiro: ' + e.filename + '\nLinha: ' + e.lineno + ':' + e.colno + '</div>' + document.body.innerHTML;
-});
-window.addEventListener('unhandledrejection', function(e) {
-  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;color:red;white-space:pre-wrap">PROMISE ERRO: ' + (e.reason && e.reason.stack ? e.reason.stack : e.reason) + '</div>' + document.body.innerHTML;
-});
 </script>
 <script src="./assets/vendor/chart.umd.min.js"></script>
 <script type="module" src="./src/main.js"></script>

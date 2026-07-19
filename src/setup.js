@@ -3,6 +3,8 @@ import { hashPassword }    from "./crypto.js";
 import { refreshIcons }    from "./utils.js";
 import { toast }           from "./toast.js";
 import { generateCodesForUser } from "./recovery-codes.js";
+import { backupService } from "./backup.js";
+import { openPicker } from "./picker.js";
 
 export async function checkSetup() {
   const first = await isFirstTime();
@@ -133,7 +135,25 @@ function showSetup() {
         '<div style="display:flex;flex-direction:column;gap:14px">',
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">',
             inp('setup-store-address',  'text', 'Bairro, Rua...', false),
-            inp('setup-store-province', 'text', 'Ex: Luanda',     false),
+            (function() {
+              return '<div>' +
+                '<label style="display:block;font-size:12px;font-weight:700;color:#3f3f46;letter-spacing:.2px;margin-bottom:6px">Província<span style="color:#a1a1aa;font-weight:500"> (opcional)</span></label>' +
+                '<select id="setup-store-province" style="display:none">' +
+                  '<option value="">Seleccionar...</option>' +
+                  '<option>Bengo</option><option>Benguela</option><option>Bié</option>' +
+                  '<option>Cabinda</option><option>Cuando</option><option>Cuanza Norte</option>' +
+                  '<option>Cuanza Sul</option><option>Cubango</option><option>Cunene</option>' +
+                  '<option>Huambo</option><option>Huíla</option><option>Icolo e Bengo</option>' +
+                  '<option>Luanda</option><option>Lunda Norte</option><option>Lunda Sul</option>' +
+                  '<option>Malanje</option><option>Moxico</option><option>Moxico Leste</option>' +
+                  '<option>Namibe</option><option>Uíge</option><option>Zaire</option>' +
+                '</select>' +
+                '<button type="button" id="setup-province-btn" class="conta-picker-btn" style="width:100%;padding:13px 14px;border:1.5px solid #e4e4e7;border-radius:11px;font-size:15px;font-family:inherit;background:#fff;color:#18181b;display:flex;align-items:center;justify-content:space-between;cursor:pointer">' +
+                  '<span id="setup-province-label" style="color:#a1a1aa">Seleccionar...</span>' +
+                  '<i data-lucide="chevron-down" style="width:16px;height:16px;flex-shrink:0;color:#a1a1aa"></i>' +
+                '</button>' +
+              '</div>';
+            })(),
           '</div>',
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">',
             inp('setup-store-nif',   'text',  'Ex: 5417382LA041', false),
@@ -185,7 +205,7 @@ function showSetup() {
 
         '<label class="setup-terms-label" style="display:flex;align-items:flex-start;gap:8px;margin-bottom:12px;cursor:pointer">',
           '<input type="checkbox" id="setup-terms-check" style="width:16px;height:16px;margin-top:1px;accent-color:#5b21b6;flex-shrink:0;cursor:pointer"/>',
-          '<span class="setup-terms-label" style="font-size:11px;color:#71717a;line-height:1.5;text-align:left">Li e aceito os <button type="button" onclick="window._showTermos()" style="background:none;border:none;padding:0;color:#5b21b6;font-weight:600;font-size:11px;cursor:pointer;font-family:inherit;text-decoration:underline">Termos</button>, a <button type="button" onclick="window._showPrivacidade()" style="background:none;border:none;padding:0;color:#5b21b6;font-weight:600;font-size:11px;cursor:pointer;font-family:inherit;text-decoration:underline">Política de Privacidade</button> e a <button type="button" onclick="window._showUsoAceitavel()" style="background:none;border:none;padding:0;color:#5b21b6;font-weight:600;font-size:11px;cursor:pointer;font-family:inherit;text-decoration:underline">Política de Uso Aceitável</button> da Introxeer</span>',
+          '<span class="setup-terms-label" style="font-size:11px;color:#71717a;line-height:1.5;text-align:left">Ao continuar, aceita os <a href="https://introxeer.vercel.app/legal/documents/consumer-terms/" target="_blank" rel="noopener" style="color:#5b21b6;font-weight:600;font-size:11px;text-decoration:underline">Termos do Consumidor</a> (que incluem a Política de Uso Aceitável) e a <a href="https://introxeer.vercel.app/legal/documents/privacy-policy/" target="_blank" rel="noopener" style="color:#5b21b6;font-weight:600;font-size:11px;text-decoration:underline">Política de Privacidade</a> da Introxeer</span>',
         '</label>',
 
         '<button id="setup-btn-finalizar" onclick="window._setupFinalizar()" style="display:none;width:100%;padding:14px;background:#16a34a;color:#fff;border:none;border-radius:13px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(22,163,74,.25)">',
@@ -221,6 +241,33 @@ function showSetup() {
     el.addEventListener('focus', function() { this.style.borderColor = '#5b21b6'; this.style.boxShadow = '0 0 0 3px rgba(91,33,182,.08)'; });
     el.addEventListener('blur',  function() { this.style.borderColor = '#e4e4e7'; this.style.boxShadow = 'none'; });
   });
+
+  var setupProvBtn = document.getElementById("setup-province-btn");
+  var setupProvSel = document.getElementById("setup-store-province");
+  var setupProvLabel = document.getElementById("setup-province-label");
+  if (setupProvBtn && setupProvSel && setupProvLabel) {
+    setupProvBtn.onclick = function() {
+      var PROVINCIAS_SETUP = ["Bengo","Benguela","Bié","Cabinda","Cuando","Cuanza Norte","Cuanza Sul","Cubango","Cunene","Huambo","Huíla","Icolo e Bengo","Luanda","Lunda Norte","Lunda Sul","Malanje","Moxico","Moxico Leste","Namibe","Uíge","Zaire"];
+      openPicker(
+        "Selecionar província",
+        PROVINCIAS_SETUP,
+        setupProvSel.value,
+        function(chosen) {
+          setupProvSel.value = chosen;
+          setupProvLabel.textContent = chosen;
+          setupProvLabel.style.color = "#18181b";
+        }
+      );
+    };
+  }
+
+  var setupPhoneInput = document.getElementById("setup-store-phone");
+  if (setupPhoneInput) {
+    setupPhoneInput.addEventListener("blur", function() {
+      var digits = this.value.replace(/\D/g, "").slice(0, 9);
+      this.value = digits.replace(/(\d{3})(?=\d)/g, "$1 ").trim();
+    });
+  }
 
   var _pin = "";
   var _pinConfirm = "";
@@ -263,6 +310,38 @@ function showSetup() {
     if (header) header.style.padding = "20px 24px 14px";
     if (footer) footer.style.padding = "8px";
   }
+
+  window._restoreBackupLogin = async function(input) {
+    var file = input.files[0];
+    if (!file) return;
+    input.value = "";
+
+    var spinnerOverlay = document.createElement("div");
+    spinnerOverlay.id = "restore-spinner-overlay";
+    spinnerOverlay.style.cssText = "position:fixed;inset:0;background:rgba(255,255,255,.96);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:inherit";
+    spinnerOverlay.innerHTML =
+      '<div style="width:38px;height:38px;border:3px solid #ede9fe;border-top-color:#5b21b6;border-radius:50%;animation:restoreSpin .8s linear infinite"></div>' +
+      '<div style="font-size:13.5px;font-weight:600;color:#3f3f46">A restaurar o backup\u2026</div>';
+    document.body.appendChild(spinnerOverlay);
+
+    if (!document.getElementById("restore-spin-style")) {
+      var spinStyle = document.createElement("style");
+      spinStyle.id = "restore-spin-style";
+      spinStyle.textContent = "@keyframes restoreSpin { to { transform: rotate(360deg) } }";
+      document.head.appendChild(spinStyle);
+    }
+
+    try {
+      var text = await file.text();
+      var results = await backupService.import(text);
+      var total = Object.values(results).reduce(function(a, b) { return a + b; }, 0);
+      toast("Backup restaurado: " + total + " registos.", "success");
+      setTimeout(function() { window.location.reload(); }, 600);
+    } catch (err) {
+      spinnerOverlay.remove();
+      toast("Erro ao restaurar: " + err.message, "error");
+    }
+  };
 
   window._setupStep2 = function() {
     var storeName  = (document.getElementById("setup-store-name")  || {}).value || "";

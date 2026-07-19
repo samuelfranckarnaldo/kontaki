@@ -114,6 +114,13 @@ window._importBackup = async (input) => {
   input.value = "";
   const text = await file.text();
 
+  // Guarda o conteúdo numa variável, nunca embutido no HTML/onclick — um
+  // backup completo pode já ter megabytes (histórico de vendas, auditoria,
+  // contabilidade), e uma string desse tamanho dentro de um atributo HTML
+  // arrisca rebentar o WebView (mesma classe de bug já corrigida no botão
+  // de partilhar .ktk via WhatsApp).
+  window._pendingBackupImport = text;
+
   openModal("Importar Backup",
     '<div style="background:var(--warning-muted-light);border:1.5px solid var(--warning-muted);border-radius:12px;padding:14px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">' +
     '<i data-lucide="alert-triangle" style="width:18px;height:18px;color:var(--warning-muted);flex-shrink:0;margin-top:1px"></i>' +
@@ -123,22 +130,40 @@ window._importBackup = async (input) => {
     '<div style="font-size:13px;color:var(--text3);margin-bottom:16px">Ficheiro: <strong>' + file.name + '</strong></div>' +
     '<div class="form-actions">' +
     '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
-    '<button class="btn btn-primary btn-full" onclick="window._confirmImportBackup(&#39;' + encodeURIComponent(text) + '&#39;)" style="background:var(--danger)">' +
+    '<button class="btn btn-primary btn-full" onclick="window._confirmImportBackup()" style="background:var(--danger)">' +
     '<i data-lucide="upload"></i> Confirmar importação</button>' +
     '</div>');
   refreshIcons(el("modal-box"));
 };
 
-window._confirmImportBackup = async (encodedText) => {
+window._confirmImportBackup = async () => {
+  const body = el("modal-body");
+  if (body) {
+    body.innerHTML =
+      '<div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 0">' +
+      '<div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--danger);border-radius:50%;animation:importSpin .8s linear infinite"></div>' +
+      '<div style="font-size:13.5px;font-weight:600;color:var(--text3)">A importar backup\u2026</div>' +
+      '</div>';
+    if (!document.getElementById("import-spin-style")) {
+      const s = document.createElement("style");
+      s.id = "import-spin-style";
+      s.textContent = "@keyframes importSpin { to { transform: rotate(360deg) } }";
+      document.head.appendChild(s);
+    }
+  }
+
   try {
-    const text    = decodeURIComponent(encodedText);
+    const text = window._pendingBackupImport;
+    if (!text) { toast("Nada para importar.", "error"); closeModal(); return; }
     const results = await backupService.import(text);
     const total   = Object.values(results).reduce((a,b) => a+b, 0);
     toast("Backup importado: " + total + " registos restaurados.", "success");
+    window._pendingBackupImport = null;
     closeModal();
     await renderConfiguracoes();
   } catch(err) {
     toast("Erro: " + err.message, "error");
+    closeModal();
   }
 };
 
