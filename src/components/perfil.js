@@ -1416,24 +1416,43 @@ async function loadContaResumo(wrap) {
   pdfBtn.onclick = gerarRelatorioPDF;
   wrap.appendChild(pdfBtn);
 
-  // ── Fecho de exercício (mensal, admin, so meses ja terminados) ──
+  // ── Fecho de exercício (mensal, admin) — secção sempre visível com os últimos meses ──
   var userForClosure = getUser();
-  var nowClosure = new Date();
-  var currentPeriod = nowClosure.getFullYear() + "-" + String(nowClosure.getMonth()+1).padStart(2,"0");
-  if (userForClosure && userForClosure.role === "admin" && mes < currentPeriod) {
-    var jaFechado = await isPeriodClosed(mes);
-    var closureBtn = document.createElement("button");
-    closureBtn.className = "btn btn-full";
-    if (jaFechado) {
-      closureBtn.style.cssText = "background:var(--success-light);color:var(--success);border:1.5px solid transparent;margin-top:8px;cursor:default";
-      closureBtn.innerHTML = '<i data-lucide="lock" style="width:16px;height:16px"></i> Mês fechado';
-      closureBtn.disabled = true;
-    } else {
-      closureBtn.style.cssText = "background:var(--bg2);color:var(--text);border:1.5px solid var(--border);margin-top:8px";
-      closureBtn.innerHTML = '<i data-lucide="lock" style="width:16px;height:16px;color:var(--primary)"></i> Fechar este mês';
-      closureBtn.onclick = function() { window._openFecharMesConfirm(mes, atual.receita, atual.cogs, atual.despesas, atual.lucroLiquido); };
+  if (userForClosure && userForClosure.role === "admin") {
+    var closureSection = document.createElement("div");
+    closureSection.style.cssText = "margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px";
+    closureSection.innerHTML = '<div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Fecho de Exercício</div><div id="closure-list"></div>';
+    wrap.appendChild(closureSection);
+
+    var closureListHtml = "";
+    for (var cli = 0; cli <= 5; cli++) {
+      var dCl = new Date(now.getFullYear(), now.getMonth()-cli, 1);
+      var periodCl = dCl.getFullYear() + "-" + String(dCl.getMonth()+1).padStart(2,"0");
+      var labelCl = dCl.toLocaleDateString("pt-AO", { month: "long", year: "numeric" });
+      var isCurrentCl = cli === 0;
+      var fechadoCl = !isCurrentCl && await isPeriodClosed(periodCl);
+
+      var statusHtml, actionHtml;
+      if (isCurrentCl) {
+        statusHtml = '<span style="font-size:11px;color:var(--text3)">Mês em curso</span>';
+        actionHtml = '<span style="font-size:11px;color:var(--text4);font-style:italic">Disponível a partir de ' + new Date(now.getFullYear(), now.getMonth()+1, 1).toLocaleDateString("pt-AO",{day:"2-digit",month:"2-digit"}) + '</span>';
+      } else if (fechadoCl) {
+        statusHtml = '<span style="font-size:11px;color:var(--success);font-weight:700"><i data-lucide="lock" style="width:11px;height:11px;vertical-align:middle;margin-right:2px"></i>Fechado</span>';
+        actionHtml = "";
+      } else {
+        statusHtml = '<span style="font-size:11px;color:var(--warning);font-weight:700">Aberto</span>';
+        actionHtml = '<button onclick="window._prepFecharMes(\'' + periodCl + '\')" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Fechar</button>';
+      }
+
+      closureListHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0' + (cli<5?';border-bottom:1px solid var(--border2)':'') + '">' +
+        '<div><div style="font-size:13px;font-weight:600;color:var(--text);text-transform:capitalize">' + labelCl + '</div>' + statusHtml + '</div>' +
+        actionHtml +
+        '</div>';
     }
-    wrap.appendChild(closureBtn);
+
+    var closureListEl = document.getElementById("closure-list");
+    if (closureListEl) closureListEl.innerHTML = closureListHtml;
+
   }
 
   // ── Gráfico: Resultado líquido, período seleccionável ──
@@ -1451,6 +1470,12 @@ async function loadContaResumo(wrap) {
 
   refreshIcons(wrap);
 }
+window._prepFecharMes = function(period) {
+  if (!window._contaCalcMes) { toast("Erro ao calcular o mês — tenta recarregar a página.", "error"); return; }
+  var m = window._contaCalcMes(period);
+  window._openFecharMesConfirm(period, m.receita, m.cogs, m.despesas, m.lucroLiquido);
+};
+
 window._openFecharMesConfirm = function(period, receita, cogs, despesas, resultado) {
   var lucroBruto = receita - cogs;
   var mesLabel = new Date(period + "-15").toLocaleDateString("pt-AO", { month: "long", year: "numeric" });
