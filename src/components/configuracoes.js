@@ -5,7 +5,7 @@ import { toast }           from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { backupService }   from "../backup.js";
 import { getLogs, clearLogs } from "../logger.js";
-import { generateUUID } from "../services.js";
+import { generateUUID, verifyAdminPin } from "../services.js";
 
 export async function loadConfiguracoes() {
   const btn = document.getElementById("btn-back-configuracoes");
@@ -70,6 +70,10 @@ async function renderConfiguracoes() {
     (logs.length > 0
       ? '<button onclick="window._clearLogs()" style="width:100%;padding:10px;background:none;border:none;color:var(--danger);font-size:13px;font-weight:600;cursor:pointer;margin-top:8px">Limpar logs</button>'
       : "") +
+    '</div>' +
+
+    '<div style="text-align:center;margin-top:24px;padding-bottom:8px">' +
+    '<button onclick="window._openDeleteAccount()" style="background:none;border:none;color:var(--text4);font-size:12px;font-weight:600;cursor:pointer;padding:8px">Eliminar conta</button>' +
     '</div>';
 
   refreshIcons(wrap);
@@ -174,3 +178,99 @@ window._clearLogs = async () => {
 };
 
 window._closeModal = closeModal;
+
+// ── ELIMINAR CONTA ───────────────────────────────────────────────────────────
+window._openDeleteAccount = () => {
+  openModal("Eliminar conta",
+    '<div style="background:var(--danger-muted-light);border:1.5px solid var(--danger-muted);border-radius:12px;padding:14px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">' +
+    '<i data-lucide="alert-triangle" style="width:18px;height:18px;color:var(--danger-muted);flex-shrink:0;margin-top:1px"></i>' +
+    '<div><div style="font-size:13px;font-weight:700;color:var(--danger-muted);margin-bottom:4px">Isto é irreversível</div>' +
+    '<div style="font-size:13px;color:var(--danger-muted);line-height:1.5">Todos os dados desta loja — vendas, clientes, produtos, histórico e configurações — serão apagados permanentemente deste dispositivo. Não há forma de recuperar depois.</div></div>' +
+    '</div>' +
+    '<div style="font-size:13px;color:var(--text3);margin-bottom:16px">Queres exportar um backup antes de continuar?</div>' +
+    '<div class="form-actions">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+    '<button class="btn btn-primary btn-full" onclick="window._deleteAccountWithBackup()">' +
+    '<i data-lucide="download"></i> Exportar backup e continuar</button>' +
+    '<button class="btn btn-full" style="background:var(--danger);color:#fff" onclick="window._openDeleteAccountPin()">Continuar sem backup</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+};
+
+window._deleteAccountWithBackup = async () => {
+  try {
+    await backupService.download();
+    toast("Backup exportado.", "success");
+  } catch(err) {
+    toast("Erro ao exportar: " + err.message, "error");
+    return;
+  }
+  window._openDeleteAccountPin();
+};
+
+window._openDeleteAccountPin = () => {
+  openModal("Confirmar com PIN",
+    '<div style="font-size:13px;color:var(--text3);margin-bottom:16px">Introduz o PIN de administrador para confirmar a eliminação.</div>' +
+    '<input id="delacc-pin" type="password" inputmode="numeric" placeholder="PIN de administrador" autocomplete="off" ' +
+    'style="width:100%;padding:13px;border:1.5px solid var(--border2);border-radius:10px;font-size:16px;font-family:inherit;text-align:center;letter-spacing:4px;margin-bottom:16px;box-sizing:border-box"/>' +
+    '<div id="delacc-err" style="display:none;color:var(--danger);font-size:12.5px;font-weight:600;margin:-8px 0 12px;text-align:center">PIN inválido.</div>' +
+    '<div class="form-actions">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+    '<button class="btn btn-full" style="background:var(--danger);color:#fff" onclick="window._confirmDeleteAccountPin()">Confirmar</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+  setTimeout(function() { var i = document.getElementById("delacc-pin"); if (i) i.focus(); }, 100);
+};
+
+window._confirmDeleteAccountPin = async () => {
+  const pinEl = document.getElementById("delacc-pin");
+  const errEl = document.getElementById("delacc-err");
+  const pin = pinEl ? pinEl.value.trim() : "";
+  if (!pin) { if (errEl) errEl.style.display = "block"; return; }
+
+  const result = await verifyAdminPin(pin);
+  if (!result.ok) {
+    if (errEl) errEl.style.display = "block";
+    if (pinEl) { pinEl.value = ""; pinEl.focus(); }
+    return;
+  }
+
+  openModal("Última confirmação",
+    '<div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:16px;text-align:center">' +
+    'Tens a certeza absoluta? Todos os dados de <strong>' + result.admin.name + '</strong> e da loja vão ser apagados agora.</div>' +
+    '<div class="form-actions">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+    '<button class="btn btn-full" style="background:var(--danger);color:#fff" onclick="window._executeDeleteAccount()">Eliminar tudo agora</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+};
+
+window._executeDeleteAccount = async () => {
+  const body = el("modal-body");
+  if (body) {
+    body.innerHTML =
+      '<div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 0">' +
+      '<div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--danger);border-radius:50%;animation:importSpin .8s linear infinite"></div>' +
+      '<div style="font-size:13.5px;font-weight:600;color:var(--text3)">A eliminar todos os dados…</div>' +
+      '</div>';
+  }
+  try {
+    indexedDB.deleteDatabase("kontaki_db");
+    localStorage.clear();
+    sessionStorage.clear();
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const reg of regs) { await reg.unregister(); }
+    }
+    setTimeout(function() {
+      location.href = "/";
+      location.reload(true);
+    }, 800);
+  } catch(err) {
+    toast("Erro ao eliminar: " + err.message, "error");
+  }
+};

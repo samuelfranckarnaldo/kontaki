@@ -123,7 +123,7 @@ function renderMenu() {
     { label: "Ajuda",             sub: "Perguntas frequentes e como usar",icon: "help-circle",   color: "#dbeafe", iconColor: "#2563eb", page: "ajuda",         group: "Sobre"      },
     { label: "Contactos",         sub: "Suporte Introxeer Technology",   icon: "headphones",     color: "#dbeafe", iconColor: "#2563eb", page: "contactos",     group: "Sobre"      },
     { label: "Sobre",             sub: "Termos, ajuda e versão",         icon: "info",           color: "#f4f4f5", iconColor: "#71717a", page: "sobre",         group: "Sobre"      },
-    { label: "Terminar Sessão",   sub: "",                               icon: "log-out",        color: "#fee2e2", iconColor: "#dc2626", page: "logout",        group: null         },
+    { label: "Terminar Sessão",   sub: "",                               icon: "log-out",        color: "#f4f4f5", iconColor: "#71717a", page: "logout",        group: null         },
   ];
 
   const items = [...(user.role === "admin" ? adminItems : caixaItems), ...commonItems];
@@ -2398,12 +2398,9 @@ function loadSobre() {
   wrap.innerHTML = "";
 
   var items = [
-    { label: "Termos do Consumidor",          icon: "file-text",    action: "window._showTermos()" },
-    { label: "Política de Privacidade",       icon: "shield-check", action: "window._showPrivacidade()" },
-    { label: "Política de Uso Aceitável",     icon: "file-text",    action: "window._showPlaceholderDoc('Política de Uso Aceitável')" },
-    { label: "Licença de Utilização (EULA)",  icon: "award",        action: "window._showLicencaEula()" },
-    { label: "Ajuda",                         icon: "help-circle",  action: "window._showAjudaFAQ()" },
-    { label: "Documentação",                  icon: "book-open",    action: "window._showPlaceholderDoc('Documentação')" },
+    { label: "Termos do Consumidor",          icon: "file-text",    action: "window.open('https://introxeer.vercel.app/legal/documents/consumer-terms/','_blank')" },
+    { label: "Política de Privacidade",       icon: "shield-check", action: "window.open('https://introxeer.vercel.app/legal/documents/privacy-policy/','_blank')" },
+    { label: "Licença de Utilização (EULA)",  icon: "award",        action: "window.open('https://introxeer.vercel.app/legal/documents/consumer-terms/#cap-ii','_blank')" },
   ];
 
   var list = document.createElement("div");
@@ -2426,7 +2423,7 @@ function loadSobre() {
 
   var footer = document.createElement("div");
   footer.className = "sobre-footer";
-  footer.innerHTML = "Kontaki v1.0.0-beta<br/>Introxeer Technology · Angola";
+  footer.innerHTML = "Kontaki Versão 1.0.0<br/><strong style=\"color:var(--primary);font-size:13px\">Edição Dolphin</strong><br/>Introxeer · Angola";
   wrap.appendChild(footer);
 
   refreshIcons(wrap);

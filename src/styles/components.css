@@ -1540,9 +1540,7 @@
 .perfil-group .perfil-menu-item:last-child { border-bottom: none; }
 
 .perfil-logout-btn {
-  margin-top: 16px; border-radius: 16px !important;
-  border: 1px solid #fca5a5 !important;
-  background: #fff5f5 !important;
+  margin-top: 16px;
 }
 
 /* Header do perfil */
