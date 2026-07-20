@@ -162,36 +162,27 @@
   align-items: center;
   background: #fff;
   border-radius: var(--radius-xl);
-  padding: 32px 24px;
+  padding: 24px 24px;
   box-shadow: 0 8px 40px rgba(91,33,182,.10), 0 1px 3px rgba(0,0,0,.05);
   border: 1px solid var(--border2);
 }
 
 .login-logo {
   text-align: center;
-  margin-bottom: 8px;
+  margin-bottom: 20px;
 }
-.login-brand-text {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text4);
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
+.login-symbol {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.login-store-logo {
-  width: 72px;
-  height: 72px;
-  border-radius: 20px;
-  object-fit: cover;
-  margin: 0 auto 12px;
-  box-shadow: 0 8px 24px rgba(91,33,182,.15);
-}
-.login-store-name-text {
-  font-size: 26px;
-  font-weight: 800;
-  color: #18181b;
-  margin-top: 6px;
-  letter-spacing: -.3px;
+.login-symbol svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .login-step-label {
@@ -422,9 +413,8 @@
 #login-page.pin-active .login-logo {
   margin-bottom: 12px;
 }
-#login-page.pin-active .login-logo img,
-#login-page.pin-active .login-brand-text {
-  transform: scale(.75);
+#login-page.pin-active .login-symbol {
+  transform: scale(.8);
 }
 
 
@@ -472,10 +462,11 @@
   border-radius: 0;
   box-shadow: none;
   border: none;
-  padding: 32px 24px 24px;
+  padding: 24px 24px 20px;
   justify-content: flex-start;
 }
 #login-page.role-active .login-logo {
+  margin-top: 56px;
   margin-bottom: 8px;
 }
 #login-page.role-active #login-step-role {
@@ -485,12 +476,28 @@
   width: 100%;
 }
 #login-page.role-active .login-users-list {
-  flex: 1;
-  justify-content: center;
+  flex: 0 0 auto;
+  min-height: 256px;
+  justify-content: flex-start;
   margin-bottom: 0;
+  margin-top: 8px;
+}
+#login-page.role-active #login-step-role {
+  justify-content: center;
+  padding-bottom: 56px;
 }
 #login-page.role-active .login-terms {
   margin-top: 24px;
+}
+#login-page.role-active .login-box {
+  position: relative;
+}
+#login-page.role-active .login-footer-brand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 20px;
+  margin-top: 0;
 }
 
 .login-rotating-msg {
@@ -498,13 +505,14 @@
   font-weight: 600;
   color: var(--text2);
   text-align: center;
-  min-height: 64px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 20px;
+  margin-bottom: 4px;
   line-height: 1.35;
-  overflow: visible;
+  overflow: hidden;
 }
 #login-page {
   overflow: hidden;

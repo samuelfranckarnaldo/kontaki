@@ -186,20 +186,7 @@ async function _renderLoginUsers() {
     if (s.status === "open") openSessionByUserId[s.userId] = s;
   });
 
-  const storeName = document.getElementById("login-store-name");
-  if (storeName && store) storeName.textContent = store.name || "Kontaki";
-
-  const logoWrap = document.getElementById("login-logo-wrap");
-  if (logoWrap && store && store.logo) {
-    logoWrap.innerHTML = "";
-    logoWrap.className = "";
-    var img = document.createElement("img");
-    img.src = store.logo;
-    img.className = "login-store-logo";
-    img.alt = store.name || "Logo";
-    logoWrap.appendChild(img);
-  }
-
+  // Login mostra sempre o símbolo fixo do Kontaki — nome/logo da loja removidos por decisão de design
   const list = document.getElementById("login-users-list");
   if (!list) return;
 
