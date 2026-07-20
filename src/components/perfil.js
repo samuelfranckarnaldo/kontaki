@@ -944,9 +944,21 @@ async function loadLoja() {
 
   var upload = document.getElementById("logo-upload");
   if (upload) {
-    upload.onchange = function(e) {
+    upload.onchange = async function(e) {
+      var licMod = await import("../license.js");
+      if (!licMod.hasFeature("logotipo")) {
+        licMod.showUpgradeBanner("Logotipo da loja disponível a partir do plano Pro. Contacta a Introxeer para upgrade.");
+        e.target.value = "";
+        return;
+      }
       var file = e.target.files[0];
       if (!file) return;
+      var maxBytes = 2 * 1024 * 1024; // 2MB — o mesmo limite já anunciado no ecrã
+      if (file.size > maxBytes) {
+        toast("Imagem demasiado grande. Máximo 2MB.", "error");
+        e.target.value = "";
+        return;
+      }
       var reader = new FileReader();
       reader.onload = async function(ev) {
         var dataUrl = ev.target.result;
