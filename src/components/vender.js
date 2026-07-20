@@ -23,13 +23,6 @@ function genHash(sid, date) {
   return Math.abs(h).toString(36).toUpperCase().slice(0, 6);
 }
 
-const PAY_DESC = {
-  dinheiro:      "Pagamento em dinheiro no ato da venda.",
-  transferencia: "Transferência bancária antes de levantar.",
-  multicaixa:    "Pagamento via terminal Multicaixa.",
-  fiado:         "Produto cedido a crédito. Registado em fiados.",
-};
-
 function validarItensContraStock(items, productsList) {
   return items.filter(function(item) {
     var p = productsList.find(function(p){ return p.id === item.id; });
@@ -86,7 +79,7 @@ export async function initVender() {
   window._verifyByCam  = () => {
     var ov = document.getElementById("verify-overlay");
     if (ov) ov.style.display = "none";
-    initCamera(onVerifyQR);
+    initCamera(onVerifyQR, ["qr_code"]);
   };
   window._verifyByCode = () => {
     var wrap = document.getElementById("verify-code-input");
@@ -571,23 +564,45 @@ window._abrirPedidosGuardados = async function() {
   var rowsHtml = pending.length ? pending.map(function(p) {
     var itemCount = p.items.reduce(function(a,i){ return a+i.qty; }, 0);
     var big = p.total >= 500000;
-    var color = big ? "var(--warning)" : "var(--primary)";
-    var bg    = big ? "#fef3c7" : "var(--primary-light)";
-    return '<button class="esc-pending-card" style="border-left:3px solid ' + color + '" onclick="window._retomarPedido(' + p.id + ')">' +
-      '<div class="esc-pending-icon" style="background:' + bg + ';color:' + color + '"><i data-lucide="shopping-bag" style="width:18px;height:18px"></i></div>' +
+    var ageHours = (Date.now() - new Date(p.createdAt).getTime()) / 36e5;
+    var isOld = ageHours >= 24;
+    var ageDays = Math.floor(ageHours / 24);
+    var preview = p.items.slice(0, 2).map(function(i){ return i.name; }).join(", ");
+    if (p.items.length > 2) preview += " +" + (p.items.length - 2);
+    return '<div class="esc-pending-row">' +
+      '<button class="esc-pending-card" onclick="window._retomarPedido(' + p.id + ')">' +
+      '<div class="esc-pending-icon"><i data-lucide="shopping-bag" style="width:18px;height:18px"></i></div>' +
       '<div class="esc-pending-info">' +
       '<div class="esc-pending-name">' + itemCount + ' ' + (itemCount===1?"produto":"produtos") + '</div>' +
-      '<div class="esc-pending-meta">' + fmtDate(p.createdAt) + '</div>' +
+      '<div class="esc-pending-items">' + preview + '</div>' +
+      '<div class="esc-pending-meta">' +
+        '<span>' + fmtDate(p.createdAt) + '</span>' +
+        (isOld ? '<span class="esc-pending-old-chip">há ' + ageDays + ' ' + (ageDays===1?"dia":"dias") + '</span>' : '') +
+      '</div>' +
       '</div>' +
       '<div class="esc-pending-right">' +
-      '<div class="esc-pending-val" style="color:' + color + '">' + fmt(p.total) + '</div>' +
-      '<i data-lucide="chevron-right" class="hist-export-arrow"></i>' +
+      '<div class="esc-pending-val' + (big?" esc-pending-val--alto":"") + '">' + fmt(p.total) + '</div>' +
       '</div>' +
-      '</button>';
+      '</button>' +
+      '<button class="esc-pending-del" onclick="event.stopPropagation();window._excluirPedidoGuardado(' + p.id + ')"><i data-lucide="trash-2" style="width:15px;height:15px"></i></button>' +
+      '</div>';
   }).join("") : '<div class="empty-state"><i data-lucide="shopping-bag"></i><div class="empty-state-title">Nenhum pedido guardado</div></div>';
 
   openModal("Pedidos guardados", '<div class="esc-pending-list">' + rowsHtml + '</div>');
   refreshIcons(el("modal-box"));
+};
+
+window._excluirPedidoGuardado = async function(id) {
+  confirmDialog(
+    '<div style="font-size:14px;color:var(--text2);line-height:1.6">Este pedido guardado vai ser eliminado. Esta ação não pode ser desfeita.</div>',
+    async function() {
+      await db.delete("pendingSales", id);
+      toast("Pedido eliminado.", "success");
+      await atualizarBadgePedidos();
+      window._abrirPedidosGuardados();
+    },
+    { title: "Eliminar pedido?", confirmText: "Eliminar", danger: true, icon: "trash-2" }
+  );
 };
 
 window._retomarPedido = async function(id) {

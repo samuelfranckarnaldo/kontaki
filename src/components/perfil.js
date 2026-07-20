@@ -2480,36 +2480,6 @@ function loadSobre() {
   refreshIcons(wrap);
 }
 
-window._showPlaceholderDoc = function(title) {
-  openModal(title,
-    '<div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:16px">' +
-    'Este documento está em preparação. Contacta a Introxeer Technology para mais informações.' +
-    '</div>' +
-    '<a href="https://wa.me/244900000000" target="_blank" class="btn btn-primary btn-full" style="text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px">' +
-    '<i data-lucide="message-circle"></i> Falar via WhatsApp</a>' +
-    '<button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="window._closeModal()">Fechar</button>');
-  refreshIcons(el("modal-box"));
-};
-
-window._showAjudaFAQ = function() {
-  var faqs = [
-    ["Como funciona o Kontaki sem internet?", "O Kontaki funciona totalmente offline. Todos os dados ficam guardados no teu dispositivo, e a sincronização entre Escritório e Caixa é feita por ficheiro, sem depender de ligação permanente à internet."],
-    ["Esqueci o meu PIN, o que faço?", "Pede a um administrador da tua loja para repor o teu PIN em Equipa. Se és o único administrador, contacta o suporte da Introxeer."],
-    ["Como faço backup dos meus dados?", "Vai a Configurações → Backup para exportar uma cópia dos teus dados. Recomendamos fazer isto regularmente."],
-    ["O que acontece se a avaliação expirar?", "Após o período de avaliação, algumas funcionalidades ficam bloqueadas até activares um plano em Assinatura."],
-    ["Posso usar o Kontaki em mais de um dispositivo?", "Depende do teu plano. O número de dispositivos permitido está indicado em Assinatura."],
-    ["Como contacto o suporte?", "Vai a Contactos, no menu do Perfil, para falar com a Introxeer Technology via WhatsApp."]
-  ];
-  var body = faqs.map(function(f) {
-    return '<div style="margin-bottom:14px">' +
-      '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">' + f[0] + '</div>' +
-      '<div style="font-size:12px;color:var(--text3);line-height:1.5">' + f[1] + '</div>' +
-      '</div>';
-  }).join("");
-  openModal("Ajuda", body + '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>');
-  refreshIcons(el("modal-box"));
-};
-
 window._showLicencaEula = function() {
   var text =
     '<div style="font-size:12px;color:var(--text3);line-height:1.6;max-height:50vh;overflow-y:auto;padding-right:4px">' +

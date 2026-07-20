@@ -391,13 +391,6 @@
 .fiado-cliente-name  { font-size: 14px; font-weight: 700; color: var(--text); }
 .fiado-cliente-total { font-size: 16px; font-weight: 700; color: var(--primary); }
 
-.fiado-entry {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 16px 16px 20px; border-top: 1px solid var(--border2);
-  background: var(--bg); font-size: 13px;
-}
-.fiado-entry-amt  { font-size: 14px; font-weight: 700; }
-.fiado-entry-info { font-size: 11px; color: var(--text3); margin-top: 2px; }
 
 /* ── HISTÓRICO ──────────────────────────────────────────────────────────────── */
 .historico-item {
@@ -3080,29 +3073,6 @@
 }
 
 
-/* FIADO ENTRY PREMIUM REDESIGN */
-.fiado-entries-list {
-}
-.fiado-entry {
-  position: relative;
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 13px 14px 13px 17px;
-  border-bottom: 1px solid var(--border2);
-}
-.fiado-entry:last-child { border-bottom: none; }
-.fiado-entry::before {
-  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-  background: var(--border2);
-}
-.fiado-entry[data-status="open"]::before      { background: var(--warning-muted); }
-.fiado-entry[data-status="overdue"]::before   { background: var(--danger-muted); }
-.fiado-entry[data-status="paid"]::before      { background: var(--success); }
-.fiado-entry[data-status="cancelled"]::before { background: var(--text4); }
-.fiado-entry[data-status="cancelled"]         { opacity: .65; }
-
-.fiado-entry-top {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-}
 .fiado-entry-title-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 4px; }
 .fiado-entry-title { font-size: 13px; font-weight: 700; color: var(--text); }
 .fiado-entry-amount {
@@ -3111,10 +3081,6 @@
 }
 
 .fiado-entry-meta { font-size: 11.5px; color: var(--text4); line-height: 1.5; }
-
-.fiado-entry-bottom {
-  display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 2px;
-}
 
 .fiado-overdue-chip {
   font-size: 10px; font-weight: 800; color: var(--danger-muted); background: var(--danger-muted-light);
@@ -3356,19 +3322,35 @@
 
 /* Pedidos guardados — cards com ícone e cor por valor */
 .esc-pending-list { display: flex; flex-direction: column; gap: 8px; }
-.esc-pending-card {
+.esc-pending-row {
   display: flex; align-items: center; gap: 12px; width: 100%;
   background: var(--bg2); border-radius: var(--radius); padding: 14px;
-  box-shadow: var(--shadow-sm); border: none; cursor: pointer;
-  font-family: var(--font); text-align: left; transition: background .15s;
+  box-shadow: var(--shadow-sm);
 }
-.esc-pending-card:active { background: var(--border2); }
+.esc-pending-card {
+  display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: var(--font); text-align: left;
+}
 .esc-pending-icon {
   width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  background: var(--border2); color: var(--text2);
   display: flex; align-items: center; justify-content: center;
 }
 .esc-pending-info { flex: 1; min-width: 0; }
 .esc-pending-name { font-size: 14px; font-weight: 700; color: var(--text); }
-.esc-pending-meta { font-size: 11.5px; color: var(--text3); margin-top: 2px; }
-.esc-pending-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.esc-pending-val { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.esc-pending-items { font-size: 11.5px; color: var(--text3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.esc-pending-meta { font-size: 11px; color: var(--text4); margin-top: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.esc-pending-old-chip {
+  font-size: 9.5px; font-weight: 800; color: var(--warning);
+  background: var(--warning-light); padding: 1px 6px; border-radius: 999px;
+}
+.esc-pending-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.esc-pending-val { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
+.esc-pending-val--alto { color: var(--warning); }
+.esc-pending-del {
+  width: 30px; height: 30px; border-radius: 9px; border: none; flex-shrink: 0;
+  background: none; color: var(--text4); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background .15s;
+}
+.esc-pending-del:active { background: var(--danger-muted-light); color: var(--danger-muted); }

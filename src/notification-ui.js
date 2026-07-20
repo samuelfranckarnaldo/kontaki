@@ -37,9 +37,9 @@ function fmtNotifDate(iso) {
 }
 
 function severityMeta(sev) {
-  if (sev === "danger")  return { bg: "var(--danger-light)",  color: "var(--danger)",  bar: "var(--danger)",  icon: "alert-circle" };
-  if (sev === "warning") return { bg: "var(--warning-light)", color: "var(--warning)", bar: "var(--warning)", icon: "alert-triangle" };
-  return { bg: "var(--info-light)", color: "var(--info)", bar: "var(--info)", icon: "info" };
+  if (sev === "danger")  return { bg: "var(--danger-light)",  color: "var(--danger)",  icon: "alert-circle" };
+  if (sev === "warning") return { bg: "var(--warning-light)", color: "var(--warning)", icon: "alert-triangle" };
+  return { bg: "var(--info-light)", color: "var(--info)", icon: "info" };
 }
 
 function renderNotificationItem(n, index) {
@@ -48,7 +48,6 @@ function renderNotificationItem(n, index) {
   return (
     '<button onclick="window._handleNotificationAction(\'' + n.id + '\')" ' +
     'class="notif-item" style="animation-delay:' + delay + 'ms">' +
-      '<span class="notif-item-bar" style="background:' + s.bar + '"></span>' +
       '<div class="notif-item-icon" style="background:' + s.bg + '">' +
         '<i data-lucide="' + s.icon + '" style="width:17px;height:17px;color:' + s.color + '"></i>' +
       '</div>' +
@@ -134,15 +133,15 @@ export async function openNotificationCenter() {
     var idx = 0;
 
     if (groups.danger.length) {
-      html += '<div class="notif-group-label" style="color:var(--danger)">Requer ação agora</div>';
+      html += '<div class="notif-group-label">Requer ação agora</div>';
       html += groups.danger.map(function(n){ return renderNotificationItem(n, idx++); }).join("");
     }
     if (groups.warning.length) {
-      html += '<div class="notif-group-label" style="color:var(--warning);margin-top:20px">Vale atenção</div>';
+      html += '<div class="notif-group-label" style="margin-top:20px">Vale atenção</div>';
       html += groups.warning.map(function(n){ return renderNotificationItem(n, idx++); }).join("");
     }
     if (groups.info.length) {
-      html += '<div class="notif-group-label" style="color:var(--info);margin-top:20px">Informativo</div>';
+      html += '<div class="notif-group-label" style="margin-top:20px">Informativo</div>';
       html += groups.info.map(function(n){ return renderNotificationItem(n, idx++); }).join("");
     }
     list.innerHTML = html;

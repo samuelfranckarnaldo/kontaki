@@ -13,7 +13,8 @@ export function stopCamera() {
   }
 }
 
-export function initCamera(onDetected) {
+export function initCamera(onDetected, formats) {
+  formats = formats || ["ean_13", "ean_8", "qr_code", "code_128"];
   // Garante que não há nenhuma sessão anterior presa antes de começar uma nova
   stopCamera();
 
@@ -45,7 +46,7 @@ export function initCamera(onDetected) {
       toast("Este browser não suporta leitura de códigos. Usa a pesquisa manual.", "error");
       stopCamera(); return;
     }
-    const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "qr_code", "code_128"] });
+    const detector = new BarcodeDetector({ formats: formats });
     _activeInterval = setInterval(async () => {
       if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
       try {
