@@ -320,6 +320,14 @@ function _ajudaMatch(article, q) {
   return article.keywords.some(function(k){ return k.toLowerCase().indexOf(q) !== -1; });
 }
 
+function _truncateAjuda(text, max) {
+  if (text.length <= max) return text;
+  var cut = text.slice(0, max);
+  var lastSpace = cut.lastIndexOf(" ");
+  if (lastSpace > 40) cut = cut.slice(0, lastSpace);
+  return cut + "…";
+}
+
 function _renderAjuda(query) {
   var wrap = document.getElementById("ajuda-content");
   if (!wrap) return;
@@ -338,21 +346,50 @@ function _renderAjuda(query) {
     byCategory[a.category].items.push(a);
   });
 
+  var PREVIEW_LEN = 110;
+
   wrap.innerHTML = order.map(function(cat){
     var group = byCategory[cat];
     return '<div style="display:flex;align-items:center;gap:8px;margin:18px 0 10px">' +
-        '<i data-lucide="' + group.icon + '" style="width:16px;height:16px;color:var(--primary)"></i>' +
+        '<div style="width:28px;height:28px;border-radius:8px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+          '<i data-lucide="' + group.icon + '" style="width:15px;height:15px;color:var(--primary)"></i>' +
+        '</div>' +
         '<div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">' + cat + '</div>' +
       '</div>' +
       group.items.map(function(a){
-        return '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow-sm)">' +
+        return '<div class="ajuda-card" data-id="' + a.id + '" style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow-sm)">' +
           '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:6px">' + a.title + '</div>' +
-          '<div style="font-size:13px;color:var(--text2);line-height:1.6">' + a.body + '</div>' +
+          '<div class="ajuda-card-body" style="font-size:13px;color:var(--text2);line-height:1.6"></div>' +
+          '<button type="button" class="ajuda-readmore" style="border:none;background:none;color:var(--primary);font-size:12px;font-weight:700;padding:8px 0 0;cursor:pointer">Ler mais</button>' +
         '</div>';
       }).join("");
   }).join("");
 
   refreshIcons(wrap);
+
+  wrap.querySelectorAll(".ajuda-card").forEach(function(cardEl){
+    var id = cardEl.getAttribute("data-id");
+    var article = results.find(function(a){ return a.id === id; });
+    var bodyEl = cardEl.querySelector(".ajuda-card-body");
+    var btnEl = cardEl.querySelector(".ajuda-readmore");
+    if (!article || !bodyEl) return;
+
+    if (article.body.length <= PREVIEW_LEN) {
+      bodyEl.textContent = article.body;
+      if (btnEl) btnEl.style.display = "none";
+      return;
+    }
+
+    bodyEl.textContent = _truncateAjuda(article.body, PREVIEW_LEN);
+    if (btnEl) {
+      btnEl.onclick = function(){
+        var expanded = cardEl.getAttribute("data-expanded") === "true";
+        bodyEl.textContent = expanded ? _truncateAjuda(article.body, PREVIEW_LEN) : article.body;
+        btnEl.textContent = expanded ? "Ler mais" : "Mostrar menos";
+        cardEl.setAttribute("data-expanded", expanded ? "false" : "true");
+      };
+    }
+  });
 }
 
 async function loadAjuda() {
@@ -2095,13 +2132,13 @@ async function loadAssinatura() {
   // ── Limites do plano ──
   var limitsEl = document.createElement("div");
   limitsEl.className = "lic-limits";
-  var maxProd = plan.maxProducts >= 999999 ? "∞" : plan.maxProducts;
-  var maxUser = plan.maxUsers >= 999999 ? "∞" : plan.maxUsers;
-  var maxDev  = plan.maxDevices >= 999999 ? "∞" : plan.maxDevices;
+  var maxProd = plan.maxProducts === -1 ? "∞" : plan.maxProducts;
+  var maxUser = plan.maxUsers === -1 ? "∞" : plan.maxUsers;
+  var maxClie = plan.maxClients === -1 ? "∞" : plan.maxClients;
   limitsEl.innerHTML =
     '<div class="lic-limit-item"><div class="lic-limit-val">' + maxProd + '</div><div class="lic-limit-label">Produtos</div></div>' +
     '<div class="lic-limit-item"><div class="lic-limit-val">' + maxUser + '</div><div class="lic-limit-label">Utilizadores</div></div>' +
-    '<div class="lic-limit-item"><div class="lic-limit-val">' + maxDev + '</div><div class="lic-limit-label">Dispositivos</div></div>';
+    '<div class="lic-limit-item"><div class="lic-limit-val">' + maxClie + '</div><div class="lic-limit-label">Clientes</div></div>';
   wrap.appendChild(limitsEl);
 
   // ── Estado da licença ──
@@ -2113,7 +2150,7 @@ async function loadAssinatura() {
 
   var expDate = lic.expiresAt
     ? new Date(lic.expiresAt).toLocaleDateString("pt-PT",{day:"2-digit",month:"long",year:"numeric"})
-    : isTrial ? "30 dias de avaliação" : "—";
+    : isTrial ? "7 dias de avaliação" : "—";
 
   statusCard.innerHTML =
     '<div class="lic-status-title">Estado da licença</div>' +
@@ -2149,18 +2186,17 @@ async function loadAssinatura() {
   wrap.appendChild(plansLabel);
 
   var planDefs = [
-    { key:"basic",      features:["Vendas e stock","Fiados e clientes","Recuperação de PIN","Histórico e dashboard"] },
-    { key:"standard",   features:["Tudo do Basic","Contabilidade","Fornecedores","Backup e relatórios"] },
-    { key:"pro",        features:["Tudo do Standard","PDF de contabilidade","Recibo com QR","Logotipo","Equipa"] },
-    { key:"enterprise", features:["Tudo do Pro","Suporte dedicado"] },
+    { key:"basic",    features:["Vendas, stock e fiados","Fatura PDF e partilha WhatsApp","Histórico e dashboard"] },
+    { key:"standard", features:["Tudo do Básico","Contabilidade","Fornecedores","Relatórios e exportação (PDF/CSV)"] },
+    { key:"pro",      features:["Tudo do Standard","Equipa e permissões","Logotipo e dados da loja","Backup automático"] },
   ];
 
   planDefs.forEach(function(pd) {
-    var p       = PLANS[pd.key];
+    var p        = PLANS[pd.key];
     var isActive = lic.plan === pd.key;
-    var maxProd  = p.maxProducts >= 999999 ? "∞" : p.maxProducts;
-    var maxUser  = p.maxUsers >= 999999 ? "∞" : p.maxUsers;
-    var maxDev   = p.maxDevices >= 999999 ? "∞" : p.maxDevices;
+    var maxProd  = p.maxProducts === -1 ? "∞" : p.maxProducts;
+    var maxClie  = p.maxClients === -1 ? "∞" : p.maxClients;
+    var maxUser  = p.maxUsers === -1 ? "∞" : p.maxUsers;
 
     var card = document.createElement("div");
     card.className = "plan-card" + (isActive ? " plan-active" : "");
@@ -2173,8 +2209,8 @@ async function loadAssinatura() {
       '</div>' +
       '<div class="plan-card-limits">' +
         '<div class="plan-card-limit">' + maxProd + ' produtos</div>' +
+        '<div class="plan-card-limit">' + maxClie + ' clientes</div>' +
         '<div class="plan-card-limit">' + maxUser + ' utilizador' + (p.maxUsers!==1?'es':'') + '</div>' +
-        '<div class="plan-card-limit">' + maxDev + ' dispositivo' + (p.maxDevices!==1?'s':'') + '</div>' +
       '</div>' +
       '<div class="plan-card-features">' +
         pd.features.map(function(f) {
@@ -2576,7 +2612,7 @@ function startLicenseCountdown(lic) {
 
   if (_countdownInterval) { clearInterval(_countdownInterval); _countdownInterval = null; }
 
-  var isTopPlan = lic.plan === "enterprise";
+  var isTopPlan = lic.plan === "pro";
 
   function formatRemaining() {
     if (!lic.expiresAt || lic.daysLeft === 999) return null;
