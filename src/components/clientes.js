@@ -324,11 +324,22 @@ async function renderGeral(showSkeleton) {
       </div>
     </div>` : ""}
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0">
+    <div id="ct-geral-stats-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0">
       ${_statCard({ label:"Clientes", value:clients.length, sub:"total", color:"var(--text)", icon:"users" })}
       ${_statCard({ label:"Recebido", value:fmtStatVal(recebidoMes), sub:"este mês", color:"var(--success)", icon:"trending-up" })}
       ${_statCard({ label:"Cobrança", value:taxaCobranca+"%", sub:"desde sempre", color:"var(--text)", icon:"percent" })}
+      ${_statCard({ label:"Atrasados", value:overdueList.length, sub:"clientes", color:overdueList.length>0?"var(--danger)":"var(--text)", icon:"alert-triangle" })}
     </div>
+    <style>
+      #ct-geral-stats-grid .prod-stat-card { padding: 20px 12px; }
+      #ct-geral-stats-grid .prod-stat-icon { width: 44px; height: 44px; }
+      #ct-geral-stats-grid .prod-stat-icon i, #ct-geral-stats-grid .prod-stat-icon svg { width: 21px; height: 21px; }
+      #ct-geral-stats-grid .prod-stat-val2 { font-size: 28px !important; }
+      #ct-geral-stats-grid .prod-stat-val2--sm { font-size: 22px !important; }
+      #ct-geral-stats-grid .prod-stat-val2--xs { font-size: 17px !important; }
+      #ct-geral-stats-grid .prod-stat-label2 { font-size: 13px; }
+      #ct-geral-stats-grid .prod-stat-sub { font-size: 11px; }
+    </style>
 
     <div class="ct-section-label"><i data-lucide="trending-down"></i>Maiores dívidas</div>
     ${top3.length === 0
@@ -338,16 +349,20 @@ async function renderGeral(showSkeleton) {
         </div>`
       : `<div class="list-card">
           ${top3.map(({ client: c, totalOpen, overdue, maxDays, firstOpen }, i) => `
-            <div class="ct-devedor-row" style="border-left:3px solid ${overdue ? "var(--danger-muted)" : avatarColor(c.name).color}" onclick="${c.id ? `window._openClienteProfile(${c.id})` : (firstOpen ? `window._openPayModal(${firstOpen.id})` : "")}">
-              <div class="fc-row-avatar" style="background:${overdue ? "var(--danger-muted-light);color:var(--danger-muted)" : avatarColor(c.name).bg+";color:"+avatarColor(c.name).color}">
+            <div class="produto-item" style="cursor:pointer" onclick="${c.id ? `window._openClienteProfile(${c.id})` : (firstOpen ? `window._openPayModal(${firstOpen.id})` : "")}">
+              <div class="produto-avatar" style="background:${overdue ? "var(--danger-muted-light)" : avatarColor(c.name).bg};color:${overdue ? "var(--danger-muted)" : avatarColor(c.name).color}">
                 ${(c.name||"?").charAt(0).toUpperCase()}
               </div>
-              <div class="fc-row-info">
-                <div class="fc-row-name" style="white-space:normal;overflow:visible;text-overflow:clip">${c.name}${!c.id ? ' <span class="ct-nocliente-tag">sem ficha</span>' : ""}</div>
-                <div class="fc-row-meta">${overdue ? `Atrasado há ${maxDays} ${maxDays===1?"dia":"dias"}` : "Em aberto"}</div>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                  <div class="produto-name">${c.name}</div>
+                  ${!c.id ? '<span class="produto-badge produto-badge-low">sem ficha</span>' : ""}
+                  ${overdue ? `<span class="produto-badge produto-badge-zero">Atrasado ${maxDays}${maxDays===1?"d":"d"}</span>` : ""}
+                </div>
+                <div class="produto-meta">${overdue ? "Em atraso" : "Em aberto"}</div>
+                <div class="produto-price" style="margin-top:4px;color:${overdue ? "var(--danger)" : "var(--primary)"}">${fmt(totalOpen)}</div>
               </div>
-              <div class="fc-row-val ${overdue ? "overdue" : ""}${sizeMod("fc-row-val", fmt(totalOpen))}" style="color:${overdue ? "" : "var(--text2)"}">${fmt(totalOpen)}</div>
-              <i data-lucide="chevron-right" class="hist-export-arrow"></i>
+              <i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--text4);flex-shrink:0"></i>
             </div>`).join("")}
         </div>`
     }`;
@@ -408,23 +423,27 @@ async function renderClientesList(showSkeleton) {
       row.style.borderLeft = "3px solid transparent";
     }
     row.onclick = () => window._openClienteProfile(c.id);
+    row.className = "produto-item";
+    row.style.borderLeft = row.style.borderLeft || "3px solid transparent";
     row.innerHTML =
-      `<div class="fc-row-avatar" style="background:${overdue ? "var(--danger-muted-light);color:var(--danger-muted)" : "var(--primary-light);color:var(--primary)"}">
+      `<div class="produto-avatar" style="background:${overdue ? "var(--danger-muted-light)" : "var(--primary-light)"};color:${overdue ? "var(--danger-muted)" : "var(--primary)"}">
         ${c.name.charAt(0).toUpperCase()}
       </div>
-      <div class="fc-row-info">
-        <div class="fc-row-name">${c.name}</div>
-        <div class="fc-row-meta">${c.phone ? formatPhone(c.phone) : "sem telefone"} · ${mySales.length === 0 ? "Cliente novo" : mySales.length + " " + (mySales.length===1?"compra":"compras")}</div>
-        <span class="fc-risk-chip" style="color:${risk.color};background:${risk.bg}"><i data-lucide="${risk.icon}"></i>${risk.label}</span>
-      </div>
-      <div class="fc-row-right">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <div class="produto-name">${c.name}</div>
+        </div>
+        <div class="produto-meta">${c.phone ? formatPhone(c.phone) : "sem telefone"} · ${mySales.length === 0 ? "Cliente novo" : mySales.length + " " + (mySales.length===1?"compra":"compras")}</div>
+        <div style="margin-top:4px">
+          <span class="fc-risk-chip" style="color:${risk.color};background:${risk.bg}"><i data-lucide="${risk.icon}"></i>${risk.label}</span>
+        </div>
         ${fiadoAberto > 0
-          ? `<div class="fc-row-val ${overdue?"overdue":""}${sizeMod("fc-row-val", fmt(fiadoAberto))}">${fmt(fiadoAberto)}</div><div class="fc-row-sub">${overdue?"Atrasado há "+maxDays+"d":"Pendente"}</div>`
-          : `<div class="fc-row-saldo"><i data-lucide="check-circle" style="width:13px;height:13px"></i> Em dia</div>`
+          ? `<div class="produto-price" style="margin-top:4px;color:${overdue?"var(--danger)":"var(--text2)"}">${fmt(fiadoAberto)}<span style="font-size:11px;font-weight:600;margin-left:6px;color:var(--text3)">${overdue?"Atrasado há "+maxDays+"d":"Pendente"}</span></div>`
+          : `<div style="margin-top:4px;font-size:12px;font-weight:700;color:var(--success);display:flex;align-items:center;gap:4px"><i data-lucide="check-circle" style="width:13px;height:13px"></i> Em dia</div>`
         }
       </div>
-      <button class="fc-row-kebab" onclick="event.stopPropagation();window._openClienteActions(${c.id})">
-        <i data-lucide="more-vertical" style="width:16px;height:16px"></i>
+      <button class="produto-menu-btn" onclick="event.stopPropagation();window._openClienteActions(${c.id})">
+        <i data-lucide="more-vertical"></i>
       </button>`;
     listEl.appendChild(row);
   });

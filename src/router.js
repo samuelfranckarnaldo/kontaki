@@ -65,35 +65,17 @@ export var router = {
     }
 
     setTimeout(function() { self.go("vender"); }, 50);
-
-    history.pushState({ ctArmed: true }, "", "");
-    window.addEventListener("popstate", function() {
-      self.confirmExit();
-    });
-  },
-
-  confirmExit: function() {
-    history.pushState({ ctArmed: true }, "", "");
-    var ov = document.createElement("div");
-    ov.className = "m3-confirm-overlay";
-    ov.innerHTML =
-      '<div class="m3-confirm-box">' +
-        '<div class="m3-confirm-title">Sair do Kontaki?</div>' +
-        '<div class="m3-confirm-actions">' +
-          '<button class="m3-btn-text" id="ct-exit-cancel">Cancelar</button>' +
-          '<button class="m3-btn-filled" id="ct-exit-confirm">Sair</button>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(ov);
-    document.getElementById("ct-exit-cancel").onclick = function() { ov.remove(); };
-    document.getElementById("ct-exit-confirm").onclick = function() {
-      history.go(-(history.length - 1));
-      setTimeout(function() { window.close(); }, 50);
-    };
   },
 
   go: function(pageId) {
     if (!PAGES[pageId]) return;
+
+    // Fecha a ficha do cliente (overlay independente do sistema de páginas)
+    // se estiver aberta ao navegar para outra aba — sem isto ela fica presa
+    // por cima da página nova, já que o router não tinha conhecimento dela.
+    if (document.getElementById("cliente-profile-overlay") && typeof window._closeClienteProfile === "function") {
+      window._closeClienteProfile();
+    }
 
     // Salva a posicao de scroll da pagina atual antes de trocar
     var currentActive = document.querySelector(".page.active");

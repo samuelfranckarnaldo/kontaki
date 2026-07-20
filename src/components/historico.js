@@ -470,7 +470,7 @@ export function payColor(method) {
   var m = method.toLowerCase();
   if (m.includes("dinheiro") || m.includes("cash"))  return "var(--teal)";
   if (m.includes("transfer") || m.includes("banco")) return "var(--info)";
-  if (m.includes("fiado") || m.includes("crédito"))  return "var(--warning-muted)";
+  if (m.includes("fiado") || m.includes("crédito"))  return "var(--warning)";
   if (m.includes("multicaixa") || m.includes("cartão") || m.includes("cartao")) return "#4338ca";
   return "var(--text3)";
 }
@@ -480,7 +480,7 @@ export function payLabel(method) {
   var m = method.toLowerCase();
   if (m.includes("dinheiro") || m.includes("cash"))  return "Dinheiro";
   if (m.includes("transfer") || m.includes("banco")) return "Transferência";
-  if (m.includes("fiado") || m.includes("crédito"))  return "Fiado";
+  if (m.includes("fiado") || m.includes("crédito"))  return "Crédito";
   if (m.includes("multicaixa") || m.includes("cartão") || m.includes("cartao")) return "Multicaixa";
   return method;
 }
@@ -1442,7 +1442,7 @@ window._openSessionDetail = async function(sessionId) {
         '<div class="hist-session-cash-title" style="color:var(--primary)"><i data-lucide="pie-chart"></i>Vendas por forma de pagamento</div>' +
         methods.map(function(lbl) {
           var pct = Math.min(100, (byMethod[lbl] / maxMethodV) * 100);
-          var col = lbl === "Dinheiro" ? "var(--teal)" : lbl === "Multicaixa" ? "#4338ca" : lbl === "Fiado" ? "var(--warning-muted)" : "var(--info)";
+          var col = lbl === "Dinheiro" ? "var(--teal)" : lbl === "Multicaixa" ? "#4338ca" : lbl === "Crédito" ? "var(--warning)" : "var(--info)";
           return '<div class="hist-session-cash-bar-row">' +
             '<div class="hist-session-cash-bar-label">' + lbl + '</div>' +
             '<div class="hist-session-cash-bar-track"><div class="hist-session-cash-bar-fill hist-session-bar-anim" style="width:' + pct + '%;background:' + col + '"></div></div>' +

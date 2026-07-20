@@ -3,6 +3,7 @@ import { loadConfiguracoes }  from "./configuracoes.js";
 import { loadDespesas }       from "./despesas.js";
 import { loadSeguranca }   from "./seguranca.js";
 import { loadTurno } from "./turno.js";
+import { loadTesouraria } from "./tesouraria.js";
 import { loadFornecedores } from "./fornecedores.js";
 import { loadEscritorio } from "./escritorio.js";
 import { db }                    from "../db.js";
@@ -95,6 +96,7 @@ function renderMenu() {
   const adminItems = [
     // ── Gestão ──
     { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno",         group: "Gestão"     },
+    { label: "Tesouraria",        sub: "Caixa, banco e capital",         icon: "wallet",         color: "#fef3c7", iconColor: "#d97706", page: "tesouraria",    group: "Gestão"     },
     { label: "Contabilidade",     sub: "Receitas, lucros e despesas",    icon: "bar-chart-2",    color: "#dcfce7", iconColor: "#16a34a", page: "contabilidade", group: "Gestão"     },
     { label: "Gestão de Stock",   sub: "Produtos e inventário",          icon: "package",        color: "#ede9fe", iconColor: "#5b21b6", page: "stock",         group: "Gestão"     },
     { label: "Fornecedores",      sub: "Compras e fornecedores",         icon: "truck",          color: "#fef3c7", iconColor: "#d97706", page: "fornecedores",  group: "Gestão"     },
@@ -110,6 +112,7 @@ function renderMenu() {
 
   const caixaItems = [
     { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno",         group: "Gestão"     },
+    { label: "Tesouraria",        sub: "Sangria, reforço e ajustes",     icon: "wallet",         color: "#fef3c7", iconColor: "#d97706", page: "tesouraria",    group: "Gestão"     },
     { label: "Escritório",        sub: "Importar ficheiros de turno",    icon: "archive",        color: "#ede9fe", iconColor: "#5b21b6", page: "escritorio",    group: "Gestão"     },
     { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "#fee2e2", iconColor: "#dc2626", page: "seguranca",     group: "Gestão"     },
   ];
@@ -230,6 +233,7 @@ window._perfilNav = async (page) => {
   if (page === "contactos")      await loadContactosPage();
   if (page === "seguranca")    await loadSegurancaPage();
   if (page === "turno")        await loadTurnoPage();
+  if (page === "tesouraria")   await loadTesourariaPage();
   if (page === "fornecedores") await loadFornecedoresPage();
   if (page === "despesas")     await loadDespesasPage();
   if (page === "senha")        loadSenhaPage();
@@ -241,14 +245,14 @@ window._perfilNav = async (page) => {
 var SUBPAGE_TITLES = {
   stock: "Stock", incidentes: "Incidentes", equipa: "Equipa", loja: "Loja",
   senha: "Senha", dashboard: "Dashboard", fornecedores: "Fornecedores",
-  turno: "Turno", seguranca: "Segurança", configuracoes: "Configurações",
+  turno: "Turno", tesouraria: "Tesouraria", seguranca: "Segurança", configuracoes: "Configurações",
   contabilidade: "Contabilidade", despesas: "Despesas", assinatura: "Assinatura",
   contactos: "Contactos", escritorio: "Escritório", sobre: "Sobre",
   ajuda: "Ajuda", notificacoes: "Notificações",
 };
 
 function showSubpage(name) {
-  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","seguranca","configuracoes","contabilidade","despesas","assinatura","contactos","escritorio","sobre","ajuda","notificacoes"];
+  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","tesouraria","seguranca","configuracoes","contabilidade","despesas","assinatura","contactos","escritorio","sobre","ajuda","notificacoes"];
   subpages.forEach(s => {
     const node = el("subpage-" + s);
     if (node) node.style.display = "none";
@@ -261,6 +265,19 @@ function showSubpage(name) {
     const node = el("subpage-" + name);
     if (node) node.style.display = "block";
   }
+  const dashBtn = document.getElementById("btn-topbar-dashboard");
+  if (dashBtn) {
+    if (name) {
+      if (!dashBtn.dataset.origOnclick) dashBtn.dataset.origOnclick = "1"; // marcador simples
+      dashBtn.innerHTML = '<i data-lucide="arrow-left"></i>';
+      dashBtn.onclick = function() { window._perfilBack(); };
+    } else {
+      dashBtn.innerHTML = '<i data-lucide="layout-dashboard"></i>';
+      dashBtn.onclick = function() { window._openDashboard(); };
+    }
+    refreshIcons(dashBtn);
+  }
+
   const titleEl = el("topbar-title");
   if (titleEl) {
     titleEl.textContent = name ? (SUBPAGE_TITLES[name] || name) : "Perfil";
@@ -978,6 +995,13 @@ async function loadTurnoPage() {
   if (btn) btn.onclick = () => showSubpage(null);
   window._showSubpage = showSubpage;
   await loadTurno();
+}
+
+async function loadTesourariaPage() {
+  const btn = document.getElementById("btn-back-tesouraria");
+  if (btn) btn.onclick = () => showSubpage(null);
+  window._showSubpage = showSubpage;
+  await loadTesouraria();
 }
 
 async function loadIncidentesPage() {
@@ -2220,12 +2244,12 @@ async function loadContactos() {
     '<div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);border-radius:16px;padding:20px;color:#fff;text-align:center;margin-bottom:16px">' +
     '<i data-lucide="headphones" style="width:40px;height:40px;color:#ddd6fe;margin-bottom:10px"></i>' +
     '<div style="font-size:18px;font-weight:700">Suporte Kontaki</div>' +
-    '<div style="font-size:13px;color:#ddd6fe;margin-top:4px">Introxeer Technology · Angola</div>' +
+    '<div style="font-size:13px;color:#ddd6fe;margin-top:4px">Introxeer · Angola</div>' +
     '</div>' +
 
-    contactCard("WhatsApp", "Suporte técnico rápido", "message-circle", "#25D366", "https://wa.me/244900000000") +
-    contactCard("Email", "info@introxeer.co.ao", "mail", "#5b21b6", "mailto:info@introxeer.co.ao") +
-    contactCard("GitHub", "github.com/samuelfranckarnaldo/kontaki", "github", "#18181b", "https://github.com/samuelfranckarnaldo/kontaki") +
+    contactCard("WhatsApp", "Suporte técnico rápido", "message-circle", "#25D366", "https://wa.me/244934923166") +
+    contactCard("Facebook", "Introxeer", "facebook", "#1877F2", "https://www.facebook.com/profile.php?id=61591298607073") +
+    contactCard("Instagram", "@introxeer", "instagram", "#E1306C", "https://instagram.com/introxeer") +
 
     '<div style="background:#fff;border-radius:12px;padding:14px;border:1px solid #f4f4f5;margin-top:12px">' +
     '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Reportar problema</div>' +
