@@ -1,4 +1,5 @@
 import { loadDashboard }      from "./dashboard.js";
+import { loadBI }             from "./bi.js";
 import { loadConfiguracoes }  from "./configuracoes.js";
 import { loadDespesas }       from "./despesas.js";
 import { loadSeguranca }   from "./seguranca.js";
@@ -98,6 +99,7 @@ function renderMenu() {
     { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno",         group: "Gestão"     },
     { label: "Tesouraria",        sub: "Caixa, banco e capital",         icon: "wallet",         color: "#fef3c7", iconColor: "#d97706", page: "tesouraria",    group: "Gestão"     },
     { label: "Contabilidade",     sub: "Receitas, lucros e despesas",    icon: "bar-chart-2",    color: "#dcfce7", iconColor: "#16a34a", page: "contabilidade", group: "Gestão"     },
+    { label: "Business Intelligence", sub: "Tendências, comparações e análise", icon: "line-chart", color: "#fce7f3", iconColor: "#be185d", page: "dashboard",     group: "Gestão"     },
     { label: "Gestão de Stock",   sub: "Produtos e inventário",          icon: "package",        color: "#ede9fe", iconColor: "#5b21b6", page: "stock",         group: "Gestão"     },
     { label: "Fornecedores",      sub: "Compras e fornecedores",         icon: "truck",          color: "#fef3c7", iconColor: "#d97706", page: "fornecedores",  group: "Gestão"     },
     { label: "Despesas",          sub: "Renda, salários e outros custos",icon: "receipt",        color: "#fee2e2", iconColor: "#dc2626", page: "despesas",      group: "Gestão"     },
@@ -229,6 +231,7 @@ window._perfilNav = async (page) => {
   if (page === "loja")       await loadLoja();
   if (page === "configuracoes")  await loadConfiguracoesPage();
   if (page === "contabilidade")  await loadContabilidadePage();
+  if (page === "dashboard")      await loadDashboardPage();
   if (page === "assinatura")     await loadAssinaturaPage();
   if (page === "contactos")      await loadContactosPage();
   if (page === "seguranca")    await loadSegurancaPage();
@@ -244,7 +247,7 @@ window._perfilNav = async (page) => {
 
 var SUBPAGE_TITLES = {
   stock: "Stock", incidentes: "Incidentes", equipa: "Equipa", loja: "Loja",
-  senha: "Senha", dashboard: "Dashboard", fornecedores: "Fornecedores",
+  senha: "Senha", dashboard: "Business Intelligence", fornecedores: "Fornecedores",
   turno: "Turno", tesouraria: "Tesouraria", seguranca: "Segurança", configuracoes: "Configurações",
   contabilidade: "Contabilidade", despesas: "Despesas", assinatura: "Assinatura",
   contactos: "Contactos", escritorio: "Escritório", sobre: "Sobre",
@@ -1029,7 +1032,7 @@ window._closeModal = closeModal;
 async function loadDashboardPage() {
   const btn = document.getElementById("btn-back-dashboard");
   if (btn) btn.onclick = () => showSubpage(null);
-  await loadDashboard();
+  await loadBI();
 }
 
 async function loadFornecedoresPage() {

@@ -82,6 +82,82 @@ function renderPinCard() {
   if (forgotBtn) forgotBtn.addEventListener("click", openForgotPassword);
 }
 
+const LOGIN_STATIC_MESSAGES = [
+  "Vamos começar?",
+  "Tudo preparado para mais um dia.",
+  "Tenha um excelente dia de trabalho.",
+  "Tecnologia criada para simplificar negócios.",
+];
+
+function _greetingMessage() {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia.";
+  if (h < 19) return "Boa tarde.";
+  return "Boa noite.";
+}
+
+function _todayMessage() {
+  const days = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+  const months = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  const d = new Date();
+  return "Hoje é " + days[d.getDay()] + ", " + d.getDate() + " de " + months[d.getMonth()] + ".";
+}
+
+function _connectionMessage() {
+  return navigator.onLine ? "Internet disponível." : "A trabalhar offline.";
+}
+
+let _loginMsgIndex = 0;
+let _loginMsgTimer = null;
+
+function _buildLoginMessages() {
+  return [_greetingMessage(), ...LOGIN_STATIC_MESSAGES, _todayMessage(), _connectionMessage()];
+}
+
+let _loginTypeTimer = null;
+
+function _typeMessage(text, onDone) {
+  const el = document.getElementById("login-rotating-msg");
+  if (!el) return;
+  if (_loginTypeTimer) clearInterval(_loginTypeTimer);
+  el.textContent = "";
+  let i = 0;
+  _loginTypeTimer = setInterval(function() {
+    i++;
+    el.textContent = text.slice(0, i);
+    if (i >= text.length) {
+      clearInterval(_loginTypeTimer);
+      _loginTypeTimer = null;
+      if (onDone) onDone();
+    }
+  }, 32);
+}
+
+function _showNextLoginMessage() {
+  const messages = _buildLoginMessages();
+  _loginMsgIndex = (_loginMsgIndex + 1) % messages.length;
+  _typeMessage(messages[_loginMsgIndex]);
+}
+
+function _startLoginMessageRotation() {
+  const el = document.getElementById("login-rotating-msg");
+  if (!el) return;
+  const messages = _buildLoginMessages();
+  _loginMsgIndex = 0;
+  _typeMessage(messages[0]);
+  if (_loginMsgTimer) clearInterval(_loginMsgTimer);
+  _loginMsgTimer = setInterval(_showNextLoginMessage, 4200);
+}
+
+window.addEventListener("online", function() {
+  const lp = document.getElementById("login-page");
+  if (lp && lp.style.display !== "none") _typeMessage("Internet disponível.");
+});
+window.addEventListener("offline", function() {
+  const lp = document.getElementById("login-page");
+  if (lp && lp.style.display !== "none") _typeMessage("A trabalhar offline.");
+});
+
 export function initAuth() {
   const list = document.getElementById("login-users-list");
 
@@ -90,9 +166,13 @@ export function initAuth() {
     return;
   }
 
+  const loginPageInit = document.getElementById("login-page");
+  if (loginPageInit) loginPageInit.classList.add("role-active");
+
   ensurePinCardStyle();
   renderPinCard();
   _renderLoginUsers();
+  _startLoginMessageRotation();
 
   if (window.lucide) window.lucide.createIcons();
 }
@@ -187,7 +267,7 @@ async function _selectUserHandler(userId) {
   }
 
   const loginPageEl = document.getElementById("login-page");
-  if (loginPageEl) loginPageEl.classList.add("pin-active");
+  if (loginPageEl) { loginPageEl.classList.add("pin-active"); loginPageEl.classList.remove("role-active"); }
 
   const pinUserEl = document.getElementById("login-pin-user");
 
@@ -276,6 +356,7 @@ window._backToRole = function() {
 
   if (loginPageEl) {
     loginPageEl.classList.remove("pin-active");
+    loginPageEl.classList.add("role-active");
   }
 
   _updatePinDots();
@@ -579,6 +660,8 @@ function _showLoginAnimated() {
   if (loginPage) {
     loginPage.style.display = "flex";
     loginPage.style.animation = "loginFadeIn .3s ease";
+    loginPage.classList.remove("pin-active");
+    loginPage.classList.add("role-active");
   }
 
   const stepRole = document.getElementById("login-step-role");

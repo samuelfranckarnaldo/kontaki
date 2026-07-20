@@ -292,6 +292,55 @@ export async function closeAccountingPeriod(period, closedByUserId) {
   return { period, totalProveitos, totalCustos, resultadoLiquido };
 }
 
+// Calcula o saldo atual de uma conta a partir de todos os lançamentos —
+// usado para validar operações de Tesouraria antes de gravar (ex: nao deixar
+// retirar/levantar mais do que o saldo disponivel em Caixa/Banco).
+export async function getAccountBalance(code) {
+  var acc = CHART_OF_ACCOUNTS.find(function(c){ return c.code === code; });
+  if (!acc) return 0;
+  var entries = await db.getAll("journalEntries");
+  var saldo = 0;
+  entries.forEach(function(e) {
+    (e.lines||[]).forEach(function(l) {
+      if (l.account !== code) return;
+      saldo += acc.natureza === "devedora" ? (l.debit-l.credit) : (l.credit-l.debit);
+    });
+  });
+  return saldo;
+}
+
+// ── TESOURARIA ────────────────────────────────────────────────────────────
+// Conta usada para movimentos com o proprietário (aporte/retirada de capital
+// e reforço de caixa vindo do próprio proprietário). Provisório: o PGC ainda
+// nao tem uma conta corrente de socio/titular propria — usa-se Capital (51)
+// ate essa conta ser criada e migrada. Ver discussao no handoff sobre V1/V2.
+export const OWNER_ACCOUNT = "51";
+
+// Lança um movimento entre Caixa/Banco e a conta do proprietário.
+// direction: "in"  (proprietario -> caixa/banco, ex: aporte, reforco de origem proprietario)
+//            "out" (caixa/banco -> proprietario, ex: retirada)
+// method: "caixa" (conta 45) ou "banco" (conta 43)
+export async function postOwnerContribution(params) {
+  var acct = params.method === "banco" ? "43" : "45";
+  var lines = params.direction === "out"
+    ? [ { account: OWNER_ACCOUNT, debit: params.amount, credit: 0 },
+        { account: acct,          debit: 0, credit: params.amount } ]
+    : [ { account: acct,          debit: params.amount, credit: 0 },
+        { account: OWNER_ACCOUNT, debit: 0, credit: params.amount } ];
+  return createJournalEntry(params.date, params.description, "treasury", params.movementId, lines);
+}
+
+// Lança uma transferência entre Caixa (45) e Banco (43) — nas duas direções.
+// direction: "caixa_to_banco" ou "banco_to_caixa"
+export async function postBankTransfer(params) {
+  var lines = params.direction === "caixa_to_banco"
+    ? [ { account: "43", debit: params.amount, credit: 0 },
+        { account: "45", debit: 0, credit: params.amount } ]
+    : [ { account: "45", debit: params.amount, credit: 0 },
+        { account: "43", debit: 0, credit: params.amount } ];
+  return createJournalEntry(params.date, params.description, "treasury", params.movementId, lines);
+}
+
 // Lançamento de uma despesa: débito conta de custo, crédito Caixa/Depósitos
 export async function postExpenseJournal(expense) {
   await deleteJournalEntriesBySource("expense", expense.id);

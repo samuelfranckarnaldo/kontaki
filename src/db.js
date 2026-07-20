@@ -1,5 +1,5 @@
 const DB_NAME    = "kontaki_db";
-const DB_VERSION = 18; // v18: adiciona stores "chartOfAccounts" e "journalEntries" para o motor de Contabilidade (PGC Angola)
+const DB_VERSION = 19; // v19: adiciona store "treasuryMovements" para o modulo de Tesouraria
 let _db = null;
 
 function openDB() {
@@ -40,6 +40,10 @@ function openDB() {
       ensure("chartOfAccounts", { keyPath:"code" }); // plano de contas PGC (classes 1-8), semeado por seedChartOfAccounts()
       ensure("journalEntries",  { keyPath:"id", autoIncrement:true },
         [["date",false],["sourceType",false],["sourceId",false]]); // lançamentos de partidas dobradas
+      ensure("treasuryMovements", { keyPath:"id", autoIncrement:true },
+        [["type",false],["date",false],["sessionId",false],["createdAt",false]]);
+        // { id, type, date, amount, description, origem (null|"caixa"|"cofre"|"banco"|"proprietario"),
+        //   sessionId, userId, journalEntryId (null se nao gerar lancamento), createdAt }
     };
     req.onsuccess = () => {
       _db = req.result;
@@ -55,6 +59,11 @@ function openDB() {
       console.warn("IndexedDB: abertura bloqueada — outra aba pode estar a usar uma versão antiga.");
     };
   });
+}
+
+export async function getAllStoreNames() {
+  const database = await openDB();
+  return Array.from(database.objectStoreNames);
 }
 
 function dba(store, mode, fn, _isRetry) {

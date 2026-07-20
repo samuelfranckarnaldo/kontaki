@@ -35,18 +35,48 @@ function runAction(m) {
   }
 }
 
+function reducedMotion() {
+  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+// Diagrama de sincronização em miniatura — o mesmo motivo do site da
+// Introxeer, adaptado ao cartão. SVG nativo com <animate>, sem
+// depender de keyframes CSS que não existem no stylesheet do Kontaki.
+function syncIllustrationSVG() {
+  var anim = reducedMotion() ? "" :
+    '<animate attributeName="stroke-dashoffset" from="0" to="-24" dur="1.6s" repeatCount="indefinite"/>';
+  var pulseAnim = reducedMotion() ? "" :
+    '<animate attributeName="r" values="4;15;4" dur="2s" repeatCount="indefinite"/>' +
+    '<animate attributeName="opacity" values="0.6;0;0.6" dur="2s" repeatCount="indefinite"/>';
+
+  return (
+    '<svg viewBox="0 0 220 110" width="100%" height="88" style="display:block;margin:0 auto" aria-hidden="true">' +
+      '<line x1="34" y1="82" x2="176" y2="30" stroke="#C4B5FD" stroke-width="2" stroke-dasharray="5 7" fill="none">' + anim + '</line>' +
+      '<rect x="14" y="62" width="46" height="40" rx="10" fill="#fff" stroke="#E7E2F3" stroke-width="1.5"/>' +
+      '<rect x="28" y="72" width="18" height="20" rx="3" fill="none" stroke="#1A1425" stroke-width="1.4"/>' +
+      '<rect x="160" y="10" width="46" height="40" rx="10" fill="#fff" stroke="#E7E2F3" stroke-width="1.5"/>' +
+      '<path d="M172 34c-4 0-7-3-7-6.5 0-3 2-5.5 5-6.5.5-4.5 4.5-8 9-8 4 0 7.5 2.5 8.5 6.5 3.5.5 6 3.5 6 7 0 4-3 7.5-7 7.5z" fill="none" stroke="#1A1425" stroke-width="1.4"/>' +
+      '<circle cx="105" cy="56" r="4" fill="#6D28D9"/>' +
+      '<circle cx="105" cy="56" r="4" fill="none" stroke="#A78BFA" stroke-width="1.2">' + pulseAnim + '</circle>' +
+    '</svg>'
+  );
+}
+
 function cardHtml(m, opts) {
   var color = severityColor(m.severity);
   var hasAction = m.action_type && m.action_type !== "none" && m.action_value;
   return (
-    '<div style="width:56px;height:56px;border-radius:16px;background:' + color + '22;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">' +
-      '<i data-lucide="' + severityIcon(m.severity) + '" style="width:26px;height:26px;color:' + color + '"></i>' +
+    '<div style="padding:4px 0 10px">' + syncIllustrationSVG() + '</div>' +
+    '<div style="display:flex;justify-content:center;margin-bottom:16px">' +
+      '<span style="display:inline-flex;align-items:center;gap:6px;font-family:ui-monospace,\'SFMono-Regular\',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#6D28D9;background:#F6F4FD;border:1px solid #EDE9FB;padding:5px 12px 5px 10px;border-radius:999px">' +
+        '<span style="width:6px;height:6px;border-radius:50%;background:' + color + ';flex-shrink:0"></span>Introxeer' +
+      '</span>' +
     '</div>' +
-    '<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:8px">' + (m.title || "Aviso") + '</div>' +
-    '<div style="font-size:13.5px;color:var(--text3);line-height:1.5;margin-bottom:22px">' + m.body + '</div>' +
-    '<div style="display:flex;flex-direction:column;gap:8px">' +
-      (hasAction ? '<button id="msg-action-btn" style="background:' + color + ';color:#fff;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">' + actionLabel(m) + '</button>' : '') +
-      (opts.dismissible ? '<button id="msg-dismiss-btn" style="background:transparent;color:var(--text3);border:none;padding:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Agora não</button>' : '') +
+    '<div style="font-size:19px;font-weight:800;color:var(--text);margin-bottom:10px;text-align:center;letter-spacing:-0.01em">' + (m.title || "Aviso") + '</div>' +
+    '<div style="font-size:14px;color:var(--text3);line-height:1.6;margin-bottom:28px;text-align:center">' + m.body + '</div>' +
+    '<div style="display:flex;flex-direction:column;gap:10px">' +
+      (hasAction ? '<button id="msg-action-btn" style="background:' + color + ';color:#fff;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">' + actionLabel(m) + '</button>' : '') +
+      (opts.dismissible ? '<button id="msg-dismiss-btn" style="background:transparent;color:var(--text3);border:none;padding:11px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit">Agora não</button>' : '') +
       (opts.blocking ? '<button id="msg-recheck-btn" style="background:transparent;color:var(--text4);border:none;padding:8px;font-size:11.5px;cursor:pointer;font-family:inherit">Verificar novamente</button>' : '') +
     '</div>'
   );

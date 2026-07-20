@@ -1,20 +1,22 @@
-import { db } from "./db.js";
+import { db, getAllStoreNames } from "./db.js";
 
-const STORES = [
-  "users","products","sales","saleItems","fiado",
-  "incidents","sessions","stockMovements","sessionTransfers",
-  "suppliers","purchases","settings","logs",
-];
+// Backup completo: lê a lista real de stores da base de dados em vez de
+// manter uma lista fixa à parte — evita o problema que já aconteceu uma vez
+// (backup.js ficou desatualizado à medida que a app cresceu, deixando de
+// fora clients, expenses, auditLog, pendingSales, contabilidade, etc.).
+// Sempre que uma store nova for criada em db.js, o backup já a inclui
+// automaticamente, sem precisar de manutenção manual aqui.
 
 export const backupService = {
   async export() {
+    const stores = await getAllStoreNames();
     const data = {
-      version:   "1.0",
+      version:   "2.0",
       app:       "Kontaki",
       exportedAt: new Date().toISOString(),
       stores:    {},
     };
-    for (const store of STORES) {
+    for (const store of stores) {
       try { data.stores[store] = await db.getAll(store); }
       catch { data.stores[store] = []; }
     }
@@ -45,9 +47,14 @@ export const backupService = {
 
     if (!data.stores || !data.version) throw new Error("Formato de backup inválido.");
 
+    // Só tenta restaurar stores que existem de facto na base de dados atual
+    // (protege contra um backup antigo referenciar uma store já removida/
+    // renomeada) — não assume que tudo o que está no ficheiro é válido aqui.
+    const validStores = new Set(await getAllStoreNames());
+
     const results = {};
-    for (const store of STORES) {
-      if (!data.stores[store]) continue;
+    for (const store of Object.keys(data.stores)) {
+      if (!validStores.has(store)) continue;
       let count = 0;
       for (const record of data.stores[store]) {
         try { await db.put(store, record); count++; }
