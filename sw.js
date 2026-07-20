@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kontaki-v329';
+const CACHE_NAME = 'kontaki-v332';
 const BASE = self.location.pathname.replace(/\/sw\.js$/, '');
 
 const ASSETS = [
@@ -42,6 +42,14 @@ const ASSETS = [
   BASE + '/assets/fonts/DMSans-Medium.woff2',
   BASE + '/assets/fonts/DMSans-SemiBold.woff2',
   BASE + '/assets/fonts/DMSans-Bold.woff2',
+  BASE + '/assets/icons/icon-96.png',
+  BASE + '/assets/icons/icon-192.png',
+  BASE + '/assets/icons/icon-512.png',
+  BASE + '/assets/icons/icon-maskable-512.png',
+  BASE + '/assets/icons/favicon.ico',
+  BASE + '/assets/icons/favicon-32x32.png',
+  BASE + '/assets/icons/favicon-16x16.png',
+  BASE + '/assets/icons/apple-touch-icon.png',
 ];
 
 // Instala e faz cache de todos os assets
