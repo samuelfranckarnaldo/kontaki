@@ -119,12 +119,7 @@ export var router = {
       if (qrBtn && hasFeature("scanner"))         qrBtn.style.display    = "flex";
       if (pedidosBtn) pedidosBtn.style.display = "flex";
     }
-    if (pageId === "produtos") {
-      if (addBtn) {
-        addBtn.style.display = "flex";
-        addBtn.onclick = function() { openProductForm(); };
-      }
-    }
+    // Botão "+" oculto em Produtos — criação movida para Gestão de Stock
     if (pageId === "fiados") {
       if (addBtn) {
         addBtn.style.display = "flex";

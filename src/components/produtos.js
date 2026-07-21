@@ -547,10 +547,10 @@ window._openProdMenu = (id) => {
     // Header do produto — nome, categoria e preco agrupados, sem duplicar o titulo
     `<div class="stagger-item" style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-5);animation-delay:0ms">
       <div style="width:52px;height:52px;border-radius:var(--radius-lg);flex-shrink:0;
-        background:linear-gradient(135deg, ${cColor}, ${cColor}cc);
+        ${p.imageData ? `background-image:url(${p.imageData});background-size:cover;background-position:center;` : `background:linear-gradient(135deg, ${cColor}, ${cColor}cc);`}
         display:flex;align-items:center;justify-content:center;
         font-size:var(--text-xl);font-weight:var(--weight-strong);color:#fff;box-shadow:0 4px 12px ${cColor}40">
-        ${(p.name||"P").charAt(0).toUpperCase()}
+        ${!p.imageData ? (p.name||"P").charAt(0).toUpperCase() : ""}
       </div>
       <div style="flex:1;min-width:0">
         <div style="font-size:var(--text-lg);font-weight:var(--weight-strong);color:var(--text);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
@@ -586,6 +586,16 @@ window._openProdMenu = (id) => {
     (user.role==="admin" && margin!==null ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Margem</span><span style="font-weight:var(--weight-strong);color:${margin<0?"var(--danger)":"var(--success)"}">${fmt(p.price-p.costPrice)} (${margin}%)</span></div>` : "") +
     `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;font-size:var(--text-sm)"><span style="color:var(--text3)">Stock mínimo</span><span style="font-weight:var(--weight-strong);color:var(--text)">${p.minStock||5} ${p.unit||"un"}</span></div>` +
     (p.barcode ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-top:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Código de barras</span><span style="font-family:monospace;font-weight:var(--weight-strong);color:var(--text)">${p.barcode}</span></div>` : "") +
+    (p.sku ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-top:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">SKU</span><span style="font-family:monospace;font-weight:var(--weight-strong);color:var(--text)">${p.sku}</span></div>` : "") +
+    (p.purchaseUnit && p.conversionFactor ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-top:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Unidade de compra</span><span style="font-weight:var(--weight-strong);color:var(--text)">1 ${p.purchaseUnit} = ${p.conversionFactor} ${_prodAbbrevUnit(p.unit)}</span></div>` : "") +
+    (p.expiryDate ? (function(){
+        var d = daysUntil(p.expiryDate);
+        var dateLabel = new Date(p.expiryDate+"T00:00:00").toLocaleDateString("pt-AO",{day:"2-digit",month:"short",year:"numeric"});
+        var color = d < 0 ? "var(--danger-muted)" : (d <= 30 ? "var(--warning-muted)" : "var(--text)");
+        var statusLabel = d < 0 ? " · vencido" : (d <= 30 ? " · " + d + "d restantes" : "");
+        return `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-top:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Validade</span><span style="font-weight:var(--weight-strong);color:${color}">${dateLabel}${statusLabel}</span></div>`;
+      })() : "") +
+    (p.batchNumber ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-top:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Lote</span><span style="font-family:monospace;font-weight:var(--weight-strong);color:var(--text)">${p.batchNumber}</span></div>` : "") +
     `</div>` +
 
     // Acções
