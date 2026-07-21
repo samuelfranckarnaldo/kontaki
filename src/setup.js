@@ -463,6 +463,7 @@ function showSetup() {
       ov.style.animation = "onbFadeOut .25s ease forwards";
       setTimeout(function() {
         ov.remove();
+        try { sessionStorage.setItem("kontaki_boot_msg", "criando_conta"); } catch (e) {}
         window.location.reload();
       }, 220);
     });

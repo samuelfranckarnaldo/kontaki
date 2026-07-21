@@ -1,5 +1,5 @@
 const DB_NAME    = "kontaki_db";
-const DB_VERSION = 19; // v19: adiciona store "treasuryMovements" para o modulo de Tesouraria
+const DB_VERSION = 20; // v20: adiciona store "syncQueue" para sincronizacao incremental com o Console
 let _db = null;
 
 function openDB() {
@@ -44,6 +44,11 @@ function openDB() {
         [["type",false],["date",false],["sessionId",false],["createdAt",false]]);
         // { id, type, date, amount, description, origem (null|"caixa"|"cofre"|"banco"|"proprietario"),
         //   sessionId, userId, journalEntryId (null se nao gerar lancamento), createdAt }
+
+      ensure("syncQueue", { keyPath:"id", autoIncrement:true },
+        [["entityType",false],["syncedAt",false],["createdAt",false]]);
+        // { id, entityType ("sales"|"expenses"|...), localId, action ("create"|"update"|"delete"),
+        //   payload, createdAt, syncedAt (null ate ser confirmado pelo Console) }
     };
     req.onsuccess = () => {
       _db = req.result;
@@ -57,6 +62,13 @@ function openDB() {
     req.onerror   = () => reject(req.error);
     req.onblocked = () => {
       console.warn("IndexedDB: abertura bloqueada — outra aba pode estar a usar uma versão antiga.");
+      // Sem isto a Promise ficava pendente para sempre se o bloqueio nao se
+      // resolvesse sozinho (ex: outra aba/instancia a fechar a ligacao antiga
+      // devagar). Da um tempo razoavel para resolver e so rejeita se persistir,
+      // para quem chamou poder recuperar (retry) em vez de ficar preso.
+      setTimeout(() => {
+        if (!_db) reject(new Error("IndexedDB continua bloqueado — fecha outras abas do Kontaki e tenta novamente."));
+      }, 4000);
     };
   });
 }

@@ -122,16 +122,34 @@ window._confirmarDevolucao = async function() {
   var totalDevolvido = 0;
   var cogsDevolvido  = 0;
   var devolvidos = [];
+  var itensDevolvidosEstruturado = [];
+
+  // Soma quanto ja foi devolvido de cada item em devolucoes anteriores desta
+  // venda — sem isto, cada devolucao parcial validava so contra a quantidade
+  // ORIGINAL vendida, permitindo devolver mais do que o total comprado ao
+  // longo de varias devolucoes (repondo stock e estornando receita a mais).
+  var devolucoesAnteriores = sale.devolucoes || [];
+  var jaDevolvidoPorItem = {};
+  devolucoesAnteriores.forEach(function(dv) {
+    (dv.itensDevolvidos || []).forEach(function(iv) {
+      jaDevolvidoPorItem[iv.itemId] = (jaDevolvidoPorItem[iv.itemId] || 0) + iv.qty;
+    });
+  });
 
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
     var inp  = document.getElementById("dev-" + item.id);
     var qty  = inp ? (parseInt(inp.value) || 0) : 0;
     if (qty <= 0) continue;
-    if (qty > item.qty) {
-      toast("Não podes devolver mais do que foi vendido: " + item.name, "error");
+
+    var jaDevolvido = jaDevolvidoPorItem[item.id] || 0;
+    var disponivelParaDevolver = item.qty - jaDevolvido;
+    if (qty > disponivelParaDevolver) {
+      toast("Só podes devolver mais " + disponivelParaDevolver + " un. de " + item.name + " (já devolveste " + jaDevolvido + " de " + item.qty + ").", "error");
       return;
     }
+
+    itensDevolvidosEstruturado.push({ itemId: item.id, qty: qty });
 
     // Verifica stock actual do produto
     var product = await db.get("products", item.id);
@@ -176,11 +194,12 @@ window._confirmarDevolucao = async function() {
   var saleAtual = await db.get("sales", sale.id);
   var devolucoes = saleAtual.devolucoes || [];
   devolucoes.push({
-    itens:     devolvidos,
-    total:     totalDevolvido,
-    date:      new Date().toISOString(),
-    userId:    user.id,
-    userName:  user.name,
+    itens:            devolvidos,
+    itensDevolvidos:  itensDevolvidosEstruturado,
+    total:            totalDevolvido,
+    date:             new Date().toISOString(),
+    userId:           user.id,
+    userName:         user.name,
   });
   await db.put("sales", {
     ...saleAtual,

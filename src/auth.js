@@ -178,16 +178,28 @@ export function initAuth() {
 }
 
 async function _renderLoginUsers() {
-  const users = await db.getAll("users");
-  const store = await db.get("settings", "store");
-  const sessions = await db.getAll("sessions");
+  const list = document.getElementById("login-users-list");
+  var users, store, sessions;
+  try {
+    users = await db.getAll("users");
+    store = await db.get("settings", "store");
+    sessions = await db.getAll("sessions");
+  } catch (err) {
+    if (list) {
+      list.innerHTML =
+        '<div style="text-align:center;padding:20px;color:var(--danger,#dc2626)">' +
+        '<div style="font-size:13px;font-weight:600;margin-bottom:10px">Não foi possível carregar os perfis.</div>' +
+        '<button onclick="window.location.reload()" style="padding:10px 18px;background:#5b21b6;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Recarregar</button>' +
+        '</div>';
+    }
+    return;
+  }
   const openSessionByUserId = {};
   sessions.forEach(function(s) {
     if (s.status === "open") openSessionByUserId[s.userId] = s;
   });
 
   // Login mostra sempre o símbolo fixo do Kontaki — nome/logo da loja removidos por decisão de design
-  const list = document.getElementById("login-users-list");
   if (!list) return;
 
   const active = users.filter(u => u.active !== false);

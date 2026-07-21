@@ -2000,10 +2000,10 @@ async function loadContaBalancete(wrap) {
     '<i data-lucide="' + (bateOK?'check':'alert-triangle') + '" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"></i>' +
     (bateOK?'Bate certo':'Diferença') + '</div>';
 
-  var debitStr  = fmtChartVal(totalDebitGeral);
-  var creditStr = fmtChartVal(totalCreditGeral);
+  var debitStr  = fmt(totalDebitGeral);
+  var creditStr = fmt(totalCreditGeral);
   var maxLen = Math.max(debitStr.length, creditStr.length);
-  var valSize = maxLen >= 10 ? "20px" : maxLen >= 7 ? "24px" : "28px";
+  var valSize = maxLen >= 18 ? "14px" : maxLen >= 15 ? "16px" : maxLen >= 12 ? "20px" : maxLen >= 9 ? "24px" : "28px";
 
   wrap.innerHTML =
     '<div class="hist-hero" style="margin-bottom:16px;background:linear-gradient(135deg, var(--primary), var(--primary-mid))">' +

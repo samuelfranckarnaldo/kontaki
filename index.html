@@ -24,6 +24,15 @@
 </head>
 <body>
 
+<!-- BOOT SPINNER — cobre o intervalo branco entre o HTML pintar e main.js decidir
+     o que mostrar (login, app, ou onboarding). Visivel por padrao; main.js remove-o
+     assim que souber para onde navegar. Fica acima de tudo (login-page e app). -->
+<div id="boot-spinner-overlay" style="position:fixed;inset:0;background:#fff;z-index:99998;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:inherit">
+  <div style="width:40px;height:40px;border:3.5px solid #ede9fe;border-top-color:#5b21b6;border-radius:50%;animation:boot-spin .8s linear infinite"></div>
+  <div id="boot-spinner-msg" style="font-size:13.5px;font-weight:600;color:#3f3f46;text-align:center;padding:0 24px">Só mais um segundo.</div>
+</div>
+<style>@keyframes boot-spin { to { transform: rotate(360deg); } }</style>
+
 <!-- LOGIN -->
 <div id="login-page" style="display:none">
   <div class="login-box">
@@ -205,16 +214,16 @@ document.addEventListener("DOMContentLoaded", function() {
         </div>
 
         <div id="ct-panel-fiados" class="ct-panel ct-fade-panel" style="display:none">
-          <div class="search-wrap">
+          <div id="fiados-total-bar"></div>
+          <div class="search-wrap" style="margin-top:14px">
             <i data-lucide="search" class="search-icon"></i>
-            <input id="fiados-search" placeholder="Pesquisar cliente..."/>
+            <input id="fiados-search" placeholder="Pesquisar cliente por nome..."/>
           </div>
           <div class="produto-filter-chips-wrap" id="fiados-filter-pills" style="margin-top:12px;display:inline-flex">
             <button class="produto-filter-chip produto-filter-chip--active" data-filter="all">Todos</button>
             <button class="produto-filter-chip" data-filter="debt">Com dívida</button>
             <button class="produto-filter-chip" data-filter="clean">Em dia</button>
           </div>
-          <div id="fiados-total-bar" style="margin-top:8px"></div>
           <div class="list-card" id="fiados-list" style="margin-top:8px"></div>
         </div>
       </div>

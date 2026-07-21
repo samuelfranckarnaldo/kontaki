@@ -550,12 +550,13 @@ async function renderFiadosList(showSkeleton) {
   const total = open.reduce((a, f) => a + (f.amount || 0), 0);
   const uniqueClients = [...new Set(open.map(f => f.clientName))].length;
 
+  const totalStr = fmt(total);
+  const totalSizeClass = totalStr.length >= 16 ? " hist-hero-val--xs" : totalStr.length >= 13 ? " hist-hero-val--sm" : "";
   el("fiados-total-bar").innerHTML =
-    `<div class="ct-inline-summary-card">
-      <div class="ct-inline-summary">
-        <span class="ct-inline-val">${fmt(total)}</span>
-        <span class="ct-inline-label">em aberto · ${uniqueClients} ${uniqueClients===1?"cliente":"clientes"}</span>
-      </div>
+    `<div class="hist-hero">
+      <div class="hist-hero-label">Total em crédito</div>
+      <div class="hist-hero-val${totalSizeClass}">${totalStr}</div>
+      <div class="hist-hero-sub">em aberto · ${uniqueClients} ${uniqueClients===1?"cliente":"clientes"}</div>
     </div>`;
 
   const q = (search ? search.value : "").toLowerCase();
@@ -849,8 +850,8 @@ window._openClienteProfile = async (id) => {
         <div style="flex:1;min-width:0">
           <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Crédito</div>
           <div style="font-size:19px;font-weight:800;color:${fiadoAberto>0?"var(--warning)":"var(--success)"};margin-top:1px">${fmtStatVal(fiadoAberto)}</div>
+          <div style="font-size:11.5px;font-weight:600;color:var(--text3);margin-top:1px">${fiadoAberto>0?"em aberto":"nada em aberto"}</div>
         </div>
-        <div style="font-size:11.5px;font-weight:600;color:var(--text3);text-align:right;flex-shrink:0">${fiadoAberto>0?"em aberto":"nada em aberto"}</div>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">

@@ -8,6 +8,7 @@ import { addStockMovement, getStock, getOpenIncidentForProduct, getStockIncident
 import { gerarReciboPDF, partilharReciboPDF, printReciboHTML, payMethodLabel, totalExtenso } from "./recibo-pdf.js";
 import { printRecibo } from "../print.js";
 import { postSaleJournal } from "../pgc.js";
+import { queueSync } from "../sync.js";
 
 let products  = [];
 let cart      = [];
@@ -1258,7 +1259,9 @@ window._confirmarVenda = async () => {
 
     const finalHash = genHash(sid, saleDate);
     const rec       = await db.get("sales", sid);
-    await db.put("sales", { ...rec, hash:finalHash });
+    const finalRec  = { ...rec, hash:finalHash };
+    await db.put("sales", finalRec);
+    queueSync("sales", sid, "create", finalRec);
 
     // SaleItems
     for (const item of cart) {
