@@ -288,16 +288,13 @@ document.addEventListener("DOMContentLoaded", function() {
       <!-- Subpáginas -->
       <div id="subpage-stock" style="display:none">
         <div class="page-inner">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <button class="btn btn-ghost btn-sm" id="btn-back-stock" onclick="window._closeEstoque()">← Voltar</button>
-            <div style="display:flex;gap:6px">
-              <button class="btn btn-outline btn-sm" onclick="window._estOpenMoreMenu()">
-                <i data-lucide="more-horizontal"></i>
-              </button>
-              <button class="btn btn-primary btn-sm" id="btn-prod-add" onclick="window._estoqueAddProduct()">
-                <i data-lucide="plus"></i> Produto
-              </button>
-            </div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:16px">
+            <button class="btn btn-outline btn-sm" onclick="window._estOpenMoreMenu()">
+              <i data-lucide="more-horizontal"></i>
+            </button>
+            <button class="btn btn-primary btn-sm" id="btn-prod-add" onclick="window._estoqueAddProduct()">
+              <i data-lucide="plus"></i> Produto
+            </button>
           </div>
           <div class="produtos-stats" id="estoque-stats"></div>
           <div class="search-wrap" style="margin:16px 0 12px">
