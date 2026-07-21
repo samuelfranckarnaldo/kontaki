@@ -1801,17 +1801,6 @@
   display: block;
   box-shadow: 0 8px 24px rgba(91,33,182,.2);
 }
-.login-logo-mark {
-  width: 64px;
-  height: 64px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-mid));
-  border-radius: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 12px;
-  box-shadow: 0 8px 24px rgba(91,33,182,.3);
-}
 
 /* ── USER CARD LOGIN ────────────────────────────────────────────────────────── */
 .user-card {
