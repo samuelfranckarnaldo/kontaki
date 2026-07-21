@@ -1,5 +1,6 @@
 import { loadDashboard }      from "./dashboard.js";
 import { loadBI }             from "./bi.js";
+import { loadMultilojas }     from "./multilojas.js";
 import { loadConfiguracoes }  from "./configuracoes.js";
 import { loadDespesas }       from "./despesas.js";
 import { loadSeguranca }   from "./seguranca.js";
@@ -101,6 +102,7 @@ function renderMenu() {
     { label: "Tesouraria",        sub: "Caixa, banco e capital",         icon: "wallet",         color: "var(--bg)", iconColor: "var(--text3)", page: "tesouraria",    group: "Gestão"     },
     { label: "Contabilidade",     sub: "Receitas, lucros e despesas",    icon: "bar-chart-2",    color: "var(--bg)", iconColor: "var(--text3)", page: "contabilidade", group: "Gestão"     },
     { label: "Business Intelligence", sub: "Tendências, comparações e análise", icon: "line-chart", color: "var(--bg)", iconColor: "var(--text3)", page: "dashboard",     group: "Gestão"     },
+    { label: "Multi-lojas", sub: "Relatórios e dados entre lojas", icon: "network", color: "var(--bg)", iconColor: "var(--text3)", page: "multilojas",    group: "Gestão"     },
     { label: "Gestão de Stock",   sub: "Produtos e inventário",          icon: "package",        color: "var(--bg)", iconColor: "var(--text3)", page: "stock",         group: "Gestão"     },
     { label: "Fornecedores",      sub: "Compras e fornecedores",         icon: "truck",          color: "var(--bg)", iconColor: "var(--text3)", page: "fornecedores",  group: "Gestão"     },
     { label: "Despesas",          sub: "Renda, salários e outros custos",icon: "receipt",        color: "var(--bg)", iconColor: "var(--text3)", page: "despesas",      group: "Gestão"     },
@@ -233,6 +235,7 @@ window._perfilNav = async (page) => {
   if (page === "configuracoes")  await loadConfiguracoesPage();
   if (page === "contabilidade")  await loadContabilidadePage();
   if (page === "dashboard")      await loadDashboardPage();
+  if (page === "multilojas")     await loadMultilojasPage();
   if (page === "assinatura")     await loadAssinaturaPage();
   if (page === "contactos")      await loadContactosPage();
   if (page === "seguranca")    await loadSegurancaPage();
@@ -248,7 +251,7 @@ window._perfilNav = async (page) => {
 
 var SUBPAGE_TITLES = {
   stock: "Stock", incidentes: "Incidentes", equipa: "Equipa", loja: "Loja",
-  senha: "Senha", dashboard: "Business Intelligence", fornecedores: "Fornecedores",
+  senha: "Senha", dashboard: "Business Intelligence", multilojas: "Multi-lojas", fornecedores: "Fornecedores",
   turno: "Turno", tesouraria: "Tesouraria", seguranca: "Segurança", configuracoes: "Configurações",
   contabilidade: "Contabilidade", despesas: "Despesas", assinatura: "Assinatura",
   contactos: "Contactos", escritorio: "Escritório", sobre: "Sobre",
@@ -256,7 +259,7 @@ var SUBPAGE_TITLES = {
 };
 
 function showSubpage(name) {
-  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","fornecedores","turno","tesouraria","seguranca","configuracoes","contabilidade","despesas","assinatura","contactos","escritorio","sobre","ajuda","notificacoes"];
+  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","multilojas","fornecedores","turno","tesouraria","seguranca","configuracoes","contabilidade","despesas","assinatura","contactos","escritorio","sobre","ajuda","notificacoes"];
   subpages.forEach(s => {
     const node = el("subpage-" + s);
     if (node) node.style.display = "none";
@@ -1034,6 +1037,10 @@ async function loadDashboardPage() {
   const btn = document.getElementById("btn-back-dashboard");
   if (btn) btn.onclick = () => showSubpage(null);
   await loadBI();
+}
+
+async function loadMultilojasPage() {
+  await loadMultilojas();
 }
 
 async function loadFornecedoresPage() {
