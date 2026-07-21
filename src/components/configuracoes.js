@@ -101,7 +101,7 @@ window._setIncidentPolicy = async (policy) => {
 window._exportBackup = async () => {
   const licMod = await import("../license.js");
   if (!licMod.hasFeature("backup")) {
-    licMod.showUpgradeBanner("Backup disponível a partir do plano Standard. Contacta a Introxeer para upgrade.");
+    licMod.showUpgradeBanner("Backup disponível a partir do plano Pro. Contacta a Introxeer para upgrade.");
     return;
   }
   try {

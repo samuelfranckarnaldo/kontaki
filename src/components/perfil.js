@@ -5,6 +5,7 @@ import { loadDespesas }       from "./despesas.js";
 import { loadSeguranca }   from "./seguranca.js";
 import { loadTurno } from "./turno.js";
 import { loadTesouraria } from "./tesouraria.js";
+import { getShortcutDates, getPeriodLabel } from "./historico.js";
 import { loadFornecedores } from "./fornecedores.js";
 import { loadEscritorio } from "./escritorio.js";
 import { db }                    from "../db.js";
@@ -1642,6 +1643,8 @@ function fmt(v) {
 
 // ── LIVRO RAZÃO ────────────────────────────────────────────────────────────────
 var _razaoContaSel = null;
+var _razaoPeriodoSel = "todos";
+var _razaoPeriodoCustom = null;
 var _contaChartMeses = 6;
 var _contaChartInstance = null;
 
@@ -1755,10 +1758,14 @@ async function loadContaRazao(wrap) {
 
   wrap.innerHTML =
     '<div id="razao-hero"></div>' +
-    '<button id="razao-conta-btn" class="conta-picker-btn" style="margin-bottom:16px">' +
+    '<div style="display:flex;gap:8px;margin-bottom:16px">' +
+    '<button id="razao-conta-btn" class="conta-picker-btn" style="flex:1">' +
     '<span>' + contaAtual.code + ' — ' + contaAtual.name + '</span>' +
     '<i data-lucide="chevron-down" style="width:16px;height:16px;flex-shrink:0;color:var(--text3)"></i>' +
     '</button>' +
+    '<button id="razao-periodo-btn" style="background:#f4f4f5;border:none;width:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">' +
+    '<i data-lucide="filter" style="width:17px;height:17px;color:#71717a"></i></button>' +
+    '</div>' +
     '<div id="razao-lancamentos"></div>';
 
   refreshIcons();
@@ -1775,7 +1782,69 @@ async function loadContaRazao(wrap) {
       }
     );
   };
+  document.getElementById("razao-periodo-btn").onclick = function() {
+    openRazaoPeriodoModal(function() { renderRazaoLancamentos(entries); });
+  };
   renderRazaoLancamentos(entries);
+}
+
+function openRazaoPeriodoModal(onApply) {
+  var options = [
+    { id:"todos",  label:"Todos os lançamentos" },
+    { id:"hoje",   label:"Hoje" },
+    { id:"semana", label:"Esta semana" },
+    { id:"mes",    label:"Este mês" },
+    { id:"ano",    label:"Este ano" },
+    { id:"custom", label:"Personalizado" },
+  ];
+
+  var customFrom = (_razaoPeriodoCustom && _razaoPeriodoCustom.from) || "";
+  var customTo   = (_razaoPeriodoCustom && _razaoPeriodoCustom.to)   || "";
+
+  openModal("Filtrar por período",
+    '<div style="display:flex;flex-direction:column;gap:2px;margin-bottom:12px">' +
+    options.map(function(o) {
+      var active = o.id === _razaoPeriodoSel;
+      return '<button data-periodo-id="' + o.id + '" style="display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;background:' +
+        (active ? "var(--primary-light)" : "none") + ';border:none;padding:13px 12px;border-radius:10px;font-size:14.5px;color:' +
+        (active ? "var(--primary)" : "#18181b") + ';font-weight:' + (active ? "700" : "400") + ';cursor:pointer;font-family:inherit">' +
+        o.label + (active ? '<i data-lucide="check" style="width:17px;height:17px"></i>' : '') +
+      '</button>';
+    }).join('') +
+    '</div>' +
+    '<div id="razao-periodo-custom" style="display:' + (_razaoPeriodoSel === "custom" ? "flex" : "none") + ';gap:8px;margin-bottom:12px">' +
+    '<div class="field" style="flex:1"><label>De</label><input type="date" id="razao-periodo-from" value="' + customFrom + '"/></div>' +
+    '<div class="field" style="flex:1"><label>Até</label><input type="date" id="razao-periodo-to" value="' + customTo + '"/></div>' +
+    '</div>' +
+    '<button class="btn btn-primary btn-full" id="razao-periodo-apply">Aplicar</button>');
+  refreshIcons(el("modal-box"));
+
+  var selected = _razaoPeriodoSel;
+  document.querySelectorAll("[data-periodo-id]").forEach(function(btn) {
+    btn.onclick = function() {
+      selected = btn.getAttribute("data-periodo-id");
+      document.querySelectorAll("[data-periodo-id]").forEach(function(b) {
+        var isSel = b === btn;
+        b.style.background = isSel ? "var(--primary-light)" : "none";
+        b.style.color = isSel ? "var(--primary)" : "#18181b";
+        b.style.fontWeight = isSel ? "700" : "400";
+      });
+      var customBox = document.getElementById("razao-periodo-custom");
+      if (customBox) customBox.style.display = selected === "custom" ? "flex" : "none";
+    };
+  });
+
+  document.getElementById("razao-periodo-apply").onclick = function() {
+    _razaoPeriodoSel = selected;
+    if (selected === "custom") {
+      var f = (el("razao-periodo-from")||{}).value;
+      var t = (el("razao-periodo-to")||{}).value;
+      if (!f || !t) { toast("Escolhe as duas datas.", "error"); return; }
+      _razaoPeriodoCustom = { from: f, to: t };
+    }
+    closeModal();
+    onApply();
+  };
 }
 
 function renderRazaoLancamentos(entries) {
@@ -1792,7 +1861,17 @@ function renderRazaoLancamentos(entries) {
       }
     });
   });
+  // Ordem cronológica primeiro — o saldo acumulado depende desta ordem.
   linhas.sort(function(a,b){ return new Date(a.date) - new Date(b.date); });
+
+  // Intervalo do filtro de período (calculado sobre TODAS as linhas, antes de filtrar,
+  // para o saldo acumulado de cada linha continuar correto mesmo com filtro activo).
+  var periodoRange = null;
+  if (_razaoPeriodoSel === "custom" && _razaoPeriodoCustom) {
+    periodoRange = _razaoPeriodoCustom;
+  } else if (_razaoPeriodoSel !== "todos") {
+    periodoRange = getShortcutDates(_razaoPeriodoSel, 0);
+  }
 
   var razaoTypeColor = { debito: "var(--info)",       credito: "var(--primary-mid)"  };
   var razaoTypeBg     = { debito: "var(--info-light)", credito: "var(--primary-light)" };
@@ -1800,8 +1879,20 @@ function renderRazaoLancamentos(entries) {
   var razaoTypeLabel  = { debito: "Débito",            credito: "Crédito"              };
 
   var saldo = 0;
-  var rows = linhas.map(function(l) {
+  var linhasComSaldo = linhas.map(function(l) {
     saldo += conta.natureza === "devedora" ? (l.debit - l.credit) : (l.credit - l.debit);
+    return Object.assign({}, l, { saldoNoMomento: saldo });
+  });
+
+  // Filtra DEPOIS de calcular o saldo — cada linha mantém o saldo correto daquele momento.
+  var linhasFiltradas = periodoRange
+    ? linhasComSaldo.filter(function(l) { var d = l.date.slice(0,10); return d >= periodoRange.from && d <= periodoRange.to; })
+    : linhasComSaldo;
+
+  // Mais recentes primeiro na exibição, sem recalcular o saldo.
+  var linhasParaExibir = linhasFiltradas.slice().reverse();
+
+  var rows = linhasParaExibir.map(function(l) {
     var tipo  = l.debit ? "debito" : "credito";
     var valor = l.debit ? l.debit : l.credit;
     var color = razaoTypeColor[tipo];
@@ -1816,7 +1907,7 @@ function renderRazaoLancamentos(entries) {
       '</div>' +
       '<div style="text-align:right;flex-shrink:0">' +
       '<div class="hist-mov-qty" style="color:' + color + '">' + fmt(valor) + '</div>' +
-      '<div class="hist-mov-range"><span class="hist-mov-range-label">Saldo</span> <strong style="color:' + (saldo>=0?"var(--text2)":"var(--danger)") + '">' + fmt(saldo) + '</strong></div>' +
+      '<div class="hist-mov-range"><span class="hist-mov-range-label">Saldo</span> <strong style="color:' + (l.saldoNoMomento>=0?"var(--text2)":"var(--danger)") + '">' + fmt(l.saldoNoMomento) + '</strong></div>' +
       '</div></div>';
   }).join("");
 

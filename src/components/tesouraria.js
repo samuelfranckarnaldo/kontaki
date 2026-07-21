@@ -7,45 +7,172 @@ import { postOwnerContribution, postBankTransfer, getAccountBalance } from "../p
 import { verifyAdminPin } from "../services.js";
 
 var ADMIN_OPS = [
-  { key: "aporte",       label: "Aporte de capital",        sub: "Entrada de capital do proprietário",   icon: "trending-up",        color: "#dcfce7", iconColor: "#16a34a" },
-  { key: "retirada",     label: "Retirada do proprietário",  sub: "Saída de capital para o proprietário", icon: "trending-down",      color: "#fee2e2", iconColor: "#dc2626" },
-  { key: "deposito",     label: "Depósito bancário",         sub: "Caixa → Banco",                        icon: "landmark",           color: "#dbeafe", iconColor: "#2563eb" },
-  { key: "levantamento", label: "Levantamento bancário",     sub: "Banco → Caixa",                        icon: "landmark",           color: "#dbeafe", iconColor: "#2563eb" },
-  { key: "sangria",      label: "Sangria de caixa",          sub: "Retirar dinheiro do caixa físico",     icon: "arrow-up-from-line", color: "#fef3c7", iconColor: "#d97706" },
-  { key: "reforco",      label: "Reforço de caixa",          sub: "Repor dinheiro no caixa físico",       icon: "arrow-down-to-line", color: "#fef3c7", iconColor: "#d97706" },
-  { key: "ajuste",       label: "Ajuste de caixa",           sub: "Regularizar diferenças",               icon: "sliders-horizontal", color: "#f4f4f5", iconColor: "#71717a" },
+  { key: "aporte",       label: "Aporte de capital",        sub: "Entrada de capital do proprietário",   icon: "trending-up",        color: "#dcfce7", iconColor: "#16a34a", section: "Capital" },
+  { key: "retirada",     label: "Retirada do proprietário",  sub: "Saída de capital para o proprietário", icon: "trending-down",      color: "#fee2e2", iconColor: "#dc2626", section: "Capital" },
+  { key: "deposito",     label: "Depósito bancário",         sub: "Caixa → Banco",                        icon: "landmark",           color: "#dbeafe", iconColor: "#2563eb", section: "Banco" },
+  { key: "levantamento", label: "Levantamento bancário",     sub: "Banco → Caixa",                        icon: "landmark",           color: "#dbeafe", iconColor: "#2563eb", section: "Banco" },
+  { key: "sangria",      label: "Sangria de caixa",          sub: "Retirar dinheiro do caixa físico",     icon: "arrow-up-from-line", color: "#fef3c7", iconColor: "#d97706", section: "Caixa" },
+  { key: "reforco",      label: "Reforço de caixa",          sub: "Repor dinheiro no caixa físico",       icon: "arrow-down-to-line", color: "#fef3c7", iconColor: "#d97706", section: "Caixa" },
+  { key: "ajuste",       label: "Ajuste de caixa",           sub: "Regularizar diferenças",               icon: "sliders-horizontal", color: "#f4f4f5", iconColor: "#71717a", section: "Caixa" },
 ];
 
 var CAIXA_OPS = [
-  { key: "sangria", label: "Sangria de caixa", sub: "Retirar dinheiro do caixa físico",             icon: "arrow-up-from-line", color: "#fef3c7", iconColor: "#d97706" },
-  { key: "reforco", label: "Reforço de caixa",  sub: "Repor dinheiro no caixa físico",               icon: "arrow-down-to-line", color: "#fef3c7", iconColor: "#d97706" },
-  { key: "ajuste",  label: "Ajuste de caixa",   sub: "Regularizar diferenças (requer autorização)",  icon: "sliders-horizontal", color: "#f4f4f5", iconColor: "#71717a" },
+  { key: "sangria", label: "Sangria de caixa", sub: "Retirar dinheiro do caixa físico",             icon: "arrow-up-from-line", color: "#fef3c7", iconColor: "#d97706", section: "Caixa" },
+  { key: "reforco", label: "Reforço de caixa",  sub: "Repor dinheiro no caixa físico",               icon: "arrow-down-to-line", color: "#fef3c7", iconColor: "#d97706", section: "Caixa" },
+  { key: "ajuste",  label: "Ajuste de caixa",   sub: "Regularizar diferenças (requer autorização)",  icon: "sliders-horizontal", color: "#f4f4f5", iconColor: "#71717a", section: "Caixa" },
 ];
+
+var TYPE_META = {
+  aporte_capital:        { label: "Aporte de capital",       icon: "trending-up",        color: "#16a34a" },
+  retirada_proprietario: { label: "Retirada do proprietário", icon: "trending-down",      color: "#dc2626" },
+  deposito_bancario:     { label: "Depósito bancário",       icon: "landmark",           color: "#2563eb" },
+  levantamento_bancario: { label: "Levantamento bancário",   icon: "landmark",           color: "#2563eb" },
+  sangria:                { label: "Sangria de caixa",        icon: "arrow-up-from-line", color: "#d97706" },
+  reforco:                { label: "Reforço de caixa",        icon: "arrow-down-to-line", color: "#d97706" },
+  ajuste:                 { label: "Ajuste de caixa",         icon: "sliders-horizontal", color: "#71717a" },
+};
+
+var TYPE_SIGN = {
+  aporte_capital: 1, retirada_proprietario: -1,
+  deposito_bancario: 0, levantamento_bancario: 0,
+  sangria: -1, reforco: 1, ajuste: 0,
+};
+
+async function renderHistoricoList(filterType, isAdmin, session) {
+  var listEl = document.getElementById("tes-hist-list");
+  if (!listEl) return;
+
+  var all = await db.getAll("treasuryMovements");
+  if (!isAdmin && session) all = all.filter(function(m) { return m.sessionId === session.id; });
+  if (filterType !== "all") all = all.filter(function(m) { return m.type === filterType; });
+
+  all.sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
+
+  if (!all.length) {
+    listEl.innerHTML = '<div style="font-size:12px;color:#a1a1aa;text-align:center;padding:20px 10px">Nenhum movimento registado.</div>';
+    return;
+  }
+
+  listEl.innerHTML = all.map(function(m) {
+    var meta = TYPE_META[m.type] || { label: m.type, icon: "circle", color: "#71717a" };
+    var sign = TYPE_SIGN[m.type] || 0;
+    var amountDisplay = m.type === "ajuste" ? m.amount : Math.abs(m.amount);
+    var signPrefix = m.type === "ajuste" ? (m.amount > 0 ? "+" : "") : (sign > 0 ? "+" : (sign < 0 ? "-" : ""));
+    var valColor = m.type === "ajuste" ? (m.amount >= 0 ? "#2563eb" : "#dc2626") : (sign > 0 ? "#16a34a" : (sign < 0 ? "#dc2626" : "#18181b"));
+    var dataFmt = new Date(m.createdAt).toLocaleDateString("pt-AO", { day:"2-digit", month:"2-digit", year:"numeric" });
+
+    return '<div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fff;border-radius:12px;border:1px solid #f4f4f5;margin-bottom:8px">' +
+      '<div style="width:38px;height:38px;background:' + meta.color + '22;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+      '<i data-lucide="' + meta.icon + '" style="width:17px;height:17px;color:' + meta.color + '"></i></div>' +
+      '<div style="flex:1;min-width:0">' +
+      '<div style="font-size:13.5px;font-weight:700;color:#18181b">' + meta.label + '</div>' +
+      '<div style="font-size:11.5px;color:#71717a;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (m.description||"") + ' · ' + dataFmt + '</div>' +
+      '</div>' +
+      '<div style="font-size:13.5px;font-weight:700;color:' + valColor + ';flex-shrink:0">' + signPrefix + amountDisplay.toLocaleString("pt-AO") + ' Kz</div>' +
+    '</div>';
+  }).join('');
+
+  refreshIcons(listEl);
+}
+
+function openHistoricoFilterModal(current, onSelect) {
+  var options = [
+    { value: "all",                    label: "Todos os tipos" },
+    { value: "aporte_capital",         label: "Aporte de capital" },
+    { value: "retirada_proprietario",  label: "Retirada do proprietário" },
+    { value: "deposito_bancario",      label: "Depósito bancário" },
+    { value: "levantamento_bancario",  label: "Levantamento bancário" },
+    { value: "sangria",                label: "Sangria de caixa" },
+    { value: "reforco",                label: "Reforço de caixa" },
+    { value: "ajuste",                 label: "Ajuste de caixa" },
+  ];
+
+  openModal("Filtrar histórico",
+    '<div style="display:flex;flex-direction:column;gap:2px">' +
+    options.map(function(o) {
+      var active = o.value === current;
+      return '<button data-filter-val="' + o.value + '" style="display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;background:' +
+        (active ? "var(--primary-light)" : "none") + ';border:none;padding:13px 12px;border-radius:10px;font-size:14.5px;color:' +
+        (active ? "var(--primary)" : "#18181b") + ';font-weight:' + (active ? "700" : "400") + ';cursor:pointer;font-family:inherit">' +
+        o.label + (active ? '<i data-lucide="check" style="width:17px;height:17px"></i>' : '') +
+      '</button>';
+    }).join('') +
+    '</div>');
+  refreshIcons(el("modal-box"));
+
+  document.querySelectorAll("[data-filter-val]").forEach(function(btn) {
+    btn.onclick = function() {
+      onSelect(btn.getAttribute("data-filter-val"));
+      closeModal();
+    };
+  });
+}
 
 export async function loadTesouraria() {
   var user = getUser();
+  var session = getSession();
   var wrap = document.getElementById("tesouraria-content");
   if (!wrap) return;
 
   var isAdmin = user && user.role === "admin";
   var ops = isAdmin ? ADMIN_OPS : CAIXA_OPS;
 
+  var todosMovimentos = await db.getAll("treasuryMovements");
+  var saldoCofre = todosMovimentos.reduce(function(acc, m) {
+    if (m.type === "sangria") return acc + (m.amount||0);
+    if (m.type === "reforco") return acc - (m.amount||0);
+    return acc;
+  }, 0);
+
   wrap.innerHTML =
+    '<div class="hist-hero" style="margin-bottom:16px">' +
+    '<div class="hist-hero-label">Saldo do Cofre</div>' +
+    '<div class="hist-hero-val">' + saldoCofre.toLocaleString("pt-AO") + ' Kz</div>' +
+    '<div class="hist-hero-context">' + (saldoCofre > 0 ? "Disponível para reforço de caixa" : "Sem dinheiro guardado no cofre") + '</div>' +
+    '</div>' +
     '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">' +
     (isAdmin ? "Todas as operações" : "Operações do teu turno") +
     '</div>' +
-    ops.map(function(op) {
-      return '<button data-op-key="' + op.key + '" class="tesouraria-op-btn" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px;background:#fff;border-radius:12px;border:1px solid #f4f4f5;margin-bottom:8px;cursor:pointer;font-family:inherit">' +
-        '<div style="width:44px;height:44px;background:' + op.color + ';border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
-        '<i data-lucide="' + op.icon + '" style="width:20px;height:20px;color:' + op.iconColor + '"></i></div>' +
-        '<div><div style="font-size:14px;font-weight:700;color:#18181b">' + op.label + '</div>' +
-        '<div style="font-size:12px;color:#71717a;margin-top:2px">' + op.sub + '</div></div>' +
-        '<i data-lucide="chevron-right" style="width:16px;height:16px;color:#a1a1aa;margin-left:auto"></i>' +
-      '</button>';
-    }).join('') +
-    '<div style="font-size:12px;color:#a1a1aa;text-align:center;padding:20px 10px">Histórico de movimentos em breve.</div>';
+    (function() {
+      var lastSection = null;
+      return ops.map(function(op) {
+        var headerHTML = '';
+        if (op.section !== lastSection) {
+          lastSection = op.section;
+          headerHTML = '<div style="font-size:11px;font-weight:700;color:#a1a1aa;text-transform:uppercase;letter-spacing:.5px;margin:' + (lastSection === ops[0].section ? '0' : '18px') + ' 0 8px 2px">' + op.section + '</div>';
+        }
+        return headerHTML +
+          '<button data-op-key="' + op.key + '" class="tesouraria-op-btn" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px;background:#fff;border-radius:12px;border:1px solid #f4f4f5;margin-bottom:8px;cursor:pointer;font-family:inherit">' +
+          '<div style="width:44px;height:44px;background:' + op.color + ';border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+          '<i data-lucide="' + op.icon + '" style="width:20px;height:20px;color:' + op.iconColor + '"></i></div>' +
+          '<div><div style="font-size:14px;font-weight:700;color:#18181b">' + op.label + '</div>' +
+          '<div style="font-size:12px;color:#71717a;margin-top:2px">' + op.sub + '</div></div>' +
+          '<i data-lucide="chevron-right" style="width:16px;height:16px;color:#a1a1aa;margin-left:auto"></i>' +
+        '</button>';
+      }).join('');
+    })() +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px">' +
+    '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px">Histórico</div>' +
+    '<button id="tes-hist-filter-btn" style="background:#f4f4f5;border:none;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer">' +
+    '<i data-lucide="filter" style="width:15px;height:15px;color:#71717a"></i></button>' +
+    '</div>' +
+    '<div id="tes-hist-list"></div>';
 
   refreshIcons(wrap);
+
+  var isAdmin2 = isAdmin;
+  var currentFilter = "all";
+  renderHistoricoList(currentFilter, isAdmin2, session);
+
+  var filterBtn = document.getElementById("tes-hist-filter-btn");
+  if (filterBtn) {
+    filterBtn.onclick = function() {
+      openHistoricoFilterModal(currentFilter, function(chosen) {
+        currentFilter = chosen;
+        renderHistoricoList(currentFilter, isAdmin2, session);
+      });
+    };
+  }
 
   wrap.querySelectorAll(".tesouraria-op-btn").forEach(function(btn) {
     btn.onclick = function() {

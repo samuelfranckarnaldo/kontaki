@@ -437,7 +437,6 @@
 [data-theme="dark"] .bottom-nav  { background: var(--bg2); border-color: var(--border); }
 
 /* ── LOGIN EXTRA ────────────────────────────────────────────────────────────── */
-.login-users-list  { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .pin-dots          { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
 .login-err         { display: none; background: var(--danger-light); border-radius: 8px; padding: 10px; text-align: center; font-size: 13px; color: var(--danger); margin-bottom: 12px; }
 .pin-btn-back      { background: transparent !important; box-shadow: none !important; color: var(--text3); }
@@ -447,10 +446,6 @@
 .login-forgot-btn  { background: none; border: none; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--font); padding: 8px; text-align: center; width: 100%; }
 
 /* ── LOGIN — REDESIGN ───────────────────────────────────────────────────────── */
-.login-logo-mark {
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(91,33,182,.25);
-}
 .login-logo h1 {
   font-size: 26px;
   font-weight: 800;
@@ -459,12 +454,6 @@
 .login-logo p {
   font-size: 13px;
   color: #6b7280;
-}
-.login-users-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
 }
 .login-user-btn {
   display: flex; align-items: center; gap: 14px;
@@ -542,15 +531,6 @@
 
 .login-logo { text-align: center; margin-bottom: 32px; }
 
-.login-logo-mark {
-  width: 72px; height: 72px;
-  background: linear-gradient(135deg, #5b21b6, #7c3aed);
-  border-radius: 22px;
-  display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 16px;
-  box-shadow: 0 8px 24px rgba(91,33,182,.30);
-}
-.login-logo-mark i, .login-logo-mark svg { width: 34px; height: 34px; color: #fff; }
 .login-logo h1 { font-size: 28px; font-weight: 800; letter-spacing: -.5px; color: #111827; margin-bottom: 4px; }
 .login-logo p  { font-size: 13px; color: #9ca3af; min-height: 18px; }
 

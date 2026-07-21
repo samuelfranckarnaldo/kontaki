@@ -191,7 +191,7 @@ document.addEventListener("DOMContentLoaded", function() {
         <div class="ct-tabbar" id="ct-tabbar">
           <button class="ct-tab active" data-tab="geral">Geral</button>
           <button class="ct-tab" data-tab="clientes">Clientes</button>
-          <button class="ct-tab" data-tab="fiados">Fiados</button>
+          <button class="ct-tab" data-tab="fiados">Crédito</button>
         </div>
 
         <div id="ct-panel-geral" class="ct-panel ct-fade-panel" style="display:block"></div>
@@ -209,10 +209,10 @@ document.addEventListener("DOMContentLoaded", function() {
             <i data-lucide="search" class="search-icon"></i>
             <input id="fiados-search" placeholder="Pesquisar cliente..."/>
           </div>
-          <div class="pill-group" id="fiados-filter-pills" style="margin-top:12px">
-            <button class="pill active" data-filter="all">Todos</button>
-            <button class="pill" data-filter="debt">Com dívida</button>
-            <button class="pill" data-filter="clean">Em dia</button>
+          <div class="produto-filter-chips-wrap" id="fiados-filter-pills" style="margin-top:12px;display:inline-flex">
+            <button class="produto-filter-chip produto-filter-chip--active" data-filter="all">Todos</button>
+            <button class="produto-filter-chip" data-filter="debt">Com dívida</button>
+            <button class="produto-filter-chip" data-filter="clean">Em dia</button>
           </div>
           <div id="fiados-total-bar" style="margin-top:8px"></div>
           <div class="list-card" id="fiados-list" style="margin-top:8px"></div>

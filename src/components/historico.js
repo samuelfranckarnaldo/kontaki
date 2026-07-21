@@ -92,7 +92,7 @@ function getPreviousPeriod(from, to) {
   return { from: toLocalDateStr(prevFrom.toISOString()), to: toLocalDateStr(prevTo.toISOString()) };
 }
 
-function getShortcutDates(sc, offset) {
+export function getShortcutDates(sc, offset) {
   offset = offset || 0;
   var t = today();
 
@@ -134,10 +134,17 @@ function getShortcutDates(sc, offset) {
     return { from: fromStr, to: toStr };
   }
 
+  if (sc === "ano") {
+    var baseY = new Date().getFullYear() + offset;
+    var fromStr = baseY + "-01-01";
+    var toStr = offset === 0 ? t : (baseY + "-12-31");
+    return { from: fromStr, to: toStr };
+  }
+
   return null;
 }
 
-function getPeriodLabel(sc, offset, dates) {
+export function getPeriodLabel(sc, offset, dates) {
   var MESES_FULL = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
   if (sc === "hoje") {
     if (offset === 0) return "Hoje";
@@ -155,6 +162,10 @@ function getPeriodLabel(sc, offset, dates) {
     var d2 = new Date(dates.from + "T00:00:00");
     if (offset === 0) return MESES_FULL[d2.getMonth()] + " " + d2.getFullYear();
     return MESES_FULL[d2.getMonth()] + " " + d2.getFullYear();
+  }
+  if (sc === "ano") {
+    var d3 = new Date(dates.from + "T00:00:00");
+    return "Ano " + d3.getFullYear();
   }
   if (sc === "custom" && dates) {
     var f = new Date(dates.from + "T00:00:00");
@@ -213,6 +224,7 @@ window._openPeriodPicker = function() {
     { id:"hoje",   label:"Hoje" },
     { id:"semana", label:"Esta semana" },
     { id:"mes",    label:"Este mês" },
+    { id:"ano",    label:"Este ano" },
     { id:"custom", label:"Personalizado" },
   ];
   var body =

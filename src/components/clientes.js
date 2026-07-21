@@ -527,13 +527,13 @@ window._saveCliente = async (id) => {
 async function renderFiadosList(showSkeleton) {
   const search = el("fiados-search");
   if (search && !search.oninput) search.oninput = () => renderFiadosList();
-  document.querySelectorAll("#fiados-filter-pills .pill").forEach(btn => {
+  document.querySelectorAll("#fiados-filter-pills .produto-filter-chip").forEach(btn => {
     if (!btn.dataset.bound) {
       btn.dataset.bound = "1";
       btn.addEventListener("click", () => {
         fiadosFilter = btn.dataset.filter;
-        document.querySelectorAll("#fiados-filter-pills .pill").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
+        document.querySelectorAll("#fiados-filter-pills .produto-filter-chip").forEach(b => b.classList.remove("produto-filter-chip--active"));
+        btn.classList.add("produto-filter-chip--active");
         renderFiadosList();
       });
     }
@@ -607,29 +607,31 @@ async function renderFiadosList(showSkeleton) {
     const metaText = isSaldado ? "Saldado" : groupOverdue ? `Atrasado há ${maxDays} ${maxDays===1?"dia":"dias"}` : "Em aberto";
 
     const row = document.createElement("div");
-    row.className = "ct-devedor-row";
-    row.style.borderLeft = "3px solid " + avatarColor2;
+    row.className = "produto-item";
+    row.style.cursor = "pointer";
     row.onclick = () => {
       if (matchClient) window._openClienteProfile(matchClient.id);
       else if (firstOpen) window._openPayModal(firstOpen.id);
     };
 
     row.innerHTML =
-      `<div class="fc-row-avatar" style="background:${avatarBg};color:${avatarColor2}">${g.clientName.charAt(0).toUpperCase()}</div>
-       <div class="fc-row-info">
-         <div class="fc-row-name" style="white-space:normal;overflow:visible;text-overflow:clip">${g.clientName}${!matchClient ? ' <span class="ct-nocliente-tag">sem ficha</span>' : ""}</div>
-         <div class="fc-row-meta">${g.entries.length} ${g.entries.length===1?"entrada":"entradas"} · ${metaText}</div>
+      `<div class="produto-avatar" style="background:${avatarBg};color:${avatarColor2}">${g.clientName.charAt(0).toUpperCase()}</div>
+       <div style="flex:1;min-width:0">
+         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+           <div class="produto-name">${g.clientName}</div>
+           ${!matchClient ? '<span class="produto-badge produto-badge-low">sem ficha</span>' : ""}
+           ${groupOverdue ? `<span class="produto-badge produto-badge-zero">Atrasado ${maxDays}d</span>` : ""}
+           ${isSaldado ? '<span class="produto-badge produto-badge-ok">Saldado</span>' : ""}
+         </div>
+         <div class="produto-meta">${g.entries.length} ${g.entries.length===1?"entrada":"entradas"}</div>
+         ${!isSaldado ? `<div class="produto-price" style="margin-top:4px;color:${groupOverdue?"var(--danger)":"var(--primary)"}">${fmt(g.totalOpen)}</div>` : ""}
        </div>
-       <div class="fc-row-right">
-         ${isSaldado
-           ? `<i data-lucide="chevron-right" class="hist-export-arrow"></i>`
-           : `<span class="fc-row-val ${groupOverdue?"overdue":""}${sizeMod("fc-row-val", fmt(g.totalOpen))}">${fmt(g.totalOpen)}</span>
-              ${openCount === 1
-                ? `<button class="fc-row-icon-btn" onclick="event.stopPropagation();window._openPayModal(${firstOpen.id})"><i data-lucide="check"></i></button>`
-                : `<i data-lucide="chevron-right" class="hist-export-arrow"></i>`
-              }`
-         }
-       </div>`;
+       ${!isSaldado && openCount === 1
+         ? `<button class="produto-menu-btn" style="background:var(--success-light);color:var(--success)" onclick="event.stopPropagation();window._openPayModal(${firstOpen.id})" title="Receber">
+             <i data-lucide="check"></i>
+           </button>`
+         : `<i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--text4);flex-shrink:0"></i>`
+       }`;
     listEl.appendChild(row);
   });
 

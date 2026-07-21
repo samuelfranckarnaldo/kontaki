@@ -46,80 +46,6 @@ function parseAmountInput(id) {
   return Number(raw);
 }
 
-window._openFiadoCliente = async (encodedName) => {
-  const name    = decodeURIComponent(encodedName);
-  const all     = await db.getAll("fiado");
-  const entries = all.filter(f => f.clientName === name)
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
-  const totalOpen = entries.filter(f => f.status === "open")
-    .reduce((a, f) => a + (f.amount || 0), 0);
-  const encodedN = encodeURIComponent(name);
-  const phone = [...entries].reverse().find(e => e.phone)?.phone || "";
-
-  openModal(name,
-    `<div class="fc-modal-header ${totalOpen > 0 ? "fc-modal-open" : "fc-modal-saldo"}">
-      <div>
-        <div class="fc-modal-label">${totalOpen > 0 ? "Em dívida" : "Tudo pago"}</div>
-        <div class="fc-modal-total">${fmt(totalOpen)}</div>
-      </div>
-      ${totalOpen > 0
-        ? `<button class="btn btn-success btn-sm" onclick="window._confirmReceiveAll('${encodedN}',${totalOpen})">
-             <i data-lucide="check-check"></i> Receber tudo
-           </button>`
-        : `<div style="font-size:28px;color:var(--success)">✓</div>`
-      }
-    </div>
-
-    ${phone ? `<button class="fc-wa-full-btn" onclick="window.open('${waLink(phone, "Olá " + name + ", passando para lembrar do valor em aberto de " + fmt(totalOpen) + ". Obrigado!")}','_blank')">
-        <i data-lucide="message-circle"></i> Enviar lembrete no WhatsApp
-       </button>` : ""
-    }
-
-    <div class="fc-modal-entries">
-      ${entries.map(e => `
-        <div class="fc-modal-entry">
-          <div class="fc-modal-entry-left">
-            <div class="fc-modal-entry-val ${e.status === "open" ? "fc-val-open" : (e.status === "cancelled" ? "fc-val-cancelled" : "fc-val-paid")}">
-              ${fmt(e.amount)}
-              ${e.status === "paid" ? `<span class="fc-paid-tag">✓ Pago</span>` : ""}
-              ${e.status === "cancelled" ? `<span class="fc-cancelled-tag">Anulado</span>` : ""}
-              ${overdueBadge(e)}
-            </div>
-            <div class="fc-modal-entry-date">
-              ${fmtDate(e.date)}${e.notes ? " · " + e.notes : ""}
-              ${e.dueDate ? " · vence " + fmtDate(e.dueDate) : ""}
-              ${e.status === "cancelled" && e.cancelReason ? " · Motivo: " + e.cancelReason : ""}
-            </div>
-          </div>
-          ${e.status === "open"
-            ? `<div style="display:flex;gap:6px;flex-shrink:0">
-                 <button class="fc-icon-btn" onclick="window._openEditFiado(${e.id})" title="Editar">
-                   <i data-lucide="pencil" style="width:14px;height:14px"></i>
-                 </button>
-                 <button class="fc-icon-btn fc-icon-btn-danger" onclick="window._openCancelFiado(${e.id})" title="Anular">
-                   <i data-lucide="x" style="width:14px;height:14px"></i>
-                 </button>
-                 <button class="btn btn-outline btn-sm" onclick="window._openPayModal(${e.id})">
-                   <i data-lucide="check"></i> Receber
-                 </button>
-               </div>`
-            : (e.status === "paid"
-                ? `<div class="fc-paid-icon"><i data-lucide="check-circle" style="width:18px;height:18px;color:var(--success)"></i></div>`
-                : `<div class="fc-paid-icon"><i data-lucide="x-circle" style="width:18px;height:18px;color:var(--text4)"></i></div>`
-              )
-          }
-        </div>`).join("")}
-    </div>
-
-    <div class="form-actions">
-      <button class="btn btn-ghost btn-full" onclick="window._closeModal()">Fechar</button>
-      <button class="btn btn-primary btn-full" onclick="window._addFiadoCliente('${encodedN}')">
-        <i data-lucide="plus"></i> Novo fiado
-      </button>
-    </div>`);
-  refreshIcons(el("modal-box"));
-};
-
 window._confirmReceiveAll = (encodedName, total) => {
   const name = decodeURIComponent(encodedName);
   openModal("",
@@ -150,11 +76,6 @@ window._pagarTudo = async (encodedName) => {
   toast("Todos os fiados de " + name + " recebidos.", "success");
   closeModal();
   if (window._refreshClientesTab) window._refreshClientesTab();
-};
-
-window._addFiadoCliente = (encodedName) => {
-  closeModal();
-  window._openFiadoAdd(decodeURIComponent(encodedName));
 };
 
 async function openFiadoAdd(prefillName = "", prefillPhone = "") {

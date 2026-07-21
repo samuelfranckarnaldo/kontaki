@@ -249,6 +249,47 @@ export function computePaymentMethods(sales, mes) {
   return list;
 }
 
+/**
+ * Previsão de vendas para os próximos numForecastDays, por regressão linear simples
+ * sobre os últimos `values` (mesmo período usado na tendência).
+ * Retorna { days: [...], values: [...] } só com os dias futuros (não repete o histórico).
+ * Se houver menos de 5 pontos de dados, ou todos forem 0, devolve forecast vazio (dados insuficientes).
+ */
+export function computeSalesForecast(historyDays, historyValues, numForecastDays) {
+  numForecastDays = numForecastDays || 7;
+
+  var n = historyValues.length;
+  var nonZeroCount = historyValues.filter(function(v) { return v > 0; }).length;
+  if (n < 5 || nonZeroCount < 3) {
+    return { days: [], values: [], reliable: false };
+  }
+
+  // Regressão linear (mínimos quadrados): y = a + b*x, x = índice do dia (0..n-1)
+  var sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+  for (var i = 0; i < n; i++) {
+    sumX += i;
+    sumY += historyValues[i];
+    sumXY += i * historyValues[i];
+    sumX2 += i * i;
+  }
+  var b = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX || 1);
+  var a = (sumY - b * sumX) / n;
+
+  var lastDate = new Date(historyDays[historyDays.length - 1] + "T00:00:00");
+  var days = [];
+  var values = [];
+  for (var f = 1; f <= numForecastDays; f++) {
+    var d = new Date(lastDate);
+    d.setDate(d.getDate() + f);
+    days.push(d.toISOString().slice(0, 10));
+
+    var predicted = a + b * (n - 1 + f);
+    values.push(Math.max(0, Math.round(predicted)));
+  }
+
+  return { days: days, values: values, reliable: true, trend: b > 0 ? "subida" : (b < 0 ? "descida" : "estável") };
+}
+
 // ═══════════════════════════════════════════
 // UI
 // ═══════════════════════════════════════════
@@ -324,6 +365,29 @@ function _comparisonStatsGrid(comparison) {
   '</div>';
 }
 
+var _biData = null; // { sales, products, expenses } — cache para trocar de período sem re-consultar a BD
+var _biPeriod = 30;  // 7 | 30 | 90
+
+var PERIOD_OPTIONS = [
+  { value: 7,  label: "7 dias" },
+  { value: 30, label: "30 dias" },
+  { value: 90, label: "90 dias" },
+];
+
+function _periodSelectorHtml() {
+  return '<div style="display:flex;background:var(--primary-light, #ede9fe);border-radius:var(--radius-xl);padding:3px;gap:2px;margin-bottom:20px">' +
+    PERIOD_OPTIONS.map(function(o) {
+      var active = _biPeriod === o.value;
+      return '<button onclick="window._biSetPeriod(' + o.value + ')" style="flex:1;padding:8px 10px;border-radius:calc(var(--radius-xl) - 3px);border:none;background:' + (active ? "#fff" : "transparent") + ';color:' + (active ? "var(--primary)" : "var(--text3)") + ';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:' + (active ? "var(--shadow-sm)" : "none") + ';transition:all .15s ease">' + o.label + '</button>';
+    }).join("") +
+  '</div>';
+}
+
+window._biSetPeriod = function(days) {
+  _biPeriod = days;
+  _biRender();
+};
+
 export async function loadBI() {
   var wrap = document.getElementById("dash-content");
   if (!wrap) return;
@@ -333,21 +397,35 @@ export async function loadBI() {
   var results = await Promise.all([
     db.getAll("sales"), db.getAll("products"), db.getAll("expenses"),
   ]);
-  var sales = results[0], products = results[1], expenses = results[2];
+  _biData = { sales: results[0], products: results[1], expenses: results[2] };
 
-  var trend = computeSalesTrend(sales, 30);
+  _biRender();
+}
+
+function _biRender() {
+  var wrap = document.getElementById("dash-content");
+  if (!wrap || !_biData) return;
+
+  var sales = _biData.sales, products = _biData.products, expenses = _biData.expenses;
+  var days = _biPeriod;
+
+  var trend = computeSalesTrend(sales, days);
+  var forecast = computeSalesForecast(trend.days, trend.values, 7);
   var comparison = computeMonthlyComparison(sales, expenses, products);
   var topProducts = computeTopProducts(sales);
-  var profitTrend = computeProfitTrend(sales, products, 30);
-  var peakHours = computePeakHours(sales, 90);
+  var profitTrend = computeProfitTrend(sales, products, days);
+  var peakHours = computePeakHours(sales, days);
   var paymentMethods = computePaymentMethods(sales);
 
   wrap.innerHTML =
+    _periodSelectorHtml() +
+
     '<div style="margin-bottom:14px">' +
       '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px">Tendência de vendas</div>' +
-      '<div style="font-size:12px;color:var(--text3)">Últimos 30 dias</div>' +
+      '<div style="font-size:12px;color:var(--text3)">Últimos ' + days + ' dias</div>' +
     '</div>' +
-    '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px 12px 8px;margin-bottom:28px;height:220px"><canvas id="bi-trend-canvas"></canvas></div>' +
+    '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px 12px 8px;margin-bottom:8px;height:220px"><canvas id="bi-trend-canvas"></canvas></div>' +
+    _forecastNoteHtml(forecast) +
 
     '<div style="font-size:15px;font-weight:800;color:var(--text)">' + comparison.mesAtualLabel.charAt(0).toUpperCase() + comparison.mesAtualLabel.slice(1) + ' vs. ' + comparison.mesAnteriorLabel + '</div>' +
     _comparisonStatsGrid(comparison) +
@@ -357,11 +435,11 @@ export async function loadBI() {
     _topProductsHtml(topProducts) +
 
     '<div style="font-size:15px;font-weight:800;color:var(--text);margin:8px 0 2px">Margem de lucro</div>' +
-    '<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Últimos 30 dias, % sobre receita</div>' +
+    '<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Últimos ' + days + ' dias, % sobre receita</div>' +
     '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px 12px 8px;margin-bottom:28px;height:200px"><canvas id="bi-profit-canvas"></canvas></div>' +
 
     '<div style="font-size:15px;font-weight:800;color:var(--text);margin:0 0 2px">Horários de pico</div>' +
-    '<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Últimos 90 dias, por número de vendas</div>' +
+    '<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Últimos ' + days + ' dias, por número de vendas</div>' +
     _peakHoursHtml(peakHours) +
 
     '<div style="font-size:15px;font-weight:800;color:var(--text);margin:0 0 2px">Métodos de pagamento</div>' +
@@ -369,7 +447,7 @@ export async function loadBI() {
     _paymentMethodsHtml(paymentMethods);
 
   refreshIcons(wrap);
-  _renderTrendChart(trend.days, trend.values);
+  _renderTrendChart(trend.days, trend.values, forecast);
   _renderProfitChart(profitTrend.days, profitTrend.values);
 }
 
@@ -459,12 +537,36 @@ function _topProductsHtml(topProducts) {
   '</div>';
 }
 
-function _renderTrendChart(days, values) {
+function _forecastNoteHtml(forecast) {
+  if (!forecast || !forecast.reliable) {
+    return '<div style="font-size:11px;color:var(--text4);margin-bottom:20px">Previsão indisponível — histórico de vendas ainda insuficiente.</div>';
+  }
+  var icon = forecast.trend === "subida" ? "trending-up" : (forecast.trend === "descida" ? "trending-down" : "minus");
+  var color = forecast.trend === "subida" ? "var(--success, #16a34a)" : (forecast.trend === "descida" ? "var(--danger, #dc2626)" : "var(--text3)");
+  var label = forecast.trend === "subida" ? "tendência de subida" : (forecast.trend === "descida" ? "tendência de descida" : "tendência estável");
+  return '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);margin-bottom:20px">' +
+    '<span style="width:14px;height:2px;background:#f59e0b;border-radius:1px;display:inline-block;background-image:linear-gradient(to right, #f59e0b 50%, transparent 50%);background-size:5px 2px"></span>' +
+    'Previsão para os próximos 7 dias — ' +
+    '<i data-lucide="' + icon + '" style="width:12px;height:12px;color:' + color + '"></i> ' + label +
+  '</div>';
+}
+
+function _renderTrendChart(days, values, forecast) {
   var canvas = document.getElementById("bi-trend-canvas");
   if (!canvas || typeof Chart === "undefined") return;
 
-  var labels = days.map(function(d) { return d.slice(5).split("-").reverse().join("/"); });
-  var maxV = Math.max.apply(null, values.concat([1]));
+  var hasForecast = forecast && forecast.reliable && forecast.values.length > 0;
+
+  var allDays = hasForecast ? days.concat(forecast.days) : days;
+  var labels = allDays.map(function(d) { return d.slice(5).split("-").reverse().join("/"); });
+
+  var historicalData = values.concat(hasForecast ? forecast.values.map(function() { return null; }) : []);
+  var forecastData = hasForecast
+    ? values.map(function() { return null; }).slice(0, -1).concat([values[values.length - 1]]).concat(forecast.values)
+    : [];
+
+  var allValuesForMax = values.concat(hasForecast ? forecast.values : []);
+  var maxV = Math.max.apply(null, allValuesForMax.concat([1]));
   var suggestedMax = maxV * 1.2;
 
   if (biChartInstance) { biChartInstance.destroy(); biChartInstance = null; }
@@ -474,31 +576,58 @@ function _renderTrendChart(days, values) {
   gradient.addColorStop(0, "rgba(124,58,237,0.28)");
   gradient.addColorStop(1, "rgba(124,58,237,0)");
 
+  var datasets = [{
+    label: "Histórico",
+    data: historicalData,
+    borderColor: "#5b21b6",
+    backgroundColor: gradient,
+    borderWidth: 2.5,
+    pointBackgroundColor: "#7c3aed",
+    pointBorderColor: "#fff",
+    pointBorderWidth: 1.5,
+    pointRadius: 2,
+    pointHoverRadius: 5,
+    tension: 0.3,
+    fill: true,
+    spanGaps: false,
+  }];
+
+  if (hasForecast) {
+    datasets.push({
+      label: "Previsão",
+      data: forecastData,
+      borderColor: "#f59e0b",
+      backgroundColor: "transparent",
+      borderWidth: 2,
+      borderDash: [5, 4],
+      pointBackgroundColor: "#a78bfa",
+      pointBorderColor: "#fff",
+      pointBorderWidth: 1.5,
+      pointRadius: 2,
+      pointHoverRadius: 5,
+      tension: 0.3,
+      fill: false,
+      spanGaps: true,
+    });
+  }
+
   biChartInstance = new Chart(ctx, {
     type: "line",
-    data: {
-      labels: labels,
-      datasets: [{
-        data: values,
-        borderColor: "#5b21b6",
-        backgroundColor: gradient,
-        borderWidth: 2.5,
-        pointBackgroundColor: "#7c3aed",
-        pointBorderColor: "#fff",
-        pointBorderWidth: 1.5,
-        pointRadius: 2,
-        pointHoverRadius: 5,
-        tension: 0.3,
-        fill: true,
-      }]
-    },
+    data: { labels: labels, datasets: datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       animation: { duration: 400, easing: "easeOutQuart" },
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: function(ctx3) { return fmt(ctx3.parsed.y); } } }
+        tooltip: {
+          callbacks: {
+            label: function(ctx3) {
+              var prefix = ctx3.datasetIndex === 1 ? "Previsão: " : "";
+              return prefix + fmt(ctx3.parsed.y);
+            }
+          }
+        }
       },
       scales: {
         y: { suggestedMax: suggestedMax, ticks: { display: false }, grid: { display: false } },
