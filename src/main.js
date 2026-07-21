@@ -31,6 +31,8 @@ async function boot() {
   initModal();
   await loadLicense();
 
+  import("./sync.js").then(function(m) { m.syncRegister(); }).catch(function() {});
+
   const users = await db.getAll("users");
 
   const hasUsers = users && users.length > 0;

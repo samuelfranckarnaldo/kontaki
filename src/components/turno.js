@@ -45,28 +45,28 @@ async function renderTurno() {
   if (session) {
     // ── Cabeçalho do turno activo ──
     html +=
-      '<div style="background:linear-gradient(135deg,#4c1d95,#6d28d9);border-radius:16px;padding:20px;color:#fff;margin-bottom:16px">' +
+      '<div style="background:#fff;border:1px solid var(--border2);border-radius:16px;padding:20px;color:var(--text);margin-bottom:16px;box-shadow:var(--shadow-sm)">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">' +
           '<div>' +
-            '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#c4b5fd;margin-bottom:6px">Turno activo</div>' +
-            '<div style="font-size:18px;font-weight:700;line-height:1.2">' + user.name + '</div>' +
-            '<div style="font-size:12px;color:#c4b5fd;margin-top:4px">desde ' + fmtDate(session.openedAt) + '</div>' +
+            '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--primary);margin-bottom:6px">Turno activo</div>' +
+            '<div style="font-size:18px;font-weight:700;line-height:1.2;color:var(--text)">' + user.name + '</div>' +
+            '<div style="font-size:12px;color:var(--text3);margin-top:4px">desde ' + fmtDate(session.openedAt) + '</div>' +
           '</div>' +
-          '<div style="background:rgba(255,255,255,.12);border-radius:10px;padding:8px 12px;text-align:center">' +
-            '<div style="font-size:20px;font-weight:800;line-height:1">' + (duration?duration.str:"—") + '</div>' +
-            '<div style="font-size:10px;color:#c4b5fd;margin-top:2px">duração</div>' +
-            (duration&&duration.warn?'<div style="font-size:9px;color:#fde68a;margin-top:3px">⚠ longo</div>':"") +
+          '<div style="background:var(--bg);border-radius:10px;padding:8px 12px;text-align:center">' +
+            '<div style="font-size:20px;font-weight:800;line-height:1;color:var(--text)">' + (duration?duration.str:"—") + '</div>' +
+            '<div style="font-size:10px;color:var(--text3);margin-top:2px">duração</div>' +
+            (duration&&duration.warn?'<div style="font-size:9px;color:var(--warning-muted);margin-top:3px">⚠ longo</div>':"") +
           '</div>' +
         '</div>' +
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
-          '<div style="background:rgba(255,255,255,.1);border-radius:10px;padding:12px">' +
-            '<div style="font-size:10px;color:#c4b5fd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Vendas</div>' +
-            '<div style="font-size:18px;font-weight:800">' + fmt(totalVendas) + '</div>' +
-            '<div style="font-size:11px;color:#c4b5fd;margin-top:2px">' + sessionSales.length + ' transacções</div>' +
+          '<div style="background:var(--bg);border-radius:10px;padding:12px">' +
+            '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Vendas</div>' +
+            '<div style="font-size:18px;font-weight:800;color:var(--text)">' + fmt(totalVendas) + '</div>' +
+            '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + sessionSales.length + ' transacções</div>' +
           '</div>' +
-          '<div style="background:rgba(255,255,255,.1);border-radius:10px;padding:12px">' +
-            '<div style="font-size:10px;color:#c4b5fd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">ID do turno</div>' +
-            '<div style="font-size:11px;font-weight:700;word-break:break-all;line-height:1.4;margin-top:2px">' + (session.uuid||"sem uuid...").slice(0,20) + '</div>' +
+          '<div style="background:var(--bg);border-radius:10px;padding:12px">' +
+            '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">ID do turno</div>' +
+            '<div style="font-size:11px;font-weight:700;word-break:break-all;line-height:1.4;margin-top:2px;color:var(--text)">' + (session.uuid||"sem uuid...").slice(0,20) + '</div>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -118,8 +118,8 @@ async function renderTurno() {
       var isValidated  = s.validated;
       var hasIncidents = s.hasIncidents;
       var isImported   = s.isImported;
-      var color  = isValidated?"#16a34a":hasIncidents?"#dc2626":"#5b21b6";
-      var bgPill = isValidated?"#dcfce7":hasIncidents?"#fee2e2":"#ede9fe";
+      var color  = isValidated?"#16a34a":hasIncidents?"#dc2626":"#71717a";
+      var bgPill = isValidated?"#dcfce7":hasIncidents?"#fee2e2":"#f4f4f5";
       var label  = isValidated?"Validado":hasIncidents?"Com incidentes":isImported?"Importado":"Fechado";
       html +=
         '<div onclick="window._reexportarTurno(' + s.id + ')" style="background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:8px;border:1px solid #f4f4f5;box-shadow:0 1px 3px rgba(0,0,0,.05);display:flex;align-items:center;gap:12px;cursor:pointer">' +

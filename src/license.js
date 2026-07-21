@@ -61,7 +61,7 @@ export async function loadLicense() {
       var daysLeft = exp ? Math.ceil((exp - now) / 86400000) : 999;
       _license = {
         plan:          lic.plan,
-        status:        exp && daysLeft <= 0 ? "expired" : "active",
+        status:        lic.revoked ? "revoked" : (exp && daysLeft <= 0 ? "expired" : "active"),
         daysLeft:      daysLeft,
         expiresAt:     lic.expiresAt,
         code:          lic.code,
@@ -180,7 +180,41 @@ if (typeof window !== "undefined") {
       const uiMod = await import("./message-ui.js");
       await uiMod.checkAndShowMessages();
     } catch (e) {}
+    try {
+      const syncMod = await import("./sync.js");
+      await syncMod.syncRegister();
+    } catch (e) {}
   });
+
+  // Revalidação periódica enquanto estiver online — sem isto, uma
+  // licença revogada só era detetada na próxima transição
+  // offline->online ou no próximo arranque da app.
+  setInterval(function () {
+    if (navigator.onLine) {
+      validateLicenseOnline().catch(function () {});
+      import("./sync.js").then(function(m) { m.syncRegister(); }).catch(function() {});
+    }
+  }, 15 * 60 * 1000);
+}
+
+// Ecrã de bloqueio total — só para licença REVOGADA (ação
+// administrativa deliberada). Licença apenas expirada NÃO usa isto;
+// continua a permitir vender/gerir stock, só bloqueia os extras via
+// hasFeature(). Sem botão de fechar, de propósito.
+export function showRevokedLockout() {
+  if (document.getElementById("revoked-lockout")) return;
+  var ov = document.createElement("div");
+  ov.id = "revoked-lockout";
+  ov.style.cssText = "position:fixed;inset:0;background:#fff;z-index:99998;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;font-family:inherit";
+  ov.innerHTML =
+    '<i data-lucide="shield-off" style="width:48px;height:48px;color:#dc2626;margin-bottom:20px"></i>' +
+    '<div style="font-size:19px;font-weight:800;color:#1A1425;margin-bottom:10px">Conta suspensa</div>' +
+    '<div style="font-size:14px;color:#6E6680;line-height:1.6;max-width:320px;margin-bottom:28px">A tua licença foi revogada pela Introxeer. Contacta-nos para reactivar o acesso ao Kontaki.</div>' +
+    '<a href="https://wa.me/244900000000" style="display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;font-weight:700;font-size:13.5px;padding:12px 24px;border-radius:999px;text-decoration:none">' +
+      '<i data-lucide="message-circle" style="width:16px;height:16px"></i> Falar no WhatsApp' +
+    '</a>';
+  document.body.appendChild(ov);
+  if (window.lucide) window.lucide.createIcons({ el: ov });
 }
 
 export async function validateLicenseOnline() {
@@ -196,8 +230,14 @@ export async function validateLicenseOnline() {
     var data = await res.json();
 
     if (!res.ok || !data.valid) {
-      await db.put("settings", { ...lic, status: "expired" });
-      _license = { ...(_license||{}), status: "expired" };
+      if (data.reason === "revoked") {
+        await db.put("settings", { ...lic, revoked: true, status: "revoked" });
+        _license = { ...(_license||{}), status: "revoked" };
+        showRevokedLockout();
+      } else {
+        await db.put("settings", { ...lic, status: "expired" });
+        _license = { ...(_license||{}), status: "expired" };
+      }
       return false;
     }
 

@@ -100,6 +100,23 @@ export async function seed() {
     const key = Array.from(bytes).map(b=>b.toString(16).padStart(2,"0")).join("");
     await db.put("settings",{ key:"storeKey", value:key, createdAt:new Date().toISOString(), distributed:false });
   }
+
+  // storeId: identificador PÚBLICO e permanente da loja, distinto do storeKey
+  // (que é secreto, usado só para assinar hashes locais e nunca sai do dispositivo).
+  // Enviado ao Console para identificar a loja em sincronizações e relatórios.
+  const sid = await db.get("settings","storeId");
+  if (!sid) {
+    const uuid = (crypto.randomUUID) ? crypto.randomUUID() : _uuidFallback();
+    await db.put("settings",{ key:"storeId", value:uuid, createdAt:new Date().toISOString() });
+  }
+}
+
+function _uuidFallback() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0;
+    var v = c === "x" ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
 
 export async function isFirstTime() {
