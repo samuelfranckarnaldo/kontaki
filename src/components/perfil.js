@@ -97,36 +97,36 @@ function renderMenu() {
 
   const adminItems = [
     // ── Gestão ──
-    { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno",         group: "Gestão"     },
-    { label: "Tesouraria",        sub: "Caixa, banco e capital",         icon: "wallet",         color: "#fef3c7", iconColor: "#d97706", page: "tesouraria",    group: "Gestão"     },
-    { label: "Contabilidade",     sub: "Receitas, lucros e despesas",    icon: "bar-chart-2",    color: "#dcfce7", iconColor: "#16a34a", page: "contabilidade", group: "Gestão"     },
-    { label: "Business Intelligence", sub: "Tendências, comparações e análise", icon: "line-chart", color: "#fce7f3", iconColor: "#be185d", page: "dashboard",     group: "Gestão"     },
-    { label: "Gestão de Stock",   sub: "Produtos e inventário",          icon: "package",        color: "#ede9fe", iconColor: "#5b21b6", page: "stock",         group: "Gestão"     },
-    { label: "Fornecedores",      sub: "Compras e fornecedores",         icon: "truck",          color: "#fef3c7", iconColor: "#d97706", page: "fornecedores",  group: "Gestão"     },
-    { label: "Despesas",          sub: "Renda, salários e outros custos",icon: "receipt",        color: "#fee2e2", iconColor: "#dc2626", page: "despesas",      group: "Gestão"     },
-    { label: "Escritório",        sub: "Importar e confirmar turnos",    icon: "archive",        color: "#ede9fe", iconColor: "#5b21b6", page: "escritorio",    group: "Gestão"     },
-    { label: "Incidentes",        sub: "Divergências de stock",          icon: "alert-triangle", color: "#fef3c7", iconColor: "#d97706", page: "incidentes",    group: "Gestão"     },
-    { label: "Equipa",            sub: "Funcionários e acessos",         icon: "users-2",        color: "#dbeafe", iconColor: "#2563eb", page: "equipa",        group: "Gestão"     },
-    { label: "Dados da Loja",     sub: "Nome, logo, endereço e IVA",     icon: "store",          color: "#dcfce7", iconColor: "#16a34a", page: "loja",          group: "Gestão"     },
+    { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "var(--bg)", iconColor: "var(--text3)", page: "turno",         group: "Gestão"     },
+    { label: "Tesouraria",        sub: "Caixa, banco e capital",         icon: "wallet",         color: "var(--bg)", iconColor: "var(--text3)", page: "tesouraria",    group: "Gestão"     },
+    { label: "Contabilidade",     sub: "Receitas, lucros e despesas",    icon: "bar-chart-2",    color: "var(--bg)", iconColor: "var(--text3)", page: "contabilidade", group: "Gestão"     },
+    { label: "Business Intelligence", sub: "Tendências, comparações e análise", icon: "line-chart", color: "var(--bg)", iconColor: "var(--text3)", page: "dashboard",     group: "Gestão"     },
+    { label: "Gestão de Stock",   sub: "Produtos e inventário",          icon: "package",        color: "var(--bg)", iconColor: "var(--text3)", page: "stock",         group: "Gestão"     },
+    { label: "Fornecedores",      sub: "Compras e fornecedores",         icon: "truck",          color: "var(--bg)", iconColor: "var(--text3)", page: "fornecedores",  group: "Gestão"     },
+    { label: "Despesas",          sub: "Renda, salários e outros custos",icon: "receipt",        color: "var(--bg)", iconColor: "var(--text3)", page: "despesas",      group: "Gestão"     },
+    { label: "Escritório",        sub: "Importar e confirmar turnos",    icon: "archive",        color: "var(--bg)", iconColor: "var(--text3)", page: "escritorio",    group: "Gestão"     },
+    { label: "Incidentes",        sub: "Divergências de stock",          icon: "alert-triangle", color: "var(--bg)", iconColor: "var(--text3)", page: "incidentes",    group: "Gestão"     },
+    { label: "Equipa",            sub: "Funcionários e acessos",         icon: "users-2",        color: "var(--bg)", iconColor: "var(--text3)", page: "equipa",        group: "Gestão"     },
+    { label: "Dados da Loja",     sub: "Nome, logo, endereço e IVA",     icon: "store",          color: "var(--bg)", iconColor: "var(--text3)", page: "loja",          group: "Gestão"     },
     // ── Sistema ──
-    { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "#fee2e2", iconColor: "#dc2626", page: "seguranca",     group: "Sistema"    },
-    { label: "Configurações",     sub: "Backup, logs e dados",           icon: "settings",       color: "#f4f4f5", iconColor: "#71717a", page: "configuracoes", group: "Sistema"    },
+    { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "var(--bg)", iconColor: "var(--text3)", page: "seguranca",     group: "Sistema"    },
+    { label: "Configurações",     sub: "Backup, logs e dados",           icon: "settings",       color: "var(--bg)", iconColor: "var(--text3)", page: "configuracoes", group: "Sistema"    },
   ];
 
   const caixaItems = [
-    { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "#ede9fe", iconColor: "#5b21b6", page: "turno",         group: "Gestão"     },
-    { label: "Tesouraria",        sub: "Sangria, reforço e ajustes",     icon: "wallet",         color: "#fef3c7", iconColor: "#d97706", page: "tesouraria",    group: "Gestão"     },
-    { label: "Escritório",        sub: "Importar ficheiros de turno",    icon: "archive",        color: "#ede9fe", iconColor: "#5b21b6", page: "escritorio",    group: "Gestão"     },
-    { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "#fee2e2", iconColor: "#dc2626", page: "seguranca",     group: "Gestão"     },
+    { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "var(--bg)", iconColor: "var(--text3)", page: "turno",         group: "Gestão"     },
+    { label: "Tesouraria",        sub: "Sangria, reforço e ajustes",     icon: "wallet",         color: "var(--bg)", iconColor: "var(--text3)", page: "tesouraria",    group: "Gestão"     },
+    { label: "Escritório",        sub: "Importar ficheiros de turno",    icon: "archive",        color: "var(--bg)", iconColor: "var(--text3)", page: "escritorio",    group: "Gestão"     },
+    { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "var(--bg)", iconColor: "var(--text3)", page: "seguranca",     group: "Gestão"     },
   ];
 
   const commonItems = [
-    { label: "Alterar PIN",       sub: "Mudar PIN de acesso",            icon: "lock",           color: "#f4f4f5", iconColor: "#5b21b6", page: "senha",         group: "Sistema"    },
-    { label: "Assinatura",        sub: "Licença e plano activo",         icon: "award",          color: "#ede9fe", iconColor: "#5b21b6", page: "assinatura",    group: "Sistema"    },
-    { label: "Ajuda",             sub: "Perguntas frequentes e como usar",icon: "help-circle",   color: "#dbeafe", iconColor: "#2563eb", page: "ajuda",         group: "Sobre"      },
-    { label: "Contactos",         sub: "Suporte Introxeer Technology",   icon: "headphones",     color: "#dbeafe", iconColor: "#2563eb", page: "contactos",     group: "Sobre"      },
-    { label: "Sobre",             sub: "Termos, ajuda e versão",         icon: "info",           color: "#f4f4f5", iconColor: "#71717a", page: "sobre",         group: "Sobre"      },
-    { label: "Terminar Sessão",   sub: "",                               icon: "log-out",        color: "#f4f4f5", iconColor: "#71717a", page: "logout",        group: null         },
+    { label: "Alterar PIN",       sub: "Mudar PIN de acesso",            icon: "lock",           color: "var(--bg)", iconColor: "var(--text3)", page: "senha",         group: "Sistema"    },
+    { label: "Assinatura",        sub: "Licença e plano activo",         icon: "credit-card",    color: "var(--bg)", iconColor: "var(--text3)", page: "assinatura",    group: "Sistema"    },
+    { label: "Ajuda",             sub: "Perguntas frequentes e como usar",icon: "help-circle",   color: "var(--bg)", iconColor: "var(--text3)", page: "ajuda",         group: "Sobre"      },
+    { label: "Contactos",         sub: "Suporte Introxeer Technology",   icon: "headphones",     color: "var(--bg)", iconColor: "var(--text3)", page: "contactos",     group: "Sobre"      },
+    { label: "Sobre",             sub: "Termos, ajuda e versão",         icon: "info",           color: "var(--bg)", iconColor: "var(--text3)", page: "sobre",         group: "Sobre"      },
+    { label: "Terminar Sessão",   sub: "",                               icon: "log-out",        color: "var(--bg)", iconColor: "var(--text3)", page: "logout",        group: null         },
   ];
 
   const items = [...(user.role === "admin" ? adminItems : caixaItems), ...commonItems];
