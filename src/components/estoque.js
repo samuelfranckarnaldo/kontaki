@@ -523,6 +523,11 @@ window._estComprar = async () => {
 let _invDraft = {};
 
 window._estInventario = async () => {
+  const licMod = await import("../license.js");
+  if (!licMod.hasFeature("inventario_periodico")) {
+    licMod.showUpgradeBanner("Inventário periódico disponível a partir do plano Standard. Contacta a Introxeer para upgrade.");
+    return;
+  }
   const active = allProducts.filter(p => p.active);
   const hasDraft = Object.keys(_invDraft).length > 0;
 
@@ -658,6 +663,11 @@ window._estOpenMoreMenu = () => {
 };
 
 window._estOpenReports = async () => {
+  const licMod = await import("../license.js");
+  if (!licMod.hasFeature("relatorios_estoque")) {
+    licMod.showUpgradeBanner("Relatórios de stock disponíveis a partir do plano Standard. Contacta a Introxeer para upgrade.");
+    return;
+  }
   const [sales, allProds] = await Promise.all([
     db.getAll("sales"),
     Promise.resolve(allProducts.filter(p => p.active)),

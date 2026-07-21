@@ -186,7 +186,12 @@ export async function initHistorico() {
 
 var calState = { viewYear:0, viewMonth:0, selFrom:null, selTo:null };
 
-window._openExportMenu = function(filtered) {
+window._openExportMenu = async function(filtered) {
+  var licMod = await import("../license.js");
+  if (!licMod.hasFeature("exportar_relatorios")) {
+    licMod.showUpgradeBanner("Exportação de relatórios disponível a partir do plano Standard. Contacta a Introxeer para upgrade.");
+    return;
+  }
   var isAdmin = getUser().role === "admin";
   var body =
     '<div class="hist-export-options">' +
@@ -652,7 +657,7 @@ async function loadGeral(from, to) {
     stats.innerHTML =
       kpi("Nº Vendas",     nVendas,         "var(--text)",  "", null) +
       kpi("Média por Venda",  fmt(ticket),     "var(--text)",     "", null) +
-      kpi("Fiado Aberto",  fmt(fiadoAb),    "var(--warning-muted)",  fiadoAlert?"Valor alto":"", fiadoAb>0?"hist-kpi--attention":null) +
+      kpi("Crédito Aberto",  fmt(fiadoAb),    "var(--warning-muted)",  fiadoAlert?"Valor alto":"", null) +
       kpi("Devoluções",    fmt(devTotal),   devTotal>0?"var(--danger-muted)":"var(--success)", devAnomaly?"Acima do habitual":(incOpen+" incidente"+(incOpen===1?"":"s")), devTotal>0?"hist-kpi--danger":null);
   }
 
@@ -1168,8 +1173,8 @@ async function loadAuditoria(from, to) {
     var salesTotal = periodSales.reduce(function(a,s){ return a+((s.total||0)-(s.totalDevolvido||0)); }, 0);
     stats.innerHTML =
       kpi("Vendas", periodSales.length, "var(--text)", fmt(salesTotal), null) +
-      kpi("Ajustes", adjustments.length, "var(--primary-mid)", "stock", adjustments.length>0?"hist-kpi--attention":null) +
-      kpi("Incidentes", periodIncidents.length, periodIncidents.length>0?"var(--danger)":"var(--success)", "", periodIncidents.length>0?"hist-kpi--danger":null) +
+      kpi("Ajustes", adjustments.length, "var(--primary-mid)", "stock", null) +
+      kpi("Incidentes", periodIncidents.length, periodIncidents.length>0?"var(--danger)":"var(--success)", "", null) +
       kpi("Sessões", periodSessions.length, "var(--text)", "", null);
   }
 
@@ -1497,7 +1502,7 @@ window._openSessionDetail = async function(sessionId) {
       var totalFiado = sessionFiados.reduce(function(a,f){ return a+(f.amount||0); }, 0);
       fiadosSection =
         '<div class="hist-session-cash hist-session-fade" style="animation-delay:' + sectionDelay() + '">' +
-          '<div class="hist-session-cash-title" style="color:var(--warning-muted)"><i data-lucide="hand-coins"></i>Fiados concedidos (' + sessionFiados.length + ')</div>' +
+          '<div class="hist-session-cash-title" style="color:var(--warning-muted)"><i data-lucide="hand-coins"></i>Crédito concedido (' + sessionFiados.length + ')</div>' +
           sessionFiados.map(function(f) {
             return '<div class="hist-session-incident-row">' +
               '<span>' + (f.clientName||"Cliente") + '</span>' +

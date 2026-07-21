@@ -5,7 +5,7 @@ import { loadDespesas }       from "./despesas.js";
 import { loadSeguranca }   from "./seguranca.js";
 import { loadTurno } from "./turno.js";
 import { loadTesouraria } from "./tesouraria.js";
-import { getShortcutDates, getPeriodLabel } from "./historico.js";
+import { getShortcutDates, getPeriodLabel, fmtChartVal } from "./historico.js";
 import { loadFornecedores } from "./fornecedores.js";
 import { loadEscritorio } from "./escritorio.js";
 import { db }                    from "../db.js";
@@ -1242,7 +1242,22 @@ function accountBalance(entries, code) {
   return acc.natureza === "devedora" ? (d - c) : (c - d);
 }
 
+function minDelayConta(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
+}
+
 async function loadContaResumo(wrap) {
+  wrap.innerHTML =
+    '<div class="hist-skel hist-hero-skel" style="margin-bottom:16px"><div class="skel-line skel-line--label" style="background:rgba(255,255,255,.3)"></div><div class="skel-line skel-line--hero" style="background:rgba(255,255,255,.35)"></div></div>' +
+    '<div class="hist-mov-card hist-skel" style="margin-bottom:14px;height:150px"></div>' +
+    '<div class="hist-mov-card hist-skel">' +
+      '<div class="skel-line skel-line--title" style="margin-bottom:12px"></div>' +
+      '<div class="skel-line skel-line--sub" style="margin-bottom:16px"></div>' +
+      '<div class="skel-line skel-line--sub" style="margin-bottom:16px"></div>' +
+      '<div class="skel-line skel-line--sub"></div>' +
+    '</div>';
+  await minDelayConta(280);
+
   var sales     = await db.getAll("sales");
   var purchases = await db.getAll("purchases");
   var products  = await db.getAll("products");
@@ -1330,24 +1345,6 @@ async function loadContaResumo(wrap) {
   var contasAPagar    = accountBalance(entries, "32");
   var ivaAPagar       = accountBalance(entries, "34");
 
-  // Top produtos
-  var prodReceita = {};
-  atual.vendas.forEach(function(s){
-    (s.items||[]).forEach(function(i){
-      prodReceita[i.id] = (prodReceita[i.id]||{name:i.name,total:0,qty:0});
-      prodReceita[i.id].total += i.price*i.qty;
-      prodReceita[i.id].qty   += i.qty;
-    });
-  });
-  var topProd = Object.values(prodReceita).sort(function(a,b){ return b.total-a.total; }).slice(0,5);
-
-  // Por método de pagamento
-  var porMetodo = {};
-  atual.vendas.forEach(function(s){
-    porMetodo[s.payMethod] = (porMetodo[s.payMethod]||0) + s.total;
-  });
-  var metodoLabels = { dinheiro:"Dinheiro", transferencia:"Transferência", multicaixa:"Multicaixa", fiado:"Venda a Crédito" };
-
   var trendHtml = trendPct === null ? "" :
     '<div class="hist-hero-trend hist-hero-trend--corner ' + (trendPct>=0?'hist-hero-trend--up':'hist-hero-trend--down') + '">' +
     (trendPct>=0?'▲ ':'▼ ') + Math.abs(trendPct) + '%</div>';
@@ -1415,36 +1412,6 @@ async function loadContaResumo(wrap) {
     iconRow("package-plus", "var(--success)", "var(--success-light)", "Compras do mês", null, fmt(comprasMes), "var(--text)") +
     iconRow("rotate-ccw", "var(--warning)", "var(--warning-light)", "Devoluções do mês", null, fmt(devMes), devMes>0?"var(--warning)":"var(--text)") +
 
-    // Top produtos
-    (topProd.length ?
-    '<div class="hist-day-label--inset"><i data-lucide="trophy" style="width:13px;height:13px"></i>Top produtos do mês</div>' +
-    topProd.map(function(p,i){
-      var pct = atual.receita>0?Math.round((p.total/atual.receita)*100):0;
-      return '<div class="hist-mov-item hist-mov-item--compact" style="border-left:3px solid var(--primary);align-items:center">' +
-        '<div class="hist-mov-icon" style="background:var(--primary-light);color:var(--primary);font-weight:800;font-size:13px">' + (i+1) + '</div>' +
-        '<div style="flex:1;min-width:0">' +
-        '<div class="hist-mov-name">' + p.name + '</div>' +
-        '<div style="height:5px;background:var(--border2);border-radius:3px;overflow:hidden;margin-top:6px">' +
-        '<div style="height:100%;width:' + pct + '%;background:var(--primary);border-radius:3px;transition:width .5s"></div>' +
-        '</div>' +
-        '<div class="hist-mov-meta" style="margin-top:4px">' + p.qty + ' un · ' + pct + '% da receita</div>' +
-        '</div>' +
-        '<div style="text-align:right;flex-shrink:0">' +
-        '<div class="hist-mov-qty">' + fmt(p.total) + '</div>' +
-        '</div></div>';
-    }).join("") : "") +
-
-    // Por método de pagamento
-    '<div class="hist-day-label--inset"><i data-lucide="credit-card" style="width:13px;height:13px"></i>Por método de pagamento</div>' +
-    Object.entries(porMetodo).map(function(e){
-      var pct = atual.receita>0?Math.round((e[1]/atual.receita)*100):0;
-      var label = metodoLabels[e[0]] || e[0];
-      var metodoIcon  = { dinheiro:"banknote", transferencia:"arrow-left-right", multicaixa:"credit-card", fiado:"users" };
-      var metodoColor = { dinheiro:"var(--success)", transferencia:"var(--info)", multicaixa:"var(--primary-mid)", fiado:"var(--warning)" };
-      var icon  = metodoIcon[e[0]] || "circle";
-      var color = metodoColor[e[0]] || "var(--text3)";
-      return iconRow(icon, color, color.replace("var(--","var(--").replace(")","-light)"), label, pct + "% da receita", fmt(e[1]), "var(--text)");
-    }).join("") +
     '</div>';
 
   // Relatorio por funcionario
@@ -1663,6 +1630,21 @@ window._contaSetChartPeriod = function(meses) {
   }
   window._contaRenderChart(meses);
 };
+
+if (!window._contaVisibilityBound) {
+  window._contaVisibilityBound = true;
+  document.addEventListener("visibilitychange", function() {
+    if (document.visibilityState === "visible" && _contaChartInstance) {
+      // Canvas perde as dimensões quando a app volta do background — força resize + redesenho
+      setTimeout(function() {
+        if (_contaChartInstance) {
+          _contaChartInstance.resize();
+          _contaChartInstance.update();
+        }
+      }, 50);
+    }
+  });
+}
 
 window._contaRenderChart = function(meses) {
   if (!window._contaCalcMes) return;
@@ -2018,18 +2000,18 @@ async function loadContaBalancete(wrap) {
     '<i data-lucide="' + (bateOK?'check':'alert-triangle') + '" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"></i>' +
     (bateOK?'Bate certo':'Diferença') + '</div>';
 
-  var debitStr  = fmt(totalDebitGeral);
-  var creditStr = fmt(totalCreditGeral);
+  var debitStr  = fmtChartVal(totalDebitGeral);
+  var creditStr = fmtChartVal(totalCreditGeral);
   var maxLen = Math.max(debitStr.length, creditStr.length);
-  var valSize = maxLen >= 16 ? "20px" : maxLen >= 13 ? "24px" : "28px";
+  var valSize = maxLen >= 10 ? "20px" : maxLen >= 7 ? "24px" : "28px";
 
   wrap.innerHTML =
     '<div class="hist-hero" style="margin-bottom:16px;background:linear-gradient(135deg, var(--primary), var(--primary-mid))">' +
     balanceteStatusBadge +
     '<div class="hist-hero-label">' + (bateOK?'Balancete equilibrado':'Balancete desequilibrado') + '</div>' +
-    '<div style="display:flex;gap:20px;margin-top:6px">' +
-    '<div><div style="font-size:11px;opacity:.75;margin-bottom:2px">Débito</div><div style="font-size:' + valSize + ';font-weight:800;font-variant-numeric:tabular-nums">' + debitStr + '</div></div>' +
-    '<div><div style="font-size:11px;opacity:.75;margin-bottom:2px">Crédito</div><div style="font-size:' + valSize + ';font-weight:800;font-variant-numeric:tabular-nums">' + creditStr + '</div></div>' +
+    '<div style="display:flex;margin-top:6px">' +
+    '<div style="flex:1;min-width:0"><div style="font-size:11px;opacity:.75;margin-bottom:2px">Débito</div><div style="font-size:' + valSize + ';font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap">' + debitStr + '</div></div>' +
+    '<div style="flex:1;min-width:0"><div style="font-size:11px;opacity:.75;margin-bottom:2px">Crédito</div><div style="font-size:' + valSize + ';font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap">' + creditStr + '</div></div>' +
     '</div>' +
     (bateOK?'':'<div class="hist-hero-sub" style="margin-top:8px">Diferença: '+fmt(diff)+'</div>') +
     '</div>' + html;
@@ -2426,6 +2408,11 @@ window._reportarProblema = function() {
 
 
 window._gerarRelatorioFuncionario = async function() {
+  var licMod = await import("../license.js");
+  if (!licMod.hasFeature("relatorio_funcionario")) {
+    licMod.showUpgradeBanner("Relatório por funcionário disponível a partir do plano Pro. Contacta a Introxeer para upgrade.");
+    return;
+  }
   var sel = document.getElementById("func-select");
   if (!sel) return;
   var userId = Number(sel.value);
