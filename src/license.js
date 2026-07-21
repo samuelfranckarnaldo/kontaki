@@ -183,6 +183,7 @@ if (typeof window !== "undefined") {
     try {
       const syncMod = await import("./sync.js");
       await syncMod.syncRegister();
+      await syncMod.syncSales();
     } catch (e) {}
   });
 
@@ -192,7 +193,7 @@ if (typeof window !== "undefined") {
   setInterval(function () {
     if (navigator.onLine) {
       validateLicenseOnline().catch(function () {});
-      import("./sync.js").then(function(m) { m.syncRegister(); }).catch(function() {});
+      import("./sync.js").then(function(m) { m.syncRegister().then(function(){ return m.syncSales(); }); }).catch(function() {});
     }
   }, 15 * 60 * 1000);
 }

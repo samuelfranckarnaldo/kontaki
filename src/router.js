@@ -11,7 +11,7 @@ import { initDarkMode, checkBadges, startRealtimeSync } from "./components/extra
 import { updateNotificationBadge } from "./notification-ui.js";
 import { saveScroll, restoreScroll } from "./view-state.js";
 import { loadDashboard }                    from "./components/dashboard.js";
-import { hasFeature, getLicense }          from "./license.js";
+import { hasFeature, getLicense, showRevokedLockout } from "./license.js";
 
 var PAGES = {
   vender:    { init: initVender    },
@@ -69,6 +69,16 @@ export var router = {
 
   go: function(pageId) {
     if (!PAGES[pageId]) return;
+
+    // Licença revogada bloqueia o núcleo (vender/stock/etc) — ao
+    // contrário de apenas expirada, que continua a permitir vender e
+    // só bloqueia extras via hasFeature(). Verificado aqui, não só na
+    // revalidação periódica, para cobrir o caso de já estar revogada
+    // localmente desde o arranque, sem esperar por nova rede.
+    if (getLicense().status === "revoked") {
+      showRevokedLockout();
+      return;
+    }
 
     // Fecha a ficha do cliente (overlay independente do sistema de páginas)
     // se estiver aberta ao navegar para outra aba — sem isto ela fica presa
