@@ -4,6 +4,7 @@ import { refreshIcons, el } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { postOwnerContribution, postBankTransfer, getAccountBalance } from "../pgc.js";
+import { verifyAdminPin } from "../services.js";
 
 var ADMIN_OPS = [
   { key: "aporte",       label: "Aporte de capital",        sub: "Entrada de capital do proprietário",   icon: "trending-up",        color: "#dcfce7", iconColor: "#16a34a" },
@@ -54,9 +55,221 @@ export async function loadTesouraria() {
       if (key === "deposito") { openDepositoModal(); return; }
       if (key === "levantamento") { openLevantamentoModal(); return; }
       if (key === "sangria") { openSangriaModal(); return; }
+      if (key === "reforco") { openReforcoModal(); return; }
+      if (key === "ajuste") { openAjusteModal(); return; }
       toast("Esta operação ainda está em construção.", "info");
     };
   });
+}
+
+// ── AJUSTE DE CAIXA ──────────────────────────────────────────────────────────
+// Regularização baseada em contagem física (Esperado vs Contado), não num valor
+// arbitrário. Sem lançamento contabilístico (mesma decisão de Sangria/Reforço).
+// Se quem estiver a operar não for admin, exige PIN de administrador antes de
+// gravar — reaproveita verifyAdminPin(), já usado para vendas com incidente.
+async function _saveAjuste(p) {
+  var saveBtn = document.getElementById("tes-ajuste-save");
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "A gravar..."; }
+
+  try {
+    await db.add("treasuryMovements", {
+      type: "ajuste",
+      date: p.date,
+      amount: p.diff,
+      description: p.motivo,
+      origem: null,
+      expected: p.esperado,
+      counted: p.contado,
+      sessionId: p.session.id,
+      userId: p.user ? p.user.id : null,
+      journalEntryId: null,
+      createdAt: new Date().toISOString(),
+    });
+
+    toast("Ajuste de caixa registado.", "success");
+    closeModal();
+    await loadTesouraria();
+  } catch (err) {
+    toast("Erro ao registar ajuste: " + err.message, "error");
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Confirmar Ajuste"; }
+  }
+}
+
+function openAjusteAuthModal(payload) {
+  openModal("Autorização necessária",
+    '<div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:16px">' +
+    'O ajuste de caixa altera o saldo operacional. É necessário o PIN de um administrador para continuar.' +
+    '</div>' +
+    '<div class="field" style="margin-bottom:14px">' +
+    '<label>PIN do administrador</label>' +
+    '<input type="password" inputmode="numeric" maxlength="6" id="tes-ajuste-auth-pin" placeholder="••••••" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:18px;text-align:center;letter-spacing:6px;font-family:inherit"/>' +
+    '</div>' +
+    '<div id="tes-ajuste-auth-err" style="display:none;color:var(--danger);font-size:12px;margin-bottom:10px"></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn btn-ghost" id="tes-ajuste-auth-back" style="flex:0 0 auto"><i data-lucide="arrow-left" style="width:16px;height:16px"></i></button>' +
+    '<button class="btn btn-ghost btn-full" id="tes-ajuste-auth-cancel">Cancelar</button>' +
+    '<button class="btn btn-primary btn-full" id="tes-ajuste-auth-confirm">Confirmar</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+
+  document.getElementById("tes-ajuste-auth-cancel").onclick = closeModal;
+  document.getElementById("tes-ajuste-auth-back").onclick = function() {
+    openAjusteModal({ contado: payload.contado, motivo: payload.motivo, date: payload.date });
+  };
+
+  document.getElementById("tes-ajuste-auth-confirm").onclick = async function() {
+    var pinEl  = document.getElementById("tes-ajuste-auth-pin");
+    var errEl  = document.getElementById("tes-ajuste-auth-err");
+    var pin    = pinEl ? pinEl.value : "";
+    if (!pin || pin.length < 4) {
+      if (errEl) { errEl.style.display = "block"; errEl.textContent = "Introduz o PIN."; }
+      return;
+    }
+    var result = await verifyAdminPin(pin);
+    if (!result.ok) {
+      if (errEl) {
+        errEl.style.display = "block";
+        errEl.textContent = result.reason === "no_admin" ? "Nenhum administrador disponível." : "PIN de administrador incorrecto.";
+      }
+      return;
+    }
+    await _saveAjuste(payload);
+  };
+}
+
+function openAjusteModal(prefill) {
+  prefill = prefill || {};
+  getAccountBalance("45").then(function(esperado) {
+    openModal("Ajuste de Caixa",
+      '<div style="display:flex;flex-direction:column;gap:14px">' +
+      '<div style="background:var(--warning-muted-light);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--warning-muted);display:flex;align-items:center;gap:8px">' +
+      '<i data-lucide="info" style="width:15px;height:15px;flex-shrink:0"></i> Operação sem lançamento contabilístico — regulariza o saldo operacional do caixa.</div>' +
+      '<div class="field"><label>Saldo esperado (Kz)</label><input type="text" value="' + esperado.toLocaleString("pt-AO") + '" disabled style="background:var(--bg);color:var(--text3)"/></div>' +
+      '<div class="field"><label>Valor contado (Kz) *</label><input type="number" id="tes-ajuste-contado" placeholder="0" value="' + (prefill.contado != null ? prefill.contado : "") + '"/></div>' +
+      '<div id="tes-ajuste-diff-preview" style="display:none;padding:12px;border-radius:10px;text-align:center;font-weight:700;font-size:15px"></div>' +
+      '<div class="field"><label>Motivo *</label><input id="tes-ajuste-motivo" placeholder="Ex: Contagem de fecho, nota mal trocada..." value="' + (prefill.motivo || "").replace(/"/g,"&quot;") + '"/></div>' +
+      '<div class="field"><label>Data</label><input type="date" id="tes-ajuste-date" value="' + (prefill.date || new Date().toISOString().slice(0,10)) + '"/></div>' +
+      '</div>' +
+      '<div class="form-actions">' +
+      '<button class="btn btn-ghost btn-full" id="tes-ajuste-cancel">Cancelar</button>' +
+      '<button class="btn btn-primary btn-full" style="background:var(--warning-muted)" id="tes-ajuste-save">Confirmar Ajuste</button>' +
+      '</div>');
+    refreshIcons(el("modal-box"));
+
+    var contadoInput = document.getElementById("tes-ajuste-contado");
+    var diffPreview  = document.getElementById("tes-ajuste-diff-preview");
+    function _updateDiffPreview() {
+      var contado = Number(contadoInput.value);
+      if (!contadoInput.value) { diffPreview.style.display = "none"; return; }
+      var diff = contado - esperado;
+      diffPreview.style.display = "block";
+      diffPreview.style.background = diff === 0 ? "var(--success-light)" : (diff > 0 ? "var(--info-light)" : "var(--danger-light)");
+      diffPreview.style.color      = diff === 0 ? "var(--success)"       : (diff > 0 ? "var(--info)"       : "var(--danger)");
+      diffPreview.textContent = "Diferença: " + (diff > 0 ? "+" : "") + diff.toLocaleString("pt-AO") + " Kz";
+    }
+    contadoInput.addEventListener("input", _updateDiffPreview);
+    if (prefill.contado != null) _updateDiffPreview();
+
+    document.getElementById("tes-ajuste-cancel").onclick = closeModal;
+
+    document.getElementById("tes-ajuste-save").onclick = async function() {
+      var session = getSession();
+      if (!session) { toast("Abre um turno primeiro.", "error"); return; }
+
+      if (!contadoInput.value) { toast("Introduz o valor contado.", "error"); return; }
+      var contado = Number(contadoInput.value);
+      var diff = contado - esperado;
+
+      var motivo = ((el("tes-ajuste-motivo")||{}).value || "").trim();
+      if (!motivo) { toast("O motivo é obrigatório.", "error"); return; }
+
+      if (diff === 0) { toast("Não há diferença a regularizar.", "info"); return; }
+
+      var user = getUser();
+      var date = (el("tes-ajuste-date")||{}).value || new Date().toISOString().slice(0,10);
+
+      var payload = { esperado: esperado, contado: contado, diff: diff, motivo: motivo, date: date, session: session, user: user };
+
+      if (user && user.role !== "admin") {
+        openAjusteAuthModal(payload);
+        return;
+      }
+
+      await _saveAjuste(payload);
+    };
+  });
+}
+
+// ── REFORÇO DE CAIXA ─────────────────────────────────────────────────────────
+// Espelho exato da Sangria: dinheiro sai do cofre para a gaveta, continua a ser
+// numerário da empresa (conta 45 do PGC). Sem lançamento contabilístico.
+function openReforcoModal() {
+  openModal("Reforço de Caixa",
+    '<div style="display:flex;flex-direction:column;gap:14px">' +
+    '<div style="background:var(--warning-muted-light);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--warning-muted);display:flex;align-items:center;gap:8px">' +
+    '<i data-lucide="info" style="width:15px;height:15px;flex-shrink:0"></i> Operação sem lançamento contabilístico — o dinheiro continua na empresa, só muda de local físico.</div>' +
+    '<div class="field"><label>Valor (Kz) *</label><input type="number" id="tes-reforco-amount" placeholder="0"/></div>' +
+    '<div class="field"><label>Motivo *</label><input id="tes-reforco-motivo" placeholder="Ex: Reforço de troco, falta de numerário..."/></div>' +
+    '<div class="field"><label>Data</label><input type="date" id="tes-reforco-date" value="' + new Date().toISOString().slice(0,10) + '"/></div>' +
+    '</div>' +
+    '<div class="form-actions">' +
+    '<button class="btn btn-ghost btn-full" id="tes-reforco-cancel">Cancelar</button>' +
+    '<button class="btn btn-primary btn-full" style="background:var(--warning-muted)" id="tes-reforco-save">Confirmar Reforço</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+
+  document.getElementById("tes-reforco-cancel").onclick = closeModal;
+
+  document.getElementById("tes-reforco-save").onclick = async function() {
+    var session = getSession();
+    if (!session) { toast("Abre um turno primeiro.", "error"); return; }
+
+    var amount = Number((el("tes-reforco-amount")||{}).value);
+    if (!amount || amount <= 0) { toast("O valor deve ser maior que zero.", "error"); return; }
+
+    var motivo = ((el("tes-reforco-motivo")||{}).value || "").trim();
+    if (!motivo) { toast("O motivo é obrigatório.", "error"); return; }
+
+    var todos = await db.getAll("treasuryMovements");
+    var saldoCofre = todos.reduce(function(acc, m) {
+      if (m.type === "sangria") return acc + (m.amount||0);
+      if (m.type === "reforco") return acc - (m.amount||0);
+      return acc;
+    }, 0);
+    if (amount > saldoCofre) {
+      toast("Saldo insuficiente no cofre (disponível: " + saldoCofre.toLocaleString("pt-AO") + " Kz).", "error");
+      return;
+    }
+
+    var date = (el("tes-reforco-date")||{}).value || new Date().toISOString().slice(0,10);
+    var user = getUser();
+
+    var saveBtn = document.getElementById("tes-reforco-save");
+    saveBtn.disabled = true;
+    saveBtn.textContent = "A gravar...";
+
+    try {
+      await db.add("treasuryMovements", {
+        type: "reforco",
+        date: date,
+        amount: amount,
+        description: motivo,
+        origem: "cofre",
+        sessionId: session.id,
+        userId: user ? user.id : null,
+        journalEntryId: null,
+        createdAt: new Date().toISOString(),
+      });
+
+      toast("Reforço registado.", "success");
+      closeModal();
+      await loadTesouraria();
+    } catch (err) {
+      toast("Erro ao registar reforço: " + err.message, "error");
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Confirmar Reforço";
+    }
+  };
 }
 
 // ── SANGRIA DE CAIXA ─────────────────────────────────────────────────────────
