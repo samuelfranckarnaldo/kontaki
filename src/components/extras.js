@@ -85,6 +85,22 @@ export async function openDevolucao(saleId) {
   var items = sale.items || [];
   if (!items.length) { toast("Venda sem itens.", "error"); return; }
 
+  var store = (await db.get("settings", "store")) || {};
+  var maxDias = store.devolucaoMaxDias != null ? store.devolucaoMaxDias : 30;
+  var diasDesdeVenda = Math.floor((Date.now() - new Date(sale.date).getTime()) / 86400000);
+  var foraDoPrazo = diasDesdeVenda > maxDias;
+  var politicaBloqueia = (store.devolucaoForaPrazoPolicy || "bloquear") === "bloquear";
+
+  if (foraDoPrazo && politicaBloqueia) {
+    toast("Esta venda foi feita há " + diasDesdeVenda + " dias — o limite para devoluções é de " + maxDias + " dias.", "error");
+    return;
+  }
+
+  var avisoForaDoPrazo = foraDoPrazo
+    ? '<div style="background:var(--warning-muted-light);border:1.5px solid var(--warning-muted);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--warning-muted)">' +
+      '<i data-lucide="alert-triangle" style="width:14px;height:14px;vertical-align:-2px"></i> Esta venda foi feita há ' + diasDesdeVenda + ' dias, acima do limite de ' + maxDias + ' dias. A devolução ainda é permitida, mas fica assinalada.</div>'
+    : '';
+
   var rows = items.map(function(item) {
     return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f4f4f5">' +
       '<div style="flex:1">' +
@@ -99,15 +115,41 @@ export async function openDevolucao(saleId) {
   window._saleParaDevolucao = sale;
 
   openModal("Devolução — Venda #" + saleId,
+    avisoForaDoPrazo +
     '<div style="font-size:13px;color:#71717a;margin-bottom:12px;line-height:1.5">' +
-    'Insere a quantidade a devolver para cada produto. Stock será reposto automaticamente.</div>' +
-    '<div style="max-height:300px;overflow-y:auto;margin-bottom:14px">' + rows + '</div>' +
+    'Insere a quantidade a devolver para cada produto.</div>' +
+    '<div style="max-height:280px;overflow-y:auto;margin-bottom:14px">' + rows + '</div>' +
+    '<div class="field" style="margin-bottom:12px">' +
+    '<label>Motivo da devolução *</label>' +
+    '<input id="dev-motivo" placeholder="Ex: Produto com defeito, cliente desistiu..."/>' +
+    '</div>' +
+    '<div class="field" style="margin-bottom:14px">' +
+    '<label>Destino do produto devolvido</label>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button type="button" data-destino="vendavel" class="dev-destino-btn dev-destino-active" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--primary);background:var(--primary-light);color:var(--primary);font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit">Vendável</button>' +
+    '<button type="button" data-destino="danificado" class="dev-destino-btn" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--border2);background:#fff;color:var(--text3);font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit">Danificado</button>' +
+    '</div>' +
+    '<div style="font-size:11px;color:#a1a1aa;margin-top:6px">Vendável repõe o stock disponível. Danificado regista a devolução sem repor o stock.</div>' +
+    '</div>' +
     '<div class="form-actions">' +
     '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
     '<button class="btn btn-primary btn-full" onclick="window._confirmarDevolucao()" style="background:#d97706">' +
     '<i data-lucide="rotate-ccw"></i> Confirmar devolução</button>' +
     '</div>');
   refreshIcons(document.getElementById("modal-box"));
+
+  window._devolucaoDestino = "vendavel";
+  document.querySelectorAll(".dev-destino-btn").forEach(function(btn) {
+    btn.onclick = function() {
+      window._devolucaoDestino = btn.getAttribute("data-destino");
+      document.querySelectorAll(".dev-destino-btn").forEach(function(other) {
+        var active = other === btn;
+        other.style.borderColor = active ? "var(--primary)" : "var(--border2)";
+        other.style.background  = active ? "var(--primary-light)" : "#fff";
+        other.style.color       = active ? "var(--primary)" : "var(--text3)";
+      });
+    };
+  });
 }
 
 window._confirmarDevolucao = async function() {
@@ -116,6 +158,11 @@ window._confirmarDevolucao = async function() {
 
   var sale = window._saleParaDevolucao;
   if (!sale) return;
+
+  var motivo = ((document.getElementById("dev-motivo")||{}).value || "").trim();
+  if (!motivo) { toast("O motivo da devolução é obrigatório.", "error"); return; }
+
+  var destino = window._devolucaoDestino || "vendavel";
 
   var user  = getUser();
   var items = sale.items || [];
@@ -155,25 +202,28 @@ window._confirmarDevolucao = async function() {
     var product = await db.get("products", item.id);
     var stockActual = product ? (product.stock || 0) : 0;
 
-    // Cria StockMovement de devolução — adiciona qty ao stock
+    // Cria StockMovement de devolução. Se "vendavel", repõe qty ao stock
+    // disponível; se "danificado", fica só registado para auditoria — o
+    // produto não volta a ficar disponível para venda.
+    var repoeStock = destino === "vendavel";
     await db.add("stockMovements", {
       productId:   item.id,
       productName: item.name,
       type:        "return",
       location:    "shop",
-      qty:         qty,           // positivo — repõe stock
+      qty:         repoeStock ? qty : 0,
       qtyBefore:   stockActual,
-      qtyAfter:    stockActual + qty,
+      qtyAfter:    repoeStock ? (stockActual + qty) : stockActual,
       reference:   "return#" + sale.id,
-      note:        "Devolução da venda #" + sale.id,
+      note:        "Devolução da venda #" + sale.id + " — " + motivo + (repoeStock ? "" : " (produto danificado, não repõe stock)"),
       userId:      user.id,
       sessionId:   user.sessionId || null,
       imported:    false,
       createdAt:   new Date().toISOString(),
     });
 
-    // Actualiza cache do produto
-    if (product) {
+    // Actualiza cache do produto — só se for reposto como vendável
+    if (product && repoeStock) {
       await db.put("products", {
         ...product,
         stock: stockActual + qty,
@@ -193,10 +243,14 @@ window._confirmarDevolucao = async function() {
   // Marca a venda com devolução
   var saleAtual = await db.get("sales", sale.id);
   var devolucoes = saleAtual.devolucoes || [];
+  var diasDesdeVendaFinal = Math.floor((Date.now() - new Date(sale.date).getTime()) / 86400000);
   devolucoes.push({
     itens:            devolvidos,
     itensDevolvidos:  itensDevolvidosEstruturado,
     total:            totalDevolvido,
+    motivo:           motivo,
+    destino:          destino,
+    diasDesdeVenda:   diasDesdeVendaFinal,
     date:             new Date().toISOString(),
     userId:           user.id,
     userName:         user.name,
@@ -227,6 +281,7 @@ window._confirmarDevolucao = async function() {
   closeModal();
   toast("Devolução registada: " + devolvidos.join(", ") + " — " + fmt(totalDevolvido) + " reembolsados.", "success");
   window._saleParaDevolucao = null;
+  window._devolucaoDestino = null;
 };
 
 // ── RELATÓRIO PDF MENSAL ──────────────────────────────────────────────────────

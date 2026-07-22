@@ -53,6 +53,17 @@ async function renderConfiguracoes() {
     _incidentPolicyOption("allow_with_auth", store, "alert-triangle", "Permitir com autorização", "A venda é permitida após confirmação com PIN de administrador. A decisão fica registada na auditoria.") +
     '</div>' +
 
+    sectionLabel("Devolução") +
+    '<div class="vender-card" style="margin-bottom:14px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
+    '<div style="font-size:13px;color:var(--text3);margin-bottom:12px;line-height:1.5">Define até quantos dias após a venda uma devolução pode ser feita.</div>' +
+    '<div class="field" style="margin-bottom:14px">' +
+    '<label>Dias máximos para devolução</label>' +
+    '<input type="number" id="dev-max-dias" min="0" value="' + (store.devolucaoMaxDias != null ? store.devolucaoMaxDias : 30) + '" onchange="window._setDevolucaoMaxDias(this.value)"/>' +
+    '</div>' +
+    _devolucaoPolicyOption("bloquear", store, "lock", "Bloquear fora do prazo", "Depois do limite de dias, a devolução não pode ser feita por ninguém.") +
+    _devolucaoPolicyOption("avisar", store, "alert-triangle", "Apenas avisar (mais liberdade)", "Depois do limite de dias, mostra um aviso mas continua a permitir a devolução.") +
+    '</div>' +
+
     sectionLabel("Últimos erros (" + logs.length + ")") +
     '<div class="vender-card" style="margin-bottom:14px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
     (logs.length === 0
@@ -95,6 +106,33 @@ window._setIncidentPolicy = async (policy) => {
   const store = (await db.get("settings","store")) || {};
   await db.put("settings", { ...store, key:"store", stockIncidentPolicy: policy });
   toast("Política de inventário actualizada.", "success");
+  await renderConfiguracoes();
+};
+
+function _devolucaoPolicyOption(value, store, icon, title, desc) {
+  const policy = store.devolucaoForaPrazoPolicy || "bloquear";
+  const active = policy === value;
+  return '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;border:1.5px solid ' + (active?"var(--primary)":"var(--border2)") + ';border-radius:10px;margin-bottom:8px;cursor:pointer;background:' + (active?"var(--primary-light)":"var(--bg2)") + '">' +
+    '<input type="radio" name="dev-policy" value="' + value + '" ' + (active?"checked":"") + ' onchange="window._setDevolucaoPolicy(&#39;' + value + '&#39;)" style="margin-top:2px"/>' +
+    '<div style="width:32px;height:32px;border-radius:9px;background:' + (active?"#fff":"var(--border2)") + ';color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+    '<i data-lucide="' + icon + '" style="width:16px;height:16px"></i></div>' +
+    '<div><div style="font-size:14px;font-weight:700;color:var(--text)">' + title + '</div>' +
+    '<div style="font-size:12px;color:var(--text3);margin-top:2px">' + desc + '</div></div>' +
+    '</label>';
+}
+
+window._setDevolucaoMaxDias = async (value) => {
+  const dias = parseInt(value);
+  if (isNaN(dias) || dias < 0) { toast("Introduz um número de dias válido.", "error"); return; }
+  const store = (await db.get("settings","store")) || {};
+  await db.put("settings", { ...store, key:"store", devolucaoMaxDias: dias });
+  toast("Limite de dias actualizado.", "success");
+};
+
+window._setDevolucaoPolicy = async (policy) => {
+  const store = (await db.get("settings","store")) || {};
+  await db.put("settings", { ...store, key:"store", devolucaoForaPrazoPolicy: policy });
+  toast("Política de devolução actualizada.", "success");
   await renderConfiguracoes();
 };
 
