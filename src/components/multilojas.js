@@ -156,6 +156,8 @@ async function _renderResumoAgregado(wrap) {
       _statCard({ label: "Lojas ativas", value: data.storeCount, sub: "na empresa", color: "var(--bg)", iconColor: "var(--text3)", icon: "store" }) +
     '</div>' +
 
+    _liveStatusHtml() +
+
     (multiStore ? (
       '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:12px">Ranking de lojas</div>' +
       '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px">' +
@@ -225,6 +227,34 @@ function _renderTrendChart(days, values) {
       }
     }
   });
+}
+
+
+function _liveStatusHtml() {
+  if (!_mlStoresCache || !_mlStoresCache.length) return '';
+
+  return '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px">Estado ao vivo</div>' +
+    '<div style="font-size:11px;color:var(--text4);margin-bottom:12px">Aproximado pela última sincronização — não é o estado real do turno</div>' +
+    '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:24px">' +
+      _mlStoresCache.map(function(s, i) {
+        var isRecent = s.liveStatus === 'recent';
+        var dotColor = isRecent ? 'var(--success,#16a34a)' : '#d4d4d8';
+        var label = isRecent ? 'Sincronizada há pouco' : 'Sem sincronizar há um tempo';
+        return '<button onclick="window._mlSelectStore(\'' + s.id + '\')" style="width:100%;text-align:left;border:none;background:none;font-family:inherit;cursor:pointer;padding:0;display:flex;justify-content:space-between;align-items:center;margin-bottom:' + (i < _mlStoresCache.length - 1 ? '12px' : '0') + '">' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span style="width:8px;height:8px;border-radius:50%;background:' + dotColor + ';flex-shrink:0"></span>' +
+            '<div>' +
+              '<div style="font-size:13px;font-weight:700;color:var(--text)">' + s.name + '</div>' +
+              '<div style="font-size:10.5px;color:var(--text4)">' + label + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="text-align:right">' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text2)">' + fmt(s.salesToday) + '</div>' +
+            '<div style="font-size:10.5px;color:var(--text4)">' + s.transactionsToday + ' venda' + (s.transactionsToday !== 1 ? 's' : '') + ' hoje</div>' +
+          '</div>' +
+        '</button>';
+      }).join("") +
+    '</div>';
 }
 
 // ── RESUMO — UMA LOJA ───────────────────────────────────────────────────

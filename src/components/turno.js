@@ -162,6 +162,21 @@ window._abrirTurno = async function() {
   }
 };
 
+function _abbrevUnit(unit) {
+  var map = { "Unidade":"un", "Quilograma":"Kg", "Grama":"g", "Litro":"L", "Mililitro":"ml",
+    "Caixa":"cx", "Pacote":"pct", "Fardo":"fd", "Grade":"gd", "Garrafa":"gf", "Saco":"sc", "Rolo":"rl" };
+  return map[unit] || (unit||"").slice(0,3);
+}
+
+window._turnoRowChanged = function(input) {
+  var row = input.closest(".turno-stock-row");
+  if (!row) return;
+  var defaultVal = row.getAttribute("data-default");
+  var changed = String(input.value) !== String(defaultVal);
+  row.style.background = changed ? "var(--primary-light)" : "transparent";
+  row.style.borderLeftColor = changed ? "var(--primary)" : "transparent";
+};
+
 // ── ABRIR TURNO — modal de confirmação de stock/caixa ─────────────────────────
 async function showAberturaModal(lastClosed) {
   var { getAllStocks } = await import("../services.js");
@@ -174,15 +189,16 @@ async function showAberturaModal(lastClosed) {
 
   var rows = products.map(function(p){
     var esperado = shopMap[p.id]||0;
-    return '<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #f4f4f5">' +
-      '<div style="flex:1">' +
+    return '<div class="turno-stock-row" data-default="'+esperado+'" style="display:flex;align-items:center;gap:8px;padding:10px 8px;border-bottom:1px solid #f4f4f5;border-left:3px solid transparent;background:transparent;transition:background .15s">' +
+      '<div style="flex:1;min-width:0">' +
       '<div style="font-size:13px;font-weight:600">' + p.name + '</div>' +
       '<div style="font-size:11px;color:#71717a">Esperado: <strong>' + esperado + '</strong> ' + p.unit + '</div>' +
       '</div>' +
-      '<div style="display:flex;align-items:center;gap:6px">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
       '<input type="number" id="open-stock-'+p.id+'" min="0" value="'+esperado+'" ' +
+      'oninput="window._turnoRowChanged(this)" ' +
       'style="width:70px;padding:7px;border:1.5px solid #ddd6fe;border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
-      '<span style="font-size:11px;color:#71717a">' + p.unit + '</span>' +
+      '<span style="font-size:11px;color:#71717a;white-space:nowrap;flex-shrink:0">' + _abbrevUnit(p.unit) + '</span>' +
       '</div></div>';
   }).join("");
 
@@ -379,15 +395,16 @@ window._fecharTurno = async function() {
 
   var rows = products.map(function(p){
     var sm = stockMap[p.id];
-    return '<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #f4f4f5">' +
-      '<div style="flex:1">' +
+    return '<div class="turno-stock-row" data-default="'+sm.esperado+'" style="display:flex;align-items:center;gap:8px;padding:10px 8px;border-bottom:1px solid #f4f4f5;border-left:3px solid transparent;background:transparent;transition:background .15s">' +
+      '<div style="flex:1;min-width:0">' +
       '<div style="font-size:13px;font-weight:600">' + p.name + '</div>' +
       '<div style="font-size:11px;color:#71717a">Esperado: <strong>' + sm.esperado + '</strong> ' + p.unit + '</div>' +
       '</div>' +
-      '<div style="display:flex;align-items:center;gap:6px">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
       '<input type="number" id="stock-conf-'+p.id+'" min="0" value="'+sm.esperado+'" ' +
+      'oninput="window._turnoRowChanged(this)" ' +
       'style="width:70px;padding:7px;border:1.5px solid #ddd6fe;border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
-      '<span style="font-size:11px;color:#71717a">' + p.unit + '</span>' +
+      '<span style="font-size:11px;color:#71717a;white-space:nowrap;flex-shrink:0">' + _abbrevUnit(p.unit) + '</span>' +
       '</div></div>';
   }).join("");
 
@@ -403,7 +420,7 @@ window._fecharTurno = async function() {
     '<div style="max-height:300px;overflow-y:auto;margin-bottom:14px">' + rows + '</div>' +
     '<div class="form-actions">' +
     '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
-    '<button class="btn btn-primary btn-full" onclick="window._confirmarFecho()" style="background:#dc2626">' +
+    '<button class="btn btn-primary btn-full" onclick="window._confirmarFecho()" style="background:var(--text3)">' +
     '<i data-lucide="log-out"></i> Fechar turno</button>' +
     '</div>');
   refreshIcons(el("modal-box"));

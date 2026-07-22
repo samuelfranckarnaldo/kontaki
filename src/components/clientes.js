@@ -704,29 +704,27 @@ function renderFiadosPanel(myFiados, clientName) {
     const entryIconColor = paid ? "var(--success)" : cancelled ? "var(--text4)" : overdue ? "var(--danger-muted)" : "var(--warning)";
     const borderColor = paid ? "var(--success)" : cancelled ? "var(--border2)" : overdue ? "var(--danger-muted)" : "var(--warning)";
 
-    return `<div class="fc-credit-card${cancelled?" fc-credit-card--cancelled":""}" style="border-left:3px solid ${borderColor}">
-      <div class="fc-credit-avatar" style="background:${entryIconBg};color:${entryIconColor}">
+    return `<div class="produto-item" style="${cancelled?"opacity:.6":""}">
+      <div class="produto-avatar" style="background:${entryIconBg};color:${entryIconColor}">
         <i data-lucide="${entryIcon}"></i>
       </div>
-      <div class="fc-credit-info">
-        <div class="fiado-entry-title-wrap">
-          <span class="fiado-entry-title">${title}</span>
-          ${overdue ? `<span class="fiado-overdue-chip">Atrasado há ${days} ${days===1?"dia":"dias"}</span>` : ""}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <div class="produto-name">${title}</div>
+          ${overdue ? `<span class="produto-badge produto-badge-zero">Atrasado ${days}d</span>` : ""}
         </div>
-        <div class="fc-credit-meta">${metaParts.join(" · ")}</div>
+        <div class="produto-meta">${metaParts.join(" · ")}</div>
+        <div class="produto-price" style="margin-top:4px;color:${amountColor};${cancelled?"text-decoration:line-through":""}">${fmt(f.amount)}</div>
       </div>
-      <div class="fc-credit-right">
-        <span class="fiado-entry-amount${sizeMod("fiado-entry-amount", fmt(f.amount))}" style="color:${amountColor};${cancelled?"text-decoration:line-through":""}">${fmt(f.amount)}</span>
-        ${f.status === "open" ? `
-          <button class="fiado-kebab-btn-sm" onclick="window._openFiadoActions(${f.id})">
-            <i data-lucide="more-vertical" style="width:15px;height:15px"></i>
-          </button>` : ""
-        }
-      </div>
+      ${f.status === "open" ? `
+        <button class="produto-menu-btn" onclick="window._openFiadoActions(${f.id})">
+          <i data-lucide="more-vertical"></i>
+        </button>` : ""
+      }
     </div>`;
   }).join("");
 
-  return actions + `<div class="fc-credit-list">${rows}</div>`;
+  return actions + `<div class="list-card">${rows}</div>`;
 }
 
 window._openFiadoActions = (id) => {

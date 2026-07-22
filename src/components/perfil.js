@@ -2696,6 +2696,12 @@ function startLicenseCountdown(lic) {
     return "Expira em " + d + " dias";
   }
 
+  var iconEl = document.querySelector(".perfil-lic-icon");
+  if (iconEl && !iconEl.querySelector("[data-lucide]")) {
+    iconEl.innerHTML = '<i data-lucide="award"></i>';
+    refreshIcons(iconEl);
+  }
+
   function render() {
     if (lic.status === "expired" || (lic.daysLeft != null && lic.daysLeft <= 0 && lic.expiresAt)) {
       titleEl.textContent = "Licença expirada";
