@@ -512,7 +512,7 @@ window._openEstoqueItem = async (id) => {
 
 window._estoqueAddProduct = async () => {
   const mod = await import("./produtos.js");
-  mod.openProductForm({});
+  mod.openProductForm({}, { onCreated: () => { _estRefreshData(); } });
 };
 
 window._estComprar = async () => {

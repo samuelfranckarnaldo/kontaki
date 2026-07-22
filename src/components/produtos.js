@@ -941,6 +941,7 @@ window._saveProduto = async (id) => {
       await addStockMovement({ productId:newId, productName:name, type:"purchase", location:"warehouse", qty:initialWh, reference:"create", note:"Stock inicial armazem", sessionId:null });
     }
     toast("Produto adicionado!","success");
+    if (_pfOnCreated) { const cb = _pfOnCreated; _pfOnCreated = null; cb(newId); }
   }
   closeModal();
   products = await db.getAll("products");
