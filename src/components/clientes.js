@@ -553,10 +553,10 @@ async function renderFiadosList(showSkeleton) {
   const totalStr = fmt(total);
   const totalSizeClass = totalStr.length >= 16 ? " hist-hero-val--xs" : totalStr.length >= 13 ? " hist-hero-val--sm" : "";
   el("fiados-total-bar").innerHTML =
-    `<div class="hist-hero">
+    `<div class="hist-hero" style="padding-top:26px;padding-bottom:26px">
       <div class="hist-hero-label">Total em crédito</div>
       <div class="hist-hero-val${totalSizeClass}">${totalStr}</div>
-      <div class="hist-hero-sub">em aberto · ${uniqueClients} ${uniqueClients===1?"cliente":"clientes"}</div>
+      <div class="hist-hero-sub" style="margin-top:8px">em aberto · ${uniqueClients} ${uniqueClients===1?"cliente":"clientes"}</div>
     </div>`;
 
   const q = (search ? search.value : "").toLowerCase();

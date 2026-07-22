@@ -89,7 +89,7 @@ async function openFiadoAdd(prefillName = "", prefillPhone = "") {
     if (found) phoneVal = found.phone;
   }
 
-  openModal("Registar Fiado",
+  openModal("Registar Crédito",
     `<div style="display:flex;flex-direction:column;gap:14px">
       <div class="field">
         <label>Nome do cliente *</label>
