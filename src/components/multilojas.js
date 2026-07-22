@@ -5,12 +5,12 @@ import { _statCard } from "./produtos.js";
 var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
 var _mlActiveTab = "resumo";
-var _mlSelectedStoreId = null;
+var _mlSelectedStoreId = "all"; // "all" ou o id (uuid) de uma loja
+var _mlStoresCache = null;      // [{id, name, status, lastSeenAt, salesThisMonth}, ...]
 var _mlChartInstance = null;
 
 var TABS = [
   { key: "resumo",     label: "Resumo" },
-  { key: "lojas",      label: "Lojas" },
   { key: "incidentes", label: "Incidentes" },
   { key: "escritorio", label: "Escritório" },
   { key: "registros",  label: "Registos" },
@@ -26,24 +26,38 @@ function _renderTabs() {
   if (!wrap) return;
   wrap.innerHTML = TABS.map(function(t) {
     var active = _mlActiveTab === t.key;
-    return '<button onclick="window._mlSwitchTab(\'' + t.key + '\')" style="flex:1;padding:9px 4px;border:none;border-radius:8px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;background:' + (active ? "#fff" : "transparent") + ';color:' + (active ? "#5b21b6" : "#71717a") + ';box-shadow:' + (active ? "0 1px 3px rgba(0,0,0,.08)" : "none") + '">' + t.label + '</button>';
+    return '<button onclick="window._mlSwitchTab(\'' + t.key + '\')" style="flex:1;padding:9px 4px;border:none;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;background:' + (active ? "#fff" : "transparent") + ';color:' + (active ? "#5b21b6" : "#71717a") + ';box-shadow:' + (active ? "0 1px 3px rgba(0,0,0,.08)" : "none") + '">' + t.label + '</button>';
   }).join("");
+}
+
+function _renderStoreSelector() {
+  var wrap = document.getElementById("multilojas-store-selector");
+  if (!wrap || !_mlStoresCache) return;
+
+  var options = '<option value="all"' + (_mlSelectedStoreId === "all" ? ' selected' : '') + '>Todas as lojas</option>' +
+    _mlStoresCache.map(function(s) {
+      return '<option value="' + s.id + '"' + (_mlSelectedStoreId === s.id ? ' selected' : '') + '>' + s.name + '</option>';
+    }).join("");
+
+  wrap.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:10px 12px;margin-bottom:14px">' +
+      '<i data-lucide="store" style="width:16px;height:16px;color:var(--text3);flex-shrink:0"></i>' +
+      '<select onchange="window._mlSelectStore(this.value)" style="flex:1;border:none;outline:none;font-family:inherit;font-size:13px;font-weight:700;color:var(--text);background:transparent;-webkit-appearance:none;appearance:none">' +
+        options +
+      '</select>' +
+      '<i data-lucide="chevron-down" style="width:14px;height:14px;color:var(--text4);flex-shrink:0"></i>' +
+    '</div>';
+  refreshIcons(wrap);
 }
 
 window._mlSwitchTab = function(tab) {
   _mlActiveTab = tab;
-  _mlSelectedStoreId = null;
   _renderTabs();
   _renderContent();
 };
 
-window._mlOpenStore = function(storeId) {
+window._mlSelectStore = function(storeId) {
   _mlSelectedStoreId = storeId;
-  _renderContent();
-};
-
-window._mlBackToStoreList = function() {
-  _mlSelectedStoreId = null;
   _renderContent();
 };
 
@@ -67,28 +81,45 @@ function _comingSoonHtml(label) {
 export async function loadMultilojas() {
   var btn = document.getElementById("btn-back-multilojas");
   if (btn) btn.onclick = function() { window._showSubpage(null); };
+
   _mlActiveTab = "resumo";
-  _mlSelectedStoreId = null;
+  _mlSelectedStoreId = "all";
   _renderTabs();
+
+  await _loadStoresList();
+  _renderStoreSelector();
   await _renderContent();
+}
+
+async function _loadStoresList() {
+  var code = await _getLicenseCode();
+  if (!code) { _mlStoresCache = []; return; }
+
+  try {
+    var res = await fetch(CONSOLE_API + "/reports/multi-store/stores?code=" + encodeURIComponent(code));
+    if (!res.ok) { _mlStoresCache = []; return; }
+    var data = await res.json();
+    _mlStoresCache = (data && data.success) ? data.stores : [];
+  } catch (e) {
+    _mlStoresCache = [];
+  }
 }
 
 async function _renderContent() {
   var wrap = document.getElementById("multilojas-content");
   if (!wrap) return;
 
-  if (_mlActiveTab === "resumo") return _renderResumo(wrap);
-  if (_mlActiveTab === "lojas") {
-    return _mlSelectedStoreId ? _renderStoreDetail(wrap, _mlSelectedStoreId) : _renderStoreList(wrap);
+  if (_mlActiveTab === "resumo") {
+    return _mlSelectedStoreId === "all" ? _renderResumoAgregado(wrap) : _renderResumoLoja(wrap, _mlSelectedStoreId);
   }
   if (_mlActiveTab === "incidentes") { wrap.innerHTML = _comingSoonHtml("A análise de incidentes entre lojas"); refreshIcons(wrap); return; }
   if (_mlActiveTab === "escritorio") { wrap.innerHTML = _comingSoonHtml("A geração de catálogo para envio à loja"); refreshIcons(wrap); return; }
   if (_mlActiveTab === "registros")  { wrap.innerHTML = _comingSoonHtml("O registo de auditoria por funcionário"); refreshIcons(wrap); return; }
 }
 
-// ── RESUMO ───────────────────────────────────────────────────────────────
+// ── RESUMO — TODAS AS LOJAS ────────────────────────────────────────────
 
-async function _renderResumo(wrap) {
+async function _renderResumoAgregado(wrap) {
   wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
 
   var code = await _getLicenseCode();
@@ -121,8 +152,8 @@ async function _renderResumo(wrap) {
     '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px 12px 8px;margin-bottom:20px;height:200px"><canvas id="ml-trend-canvas"></canvas></div>' +
 
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px">' +
-      _statCard({ label: "Total geral", value: fmt(data.grandTotal), sub: "últimos 30 dias", color: "var(--text)", icon: "banknote" }) +
-      _statCard({ label: "Lojas ativas", value: data.storeCount, sub: "na empresa", color: "var(--text)", icon: "store" }) +
+      _statCard({ label: "Total geral", value: fmt(data.grandTotal), sub: "últimos 30 dias", color: "var(--bg)", iconColor: "var(--text3)", icon: "banknote" }) +
+      _statCard({ label: "Lojas ativas", value: data.storeCount, sub: "na empresa", color: "var(--bg)", iconColor: "var(--text3)", icon: "store" }) +
     '</div>' +
 
     (multiStore ? (
@@ -131,7 +162,7 @@ async function _renderResumo(wrap) {
         data.ranking.map(function(r, i) {
           var maxTotal = data.ranking[0].total || 1;
           var pct = Math.round((r.total / maxTotal) * 100);
-          return '<div style="margin-bottom:' + (i < data.ranking.length - 1 ? '14px' : '0') + '">' +
+          return '<button onclick="window._mlSelectStore(\'' + r.id + '\')" style="width:100%;text-align:left;border:none;background:none;font-family:inherit;cursor:pointer;padding:0;margin-bottom:' + (i < data.ranking.length - 1 ? '14px' : '0') + '">' +
             '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">' +
               '<span style="font-size:13px;font-weight:700;color:var(--text)">' + (i + 1) + '. ' + r.name + '</span>' +
               '<span style="font-size:12px;font-weight:700;color:var(--text2)">' + fmt(r.total) + '</span>' +
@@ -139,7 +170,7 @@ async function _renderResumo(wrap) {
             '<div style="height:6px;background:#f4f4f5;border-radius:3px;overflow:hidden">' +
               '<div style="height:100%;width:' + pct + '%;background:var(--primary,#5b21b6);border-radius:3px"></div>' +
             '</div>' +
-          '</div>';
+          '</button>';
         }).join("") +
       '</div>'
     ) : (
@@ -196,56 +227,7 @@ function _renderTrendChart(days, values) {
   });
 }
 
-// ── LOJAS ────────────────────────────────────────────────────────────────
-
-async function _renderStoreList(wrap) {
-  wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
-
-  var code = await _getLicenseCode();
-  if (!code) { wrap.innerHTML = _errorHtml("Licença não encontrada."); return; }
-
-  var res;
-  try {
-    res = await fetch(CONSOLE_API + "/reports/multi-store/stores?code=" + encodeURIComponent(code));
-  } catch (e) {
-    wrap.innerHTML = _errorHtml("Sem ligação à internet. Verifica a rede e tenta novamente.");
-    return;
-  }
-
-  if (!res.ok) {
-    var errData = await res.json().catch(function() { return {}; });
-    wrap.innerHTML = _errorHtml(errData.error || "Erro ao carregar as lojas.");
-    return;
-  }
-
-  var data = await res.json();
-  if (!data || !data.success) { wrap.innerHTML = _errorHtml("Resposta inválida do servidor."); return; }
-
-  if (!data.stores.length) {
-    wrap.innerHTML = '<div class="empty-state"><div class="empty-state-title">Nenhuma loja encontrada</div></div>';
-    return;
-  }
-
-  wrap.innerHTML = '<div style="display:flex;flex-direction:column;gap:10px">' +
-    data.stores.map(function(s) {
-      var statusColor = s.status === "active" ? "var(--success,#16a34a)" : "var(--text4)";
-      var lastSeen = s.lastSeenAt ? _relativeTime(s.lastSeenAt) : "nunca sincronizada";
-      return '<button onclick="window._mlOpenStore(\'' + s.id + '\')" style="text-align:left;background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;align-items:center">' +
-        '<div>' +
-          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">' +
-            '<span style="width:7px;height:7px;border-radius:50%;background:' + statusColor + '"></span>' +
-            '<span style="font-size:14px;font-weight:700;color:var(--text)">' + s.name + '</span>' +
-          '</div>' +
-          '<div style="font-size:11px;color:var(--text4)">' + lastSeen + '</div>' +
-        '</div>' +
-        '<div style="text-align:right">' +
-          '<div style="font-size:13px;font-weight:700;color:var(--text2)">' + fmt(s.salesThisMonth) + '</div>' +
-          '<div style="font-size:10.5px;color:var(--text4)">este mês</div>' +
-        '</div>' +
-      '</button>';
-    }).join("") +
-  '</div>';
-}
+// ── RESUMO — UMA LOJA ───────────────────────────────────────────────────
 
 function _relativeTime(iso) {
   var diffMs = Date.now() - new Date(iso).getTime();
@@ -258,7 +240,7 @@ function _relativeTime(iso) {
   return "há " + days + " dia" + (days !== 1 ? "s" : "");
 }
 
-async function _renderStoreDetail(wrap, storeId) {
+async function _renderResumoLoja(wrap, storeId) {
   wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
 
   var code = await _getLicenseCode();
@@ -284,16 +266,12 @@ async function _renderStoreDetail(wrap, storeId) {
   var totalVendas = data.sales.reduce(function(a, s) { return a + (s.total || 0); }, 0);
 
   wrap.innerHTML =
-    '<button onclick="window._mlBackToStoreList()" style="border:none;background:none;color:var(--primary,#5b21b6);font-size:13px;font-weight:700;padding:0 0 12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">' +
-      '<i data-lucide="chevron-left" style="width:16px;height:16px"></i> Lojas' +
-    '</button>' +
-
     '<div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:2px">' + data.store.name + '</div>' +
     '<div style="font-size:12px;color:var(--text4);margin-bottom:20px">' + (data.store.lastSeenAt ? _relativeTime(data.store.lastSeenAt) : "nunca sincronizada") + '</div>' +
 
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px">' +
-      _statCard({ label: "Vendas", value: fmt(totalVendas), sub: "últimos registos", color: "var(--text)", icon: "shopping-bag" }) +
-      _statCard({ label: "Transações", value: data.sales.length, sub: "sincronizadas", color: "var(--text)", icon: "receipt" }) +
+      _statCard({ label: "Vendas", value: fmt(totalVendas), sub: "últimos registos", color: "var(--bg)", iconColor: "var(--text3)", icon: "shopping-bag" }) +
+      _statCard({ label: "Transações", value: data.sales.length, sub: "sincronizadas", color: "var(--bg)", iconColor: "var(--text3)", icon: "receipt" }) +
     '</div>' +
 
     '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Produtos mais vendidos</div>' +
