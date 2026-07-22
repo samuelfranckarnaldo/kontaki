@@ -211,7 +211,7 @@ export function showRevokedLockout() {
     '<i data-lucide="shield-off" style="width:48px;height:48px;color:#dc2626;margin-bottom:20px"></i>' +
     '<div style="font-size:19px;font-weight:800;color:#1A1425;margin-bottom:10px">Conta suspensa</div>' +
     '<div style="font-size:14px;color:#6E6680;line-height:1.6;max-width:320px;margin-bottom:28px">A tua licença foi revogada pela Introxeer. Contacta-nos para reactivar o acesso ao Kontaki.</div>' +
-    '<a href="https://wa.me/244900000000" style="display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;font-weight:700;font-size:13.5px;padding:12px 24px;border-radius:999px;text-decoration:none">' +
+    '<a href="https://wa.me/244934923166" style="display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;font-weight:700;font-size:13.5px;padding:12px 24px;border-radius:999px;text-decoration:none">' +
       '<i data-lucide="message-circle" style="width:16px;height:16px"></i> Falar no WhatsApp' +
     '</a>';
   document.body.appendChild(ov);

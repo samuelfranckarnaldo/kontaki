@@ -2320,7 +2320,7 @@ async function loadAssinatura() {
   contactEl.style.cssText = "text-align:center;padding:16px 0 20px";
   contactEl.innerHTML =
     '<div style="font-size:12px;color:var(--text4);margin-bottom:12px;line-height:1.5">Para adquirir ou renovar um plano,<br>contacta a <strong style="color:var(--primary)">Introxeer</strong>:</div>' +
-    '<a href="https://wa.me/244900000000" style="display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;font-weight:700;font-size:13.5px;padding:12px 24px;border-radius:999px;text-decoration:none;box-shadow:0 6px 18px rgba(37,211,102,.32)">' +
+    '<a href="https://wa.me/244934923166" style="display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;font-weight:700;font-size:13.5px;padding:12px 24px;border-radius:999px;text-decoration:none;box-shadow:0 6px 18px rgba(37,211,102,.32)">' +
       '<i data-lucide="message-circle" style="width:16px;height:16px"></i> Falar no WhatsApp' +
     '</a>';
   wrap.appendChild(contactEl);
@@ -2408,7 +2408,7 @@ window._reportarProblema = function() {
   var msg = document.getElementById("report-msg");
   if (!msg||!msg.value.trim()) { toast("Descreve o problema primeiro.","error"); return; }
   var text = "Kontaki Bug Report:\n\n"+msg.value.trim();
-  var wa = "https://wa.me/244900000000?text="+encodeURIComponent(text);
+  var wa = "https://wa.me/244934923166?text="+encodeURIComponent(text);
   window.open(wa,"_blank");
 };
 
