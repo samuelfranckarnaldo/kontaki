@@ -642,19 +642,26 @@ function _liveStatusHtml() {
 // restantes (backup, stock mínimo, fiados vencidos, conflitos) dependem
 // de entidades ainda não sincronizadas (Fase 3) e devem ser substituídos
 // por cálculos reais antes de ir para produção.
-function _mockHealthSignals(store) {
-  // Determinístico por loja (mesmo id → mesmo resultado), para o design
-  // não "saltar" a cada re-render.
+function _mockHealthSignals(store, stock) {
+  // Determinístico por loja (mesmo id → mesmo resultado), para os sinais
+  // ainda mocados não "saltarem" a cada re-render.
   var seed = (store.id || "").split("").reduce(function(a, c) { return a + c.charCodeAt(0); }, 0);
   var pseudoRandom = function(offset) { return ((seed + offset) % 100) / 100; };
 
   var minsAgo = store.lastSeenAt ? (Date.now() - new Date(store.lastSeenAt).getTime()) / 60000 : Infinity;
 
+  var stockAvailable = stock && stock.available;
+  var lowStockCount = stockAvailable ? stock.lowStockCount : 0;
+  var stockOk = stockAvailable ? lowStockCount === 0 : pseudoRandom(3) > 0.3;
+  var stockDetail = stockAvailable
+    ? (lowStockCount === 0 ? "Sem produtos abaixo do mínimo" : lowStockCount + " produto" + (lowStockCount !== 1 ? "s" : "") + " abaixo do stock mínimo")
+    : (pseudoRandom(3) > 0.3 ? "Sem produtos abaixo do mínimo" : "2 produtos abaixo do stock mínimo");
+
   return [
     { key: "sync",     label: "Última sincronização",      ok: minsAgo <= 30,        detail: isFinite(minsAgo) ? _relativeTime(store.lastSeenAt) : "nunca sincronizada", real: true },
     { key: "backup",   label: "Backup atualizado",          ok: pseudoRandom(1) > 0.2, detail: pseudoRandom(1) > 0.2 ? "Backup feito há menos de 24h" : "Sem backup recente", real: false },
     { key: "conflicts",label: "Sem conflitos de dados",     ok: pseudoRandom(2) > 0.15, detail: pseudoRandom(2) > 0.15 ? "Nenhum conflito detetado" : "1 conflito de storeId por resolver", real: false },
-    { key: "stock",    label: "Stock consistente",          ok: pseudoRandom(3) > 0.3, detail: pseudoRandom(3) > 0.3 ? "Sem produtos abaixo do mínimo" : "2 produtos abaixo do stock mínimo", real: false },
+    { key: "stock",    label: "Stock consistente",          ok: stockOk, detail: stockDetail, real: stockAvailable },
     { key: "caixa",    label: "Caixa reconciliado",         ok: pseudoRandom(4) > 0.25, detail: pseudoRandom(4) > 0.25 ? "Sem divergências no último fecho" : "Divergência de -2 500 Kz no último turno", real: false },
     { key: "fiados",   label: "Fiados em dia",              ok: pseudoRandom(5) > 0.35, detail: pseudoRandom(5) > 0.35 ? "Sem fiados vencidos" : "1 fiado vencido há mais de 30 dias", real: false },
   ];
@@ -665,8 +672,8 @@ function _computeHealthScore(signals) {
   return Math.round((okCount / signals.length) * 100);
 }
 
-function _healthScoreHtml(store) {
-  var signals = _mockHealthSignals(store);
+function _healthScoreHtml(store, stock) {
+  var signals = _mockHealthSignals(store, stock);
   var score = _computeHealthScore(signals);
   var scoreColor = score >= 85 ? "var(--success,#16a34a)" : score >= 60 ? "var(--warning,#d97706)" : "var(--danger,#dc2626)";
 
@@ -744,7 +751,7 @@ async function _renderResumoLoja(wrap, storeId) {
       _statCard({ label: "Transações", value: data.sales.length, sub: "sincronizadas", color: "var(--bg)", iconColor: "var(--text3)", icon: "receipt" }) +
     '</div>' +
 
-    _healthScoreHtml(data.store) +
+    _healthScoreHtml(data.store, data.stock) +
 
     '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Produtos mais vendidos</div>' +
     (data.topProducts.length
@@ -775,8 +782,8 @@ async function _renderResumoLoja(wrap, storeId) {
 
     '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Outros dados</div>' +
     '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;display:flex;flex-direction:column;gap:10px">' +
-      _pendingRow("Produtos", data.products.message) +
-      _pendingRow("Stock", data.stock.message) +
+      _pendingRow("Produtos", data.products.available ? (data.products.count + " sincronizados") : data.products.message) +
+      _pendingRow("Stock", data.stock.available ? (data.stock.lowStockCount + " abaixo do mínimo") : data.stock.message) +
       _pendingRow("Clientes", data.customers.message) +
       _pendingRow("Despesas", data.expenses.message) +
     '</div>';
