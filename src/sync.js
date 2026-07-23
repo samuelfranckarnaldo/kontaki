@@ -42,10 +42,10 @@ export async function syncRegister() {
 
   try {
     var licenseCode = await getLicenseCode();
-    if (!licenseCode) return;
+    if (!licenseCode) { logger.warn("[sync] syncRegister abortado: sem licenseCode"); return; }
 
     var storeId = await getStoreId();
-    if (!storeId) return;
+    if (!storeId) { logger.warn("[sync] syncRegister abortado: sem storeId"); return; }
 
     var deviceId = await getDeviceId();
     var pInfo = getPlatformInfo();
@@ -63,13 +63,19 @@ export async function syncRegister() {
       }),
     });
 
-    if (!res.ok) return;
-    var data = await res.json();
+    var resBody = await res.text();
+    if (!res.ok) {
+      logger.error("[sync] syncRegister falhou: status=" + res.status + " body=" + resBody.slice(0, 300));
+      return;
+    }
+
+    var data = JSON.parse(resBody);
+    logger.info("[sync] syncRegister OK: storeUuid=" + (data && data.storeUuid) + " conflict=" + (data && data.conflict));
     if (data && data.conflict) {
-      console.warn("[sync] storeId em conflito com o registado no Console — contacta o suporte.");
+      logger.warn("[sync] storeId em conflito com o registado no Console");
     }
   } catch (e) {
-    // offline ou falha de rede — tenta novamente no próximo gatilho
+    logger.error("[sync] syncRegister erro de rede/execução", e);
   }
 }
 
