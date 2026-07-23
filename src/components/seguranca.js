@@ -1,6 +1,6 @@
 import { db }                from "../db.js";
 import { toast }             from "../toast.js";
-import { openModal, closeModal } from "../modal.js";
+import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { refreshIcons }      from "../utils.js";
 import { storeKeyService }   from "../services.js";
 import { getUser }           from "../auth.js";
@@ -196,12 +196,16 @@ async function renderSeguranca() {
 window._regenerateRecoveryCodes = async function() {
   const user = getUser();
   if (!user) return;
-  if (!confirm("Gerar um novo conjunto de 10 códigos? Os códigos antigos deixam de funcionar.")) return;
-
-  const codes = await generateCodesForUser(user.id);
-  showRecoveryCodesScreen(codes, function() {
-    renderSeguranca();
-  });
+  confirmDialog(
+    "Gerar um novo conjunto de 10 códigos? Os códigos antigos deixam de funcionar.",
+    async function() {
+      const codes = await generateCodesForUser(user.id);
+      showRecoveryCodesScreen(codes, function() {
+        renderSeguranca();
+      });
+    },
+    { danger: true, confirmText: "Gerar" }
+  );
 };
 
 let _keyFileData = null;

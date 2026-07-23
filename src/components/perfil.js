@@ -820,7 +820,7 @@ window._generateInviteQR = async function() {
     var { generateQR } = await import("../utils.js");
     generateQR(JSON.stringify(payload), qrBox, 180);
   } catch (err) {
-    alert(err.message || "Erro ao gerar convite.");
+    toast(err.message || "Erro ao gerar convite.", "error");
   }
 };
 

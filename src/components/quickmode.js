@@ -215,7 +215,7 @@ function renderQmCart() {
       </div>
       <div style="display:flex;align-items:center;border:1.5px solid #e4e4e7;border-radius:8px;overflow:hidden;flex-shrink:0">
         <button onclick="window._qmChangeQty(${item.id},-1)"
-                style="width:32px;height:32px;background:#f4f4f5;border:none;color:#5b21b6;
+                style="width:32px;height:32px;background:#f4f4f5;border:none;color:#18181b;
                        cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">
           <i data-lucide="minus" style="width:14px;height:14px"></i>
         </button>
@@ -223,7 +223,7 @@ function renderQmCart() {
                      border-left:1px solid #e4e4e7;border-right:1px solid #e4e4e7;
                      padding:6px 0;display:block">${item.qty}</span>
         <button onclick="window._qmChangeQty(${item.id},1)"
-                style="width:32px;height:32px;background:#f4f4f5;border:none;color:#5b21b6;
+                style="width:32px;height:32px;background:#f4f4f5;border:none;color:#18181b;
                        cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">
           <i data-lucide="plus" style="width:14px;height:14px"></i>
         </button>

@@ -595,8 +595,19 @@ export const ktkService = {
       isImported:true, hashLegacy:rec.hashResult?.legacy,
       lojaId:ktk.loja_id, lojaNome:ktk.loja_nome,
     });
+    // ADR-0005: resolve productId local antes de gravar o movimento importado —
+    // sem isto, o registo ficava com o productId do dispositivo de ORIGEM, que
+    // so por acidente de ordem de criacao corresponde ao produto certo no
+    // destino. Usa catalogId (identidade global) quando presente; recua para
+    // m.productId bruto so em .ktk legado (2.0/sem catalogId), mantendo o
+    // comportamento anterior nesse caso — nao ha identidade global para
+    // resolver, e nao e este ADR que decide politica de correspondencia.
     for(const m of (ktk.stock_movements||[])) {
-      await db.add("stockMovements",{...m,sessionId,userId:ktk.funcionario_id,imported:true,createdAt:m.createdAt||new Date().toISOString()});
+      let localProductId = m.productId;
+      if (m.catalogId && productByCatalogId[m.catalogId]) {
+        localProductId = productByCatalogId[m.catalogId].id;
+      }
+      await db.add("stockMovements",{...m,productId:localProductId,sessionId,userId:ktk.funcionario_id,imported:true,createdAt:m.createdAt||new Date().toISOString()});
     }
     for(const inc of (ktk.incidentes||[])) {
       await db.add("incidents",{

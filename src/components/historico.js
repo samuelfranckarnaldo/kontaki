@@ -308,11 +308,14 @@ function updatePeriodTrigger(sc, offset, dates) {
 }
 
 function renderTabs() {
+  var user = getUser();
   var tabs = [
     { id:"geral",     label:"Geral"     },
     { id:"stock",     label:"Stock"     },
-    { id:"auditoria", label:"Auditoria" },
   ];
+  if (user && user.role === "admin") {
+    tabs.push({ id:"auditoria", label:"Auditoria" });
+  }
   var wrap = el("historico-tabs");
   if (!wrap) return;
   wrap.innerHTML = tabs.map(function(t) {
@@ -371,7 +374,10 @@ async function loadData() {
 
   if (activeTab === "geral")     await loadGeral(from, to);
   if (activeTab === "stock")     await loadStock(from, to);
-  if (activeTab === "auditoria") await loadAuditoria(from, to);
+  if (activeTab === "auditoria") {
+    var _u = getUser();
+    if (_u && _u.role === "admin") await loadAuditoria(from, to);
+  }
 
   var searchWrapDone = el("hist-search-wrap");
   if (searchWrapDone) searchWrapDone.classList.remove("hist-skel");

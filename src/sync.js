@@ -1,4 +1,5 @@
 import { db } from "./db.js";
+import { logger } from "./logger.js";
 
 var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
@@ -149,5 +150,61 @@ export async function syncSales() {
     }
   } catch (e) {
     // offline ou falha de rede — a fila fica intacta para o próximo gatilho
+  }
+}
+
+// ── SINCRONIZAÇÃO DE PRODUTOS (snapshot completo) ───────────────────────
+// Ao contrário de vendas (fila incremental), produtos são poucos e mudam
+// em vários sítios do código sem updatedAt consistente. Por isso, em vez
+// de perseguir cada ponto de escrita, envia-se sempre o estado completo
+// dos produtos ativos. O Console faz upsert por (store_id, local_id).
+export async function syncProducts() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+
+  try {
+    var storeId = await getStoreId();
+    var licenseCode = await getLicenseCode();
+    if (!storeId || !licenseCode) {
+      logger.warn("[sync] syncProducts abortado: storeId=" + storeId + " licenseCode=" + licenseCode);
+      return;
+    }
+
+    var products = await db.getAll("products");
+    var active = products.filter(function(p) { return p.active; });
+    logger.info("[sync] syncProducts: " + active.length + " produtos ativos de " + products.length + " total");
+
+    var deviceId = await getDeviceId();
+
+    var res = await fetch(CONSOLE_API + "/sync/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        storeId: storeId,
+        licenseCode: licenseCode,
+        deviceId: deviceId,
+        products: active.map(function(p) {
+          return {
+            localId: p.id,
+            name: p.name,
+            category: p.category || null,
+            price: p.price || 0,
+            costPrice: p.costPrice || 0,
+            stock: p.stock || 0,
+            warehouseStock: p.warehouseStock || 0,
+            minStock: p.minStock || 5,
+            unit: p.unit || null,
+          };
+        }),
+      }),
+    });
+
+    var resBody = await res.text();
+    if (!res.ok) {
+      logger.error("[sync] syncProducts falhou: status=" + res.status + " body=" + resBody.slice(0, 300));
+      return;
+    }
+    logger.info("[sync] syncProducts OK: status=" + res.status);
+  } catch (e) {
+    logger.error("[sync] syncProducts erro de rede/execução", e);
   }
 }

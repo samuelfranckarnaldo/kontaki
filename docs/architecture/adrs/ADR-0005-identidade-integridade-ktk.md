@@ -1,6 +1,9 @@
 # ADR-0005 — Identidade e Integridade do Payload `.ktk`
 
-**Estado:** Proposta
+**Estado:** Implementado e revisto por inspeção de código.
+Pendente: validação em ambiente real com dois dispositivos e importação
+de `.ktk` contendo `catalogId` divergente (fica para bateria de testes
+com o Guelord, junto com o resto do módulo de Tesouraria).
 **Data:** 2026-07-14
 **Âmbito:** `services.js` (`closeSession`, `ktkService.generate`,
 `ktkService.confirmImport`, `generateKtkHash`), `db.js` (`clients`)

@@ -92,6 +92,13 @@ window._dpPick = function (dateStr) {
   closeDatePicker();
 };
 
+export function openField(input, title, onChange) {
+  openDatePicker(title || "Selecionar data", input.value, function(dateStr) {
+    input.value = dateStr;
+    if (onChange) onChange(dateStr);
+  });
+}
+
 export function openDatePicker(title, currentValue, onSelect) {
   ensureDatePickerDOM();
   var ov = document.getElementById("dp-overlay");
