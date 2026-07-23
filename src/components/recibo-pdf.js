@@ -514,4 +514,4 @@ export async function partilharReciboPDF(saleId) {
   }, "image/png");
 }
 
-export { printReciboHTML, payMethodLabel, totalExtenso };
+export { printReciboHTML, payMethodLabel, totalExtenso, getSkuMap };

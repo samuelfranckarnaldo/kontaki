@@ -57,7 +57,11 @@ async function boot() {
   initModal();
   await loadLicense();
 
-  import("./sync.js").then(function(m) { m.syncRegister(); }).catch(function() {});
+  import("./sync.js").then(function(m) {
+    return m.syncRegister()
+      .then(function(){ return m.syncSales(); })
+      .then(function(){ return m.syncProducts(); });
+  }).catch(function() {});
 
   const users = await db.getAll("users");
 

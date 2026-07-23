@@ -1,20 +1,12 @@
 {
   "name": "kontaki",
   "version": "1.0.0",
-  "description": "Sistema de gestão de vendas e inventário",
-  "main": "index.js",
+  "description": "Software POS ERP Empresarial",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "build:apk": "eas build --platform android --local"
+    "start": "node server.js",
+    "cap:sync": "npx cap sync",
+    "cap:open": "npx cap open android",
+    "cap:build": "cd android && ./gradlew assembleDebug"
   },
-  "dependencies": {
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.23.0"
-  }
+  "dependencies": {}
 }
