@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { openField } from "../date-picker.js";
 import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
@@ -509,7 +510,7 @@ function _cpRenderForm() {
       <div class="field-row">
         <div class="field">
           <label>Data da compra</label>
-          <input type="date" id="cp-date" value="${_cpState.dateStr}" oninput="window._cpFieldSet('dateStr',this.value)"/>
+          <input type="text" id="cp-date" readonly value="${_cpState.dateStr}" onclick="window._openDateField(this, 'Data da compra', function(v){ window._cpFieldSet('dateStr', v); })"/>
         </div>
         <div class="field">
           <label>Referência / Factura</label>
@@ -815,6 +816,7 @@ window._saveCompra = async () => {
 };
 
 window._closeModal = closeModal;
+window._openDateField = openField;
 
 window._deleteSupplier = async (id) => {
   const purchases = await db.getAll("purchases");

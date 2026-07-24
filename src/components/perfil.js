@@ -15,6 +15,7 @@ import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { openPicker } from "../picker.js";
+import { openField } from "../date-picker.js";
 import { generateInvite } from "../invite.js";
 import { getUser, logout, changePasswordAuth, createUser, resetUserPin } from "../auth.js";
 import { generateCodesForUser } from "../recovery-codes.js";
@@ -1032,6 +1033,7 @@ window._togglePinField = function(id, btn) {
 };
 
 window._closeModal = closeModal;
+window._openDateField = openField;
 
 async function loadDashboardPage() {
   const btn = document.getElementById("btn-back-dashboard");
@@ -1802,8 +1804,8 @@ function openRazaoPeriodoModal(onApply) {
     }).join('') +
     '</div>' +
     '<div id="razao-periodo-custom" style="display:' + (_razaoPeriodoSel === "custom" ? "flex" : "none") + ';gap:8px;margin-bottom:12px">' +
-    '<div class="field" style="flex:1"><label>De</label><input type="date" id="razao-periodo-from" value="' + customFrom + '"/></div>' +
-    '<div class="field" style="flex:1"><label>Até</label><input type="date" id="razao-periodo-to" value="' + customTo + '"/></div>' +
+    '<div class="field" style="flex:1"><label>De</label><input type="text" id="razao-periodo-from" readonly value="' + customFrom + '" onclick="window._openDateField(this)"/></div>' +
+    '<div class="field" style="flex:1"><label>Até</label><input type="text" id="razao-periodo-to" readonly value="' + customTo + '" onclick="window._openDateField(this)"/></div>' +
     '</div>' +
     '<button class="btn btn-primary btn-full" id="razao-periodo-apply">Aplicar</button>');
   refreshIcons(el("modal-box"));

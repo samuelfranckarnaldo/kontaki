@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { openField } from "../date-picker.js";
 import { fmt, fmtDate, el, val, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
@@ -105,7 +106,7 @@ async function openFiadoAdd(prefillName = "", prefillPhone = "") {
       </div>
       <div class="field">
         <label>Vencimento (opcional)</label>
-        <input type="date" id="fa-duedate"/>
+        <input type="text" id="fa-duedate" readonly onclick="window._openDateField(this)"/>
       </div>
       <div class="field">
         <label>Notas (opcional)</label>
@@ -156,7 +157,7 @@ window._openEditFiado = async (id) => {
       </div>
       <div class="field">
         <label>Vencimento</label>
-        <input type="date" id="ef-duedate" value="${dueVal}"/>
+        <input type="text" id="ef-duedate" readonly value="${dueVal}" onclick="window._openDateField(this)"/>
       </div>
       <div class="field">
         <label>Notas</label>
@@ -293,3 +294,4 @@ window._confirmPay = async (id, fullAmt) => {
 };
 
 window._closeModal = closeModal;
+window._openDateField = openField;

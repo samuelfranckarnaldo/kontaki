@@ -3,6 +3,8 @@ import { getUser, getSession } from "../auth.js";
 import { refreshIcons, el } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
+import { openField } from "../date-picker.js";
+window._openDateField = openField;
 import { postOwnerContribution, postBankTransfer, getAccountBalance } from "../pgc.js";
 import { verifyAdminPin } from "../services.js";
 
@@ -275,7 +277,7 @@ function openAjusteModal(prefill) {
       '<div class="field"><label>Valor contado (Kz) *</label><input type="number" id="tes-ajuste-contado" placeholder="0" value="' + (prefill.contado != null ? prefill.contado : "") + '"/></div>' +
       '<div id="tes-ajuste-diff-preview" style="display:none;padding:12px;border-radius:10px;text-align:center;font-weight:700;font-size:15px"></div>' +
       '<div class="field"><label>Motivo *</label><input id="tes-ajuste-motivo" placeholder="Ex: Contagem de fecho, nota mal trocada..." value="' + (prefill.motivo || "").replace(/"/g,"&quot;") + '"/></div>' +
-      '<div class="field"><label>Data</label><input type="date" id="tes-ajuste-date" value="' + (prefill.date || new Date().toISOString().slice(0,10)) + '"/></div>' +
+      '<div class="field"><label>Data</label><input type="text" id="tes-ajuste-date" readonly value="' + (prefill.date || new Date().toISOString().slice(0,10)) + '" onclick="window._openDateField(this)"/></div>' +
       '</div>' +
       '<div class="form-actions">' +
       '<button class="btn btn-ghost btn-full" id="tes-ajuste-cancel">Cancelar</button>' +
@@ -337,7 +339,7 @@ function openReforcoModal() {
     '<i data-lucide="info" style="width:15px;height:15px;flex-shrink:0"></i> Operação sem lançamento contabilístico — o dinheiro continua na empresa, só muda de local físico.</div>' +
     '<div class="field"><label>Valor (Kz) *</label><input type="number" id="tes-reforco-amount" placeholder="0"/></div>' +
     '<div class="field"><label>Motivo *</label><input id="tes-reforco-motivo" placeholder="Ex: Reforço de troco, falta de numerário..."/></div>' +
-    '<div class="field"><label>Data</label><input type="date" id="tes-reforco-date" value="' + new Date().toISOString().slice(0,10) + '"/></div>' +
+    '<div class="field"><label>Data</label><input type="text" id="tes-reforco-date" readonly value="' + new Date().toISOString().slice(0,10) + '" onclick="window._openDateField(this)"/></div>' +
     '</div>' +
     '<div class="form-actions">' +
     '<button class="btn btn-ghost btn-full" id="tes-reforco-cancel">Cancelar</button>' +
@@ -411,7 +413,7 @@ function openSangriaModal() {
     '<i data-lucide="info" style="width:15px;height:15px;flex-shrink:0"></i> Operação sem lançamento contabilístico — o dinheiro continua na empresa, só muda de local físico.</div>' +
     '<div class="field"><label>Valor (Kz) *</label><input type="number" id="tes-sangria-amount" placeholder="0"/></div>' +
     '<div class="field"><label>Motivo *</label><input id="tes-sangria-motivo" placeholder="Ex: Excesso de numerário, entrega ao gerente..."/></div>' +
-    '<div class="field"><label>Data</label><input type="date" id="tes-sangria-date" value="' + new Date().toISOString().slice(0,10) + '"/></div>' +
+    '<div class="field"><label>Data</label><input type="text" id="tes-sangria-date" readonly value="' + new Date().toISOString().slice(0,10) + '" onclick="window._openDateField(this)"/></div>' +
     '</div>' +
     '<div class="form-actions">' +
     '<button class="btn btn-ghost btn-full" id="tes-sangria-cancel">Cancelar</button>' +
@@ -476,7 +478,7 @@ function openLevantamentoModal() {
     '<i data-lucide="landmark" style="width:15px;height:15px;flex-shrink:0"></i> Banco → Caixa</div>' +
     '<div class="field"><label>Valor (Kz) *</label><input type="number" id="tes-levantamento-amount" placeholder="0"/></div>' +
     '<div class="field"><label>Descrição</label><input id="tes-levantamento-desc" placeholder="Ex: Levantamento para troco, reforço de caixa..."/></div>' +
-    '<div class="field"><label>Data</label><input type="date" id="tes-levantamento-date" value="' + new Date().toISOString().slice(0,10) + '"/></div>' +
+    '<div class="field"><label>Data</label><input type="text" id="tes-levantamento-date" readonly value="' + new Date().toISOString().slice(0,10) + '" onclick="window._openDateField(this)"/></div>' +
     '</div>' +
     '<div class="form-actions">' +
     '<button class="btn btn-ghost btn-full" id="tes-levantamento-cancel">Cancelar</button>' +
@@ -550,7 +552,7 @@ function openDepositoModal() {
     '<i data-lucide="landmark" style="width:15px;height:15px;flex-shrink:0"></i> Caixa → Banco</div>' +
     '<div class="field"><label>Valor (Kz) *</label><input type="number" id="tes-deposito-amount" placeholder="0"/></div>' +
     '<div class="field"><label>Descrição</label><input id="tes-deposito-desc" placeholder="Ex: Depósito no BAI, fecho de caixa..."/></div>' +
-    '<div class="field"><label>Data</label><input type="date" id="tes-deposito-date" value="' + new Date().toISOString().slice(0,10) + '"/></div>' +
+    '<div class="field"><label>Data</label><input type="text" id="tes-deposito-date" readonly value="' + new Date().toISOString().slice(0,10) + '" onclick="window._openDateField(this)"/></div>' +
     '</div>' +
     '<div class="form-actions">' +
     '<button class="btn btn-ghost btn-full" id="tes-deposito-cancel">Cancelar</button>' +
@@ -622,7 +624,7 @@ function openRetiradaModal() {
     '<div style="display:flex;flex-direction:column;gap:14px">' +
     '<div class="field"><label>Valor (Kz) *</label><input type="number" id="tes-retirada-amount" placeholder="0"/></div>' +
     '<div class="field"><label>Descrição</label><input id="tes-retirada-desc" placeholder="Ex: Retirada pessoal, despesa do proprietário..."/></div>' +
-    '<div class="field"><label>Data</label><input type="date" id="tes-retirada-date" value="' + new Date().toISOString().slice(0,10) + '"/></div>' +
+    '<div class="field"><label>Data</label><input type="text" id="tes-retirada-date" readonly value="' + new Date().toISOString().slice(0,10) + '" onclick="window._openDateField(this)"/></div>' +
     '<div class="field"><label>Sai de</label>' +
       '<div style="display:flex;gap:8px">' +
         '<button type="button" data-method="caixa" class="tes-method-btn-r tes-method-active" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--primary);background:var(--primary-light);color:var(--primary);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">Caixa</button>' +
@@ -716,7 +718,7 @@ function openAporteModal() {
     '<div style="display:flex;flex-direction:column;gap:14px">' +
     '<div class="field"><label>Valor (Kz) *</label><input type="number" id="tes-aporte-amount" placeholder="0"/></div>' +
     '<div class="field"><label>Descrição</label><input id="tes-aporte-desc" placeholder="Ex: Capital inicial, reforço de tesouraria..."/></div>' +
-    '<div class="field"><label>Data</label><input type="date" id="tes-aporte-date" value="' + new Date().toISOString().slice(0,10) + '"/></div>' +
+    '<div class="field"><label>Data</label><input type="text" id="tes-aporte-date" readonly value="' + new Date().toISOString().slice(0,10) + '" onclick="window._openDateField(this)"/></div>' +
     '<div class="field"><label>Entra em</label>' +
       '<div style="display:flex;gap:8px">' +
         '<button type="button" data-method="caixa" class="tes-method-btn tes-method-active" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--primary);background:var(--primary-light);color:var(--primary);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">Caixa</button>' +
