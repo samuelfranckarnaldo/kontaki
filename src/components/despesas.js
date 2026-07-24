@@ -1,4 +1,5 @@
 import { db }            from "../db.js";
+import { openField }     from "../date-picker.js";
 import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast }         from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
@@ -514,7 +515,7 @@ window._editDespesa = async function(id) {
     '<div class="field"><label>Descrição *</label><input id="de-desc" value="' + e.description + '" placeholder="Ex: Renda de Junho"/></div>' +
     _catPickerButtonHtml(e.category || CATEGORIAS[0]) +
     '<div class="field"><label>Valor (Kz) *</label><input type="number" id="de-amount" value="' + e.amount + '" placeholder="0"/></div>' +
-    '<div class="field"><label>Data</label><input type="date" id="de-date" value="' + (e.date||"").slice(0,10) + '"/></div>' +
+    '<div class="field"><label>Data</label><input type="text" id="de-date" readonly value="' + (e.date||"").slice(0,10) + '" onclick="window._openDateField(this)"/></div>' +
     _payMethodHtml(e.payMethod) +
     _supplierButtonHtml(e.supplierId||"", e.supplierName||"") +
     _accountingToggleHtml(e.countsInAccounting) +
@@ -574,7 +575,7 @@ window._openDespesaForm = async function() {
     '<div class="field"><label>Descrição *</label><input id="de-desc" placeholder="Ex: Renda de Junho"/></div>' +
     _catPickerButtonHtml(CATEGORIAS[0]) +
     '<div class="field"><label>Valor (Kz) *</label><input type="number" id="de-amount" placeholder="0"/></div>' +
-    '<div class="field"><label>Data</label><input type="date" id="de-date" value="' + new Date().toISOString().slice(0,10) + '"/></div>' +
+    '<div class="field"><label>Data</label><input type="text" id="de-date" readonly value="' + new Date().toISOString().slice(0,10) + '" onclick="window._openDateField(this)"/></div>' +
     _payMethodHtml("dinheiro") +
     _supplierButtonHtml("", "") +
     _accountingToggleHtml(true) +
@@ -653,6 +654,7 @@ window._toggleArquivadasDespesas = function() {
 };
 
 window._closeModal = closeModal;
+window._openDateField = openField;
 
 window._repetirDespesa = async function(id) {
   var { getSession } = await import("../auth.js");
@@ -666,7 +668,7 @@ window._repetirDespesa = async function(id) {
     '<div class="field"><label>Descrição *</label><input id="de-desc" value="' + orig.description + '" placeholder="Ex: Renda de Junho"/></div>' +
     _catPickerButtonHtml(orig.category || CATEGORIAS[0]) +
     '<div class="field"><label>Valor (Kz) *</label><input type="number" id="de-amount" value="' + orig.amount + '" placeholder="0"/></div>' +
-    '<div class="field"><label>Data</label><input type="date" id="de-date" value="' + new Date().toISOString().slice(0,10) + '"/></div>' +
+    '<div class="field"><label>Data</label><input type="text" id="de-date" readonly value="' + new Date().toISOString().slice(0,10) + '" onclick="window._openDateField(this)"/></div>' +
     _payMethodHtml(orig.payMethod) +
     _supplierButtonHtml(orig.supplierId||"", orig.supplierName||"") +
     _accountingToggleHtml(orig.countsInAccounting) +
