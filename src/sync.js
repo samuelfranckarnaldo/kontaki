@@ -214,3 +214,65 @@ export async function syncProducts() {
     logger.error("[sync] syncProducts erro de rede/execução", e);
   }
 }
+
+// ── SINCRONIZAÇÃO DE INCIDENTES (snapshot dos últimos 300) ──────────────
+// Como produtos, incidentes são escritos/atualizados em vários pontos do
+// código (abertura/fecho de turno, resolução, arquivamento) sem
+// updatedAt consistente em todos. Snapshot é mais robusto do que
+// perseguir cada ponto de escrita.
+export async function syncIncidents() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+
+  try {
+    var storeId = await getStoreId();
+    var licenseCode = await getLicenseCode();
+    if (!storeId || !licenseCode) {
+      logger.warn("[sync] syncIncidents abortado: storeId ou licenseCode em falta");
+      return;
+    }
+
+    var all = await db.getAll("incidents");
+    all.sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
+    var recent = all.slice(0, 300);
+    logger.info("[sync] syncIncidents: " + recent.length + " de " + all.length + " total");
+
+    var deviceId = await getDeviceId();
+
+    var res = await fetch(CONSOLE_API + "/sync/incidents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        storeId: storeId,
+        licenseCode: licenseCode,
+        deviceId: deviceId,
+        incidents: recent.map(function(inc) {
+          return {
+            localId: inc.id,
+            type: inc.type || null,
+            productId: inc.productId || null,
+            productName: inc.productName || null,
+            expected: inc.expected,
+            found: inc.found,
+            diff: inc.diff,
+            status: inc.status || "open",
+            note: inc.note || null,
+            sessionId: inc.sessionId || null,
+            createdAt: inc.createdAt,
+            resolvedAt: inc.resolvedAt || null,
+            archived: !!inc.archived,
+            archivedAt: inc.archivedAt || null,
+          };
+        }),
+      }),
+    });
+
+    var resBody = await res.text();
+    if (!res.ok) {
+      logger.error("[sync] syncIncidents falhou: status=" + res.status + " body=" + resBody.slice(0, 300));
+      return;
+    }
+    logger.info("[sync] syncIncidents OK: status=" + res.status);
+  } catch (e) {
+    logger.error("[sync] syncIncidents erro de rede/execução", e);
+  }
+}

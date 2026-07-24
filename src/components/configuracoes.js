@@ -7,6 +7,23 @@ import { backupService }   from "../backup.js";
 import { getLogs, clearLogs } from "../logger.js";
 import { generateUUID, verifyAdminPin } from "../services.js";
 
+window._regenerateSyncId = async function() {
+  var confirmed = window.confirm("Gerar um novo identificador de sincronização? Isto é útil se a loja não conseguir sincronizar com o Console. A app continua a funcionar normalmente offline.");
+  if (!confirmed) return;
+
+  try {
+    var newId = generateUUID();
+    await db.put("settings", { key: "storeId", value: newId, createdAt: new Date().toISOString() });
+    toast("Identificador regenerado. A sincronizar…", "success");
+
+    var syncMod = await import("../sync.js");
+    await syncMod.syncRegister();
+    toast("Sincronização de registo concluída.", "success");
+  } catch (e) {
+    toast("Erro ao regenerar identificador: " + (e.message || e), "error");
+  }
+};
+
 export async function loadConfiguracoes() {
   const btn = document.getElementById("btn-back-configuracoes");
   if (btn) btn.onclick = () => window._showSubpage(null);
@@ -62,6 +79,13 @@ async function renderConfiguracoes() {
     '</div>' +
     _devolucaoPolicyOption("bloquear", store, "lock", "Bloquear fora do prazo", "Depois do limite de dias, a devolução não pode ser feita por ninguém.") +
     _devolucaoPolicyOption("avisar", store, "alert-triangle", "Apenas avisar (mais liberdade)", "Depois do limite de dias, mostra um aviso mas continua a permitir a devolução.") +
+    '</div>' +
+
+    sectionLabel("Sincronização") +
+    '<div class="vender-card" style="margin-bottom:14px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
+    '<div style="font-size:13px;color:var(--text3);margin-bottom:12px;line-height:1.5">Se esta loja deixou de sincronizar corretamente com o Console (ex.: depois de testes ou troca de dispositivo), podes gerar um novo identificador de sincronização. A loja continua a funcionar normalmente offline.</div>' +
+    '<button onclick="window._regenerateSyncId()" style="width:100%;padding:13px;background:none;border:1.5px solid var(--warning);color:var(--warning);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
+    '<i data-lucide="refresh-cw" style="width:16px;height:16px"></i> Regenerar identificador de sincronização</button>' +
     '</div>' +
 
     sectionLabel("Últimos erros (" + logs.length + ")") +

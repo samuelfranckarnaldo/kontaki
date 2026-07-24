@@ -187,6 +187,7 @@ if (typeof window !== "undefined") {
       await syncMod.syncRegister();
       await syncMod.syncSales();
       await syncMod.syncProducts();
+      await syncMod.syncIncidents();
     } catch (e) {}
   });
 
@@ -196,7 +197,7 @@ if (typeof window !== "undefined") {
   setInterval(function () {
     if (navigator.onLine) {
       validateLicenseOnline().catch(function () {});
-      import("./sync.js").then(function(m) { m.syncRegister().then(function(){ return m.syncSales(); }).then(function(){ return m.syncProducts(); }); }).catch(function() {});
+      import("./sync.js").then(function(m) { m.syncRegister().then(function(){ return m.syncSales(); }).then(function(){ return m.syncProducts(); }).then(function(){ return m.syncIncidents(); }); }).catch(function() {});
     }
   }, 15 * 60 * 1000);
 }
