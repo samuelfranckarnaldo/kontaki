@@ -28,7 +28,9 @@ export var PLANS = {
   pro: {
     name: "Pro", price: 2500,
     // -1 = ilimitado (serializável; Infinity vira null em JSON.stringify)
-    maxProducts: -1, maxClients: -1, maxUsers: -1,
+    // maxUsers do Pro fica em 2 (não -1) por limitação de arquitetura,
+    // não de preço — mesma razão que já limitou dispositivos antes.
+    maxProducts: -1, maxClients: -1, maxUsers: 2,
     features: [
       "vendas","stock","fiados","clientes","despesas","pin_recovery",
       "historico","scanner","venda_rapida","dashboard",

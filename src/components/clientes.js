@@ -512,6 +512,13 @@ window._saveCliente = async (id) => {
     await db.put("clients", { ...ex, ...data });
     toast("Cliente actualizado.", "success");
   } else {
+    const existing = await db.getAll("clients");
+    const licMod = await import("../license.js");
+    const maxClients = licMod.getPlanLimit("maxClients");
+    if (existing.length >= maxClients) {
+      toast("Limite de " + maxClients + " clientes atingido para o teu plano. Contacta a Introxeer para upgrade.", "error");
+      return;
+    }
     await clientService.create(data);
     toast("Cliente adicionado.", "success");
   }

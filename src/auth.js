@@ -744,9 +744,15 @@ export async function createUser(name, username, password, role) {
   // V1: só admin único por loja (decisão de produto). createUser nunca cria
   // outro admin, independentemente do que for pedido — reforço de backend,
   // já que a UI (Equipa, Convidar) também não oferece essa opção.
+  //
+  // maxUsers do plano = operadores de caixa permitidos além do admin
+  // único (não é "total de contas incluindo o admin" — Básico/Standard
+  // com maxUsers:1 continuam a permitir 1 caixa, não zero).
   const activeCaixas = users.filter(u => u.role === "caixa" && u.active !== false);
-  if (activeCaixas.length >= 2) {
-    throw new Error("Limite de 2 operadores de caixa activos neste dispositivo. Desactiva um para criar outro.");
+  const licMod = await import("./license.js");
+  const maxCaixas = licMod.getPlanLimit("maxUsers");
+  if (activeCaixas.length >= maxCaixas) {
+    throw new Error("Limite de " + maxCaixas + " operador(es) de caixa activo(s) neste dispositivo para o teu plano. Desactiva um ou faz upgrade.");
   }
 
   const passwordHash = await hashPassword(password);
