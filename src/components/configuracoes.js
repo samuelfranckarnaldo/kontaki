@@ -2,26 +2,29 @@ import { db }              from "../db.js";
 import { getUser }         from "../auth.js";
 import { fmt, el, val, refreshIcons } from "../utils.js";
 import { toast }           from "../toast.js";
-import { openModal, closeModal } from "../modal.js";
+import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { backupService }   from "../backup.js";
 import { getLogs, clearLogs } from "../logger.js";
 import { generateUUID, verifyAdminPin } from "../services.js";
 
-window._regenerateSyncId = async function() {
-  var confirmed = window.confirm("Gerar um novo identificador de sincronização? Isto é útil se a loja não conseguir sincronizar com o Console. A app continua a funcionar normalmente offline.");
-  if (!confirmed) return;
+window._regenerateSyncId = function() {
+  confirmDialog(
+    "Gerar um novo identificador de sincronização? Isto é útil se a loja não conseguir sincronizar com o Console. A app continua a funcionar normalmente offline.",
+    async function() {
+      try {
+        var newId = generateUUID();
+        await db.put("settings", { key: "storeId", value: newId, createdAt: new Date().toISOString() });
+        toast("Identificador regenerado. A sincronizar…", "success");
 
-  try {
-    var newId = generateUUID();
-    await db.put("settings", { key: "storeId", value: newId, createdAt: new Date().toISOString() });
-    toast("Identificador regenerado. A sincronizar…", "success");
-
-    var syncMod = await import("../sync.js");
-    await syncMod.syncRegister();
-    toast("Sincronização de registo concluída.", "success");
-  } catch (e) {
-    toast("Erro ao regenerar identificador: " + (e.message || e), "error");
-  }
+        var syncMod = await import("../sync.js");
+        await syncMod.syncRegister();
+        toast("Sincronização de registo concluída.", "success");
+      } catch (e) {
+        toast("Erro ao regenerar identificador: " + (e.message || e), "error");
+      }
+    },
+    { confirmText: "Gerar" }
+  );
 };
 
 export async function loadConfiguracoes() {
