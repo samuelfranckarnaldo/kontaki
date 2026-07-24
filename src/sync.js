@@ -191,6 +191,7 @@ export async function syncProducts() {
         products: active.map(function(p) {
           return {
             localId: p.id,
+            catalogId: p.catalogId || null,
             name: p.name,
             category: p.category || null,
             price: p.price || 0,
@@ -274,5 +275,65 @@ export async function syncIncidents() {
     logger.info("[sync] syncIncidents OK: status=" + res.status);
   } catch (e) {
     logger.error("[sync] syncIncidents erro de rede/execução", e);
+  }
+}
+
+// ── SINCRONIZAÇÃO DE SESSÕES/TURNO (snapshot das últimas 100) ───────────
+export async function syncSessions() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+
+  try {
+    var storeId = await getStoreId();
+    var licenseCode = await getLicenseCode();
+    if (!storeId || !licenseCode) {
+      logger.warn("[sync] syncSessions abortado: storeId ou licenseCode em falta");
+      return;
+    }
+
+    var all = await db.getAll("sessions");
+    all.sort(function(a, b) { return new Date(b.openedAt) - new Date(a.openedAt); });
+    var recent = all.slice(0, 100);
+    logger.info("[sync] syncSessions: " + recent.length + " de " + all.length + " total");
+
+    var deviceId = await getDeviceId();
+
+    var res = await fetch(CONSOLE_API + "/sync/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        storeId: storeId,
+        licenseCode: licenseCode,
+        deviceId: deviceId,
+        sessions: recent.map(function(s) {
+          return {
+            localId: s.id,
+            uuid: s.uuid,
+            userId: s.userId,
+            userName: s.userName,
+            status: s.status,
+            openedAt: s.openedAt,
+            closedAt: s.closedAt,
+            totalVendas: s.totalVendas || 0,
+            nVendas: s.nVendas || 0,
+            hasIncidents: !!s.hasIncidents,
+            cashExpectedOpen: s.cashExpectedOpen,
+            cashCountedOpen: s.cashCountedOpen,
+            cashDiffOpen: s.cashDiffOpen,
+            cashExpected: s.cashExpected,
+            cashCounted: s.cashCounted,
+            cashDiff: s.cashDiff,
+          };
+        }),
+      }),
+    });
+
+    var resBody = await res.text();
+    if (!res.ok) {
+      logger.error("[sync] syncSessions falhou: status=" + res.status + " body=" + resBody.slice(0, 300));
+      return;
+    }
+    logger.info("[sync] syncSessions OK: status=" + res.status);
+  } catch (e) {
+    logger.error("[sync] syncSessions erro de rede/execução", e);
   }
 }
