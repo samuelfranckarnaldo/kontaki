@@ -162,6 +162,30 @@ window._mlSetIncFilter = function(status) {
   _renderContent();
 };
 
+async function _fetchRealIncidents(storeId) {
+  var code = await _getLicenseCode();
+  if (!code) return null;
+  try {
+    var res = await fetch(CONSOLE_API + "/reports/multi-store/store/" + encodeURIComponent(storeId) + "?code=" + encodeURIComponent(code));
+    if (!res.ok) return null;
+    var data = await res.json();
+    if (!data || !data.success || !data.incidents || !data.incidents.available) return null;
+    return data.incidents.items.map(function(i) {
+      return {
+        productName: i.productName || (i.type === "caixa" ? "Numerário (Caixa)" : "Produto"),
+        expected: i.expected,
+        found: i.found,
+        diff: i.diff,
+        status: i.archived ? "archived" : (i.status || "open"),
+        operator: "—",
+        when: _relativeTime(i.createdAt),
+      };
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
 async function _renderIncidentes(wrap) {
   wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
 
@@ -170,11 +194,19 @@ async function _renderIncidentes(wrap) {
     return;
   }
 
-  var relevantStores = _mlSelectedStoreId === "all"
-    ? _mlStoresCache
-    : _mlStoresCache.filter(function(s) { return s.id === _mlSelectedStoreId; });
+  var isRealData = _mlSelectedStoreId !== "all";
+  var all;
 
-  var all = _mockStockIncidents(relevantStores);
+  if (isRealData) {
+    all = await _fetchRealIncidents(_mlSelectedStoreId);
+    if (all === null) {
+      wrap.innerHTML = _errorHtml("Não foi possível carregar os incidentes desta loja.");
+      return;
+    }
+  } else {
+    all = _mockStockIncidents(_mlStoresCache);
+  }
+
   var openCount = all.filter(function(i) { return i.status === "open"; }).length;
   var resolvedCount = all.filter(function(i) { return i.status === "resolved"; }).length;
   var archivedCount = all.filter(function(i) { return i.status === "archived"; }).length;
@@ -191,7 +223,7 @@ async function _renderIncidentes(wrap) {
   wrap.innerHTML =
     '<div style="margin-bottom:4px">' +
       '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px">Incidentes</div>' +
-      '<div style="font-size:11px;color:var(--text4)">Protótipo — reconciliação de stock, dados simulados</div>' +
+      '<div style="font-size:11px;color:var(--text4)">' + (isRealData ? "Reconciliação de stock, dados reais da loja" : "Protótipo — dados simulados. Seleciona uma loja para ver dados reais.") + '</div>' +
     '</div>' +
 
     '<div style="display:flex;background:var(--primary-light,#ede9fe);border-radius:var(--radius-xl);padding:3px;gap:2px;margin:14px 0 14px">' +
@@ -217,7 +249,7 @@ async function _renderIncidentes(wrap) {
             '<div style="font-size:12px;color:var(--text3);margin-bottom:4px">Diferença: <strong style="color:' + diffColor + '">' + inc.diff + ' unidades</strong></div>' +
             '<div style="font-size:11.5px;color:var(--text4);margin-bottom:6px">Esperado: ' + inc.expected + ' → Encontrado: ' + inc.found + '</div>' +
             '<div style="font-size:11px;color:var(--text4);display:flex;justify-content:space-between;align-items:center">' +
-              '<span>Turno: ' + inc.operator + (_mlSelectedStoreId === "all" ? ' · ' + inc.storeName : '') + '</span>' +
+              '<span>' + (isRealData ? "" : ("Turno: " + inc.operator + (_mlSelectedStoreId === "all" ? " · " + inc.storeName : ""))) + '</span>' +
               '<span>' + inc.when + '</span>' +
             '</div>' +
           '</div>';
