@@ -1186,6 +1186,11 @@ async function openCheckout() {
 }
 
 window._confirmarVenda = async () => {
+  const licMod = await import("../license.js");
+  if (licMod.getLicense().status === "none") {
+    licMod.showUpgradeBanner("Ativa um plano para começar a vender. Contacta a Introxeer.");
+    return;
+  }
   const fiadoWrap = document.getElementById("ck-fiado-wrap");
   const isFiado = fiadoWrap && fiadoWrap.style.display !== "none";
   const clientNameFiado = el("ck-name") ? el("ck-name").value.trim() : "";

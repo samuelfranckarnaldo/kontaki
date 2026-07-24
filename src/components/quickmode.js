@@ -266,6 +266,11 @@ function renderQmTotal() {
 }
 
 async function finalizarQm() {
+  const licMod = await import("../license.js");
+  if (licMod.getLicense().status === "none") {
+    licMod.showUpgradeBanner("Ativa um plano para começar a vender. Contacta a Introxeer.");
+    return;
+  }
   if (!qmCart.length) { toast("Carrinho vazio.", "error"); return; }
   const fc = (document.getElementById("qm-fiado-client") ? document.getElementById("qm-fiado-client").value.trim() : "") || "";
   if (qmPayMethod === "fiado" && !fc) {

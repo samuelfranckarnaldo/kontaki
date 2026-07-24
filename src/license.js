@@ -56,7 +56,7 @@ export async function loadLicense() {
   try {
     var lic = await db.get("settings", "license");
     if (!lic || !lic.plan) {
-      _license = { plan: "basic", status: "trial", daysLeft: 7, expiresAt: null, code: null };
+      _license = { plan: "basic", status: "none", daysLeft: 0, expiresAt: null, code: null };
     } else {
       var now      = Date.now();
       var exp      = lic.expiresAt ? new Date(lic.expiresAt).getTime() : null;
@@ -73,18 +73,18 @@ export async function loadLicense() {
       };
     }
   } catch(e) {
-    _license = { plan: "basic", status: "trial", daysLeft: 7, expiresAt: null };
+    _license = { plan: "basic", status: "none", daysLeft: 0, expiresAt: null };
   }
   return _license;
 }
 
 export function getLicense() {
-  return _license || { plan: "basic", status: "trial", daysLeft: 7 };
+  return _license || { plan: "basic", status: "none", daysLeft: 0 };
 }
 
 export function hasFeature(feature) {
   var lic = getLicense();
-  if (lic.status === "expired") return false;
+  if (lic.status === "expired" || lic.status === "none") return false;
   if (lic.status === "trial") return ALL_FEATURES.includes(feature);
   var plan = PLANS[lic.plan] || PLANS.basic;
   return plan.features.includes(feature);
@@ -92,7 +92,7 @@ export function hasFeature(feature) {
 
 export function getPlanLimit(key) {
   var lic = getLicense();
-  if (lic.status === "expired") return 0;
+  if (lic.status === "expired" || lic.status === "none") return 0;
   // Trial = experiência Pro com prazo, não "ilimitado à parte": herda o
   // limite do Pro (hoje -1/ilimitado; se o Pro ganhar um teto finito no
   // futuro, o trial acompanha automaticamente, sem alteração aqui).
