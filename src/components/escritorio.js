@@ -380,7 +380,8 @@ window._exportarCatalogo = async function() {
     var catStr = JSON.stringify(cat, null, 2);
     var store = (await db.get("settings","store")) || {};
     var fname = "catalogo_" + (store.name||"loja").replace(/\s+/g,"_") + "_" + new Date().toISOString().slice(0,10) + ".json";
-    await window._shareKtkFile(encodeURIComponent(fname), encodeURIComponent(catStr));
+    window._pendingKtkExport = { fname: fname, ktkStr: catStr };
+    await window._shareKtkFile();
     toast("Catálogo gerado: " + cat.produtos.length + " produtos.","success");
   } catch(err) {
     toast("Erro: "+err.message,"error");

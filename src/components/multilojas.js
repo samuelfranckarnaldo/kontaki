@@ -157,6 +157,15 @@ function _mockStockIncidents(stores) {
   return result;
 }
 
+window._mlToggleIncident = function(cardId) {
+  var body = document.getElementById(cardId);
+  var chevron = document.getElementById(cardId + "-chevron");
+  if (!body) return;
+  var isOpen = body.style.display !== "none";
+  body.style.display = isOpen ? "none" : "block";
+  if (chevron) chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
+};
+
 window._mlSetIncFilter = function(status) {
   _mlIncFilterStatus = status;
   _renderContent();
@@ -235,22 +244,29 @@ async function _renderIncidentes(wrap) {
 
     (filtered.length ? (
       '<div style="display:flex;flex-direction:column;gap:8px">' +
-        filtered.map(function(inc) {
+        filtered.map(function(inc, idx) {
           var isOpen = inc.status === "open";
           var diffColor = inc.diff < 0 ? "#dc2626" : "#16a34a";
+          var cardId = "ml-inc-" + idx;
           return '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:12px 14px">' +
-            '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">' +
+            '<button onclick="window._mlToggleIncident(\'' + cardId + '\')" style="width:100%;border:none;background:none;padding:0;margin:0;font-family:inherit;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">' +
               '<div style="display:flex;align-items:center;gap:7px">' +
                 (isOpen ? '<span style="width:7px;height:7px;border-radius:50%;background:#dc2626;flex-shrink:0"></span>' : '') +
                 '<span style="font-size:13.5px;font-weight:700;color:var(--text)">' + inc.productName + '</span>' +
               '</div>' +
-              (isOpen ? '<button style="padding:4px 10px;border-radius:20px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Resolver</button>' : '') +
-            '</div>' +
+              '<i data-lucide="chevron-down" id="' + cardId + '-chevron" style="width:16px;height:16px;color:var(--text4);flex-shrink:0;transition:transform .15s ease"></i>' +
+            '</button>' +
             '<div style="font-size:12px;color:var(--text3);margin-bottom:4px">Diferença: <strong style="color:' + diffColor + '">' + inc.diff + ' unidades</strong></div>' +
             '<div style="font-size:11.5px;color:var(--text4);margin-bottom:6px">Esperado: ' + inc.expected + ' → Encontrado: ' + inc.found + '</div>' +
             '<div style="font-size:11px;color:var(--text4);display:flex;justify-content:space-between;align-items:center">' +
               '<span>' + (isRealData ? "" : ("Turno: " + inc.operator + (_mlSelectedStoreId === "all" ? " · " + inc.storeName : ""))) + '</span>' +
               '<span>' + inc.when + '</span>' +
+            '</div>' +
+            '<div id="' + cardId + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid #f4f4f5;font-size:11.5px;color:var(--text3);line-height:1.6">' +
+              (inc.note ? '<div>Nota: ' + inc.note + '</div>' : '') +
+              (inc.createdAt ? '<div>Detetado em: ' + new Date(inc.createdAt).toLocaleString("pt-AO") + '</div>' : '') +
+              (inc.resolvedAt ? '<div>Resolvido em: ' + new Date(inc.resolvedAt).toLocaleString("pt-AO") + '</div>' : '') +
+              (inc.status ? '<div>Estado: ' + inc.status + '</div>' : '') +
             '</div>' +
           '</div>';
         }).join("") +

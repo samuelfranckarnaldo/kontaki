@@ -302,6 +302,22 @@ async function ensureProductCatalogId(product) {
   return catalogId;
 }
 
+// Migracao idempotente: garante catalogId em produtos criados antes desta
+// alteracao (productService.create() passou a gerar catalogId sempre, a
+// partir de agora). So altera produtos que ainda nao tem catalogId.
+// Chamada uma vez no arranque (ver main.js), antes do primeiro sync.
+export async function migrateProductCatalogIds() {
+  const products = await db.getAll("products");
+  const missing = products.filter(function(p) { return !p.catalogId; });
+  for (const p of missing) {
+    await ensureProductCatalogId(p);
+  }
+  if (missing.length > 0) {
+    logger.info("[migration] catalogId atribuido a " + missing.length + " produto(s) sem identificador");
+  }
+  return missing.length;
+}
+
 export const productService = {
   async getAll() {
     requireAuth();
@@ -317,6 +333,7 @@ export const productService = {
       costPrice:data.costPrice||0, minStock:data.minStock||5,
       category:data.category||"Outro", unit:data.unit||"unid",
       active:true, stock:0, warehouseStock:0, createdAt:new Date().toISOString(),
+      catalogId:generateUUID(),
     });
     if((data.stock||0)>0) await addStockMovement({productId:pid,productName:data.name,type:"purchase",location:"shop",qty:data.stock,reference:"create",note:"Stock inicial loja",sessionId:null});
     if((data.warehouseStock||0)>0) await addStockMovement({productId:pid,productName:data.name,type:"purchase",location:"warehouse",qty:data.warehouseStock,reference:"create",note:"Stock inicial armazém",sessionId:null});

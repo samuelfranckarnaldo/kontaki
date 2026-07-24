@@ -10,6 +10,53 @@ export const fmtDate = (iso) =>
 export const today = () => new Date().toISOString().split("T")[0];
 
 export const el     = (id)    => document.getElementById(id);
+
+// Vibração/haptic feedback. "success" = toque curto, "error" = padrão
+// duplo, qualquer outro valor (ou nenhum) = toque curto genérico.
+// Silencioso em dispositivos/browsers sem suporte (ex: iOS Safari).
+export function haptic(pattern) {
+  if (!navigator.vibrate) return;
+  if (pattern === "error") navigator.vibrate([30, 60, 30]);
+  else if (pattern === "success") navigator.vibrate(15);
+  else navigator.vibrate(typeof pattern === "number" ? pattern : 15);
+}
+
+// ── WAKE LOCK (manter ecrã ligado durante uma venda) ────────────────────────
+// O Wake Lock liberta-se sozinho quando a página fica escondida (ecrã apaga,
+// troca de app); guardamos a intenção em _wakeLockWanted para reaquerir
+// automaticamente quando a página volta a ficar visível.
+let _wakeLock = null;
+let _wakeLockWanted = false;
+
+async function _acquireWakeLock() {
+  if (!("wakeLock" in navigator)) return;
+  try {
+    _wakeLock = await navigator.wakeLock.request("screen");
+    _wakeLock.addEventListener("release", () => { _wakeLock = null; });
+  } catch (e) {
+    // falha silenciosa (ex: documento não visível); tenta de novo no
+    // próximo visibilitychange enquanto _wakeLockWanted continuar true
+  }
+}
+
+export async function setWakeLock(active) {
+  _wakeLockWanted = active;
+  if (!("wakeLock" in navigator)) return;
+  if (active && !_wakeLock) {
+    await _acquireWakeLock();
+  } else if (!active && _wakeLock) {
+    try { await _wakeLock.release(); } catch (e) {}
+    _wakeLock = null;
+  }
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (_wakeLockWanted && document.visibilityState === "visible" && !_wakeLock) {
+      _acquireWakeLock();
+    }
+  });
+}
 export const val    = (id)    => (el(id) ? el(id).value : "") || "";
 export const setVal = (id, v) => { if (el(id)) el(id).value = v; };
 export const html   = (id, c) => { const n = el(id); if (n) n.innerHTML = c; };

@@ -8,6 +8,7 @@ import { initModal } from "./modal.js";
 import { logger } from "./logger.js";
 import { router } from "./router.js";
 import { initMessagesOnBoot } from "./message-ui.js";
+import { migrateProductCatalogIds } from "./services.js";
 
 function hideBootSpinner() {
   var el = document.getElementById("boot-spinner-overlay");
@@ -56,6 +57,10 @@ async function boot() {
   await seedChartOfAccounts();
   initModal();
   await loadLicense();
+
+  await migrateProductCatalogIds().catch(function(e) {
+    logger.error("[migration] falha ao migrar catalogId de produtos", e);
+  });
 
   import("./sync.js").then(function(m) {
     return m.syncRegister()

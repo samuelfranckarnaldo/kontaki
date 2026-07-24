@@ -1,5 +1,5 @@
 import { db } from "../db.js";
-import { fmt, fmtDate, el, val, setVal, refreshIcons, generateQR } from "../utils.js";
+import { fmt, fmtDate, el, val, setVal, refreshIcons, generateQR, haptic, setWakeLock } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
@@ -660,6 +660,7 @@ window._undoRemove = () => {
 };
 
 function renderCart() {
+  setWakeLock(cart.length > 0);
   const count = cart.reduce((a, i) => a + i.qty, 0);
   var countEl = el("cart-count");
   if (countEl) {
@@ -1237,6 +1238,7 @@ window._confirmarVenda = async () => {
     for (const item of cart) {
       const available = await getStock(item.id, "shop");
       if (item.qty > available) {
+        haptic("error");
         toast(`Stock insuficiente: ${item.name} (disponível: ${available})`, "error");
         return;
       }
@@ -1323,9 +1325,11 @@ window._confirmarVenda = async () => {
     products = await db.getAll("products").then(p => p.filter(x => x.active));
     renderRecentProducts();
 
+    haptic("success");
     showReceipt({ sid, items:cartSnap, sub:subtotal, da, ivaPct, ivaVal, total, clientName, clientPhone, clientAddress, store, payMethod:method, saleDate, hash:finalHash, recebido, troco, operatorName: (getUser()||{}).name });
 
   } catch (err) {
+    haptic("error");
     toast("Erro: " + err.message, "error");
     console.error(err);
   }

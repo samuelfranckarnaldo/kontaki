@@ -73,9 +73,11 @@ body {
   line-height:  1.5;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  overscroll-behavior: none;
   user-select: none;
   -webkit-user-select: none;
 }
+html { overscroll-behavior: none; }
 .hist-mov-qty, .conta-hero-val, .hist-hero-val, .stat-val,
 .fc-row-val, .fiados-hero-val, .fc-pending-val, .ct-inline-val,
 .conta-row-val, .fiado-entry-amount {
