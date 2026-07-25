@@ -72,7 +72,7 @@ export async function syncRegister() {
     var data = JSON.parse(resBody);
     logger.info("[sync] syncRegister OK: storeUuid=" + (data && data.storeUuid) + " conflict=" + (data && data.conflict));
     if (data && data.conflict) {
-      logger.warn("[sync] storeId em conflito com o registado no Console");
+      logger.info("[sync] storeId foi atualizado automaticamente no Console (era diferente do anterior)");
     }
   } catch (e) {
     logger.error("[sync] syncRegister erro de rede/execução", e);
@@ -193,6 +193,8 @@ export async function syncProducts() {
             localId: p.id,
             catalogId: p.catalogId || null,
             name: p.name,
+            barcode: p.barcode || null,
+            masterBarcode: p.masterBarcode || null,
             category: p.category || null,
             price: p.price || 0,
             costPrice: p.costPrice || 0,

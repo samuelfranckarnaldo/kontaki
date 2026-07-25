@@ -803,9 +803,14 @@ export const catalogService = {
       if (existing) {
         await db.put("products",{
           ...existing,
-          name:item.name, barcode:item.barcode, masterBarcode:item.masterBarcode,
-          price:item.price, costPrice:item.costPrice, minStock:item.minStock,
-          category:item.category, unit:item.unit,
+          name:item.name!==undefined?item.name:existing.name,
+          barcode:item.barcode!==undefined?item.barcode:existing.barcode,
+          masterBarcode:item.masterBarcode!==undefined?item.masterBarcode:existing.masterBarcode,
+          price:item.price!==undefined?item.price:existing.price,
+          costPrice:item.costPrice!==undefined?item.costPrice:existing.costPrice,
+          minStock:item.minStock!==undefined?item.minStock:existing.minStock,
+          category:item.category!==undefined?item.category:existing.category,
+          unit:item.unit!==undefined?item.unit:existing.unit,
           catalogId:item.catalogId, updatedAt:new Date().toISOString(),
         });
         updated++;

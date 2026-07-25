@@ -1,8 +1,8 @@
 import { db }                from "../db.js";
 import { toast }             from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
-import { refreshIcons }      from "../utils.js";
-import { storeKeyService }   from "../services.js";
+import { refreshIcons, generateQR } from "../utils.js";
+import { storeKeyService, verifyAdminPin } from "../services.js";
 import { getUser }           from "../auth.js";
 import { countAvailableCodes, isLowOnCodes, generateCodesForUser } from "../recovery-codes.js";
 import { showRecoveryCodesScreen } from "../setup.js";
@@ -32,6 +32,11 @@ async function renderSeguranca() {
   const hasKey     = !!((sk&&sk.value));
   const distributed= (sk&&sk.distributed) || false;
   const importedAt = (sk&&sk.importedAt)   || null;
+
+  const wsLink   = await db.get("settings","workspaceLink");
+  const isLinked = !!(wsLink && wsLink.status === "active");
+  const storeIdRec = await db.get("settings","storeId");
+  const publicStoreId = storeIdRec ? storeIdRec.value : null;
 
   const user = getUser();
   const codesLeft = user ? await countAvailableCodes(user.id) : 0;
@@ -146,6 +151,48 @@ async function renderSeguranca() {
       </button>
     </div>` : ""}
 
+    <!-- Workspace -->
+    <div class="list-card" style="padding:16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="width:32px;height:32px;border-radius:9px;background:#ede9fe;
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i data-lucide="network" style="width:16px;height:16px;color:#5b21b6"></i>
+        </div>
+        <div style="font-size:14.5px;font-weight:700;color:#18181b">Workspace</div>
+      </div>
+      ${isLinked ? `
+      <div style="font-size:13px;color:#71717a;margin-bottom:12px;line-height:1.5">
+        Esta loja está ligada ao Workspace desde ${new Date(wsLink.linkedAt).toLocaleDateString("pt-AO")}.
+        O dono da empresa pode gerir esta loja remotamente.
+      </div>
+      <button onclick="window._removeWorkspaceLink()"
+              style="width:100%;padding:13px;background:transparent;color:var(--danger);
+                     border:1.5px solid var(--danger);border-radius:12px;font-size:14px;font-weight:700;
+                     cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+        <i data-lucide="unlink" style="width:16px;height:16px"></i>
+        Remover ligação
+      </button>` : `
+      <div style="font-size:13px;color:#71717a;margin-bottom:12px;line-height:1.5">
+        Para ligar esta loja ao Workspace, o dono precisa deste identificador. Introduz este
+        ID na app Workspace, ou pede-lhe para ler o código abaixo.
+      </div>
+      <div style="background:var(--bg2);border-radius:10px;padding:12px;margin-bottom:12px;
+                  display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span style="font-family:ui-monospace,monospace;font-size:13px;color:var(--text2);word-break:break-all">
+          ${publicStoreId || "—"}
+        </span>
+        ${publicStoreId ? `
+        <button onclick="window._copyStoreId()" style="background:none;border:none;color:#5b21b6;
+                flex-shrink:0;cursor:pointer;padding:4px;display:flex">
+          <i data-lucide="copy" style="width:16px;height:16px"></i>
+        </button>` : ""}
+      </div>
+      ${publicStoreId ? `
+      <div style="display:flex;justify-content:center;padding:12px 0">
+        <div id="workspace-qr"></div>
+      </div>` : ""}`}
+    </div>
+
     <!-- Importar chave -->
     <div class="list-card" style="padding:16px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -191,7 +238,83 @@ async function renderSeguranca() {
     </div>`;
 
   refreshIcons(wrap);
+
+  if (!isLinked && publicStoreId) {
+    const qrEl = document.getElementById("workspace-qr");
+    if (qrEl) generateQR(publicStoreId, qrEl, 140);
+  }
 }
+
+window._copyStoreId = async function() {
+  const storeIdRec = await db.get("settings","storeId");
+  const publicStoreId = storeIdRec ? storeIdRec.value : null;
+  if (!publicStoreId) return;
+  try {
+    await navigator.clipboard.writeText(publicStoreId);
+    toast("ID copiado.","success");
+  } catch {
+    toast("Não foi possível copiar.","error");
+  }
+};
+
+var WORKSPACE_CONSOLE_API_SEG = "https://kontaki-console.vercel.app/api";
+
+async function getLicenseCodeSeg() {
+  var lic = await db.get("settings", "license");
+  return lic ? lic.code : null;
+}
+
+window._removeWorkspaceLink = function() {
+  openModal("Confirmar administrador",
+    '<div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:16px">' +
+    'É necessário o PIN de um administrador para remover a ligação ao Workspace.' +
+    '</div>' +
+    '<div class="field" style="margin-bottom:14px">' +
+    '<label>PIN do administrador</label>' +
+    '<input type="password" inputmode="numeric" maxlength="6" id="unlink-pin" placeholder="......" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:18px;text-align:center;letter-spacing:6px;font-family:inherit"/>' +
+    '</div>' +
+    '<div id="unlink-err" style="display:none;color:var(--danger);font-size:12px;margin-bottom:10px"></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+    '<button class="btn btn-primary btn-full" onclick="window._submitRemoveWorkspaceLink()">Confirmar</button>' +
+    '</div>');
+  refreshIcons(document.getElementById("modal-box"));
+};
+
+window._submitRemoveWorkspaceLink = async function() {
+  const pinEl = document.getElementById("unlink-pin");
+  const pin = pinEl ? pinEl.value : "";
+  const errEl = document.getElementById("unlink-err");
+  if (!pin || pin.length < 4) {
+    if (errEl) { errEl.style.display = "block"; errEl.textContent = "Introduz o PIN."; }
+    return;
+  }
+  const result = await verifyAdminPin(pin);
+  if (!result.ok) {
+    if (errEl) { errEl.style.display = "block"; errEl.textContent = "PIN inválido."; }
+    return;
+  }
+  closeModal();
+
+  const licenseCode = await getLicenseCodeSeg();
+  if (!licenseCode) { toast("Licença não encontrada.","error"); return; }
+
+  try {
+    const res = await fetch(WORKSPACE_CONSOLE_API_SEG + "/workspace-auth/unlink", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ licenseCode: licenseCode }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { toast(body.error || "Erro ao remover ligação.","error"); return; }
+
+    await db.put("settings", { key: "workspaceLink", status: "removed", removedAt: new Date().toISOString() });
+    toast("Ligação removida.","success");
+    await renderSeguranca();
+  } catch (e) {
+    toast("Erro de rede ao remover ligação.","error");
+  }
+};
 
 window._regenerateRecoveryCodes = async function() {
   const user = getUser();

@@ -88,6 +88,23 @@ document.addEventListener("DOMContentLoaded", function() {
 <!-- APP -->
 <div id="app" style="display:none">
 
+  <!-- Banner de instalação PWA — aparece sozinho quando o browser reporta que é instalável -->
+  <div id="pwa-install-banner" style="display:none;align-items:center;gap:10px;padding:10px 14px;
+       background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff;flex-shrink:0;
+       padding-top:calc(10px + env(safe-area-inset-top))">
+    <i data-lucide="download" style="width:18px;height:18px;flex-shrink:0"></i>
+    <div style="flex:1;font-size:12.5px;line-height:1.35">
+      <div style="font-weight:700">Instala o Kontaki</div>
+      <div style="opacity:.85">Acesso mais rápido, sem abrir o browser</div>
+    </div>
+    <button onclick="window._installPWA()" style="background:#fff;color:#5b21b6;border:none;
+            border-radius:10px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;
+            font-family:inherit;flex-shrink:0">Instalar</button>
+    <button onclick="window._dismissInstallBanner()" style="background:none;border:none;color:#fff;
+            opacity:.75;font-size:18px;cursor:pointer;padding:0 2px;flex-shrink:0">×</button>
+  </div>
+
+
   <div id="topbar" class="topbar">
     <button class="topbar-btn" id="btn-topbar-dashboard" onclick="window._openDashboard()">
       <i data-lucide="layout-dashboard"></i>
@@ -922,6 +939,26 @@ window._showPrivacidade = function() {
       // Mostra botão de instalação no perfil
       var installBtns = document.querySelectorAll('.btn-install-pwa');
       installBtns.forEach(function(btn) { btn.style.display = 'flex'; });
+
+      // Mostra o banner discreto no topo, a não ser que já tenha sido
+      // dispensado antes (fica lembrado em localStorage).
+      if (!localStorage.getItem('kontaki-pwa-banner-dismissed')) {
+        var banner = document.getElementById('pwa-install-banner');
+        if (banner) banner.style.display = 'flex';
+      }
+    });
+
+    window._dismissInstallBanner = function() {
+      var banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.style.display = 'none';
+      try { localStorage.setItem('kontaki-pwa-banner-dismissed', '1'); } catch (e) {}
+    };
+
+    window.addEventListener('appinstalled', function() {
+      var banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.style.display = 'none';
+      var btns = document.querySelectorAll('.btn-install-pwa');
+      btns.forEach(function(btn) { btn.style.display = 'none'; });
     });
 
     window._installPWA = function() {
@@ -931,6 +968,8 @@ window._showPrivacidade = function() {
         if (result.outcome === 'accepted') {
           var btns = document.querySelectorAll('.btn-install-pwa');
           btns.forEach(function(btn) { btn.style.display = 'none'; });
+          var banner = document.getElementById('pwa-install-banner');
+          if (banner) banner.style.display = 'none';
         }
         deferredPrompt = null;
       });

@@ -3,7 +3,98 @@
 // parte do centro de notificações, aparecem por cima de tudo, no arranque,
 // antes do utilizador poder navegar.
 import { evaluateMessages, syncConsoleMessages, dismissMessage } from "./messages.js";
-import { refreshIcons } from "./utils.js";
+import { refreshIcons, el } from "./utils.js";
+import { db } from "./db.js";
+import { getUser } from "./auth.js";
+import { openModal, closeModal } from "./modal.js";
+import { toast } from "./toast.js";
+import { verifyAdminPin } from "./services.js";
+
+var WORKSPACE_CONSOLE_API = "https://kontaki-console.vercel.app/api";
+
+async function getLicenseCodeForLink() {
+  var lic = await db.get("settings", "license");
+  return lic ? lic.code : null;
+}
+
+async function confirmWorkspaceLink(m, accept) {
+  var licenseCode = await getLicenseCodeForLink();
+  if (!licenseCode) {
+    toast("Licença não encontrada neste dispositivo.", "error");
+    return;
+  }
+  try {
+    var res = await fetch(WORKSPACE_CONSOLE_API + "/workspace-auth/link-response", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId: m.action_value, licenseCode: licenseCode, accept: accept }),
+    });
+    var body = await res.json().catch(function() { return {}; });
+    if (!res.ok) {
+      toast(body.error || "Erro ao responder ao pedido.", "error");
+      return;
+    }
+    if (accept) {
+      await db.put("settings", { key: "workspaceLink", status: "active", linkedAt: new Date().toISOString() });
+    }
+    await dismissMessage(m.id);
+    var overlay = document.getElementById("msg-blocking-overlay");
+    if (overlay) overlay.style.display = "none";
+    toast(accept ? "Ligação aceite." : "Pedido rejeitado.", "success");
+  } catch (e) {
+    toast("Erro de rede ao responder ao pedido.", "error");
+  }
+}
+
+function showWorkspaceLinkPinModal(m) {
+  openModal("Confirmar administrador",
+    '<div style="font-size:13px;color:var(--text3);line-height:1.6;margin-bottom:16px">' +
+    'É necessário o PIN de um administrador para autorizar a ligação ao Workspace.' +
+    '</div>' +
+    '<div class="field" style="margin-bottom:14px">' +
+    '<label>PIN do administrador</label>' +
+    '<input type="password" inputmode="numeric" maxlength="6" id="wslink-pin" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:18px;text-align:center;letter-spacing:6px;font-family:inherit"/>' +
+    '</div>' +
+    '<div id="wslink-err" style="display:none;color:var(--danger);font-size:12px;margin-bottom:10px"></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+    '<button class="btn btn-primary btn-full" onclick="window._submitWorkspaceLinkPin()">Confirmar</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+  window._pendingWorkspaceLinkMessage = m;
+}
+
+window._submitWorkspaceLinkPin = async function() {
+  var pinEl = document.getElementById("wslink-pin");
+  var pin = pinEl ? pinEl.value : "";
+  var errEl = document.getElementById("wslink-err");
+  if (!pin || pin.length < 4) {
+    if (errEl) { errEl.style.display = "block"; errEl.textContent = "Introduz o PIN."; }
+    return;
+  }
+  var result = await verifyAdminPin(pin);
+  if (!result.ok) {
+    if (errEl) { errEl.style.display = "block"; errEl.textContent = "PIN inválido."; }
+    return;
+  }
+  closeModal();
+  var m = window._pendingWorkspaceLinkMessage;
+  window._pendingWorkspaceLinkMessage = null;
+  if (m) await confirmWorkspaceLink(m, true);
+};
+
+window._acceptWorkspaceLink = async function(m) {
+  var u = getUser();
+  if (u && u.role === "admin") {
+    await confirmWorkspaceLink(m, true);
+  } else {
+    showWorkspaceLinkPinModal(m);
+  }
+};
+
+window._rejectWorkspaceLink = async function(m) {
+  await confirmWorkspaceLink(m, false);
+};
 
 function severityColor(sev) {
   if (sev === "danger") return "var(--danger)";
@@ -75,7 +166,10 @@ function cardHtml(m, opts) {
     '<div style="font-size:19px;font-weight:800;color:var(--text);margin-bottom:10px;text-align:center;letter-spacing:-0.01em">' + (m.title || "Aviso") + '</div>' +
     '<div style="font-size:14px;color:var(--text3);line-height:1.6;margin-bottom:28px;text-align:center">' + m.body + '</div>' +
     '<div style="display:flex;flex-direction:column;gap:10px">' +
-      (hasAction ? '<button id="msg-action-btn" style="background:' + color + ';color:#fff;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">' + actionLabel(m) + '</button>' : '') +
+      (m.action_type === "workspace_link"
+        ? '<button id="msg-accept-btn" style="background:' + color + ';color:#fff;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Aceitar</button>' +
+          '<button id="msg-reject-btn" style="background:transparent;color:var(--danger);border:1.5px solid var(--danger);border-radius:14px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Rejeitar</button>'
+        : (hasAction ? '<button id="msg-action-btn" style="background:' + color + ';color:#fff;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">' + actionLabel(m) + '</button>' : '')) +
       (opts.dismissible ? '<button id="msg-dismiss-btn" style="background:transparent;color:var(--text3);border:none;padding:11px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit">Agora não</button>' : '') +
       (opts.blocking ? '<button id="msg-recheck-btn" style="background:transparent;color:var(--text4);border:none;padding:8px;font-size:11.5px;cursor:pointer;font-family:inherit">Verificar novamente</button>' : '') +
     '</div>'
@@ -93,6 +187,12 @@ function renderBlocking(m) {
 
   var actionBtn = document.getElementById("msg-action-btn");
   if (actionBtn) actionBtn.onclick = function() { runAction(m); };
+
+  var acceptBtn = document.getElementById("msg-accept-btn");
+  if (acceptBtn) acceptBtn.onclick = function() { window._acceptWorkspaceLink(m); };
+
+  var rejectBtn = document.getElementById("msg-reject-btn");
+  if (rejectBtn) rejectBtn.onclick = function() { window._rejectWorkspaceLink(m); };
 
   var recheckBtn = document.getElementById("msg-recheck-btn");
   if (recheckBtn) recheckBtn.onclick = async function() {

@@ -6,6 +6,13 @@ export function openModal(title, bodyHTML) {
   var bEl   = document.getElementById("modal-body");
   var box   = document.getElementById("modal-box");
   if (!ov || !tEl || !bEl) { console.error("Modal: elementos em falta"); return; }
+
+  // Empurra uma entrada de histórico só se ainda não estivermos "dentro"
+  // de um modal — evita acumular entradas ao trocar o conteúdo do mesmo
+  // overlay sem o fechar entretanto.
+  if (!(history.state && history.state.kontakiModal)) {
+    history.pushState({ kontakiModal: true }, "");
+  }
   tEl.textContent  = title;
   bEl.innerHTML    = bodyHTML;
   ov.style.display = "flex";
@@ -34,9 +41,26 @@ export function closeModal() {
   var bEl = document.getElementById("modal-body");
   if (ov)  ov.style.display = "none";
   if (bEl) bEl.innerHTML    = "";
+  // Se ainda estivermos na entrada de histórico do modal (fechado pelo X ou
+  // por um botão, não pelo botão físico voltar), consome-a para o botão
+  // voltar não abrir o modal outra vez na próxima vez que for premido.
+  if (history.state && history.state.kontakiModal) {
+    history.back();
+  }
 }
 
 window._closeModal = closeModal;
+
+window.addEventListener("popstate", function(e) {
+  var ov = document.getElementById("modal-overlay");
+  if (ov && ov.style.display !== "none" && ov.style.display !== "") {
+    // Fecha visualmente sem chamar closeModal() (que faria history.back()
+    // outra vez e causaria um loop), já que o popstate já consumiu a entrada.
+    var bEl = document.getElementById("modal-body");
+    ov.style.display = "none";
+    if (bEl) bEl.innerHTML = "";
+  }
+});
 
 export function initModal() {
   if (!document.getElementById("kontaki-focus-style")) {
