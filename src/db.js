@@ -1,5 +1,5 @@
 const DB_NAME    = "kontaki_db";
-const DB_VERSION = 20; // v20: adiciona store "syncQueue" para sincronizacao incremental com o Console
+const DB_VERSION = 21; // v21: adiciona store "fixedAssets" (ativos fixos e amortizações)
 let _db = null;
 
 function openDB() {
@@ -49,6 +49,12 @@ function openDB() {
         [["entityType",false],["syncedAt",false],["createdAt",false]]);
         // { id, entityType ("sales"|"expenses"|...), localId, action ("create"|"update"|"delete"),
         //   payload, createdAt, syncedAt (null ate ser confirmado pelo Console) }
+
+      ensure("fixedAssets", { keyPath:"id", autoIncrement:true },
+        [["active",false],["purchaseDate",false]]);
+        // { id, name, category, purchaseDate, purchaseValue, usefulLifeMonths,
+        //   active, createdAt } — amortização calculada em pgc.js a partir
+        //   dos lançamentos "depreciation" no journalEntries, não guardada aqui.
     };
     req.onsuccess = () => {
       _db = req.result;

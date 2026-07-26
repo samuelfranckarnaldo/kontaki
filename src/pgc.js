@@ -203,21 +203,6 @@ function expenseCostAccount(category) {
   return "75"; // Outros custos e perdas operacionais
 }
 
-// Remove lançamentos anteriores de uma origem (usado antes de re-lançar numa edição).
-// Recusa apagar lançamentos cuja data caia num período já fechado.
-async function deleteJournalEntriesBySource(sourceType, sourceId) {
-  var all = await db.getAll("journalEntries");
-  var toDelete = all.filter(function(e){ return e.sourceType === sourceType && e.sourceId === sourceId; });
-  for (var i = 0; i < toDelete.length; i++) {
-    if (await isPeriodClosed(toDelete[i].date)) {
-      throw new Error("Não é possível alterar — o período " + String(toDelete[i].date).slice(0,7) + " já está fechado.");
-    }
-  }
-  for (var j = 0; j < toDelete.length; j++) {
-    await db.delete("journalEntries", toDelete[j].id);
-  }
-}
-
 // ── FECHO DE EXERCÍCIO (mensal) ──────────────────────────────────────────────
 // Fecha um mês (YYYY-MM) já terminado: zera as contas de Proveitos (classe 6)
 // e Custos (classe 7) desse mês, transferindo o saldo líquido para a conta 88
@@ -314,6 +299,63 @@ export async function getAccountBalance(code) {
 // e reforço de caixa vindo do próprio proprietário). Provisório: o PGC ainda
 // nao tem uma conta corrente de socio/titular propria — usa-se Capital (51)
 // ate essa conta ser criada e migrada. Ver discussao no handoff sobre V1/V2.
+// ── ATIVOS FIXOS E AMORTIZAÇÕES ──────────────────────────────────────────────
+// Amortização linear simples: valor de compra / vida útil em meses, até ao
+// limite do valor de compra (nunca amortiza mais do que o bem vale).
+
+function amortizacaoMensal(asset) {
+  if (!asset.usefulLifeMonths) return 0;
+  return Math.round((asset.purchaseValue / asset.usefulLifeMonths) * 100) / 100;
+}
+
+// Soma da amortização já lançada para um ativo, em todos os períodos.
+export async function getAssetAccumulatedDepreciation(assetId, allEntriesCache) {
+  var allEntries = allEntriesCache || (await db.getAll("journalEntries"));
+  return allEntries
+    .filter(function(e) { return e.sourceType === "depreciation" && e.sourceId === assetId; })
+    .reduce(function(a, e) {
+      var linha18 = (e.lines || []).find(function(l) { return l.account === "18"; });
+      return a + (linha18 ? linha18.credit : 0);
+    }, 0);
+}
+
+// Lança as amortizações de um período (YYYY-MM) para todos os ativos ativos
+// que ainda não tenham sido amortizados nesse período e que ainda tenham
+// valor por amortizar. Devolve quantos lançamentos foram criados.
+export async function postDepreciationJournal(period) {
+  if (await isPeriodClosed(period + "-01")) {
+    throw new Error("Não é possível lançar amortizações — o período " + period + " já está fechado.");
+  }
+  var assets = await db.getAll("fixedAssets");
+  var allEntries = await db.getAll("journalEntries");
+  var lancados = 0;
+
+  for (var i = 0; i < assets.length; i++) {
+    var asset = assets[i];
+    if (!asset.active) continue;
+    if (String(asset.purchaseDate).slice(0, 7) > period) continue;
+
+    var jaLancado = allEntries.some(function (e) {
+      return e.sourceType === "depreciation" && e.sourceId === asset.id && String(e.date).slice(0, 7) === period;
+    });
+    if (jaLancado) continue;
+
+    var acumulado = await getAssetAccumulatedDepreciation(asset.id, allEntries);
+    var restante = Math.round((asset.purchaseValue - acumulado) * 100) / 100;
+    if (restante <= 0) continue;
+
+    var valor = Math.min(amortizacaoMensal(asset), restante);
+    if (valor <= 0) continue;
+
+    await createJournalEntry(period + "-01", "Amortização — " + asset.name + " (" + period + ")", "depreciation", asset.id, [
+      { account: "73", debit: valor, credit: 0 },
+      { account: "18", debit: 0, credit: valor },
+    ]);
+    lancados++;
+  }
+  return lancados;
+}
+
 export const OWNER_ACCOUNT = "51";
 
 // Lança um movimento entre Caixa/Banco e a conta do proprietário.
@@ -341,10 +383,47 @@ export async function postBankTransfer(params) {
   return createJournalEntry(params.date, params.description, "treasury", params.movementId, lines);
 }
 
-// Lançamento de uma despesa: débito conta de custo, crédito Caixa/Depósitos
+// Lançamento de uma despesa: débito conta de custo, crédito Caixa/Depósitos.
+// Em edições, NÃO apaga o lançamento anterior — estorna-o (contrapartida) e
+// lança o novo, preservando o histórico completo no Diário para auditoria
+// (princípio de imutabilidade contabilística: um lançamento postado nunca
+// desaparece, só é corrigido por contrapartida).
 export async function postExpenseJournal(expense) {
-  await deleteJournalEntriesBySource("expense", expense.id);
+  var all = await db.getAll("journalEntries");
+  var anteriores = all.filter(function(e) { return e.sourceType === "expense" && e.sourceId === expense.id; });
+
+  // Primeira vez (criação) — sem histórico anterior a preservar.
+  if (anteriores.length === 0) {
+    if (!expense.countsInAccounting) return;
+    var acctCusto0  = expenseCostAccount(expense.category);
+    var acctCredito0 = expensePaymentAccount(expense.payMethod);
+    await createJournalEntry(expense.date, "Despesa — " + expense.description, "expense", expense.id, [
+      { account: acctCusto0, debit: expense.amount, credit: 0 },
+      { account: acctCredito0, debit: 0, credit: expense.amount },
+    ]);
+    return;
+  }
+
+  // Edição — estorna o(s) lançamento(s) anterior(es).
+  for (var i = 0; i < anteriores.length; i++) {
+    var ant = anteriores[i];
+    if (await isPeriodClosed(ant.date)) {
+      throw new Error("Não é possível corrigir — o período " + String(ant.date).slice(0,7) + " já está fechado.");
+    }
+  }
+  for (var j = 0; j < anteriores.length; j++) {
+    var e2 = anteriores[j];
+    var linhasInvertidas = e2.lines.map(function(l) {
+      return { account: l.account, debit: l.credit || 0, credit: l.debit || 0 };
+    });
+    await createJournalEntry(e2.date, "Estorno (correção) — " + e2.description, "expense", expense.id, linhasInvertidas);
+  }
+
   if (!expense.countsInAccounting) return;
+
+  if (await isPeriodClosed(expense.date)) {
+    throw new Error("Não é possível lançar — o período " + String(expense.date).slice(0,7) + " já está fechado.");
+  }
   var acctCusto  = expenseCostAccount(expense.category);
   var acctCredito = expensePaymentAccount(expense.payMethod);
   await createJournalEntry(expense.date, "Despesa — " + expense.description, "expense", expense.id, [

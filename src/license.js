@@ -198,7 +198,7 @@ if (typeof window !== "undefined") {
   setInterval(function () {
     if (navigator.onLine) {
       validateLicenseOnline().catch(function () {});
-      import("./sync.js").then(function(m) { m.syncRegister().then(function(){ return m.syncSales(); }).then(function(){ return m.syncProducts(); }).then(function(){ return m.syncIncidents(); }).then(function(){ return m.syncSessions(); }).then(function(){ return m.syncWorkspaceCatalog(); }); }).catch(function() {});
+      import("./sync.js").then(function(m) { m.syncRegister().then(function(){ return m.syncSales(); }).then(function(){ return m.syncProducts(); }).then(function(){ return m.syncIncidents(); }).then(function(){ return m.syncSessions(); }).then(function(){ return m.syncAuditLog(); }).then(function(){ return m.syncWorkspaceCatalog(); }); }).catch(function() {});
     }
   }, 15 * 60 * 1000);
 }

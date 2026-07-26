@@ -68,6 +68,7 @@ async function boot() {
       .then(function(){ return m.syncProducts(); })
       .then(function(){ return m.syncIncidents(); })
       .then(function(){ return m.syncSessions(); })
+      .then(function(){ return m.syncAuditLog(); })
       .then(function(){ return m.syncWorkspaceCatalog(); });
   }).catch(function() {});
 

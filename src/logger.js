@@ -1,5 +1,6 @@
 import { db } from "./db.js";
 import { getUser } from "./auth.js";
+import { queueSync } from "./sync.js";
 
 export const logger = {
   async _write(level, message, stack) {
@@ -37,7 +38,7 @@ export async function clearLogs() {
 export async function logAudit(entityType, entityId, action, changes) {
   try {
     const user = getUser();
-    await db.add("auditLog", {
+    const record = {
       entityType,           // ex: "product"
       entityId,              // ex: 42
       action,                // ex: "edit", "create", "delete"
@@ -45,7 +46,9 @@ export async function logAudit(entityType, entityId, action, changes) {
       userId: user ? user.id : null,
       userName: user ? user.name : "Desconhecido",
       createdAt: new Date().toISOString(),
-    });
+    };
+    const id = await db.add("auditLog", record);
+    queueSync("auditLog", id, "create", { ...record, localId: id }).catch(() => {});
   } catch (e) {
     console.error("Falha ao registar auditoria:", e);
   }

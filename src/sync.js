@@ -160,6 +160,64 @@ export async function syncSales() {
   }
 }
 
+// ── SINCRONIZAÇÃO DE AUDITORIA (fila incremental) ───────────────────────
+// auditLog e imutavel (so db.add, nunca db.put) — igual a vendas, usa
+// fila (syncQueue entityType="auditLog") em vez de snapshot completo.
+export async function syncAuditLog() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+
+  try {
+    var storeId = await getStoreId();
+    var licenseCode = await getLicenseCode();
+    if (!storeId || !licenseCode) return;
+
+    var all = await db.getAll("syncQueue");
+    var pending = all.filter(function(item) {
+      return item.entityType === "auditLog" && !item.syncedAt;
+    });
+    if (pending.length === 0) return;
+
+    var batch = pending.slice(0, BATCH_SIZE);
+    var deviceId = await getDeviceId();
+
+    var res = await fetch(CONSOLE_API + "/sync/audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        storeId: storeId,
+        licenseCode: licenseCode,
+        deviceId: deviceId,
+        changes: batch.map(function(item) {
+          return {
+            localId: item.localId,
+            action: item.action,
+            payload: item.payload,
+            createdAt: item.createdAt,
+          };
+        }),
+      }),
+    });
+
+    if (!res.ok) return;
+    var data = await res.json();
+    if (!data || !data.success) return;
+
+    var acceptedIds = data.acceptedLocalIds || [];
+    var now = new Date().toISOString();
+    for (var i = 0; i < batch.length; i++) {
+      if (acceptedIds.indexOf(batch[i].localId) !== -1) {
+        await db.put("syncQueue", Object.assign({}, batch[i], { syncedAt: now }));
+      }
+    }
+
+    if (pending.length > BATCH_SIZE) {
+      await syncAuditLog();
+    }
+  } catch (e) {
+    // offline ou falha de rede — a fila fica intacta para o proximo gatilho
+  }
+}
+
 // ── SINCRONIZAÇÃO DE PRODUTOS (snapshot completo) ───────────────────────
 // Ao contrário de vendas (fila incremental), produtos são poucos e mudam
 // em vários sítios do código sem updatedAt consistente. Por isso, em vez

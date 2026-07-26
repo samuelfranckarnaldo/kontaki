@@ -10,7 +10,7 @@ import { getShortcutDates, getPeriodLabel, fmtChartVal } from "./historico.js";
 import { loadFornecedores } from "./fornecedores.js";
 import { loadEscritorio } from "./escritorio.js";
 import { db }                    from "../db.js";
-import { CHART_OF_ACCOUNTS, closeAccountingPeriod, isPeriodClosed } from "../pgc.js";
+import { CHART_OF_ACCOUNTS, closeAccountingPeriod, isPeriodClosed, postDepreciationJournal, getAssetAccumulatedDepreciation } from "../pgc.js";
 import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
@@ -1111,8 +1111,8 @@ async function loadContactosPage() {
 
 var activeContaTab = "resumo";
 
-var CONTA_TAB_ORDER = ["resumo", "razao", "balancete", "demonstracoes"];
-var CONTA_TAB_LABELS = { resumo:"Resumo", razao:"Razão", balancete:"Balancete", demonstracoes:"Demonstrações" };
+var CONTA_TAB_ORDER = ["resumo", "razao", "balancete", "demonstracoes", "ativos"];
+var CONTA_TAB_LABELS = { resumo:"Resumo", razao:"Razão", balancete:"Balancete", demonstracoes:"Demonstrações", ativos:"Ativos" };
 
 function renderContaTabs() {
   var wrap = document.getElementById("contabilidade-tabs");
@@ -1237,6 +1237,7 @@ async function loadContabilidade() {
   else if (activeContaTab === "razao")      await loadContaRazao(wrap);
   else if (activeContaTab === "balancete")      await loadContaBalancete(wrap);
   else if (activeContaTab === "demonstracoes")  await loadContaDemonstracoes(wrap);
+  else if (activeContaTab === "ativos")         await loadContaAtivos(wrap);
 }
 
 function accountBalance(entries, code) {
@@ -2110,7 +2111,12 @@ async function loadContaDemonstracoes(wrap) {
   var ativos   = contasComMov("activo");
   var passivos = contasComMov("passivo");
   var capitais = contasComMov("capital");
-  var totalAtivo    = ativos.reduce(function(a,c){ return a + saldoConta(c); }, 0);
+  var totalAtivo    = ativos.reduce(function(a,c){
+    var v = saldoConta(c);
+    // Contas de ativo com natureza credora (ex: 18 — Amortizações Acumuladas)
+    // são redutoras do ativo (contra-conta), não somam ao valor bruto.
+    return a + (c.natureza === "credora" ? -v : v);
+  }, 0);
   var totalPassivo  = passivos.reduce(function(a,c){ return a + saldoConta(c); }, 0);
   var totalCapital  = capitais.reduce(function(a,c){ return a + saldoConta(c); }, 0);
   // Resultado do período ainda não foi encerrado para 81/88 — entra como "plug" do lado do capital
@@ -2118,7 +2124,8 @@ async function loadContaDemonstracoes(wrap) {
 
   var ativoRows = ativos.map(function(c) {
     var v = saldoConta(c);
-    return movRow(c, fmt(v), v>=0?"var(--text)":"var(--danger)");
+    var vExibido = c.natureza === "credora" ? -v : v;
+    return movRow(c, fmt(vExibido), vExibido>=0?"var(--text)":"var(--danger)");
   }).join("");
   var passivoRows = passivos.map(function(c) {
     var v = saldoConta(c);
@@ -2178,6 +2185,156 @@ async function loadContaDemonstracoes(wrap) {
     '</div>';
   refreshIcons();
 }
+
+// ── ATIVOS FIXOS E AMORTIZAÇÕES ──────────────────────────────────────────────
+async function loadContaAtivos(wrap) {
+  var assets = await db.getAll("fixedAssets");
+  var allEntries = await db.getAll("journalEntries");
+
+  var totalCompra = 0, totalAmortizado = 0;
+  var linhas = [];
+  for (var i = 0; i < assets.length; i++) {
+    var a = assets[i];
+    var acumulado = await getAssetAccumulatedDepreciation(a.id, allEntries);
+    var liquido = Math.round((a.purchaseValue - acumulado) * 100) / 100;
+    totalCompra += a.purchaseValue;
+    totalAmortizado += acumulado;
+    linhas.push({ asset: a, acumulado: acumulado, liquido: liquido });
+  }
+  var totalLiquido = Math.round((totalCompra - totalAmortizado) * 100) / 100;
+  var periodoAtual = new Date().toISOString().slice(0, 7);
+
+  var kpisHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">' +
+    kpi("Valor de compra", fmt(totalCompra), "var(--info)", "wallet") +
+    kpi("Amortizado", fmt(totalAmortizado), "var(--danger-muted)", "trending-down") +
+    '</div>' +
+    '<div class="conta-card" style="margin-bottom:14px">' +
+    contaRow("Valor líquido total (contabilístico)", fmt(totalLiquido), "var(--primary)") +
+    '</div>';
+
+  var acoesHTML =
+    '<div style="display:flex;gap:8px;margin-bottom:14px">' +
+    '<button onclick="window._novoAtivo()" style="flex:1;padding:12px;background:var(--primary);color:#fff;' +
+    'border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;' +
+    'display:flex;align-items:center;justify-content:center;gap:6px">' +
+    '<i data-lucide="plus" style="width:15px;height:15px"></i> Novo Ativo</button>' +
+    '<button onclick="window._lancarAmortizacoesMes()" style="flex:1;padding:12px;background:var(--primary-light);' +
+    'color:var(--primary);border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;' +
+    'font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">' +
+    '<i data-lucide="calendar-check" style="width:15px;height:15px"></i> Lançar mês ' + periodoAtual + '</button>' +
+    '</div>';
+
+  if (!linhas.length) {
+    wrap.innerHTML = kpisHTML + acoesHTML +
+      '<div style="text-align:center;padding:40px 20px;color:#a1a1aa">' +
+      '<div style="font-size:14px;font-weight:600">Sem ativos registados</div>' +
+      '<div style="font-size:13px;margin-top:6px">Regista equipamento, mobiliário ou outros bens duradouros para começar a amortizar.</div>' +
+      '</div>';
+    refreshIcons();
+    return;
+  }
+
+  var listaHTML = '<div class="hist-mov-card">' + linhas.map(function(l) {
+    var a = l.asset;
+    var statusBadge = a.active
+      ? '<span style="font-size:10px;font-weight:700;color:var(--success);background:var(--success-light);padding:2px 7px;border-radius:8px;margin-left:6px">Ativo</span>'
+      : '<span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--border2);padding:2px 7px;border-radius:8px;margin-left:6px">Inativo</span>';
+    return '<div class="hist-mov-item hist-mov-item--compact" onclick="window._verAtivo(' + a.id + ')" style="cursor:pointer">' +
+      '<div class="hist-mov-icon" style="background:var(--info-light);color:var(--info)">' +
+      '<i data-lucide="package" style="width:18px;height:18px"></i></div>' +
+      '<div style="flex:1;min-width:0">' +
+      '<div class="hist-mov-name">' + a.name + statusBadge + '</div>' +
+      '<div style="font-size:11px;color:#a1a1aa">Comprado ' + fmtDate(a.purchaseDate) + ' · ' + a.usefulLifeMonths + ' meses</div>' +
+      '</div>' +
+      '<div style="text-align:right;flex-shrink:0">' +
+      '<div class="hist-mov-qty">' + fmt(l.liquido) + '</div>' +
+      '<div style="font-size:10px;color:#a1a1aa">líquido</div>' +
+      '</div></div>';
+  }).join("") + '</div>';
+
+  wrap.innerHTML = kpisHTML + acoesHTML + listaHTML;
+  refreshIcons();
+}
+
+window._novoAtivo = function() {
+  openModal("Novo Ativo Fixo",
+    '<div style="display:flex;flex-direction:column;gap:12px">' +
+    '<div><label style="font-size:12px;font-weight:600;color:#6b7280">Nome</label>' +
+    '<input id="ativo-nome" type="text" placeholder="Ex: Frigorífico" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;margin-top:4px"/></div>' +
+    '<div><label style="font-size:12px;font-weight:600;color:#6b7280">Categoria</label>' +
+    '<input id="ativo-categoria" type="text" placeholder="Ex: Equipamento" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;margin-top:4px"/></div>' +
+    '<div><label style="font-size:12px;font-weight:600;color:#6b7280">Data de compra</label>' +
+    '<input id="ativo-data" type="text" readonly placeholder="Toca para escolher" onclick="window._pickAtivoData()" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;margin-top:4px;background:#fff;caret-color:transparent"/></div>' +
+    '<div><label style="font-size:12px;font-weight:600;color:#6b7280">Valor de compra (Kz)</label>' +
+    '<input id="ativo-valor" type="number" inputmode="decimal" placeholder="0" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;margin-top:4px"/></div>' +
+    '<div><label style="font-size:12px;font-weight:600;color:#6b7280">Vida útil (meses)</label>' +
+    '<input id="ativo-vida" type="number" inputmode="numeric" placeholder="Ex: 60" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;margin-top:4px"/></div>' +
+    '<button onclick="window._salvarNovoAtivo()" style="width:100%;padding:13px;background:var(--primary);color:#fff;' +
+    'border:none;border-radius:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px">Guardar</button>' +
+    '</div>');
+};
+
+window._pickAtivoData = function() {
+  var input = el("ativo-data");
+  if (input) openField(input, "Data de compra");
+};
+
+window._salvarNovoAtivo = async function() {
+  var nome  = el("ativo-nome") ? el("ativo-nome").value.trim() : "";
+  var categoria = el("ativo-categoria") ? el("ativo-categoria").value.trim() : "";
+  var data  = el("ativo-data") ? el("ativo-data").value : "";
+  var valor = Number(el("ativo-valor") ? el("ativo-valor").value : 0) || 0;
+  var vida  = Number(el("ativo-vida") ? el("ativo-vida").value : 0) || 0;
+
+  if (!nome || !data || valor <= 0 || vida <= 0) {
+    toast("Preenche nome, data, valor e vida útil.", "error");
+    return;
+  }
+
+  await db.add("fixedAssets", {
+    name: nome, category: categoria, purchaseDate: data,
+    purchaseValue: valor, usefulLifeMonths: vida,
+    active: true, createdAt: new Date().toISOString(),
+  });
+
+  closeModal();
+  toast("Ativo registado.", "success");
+  var wrap = el("contabilidade-content");
+  if (wrap) await loadContaAtivos(wrap);
+};
+
+window._verAtivo = function(id) {
+  confirmDialog(
+    "Queres marcar este ativo como inativo? Deixa de gerar amortizações a partir do próximo mês, mas o histórico já lançado mantém-se.",
+    async function() {
+      var asset = await db.get("fixedAssets", id);
+      if (!asset) return;
+      await db.put("fixedAssets", Object.assign({}, asset, { active: !asset.active }));
+      var wrap = el("contabilidade-content");
+      if (wrap) await loadContaAtivos(wrap);
+    },
+    { title: "Alterar estado do ativo", confirmText: "Confirmar", icon: "package" }
+  );
+};
+
+window._lancarAmortizacoesMes = async function() {
+  var periodoAtual = new Date().toISOString().slice(0, 7);
+  confirmDialog(
+    "Vai lançar as amortizações de " + periodoAtual + " para todos os ativos ativos que ainda não tenham sido amortizados neste mês.",
+    async function() {
+      try {
+        var n = await postDepreciationJournal(periodoAtual);
+        toast(n > 0 ? (n + " amortização(ões) lançada(s).") : "Nada por lançar este mês.", "success");
+        var wrap = el("contabilidade-content");
+        if (wrap) await loadContaAtivos(wrap);
+      } catch (err) {
+        toast("Erro: " + err.message, "error");
+      }
+    },
+    { title: "Lançar amortizações", confirmText: "Lançar", icon: "calendar-check" }
+  );
+};
 
 async function loadAssinatura() {
   await loadLicense();
