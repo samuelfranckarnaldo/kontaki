@@ -788,59 +788,95 @@ export const catalogService = {
   },
 
   async apply(ktkcat) {
-    const currentUser=requireAuth();
     if (!ktkcat || ktkcat.tipo!=="ktkcat" || !Array.isArray(ktkcat.produtos)) throw new Error("INVALID_FORMAT");
     const hashResult=await validateKtkcatHash(ktkcat);
     if (!hashResult.valid && !hashResult.legacy) throw new Error("INVALID_HASH");
 
-    const localProducts=await db.getAll("products");
-    const byCatalogId={};
-    localProducts.forEach(p=>{ if (p.catalogId) byCatalogId[p.catalogId]=p; });
+    const result = await applyProductItems(ktkcat.produtos);
+    return {...result, legacy:hashResult.legacy};
+  },
 
-    let updated=0, created=0;
-    for (const item of ktkcat.produtos) {
-      const existing=byCatalogId[item.catalogId];
-      if (existing) {
-        await db.put("products",{
-          ...existing,
-          name:item.name!==undefined?item.name:existing.name,
-          barcode:item.barcode!==undefined?item.barcode:existing.barcode,
-          masterBarcode:item.masterBarcode!==undefined?item.masterBarcode:existing.masterBarcode,
-          price:item.price!==undefined?item.price:existing.price,
-          costPrice:item.costPrice!==undefined?item.costPrice:existing.costPrice,
-          minStock:item.minStock!==undefined?item.minStock:existing.minStock,
-          category:item.category!==undefined?item.category:existing.category,
-          unit:item.unit!==undefined?item.unit:existing.unit,
-          catalogId:item.catalogId, updatedAt:new Date().toISOString(),
-        });
-        updated++;
-      } else {
-        await db.add("products",{
-          catalogId:item.catalogId, name:item.name, barcode:item.barcode||"",
-          masterBarcode:item.masterBarcode||"", price:item.price, costPrice:item.costPrice||0,
-          minStock:item.minStock||5, category:item.category||"Outro", unit:item.unit||"unid",
-          active:true, stock:0, warehouseStock:0, createdAt:new Date().toISOString(),
-          pendingInitialCount:true, pendingInitialCountBy:currentUser?currentUser.id:null,
-          pendingInitialCountAt:new Date().toISOString(),
-        });
-        created++;
-      }
-    }
-
-    const incomingIds=new Set(ktkcat.produtos.map(i=>i.catalogId));
-    const discontinued=localProducts.filter(p=>p.catalogId && !incomingIds.has(p.catalogId));
-    const discontinuedWithStock=[];
-    for (const p of discontinued) {
-      const shopStock=await getStock(p.id,"shop");
-      const whStock=await getStock(p.id,"warehouse");
-      if (shopStock>0 || whStock>0) {
-        discontinuedWithStock.push({productId:p.id,productName:p.name,shopStock,whStock});
-      }
-    }
-
-    return {updated,created,discontinuedWithStock,legacy:hashResult.legacy};
+  // Aplica um catalogo vindo do Workspace (Console), sem hash/HMAC — a
+  // confianca vem do canal (HTTPS + licenca), nao de assinatura de ficheiro
+  // (ver decisao "Opcao D"). Mesma logica de aplicacao que o .ktkcat local,
+  // via applyProductItems(), para nunca haver duas implementacoes a divergir.
+  async applyWorkspaceCatalog(items) {
+    if (!Array.isArray(items)) throw new Error("INVALID_FORMAT");
+    return applyProductItems(items);
   },
 };
+
+// Logica partilhada de aplicacao de itens de catalogo a produtos locais.
+// Usada tanto pelo fluxo offline (.ktkcat com hash) como pelo fluxo online
+// (catalogo do Workspace, sem hash) — ver catalogService.apply() e
+// catalogService.applyWorkspaceCatalog().
+async function applyProductItems(items) {
+  // Nao usa requireAuth() porque este fluxo tambem corre em segundo
+  // plano (sync automatico do Workspace), sem sessao aberta. getUser()
+  // devolve null nesse caso, e o codigo ja trata isso (ver
+  // pendingInitialCountBy abaixo).
+  const currentUser=getUser();
+  const localProducts=await db.getAll("products");
+  const byCatalogId={};
+  localProducts.forEach(p=>{ if (p.catalogId) byCatalogId[p.catalogId]=p; });
+
+  let updated=0, created=0;
+  for (const item of items) {
+    const existing=byCatalogId[item.catalogId];
+    if (existing) {
+      await db.put("products",{
+        ...existing,
+        name:item.name!==undefined?item.name:existing.name,
+        barcode:item.barcode!==undefined?item.barcode:existing.barcode,
+        masterBarcode:item.masterBarcode!==undefined?item.masterBarcode:existing.masterBarcode,
+        price:item.price!==undefined?item.price:existing.price,
+        costPrice:item.costPrice!==undefined?item.costPrice:existing.costPrice,
+        minStock:item.minStock!==undefined?item.minStock:existing.minStock,
+        category:item.category!==undefined?item.category:existing.category,
+        unit:item.unit!==undefined?item.unit:existing.unit,
+        active:item.active!==undefined?item.active:existing.active,
+        catalogId:item.catalogId, updatedAt:new Date().toISOString(),
+      });
+      updated++;
+      // Produto existente ignora initialStock (decisao: catalogo nunca
+      // altera stock de produto ja existente).
+    } else {
+      const newId = await db.add("products",{
+        catalogId:item.catalogId, name:item.name, barcode:item.barcode||"",
+        masterBarcode:item.masterBarcode||"", price:item.price, costPrice:item.costPrice||0,
+        minStock:item.minStock||5, category:item.category||"Outro", unit:item.unit||"unid",
+        active:item.active!==undefined?item.active:true, stock:0, warehouseStock:0,
+        createdAt:new Date().toISOString(),
+        pendingInitialCount:true, pendingInitialCountBy:currentUser?currentUser.id:null,
+        pendingInitialCountAt:new Date().toISOString(),
+      });
+      created++;
+
+      // initialStock so se aplica na criacao, e nunca escreve stock
+      // diretamente — gera um stockMovement rastreavel (decisao: "todo
+      // stock existente tem uma origem rastreavel").
+      if (item.initialStock && item.initialStock > 0) {
+        await addStockMovement({
+          productId:newId, productName:item.name, type:"INVENTORY_INITIAL",
+          location:"shop", qty:item.initialStock,
+          reference:"Workspace", note:"Stock inicial definido no Workspace",
+        });
+      }
+    }
+  }
+
+  const incomingIds=new Set(items.map(i=>i.catalogId));
+  const discontinued=localProducts.filter(p=>p.catalogId && !incomingIds.has(p.catalogId));
+  const discontinuedWithStock=[];
+  for (const p of discontinued) {
+    const shopStock=await getStock(p.id,"shop");
+    const whStock=await getStock(p.id,"warehouse");
+    if (shopStock>0 || whStock>0) {
+      discontinuedWithStock.push({productId:p.id,productName:p.name,shopStock,whStock});
+    }
+  }
+  return {updated,created,discontinuedWithStock};
+}
 
 export const historicoService = {
   async query({from,to,userId,productId,type}={}) {

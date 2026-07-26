@@ -67,7 +67,8 @@ async function boot() {
       .then(function(){ return m.syncSales(); })
       .then(function(){ return m.syncProducts(); })
       .then(function(){ return m.syncIncidents(); })
-      .then(function(){ return m.syncSessions(); });
+      .then(function(){ return m.syncSessions(); })
+      .then(function(){ return m.syncWorkspaceCatalog(); });
   }).catch(function() {});
 
   const users = await db.getAll("users");

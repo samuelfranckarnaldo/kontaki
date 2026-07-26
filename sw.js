@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kontaki-v383';
+const CACHE_NAME = 'kontaki-v386';
 const BASE = self.location.pathname.replace(/\/sw\.js$/, '');
 
 const ASSETS = [
@@ -50,6 +50,39 @@ const ASSETS = [
   BASE + '/assets/icons/favicon-32x32.png',
   BASE + '/assets/icons/favicon-16x16.png',
   BASE + '/assets/icons/apple-touch-icon.png',
+  BASE + '/assets/vendor/chart.umd.min.js',
+  BASE + '/src/calendar.js',
+  BASE + '/src/date-picker.js',
+  BASE + '/src/invite.js',
+  BASE + '/src/license.js',
+  BASE + '/src/message-ui.js',
+  BASE + '/src/messages.js',
+  BASE + '/src/notification-ui.js',
+  BASE + '/src/notifications.js',
+  BASE + '/src/onboarding.js',
+  BASE + '/src/pgc.js',
+  BASE + '/src/picker.js',
+  BASE + '/src/recovery-codes.js',
+  BASE + '/src/role-select.js',
+  BASE + '/src/setup.js',
+  BASE + '/src/sync.js',
+  BASE + '/src/version.js',
+  BASE + '/src/view-state.js',
+  BASE + '/src/components/bi.js',
+  BASE + '/src/components/clientes.js',
+  BASE + '/src/components/despesas.js',
+  BASE + '/src/components/estoque.js',
+  BASE + '/src/components/extras.js',
+  BASE + '/src/components/fornecedores.js',
+  BASE + '/src/components/multilojas.js',
+  BASE + '/src/components/recibo-pdf.js',
+  BASE + '/src/components/tesouraria.js',
+  BASE + '/src/help/despesas.js',
+  BASE + '/src/help/incidentes.js',
+  BASE + '/src/help/index.js',
+  BASE + '/src/help/turno.js',
+  BASE + '/src/help/vendas.js',
+  BASE + '/src/styles/dark.css',
 ];
 
 // Instala e faz cache de todos os assets

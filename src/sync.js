@@ -1,5 +1,6 @@
 import { db } from "./db.js";
 import { logger } from "./logger.js";
+import { catalogService } from "./services.js";
 
 var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
@@ -337,5 +338,46 @@ export async function syncSessions() {
     logger.info("[sync] syncSessions OK: status=" + res.status);
   } catch (e) {
     logger.error("[sync] syncSessions erro de rede/execução", e);
+  }
+}
+
+// Consulta se ha um catalogo novo publicado pelo Workspace (Console) e
+// aplica-o diretamente, sem hash/HMAC — a confianca vem da licenca+HTTPS,
+// nao de assinatura de ficheiro (ver decisao "Opcao D"). Corre no mesmo
+// ciclo dos outros syncs (arranque, online, 15min).
+export async function syncWorkspaceCatalog() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+  try {
+    var storeId = await getStoreId();
+    var licenseCode = await getLicenseCode();
+    if (!storeId || !licenseCode) {
+      logger.warn("[sync] syncWorkspaceCatalog abortado: storeId=" + storeId + " licenseCode=" + licenseCode);
+      return;
+    }
+
+    var lastVersionRec = await db.get("settings", "workspaceCatalogVersion");
+    var lastVersion = lastVersionRec ? lastVersionRec.value : 0;
+
+    var res = await fetch(CONSOLE_API + "/sync/workspace-catalog?licenseCode=" + encodeURIComponent(licenseCode) + "&lastAppliedVersion=" + lastVersion, {
+      method: "GET",
+    });
+
+    var resBody = await res.text();
+    if (!res.ok) {
+      logger.error("[sync] syncWorkspaceCatalog falhou: status=" + res.status + " body=" + resBody.slice(0, 300));
+      return;
+    }
+
+    var data = JSON.parse(resBody);
+    if (!data.available) {
+      logger.info("[sync] syncWorkspaceCatalog: nenhum catalogo novo");
+      return;
+    }
+
+    var result = await catalogService.applyWorkspaceCatalog(data.produtos);
+    await db.put("settings", { key: "workspaceCatalogVersion", value: data.version });
+    logger.info("[sync] syncWorkspaceCatalog aplicado: versao=" + data.version + " criados=" + result.created + " atualizados=" + result.updated);
+  } catch (e) {
+    logger.error("[sync] syncWorkspaceCatalog erro de rede/execução", e);
   }
 }
