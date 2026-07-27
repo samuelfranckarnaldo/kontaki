@@ -369,7 +369,7 @@ window._openExpiryPicker = () => {
   });
 };
 
-function _prodAbbrevQty(n) {
+export function _prodAbbrevQty(n) {
   function fmtAbbrev(v) {
     var s = v.toFixed(1);
     return s.endsWith(".0") ? s.slice(0, -2) : s;
@@ -382,7 +382,7 @@ function _prodAbbrevQty(n) {
   return sign + fmtAbbrev(abs/1e9) + "B";
 }
 
-function _prodAbbrevUnit(unit) {
+export function _prodAbbrevUnit(unit) {
   if (!unit) return "un";
   const map = {
     "Unidade": "un", "Litro": "L", "Mililitro": "ml", "Quilograma": "kg",
@@ -393,7 +393,7 @@ function _prodAbbrevUnit(unit) {
   return unit.length > 4 ? unit.slice(0, 3) + "." : unit;
 }
 
-function categoryColor(cat) {
+export function categoryColor(cat) {
   return {"Alimentacao":"#f97316","Bebidas":"#3b82f6","Higiene":"#ec4899","Limpeza":"#10b981","Outro":"#6b7280"}[cat] || "#6b7280";
 }
 

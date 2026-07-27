@@ -1,6 +1,6 @@
 import { db } from "../db.js";
 import { fmt, refreshIcons } from "../utils.js";
-import { _statCard } from "./produtos.js";
+import { _statCard, _prodAbbrevQty, _prodAbbrevUnit, categoryColor } from "./produtos.js";
 import { openModal, closeModal } from "../modal.js";
 import { toast } from "../toast.js";
 
@@ -642,7 +642,9 @@ function _mockTurnoStatus(store) {
 }
 
 var _mlEspelhoProducts = null;
+var _mlEscritorioSession = null;
 var _mlEscritorioStoreId = null;
+var _mlEscritorioView = "turno"; // turno | produtos | catalogo
 var _mlWorkspaceSubView = "list";
 var _mlWorkspaceEditingCatalogId = null;
 var _mlWorkspaceLastExport = null;
@@ -683,9 +685,11 @@ async function _renderEscritorio(wrap) {
     return;
   }
   _mlEspelhoProducts = (storeData.products && storeData.products.items) || [];
+  _mlEscritorioSession = storeData.session || { available: false, message: "Sem sessões sincronizadas ainda" };
 
   _mlWorkspaceStoreId = store.id;
   _mlWorkspaceStoreName = store.name;
+  _mlEscritorioView = "turno";
   _mlWorkspaceSubView = "list";
   _mlWorkspaceEditingCatalogId = null;
 
@@ -716,48 +720,149 @@ async function _renderEscritorio(wrap) {
   _mlRenderEscritorioContent(wrap, store);
 }
 
-function _mlRenderEscritorioContent(wrap, store) {
-  var t = _mockTurnoStatus(store);
-  var meta = TURNO_STATUS_META[t.status];
-  var diffColor = t.caixaDiff === 0 ? "var(--text3)" : (t.caixaDiff < 0 ? "#dc2626" : "#16a34a");
-  var diffLabel = t.caixaDiff === 0 ? "Sem diferença" : (t.caixaDiff < 0 ? fmt(t.caixaDiff) : "+" + fmt(t.caixaDiff));
+var ESCRITORIO_VIEWS = [
+  { key: "turno",     label: "Turno",    desc: "Estado do turno, operador e diferença de caixa", icon: "clipboard-list", iconClass: "hist-export-icon--edit" },
+  { key: "produtos",  label: "Produtos", desc: "Inventário da loja, só leitura",                   icon: "package",        iconStyle: "background:#eff6ff;color:#2563eb" },
+  { key: "catalogo",  label: "Catálogo", desc: "Editar produtos e publicar alterações",           icon: "pencil",         iconClass: "hist-export-icon--csv" },
+];
 
-  var turnoHtml =
-    '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:16px">' +
-      '<div style="font-size:10.5px;color:var(--text4);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Turno (simulado)</div>' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
-        '<span style="font-size:14px;font-weight:700;color:var(--text)">' + store.name + '</span>' +
-        '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:' + meta.color + ';background:' + meta.bg + ';padding:3px 9px;border-radius:20px">' +
-          '<span style="width:6px;height:6px;border-radius:50%;background:' + meta.dot + '"></span>' + meta.label +
-        '</span>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
-        '<div><div style="font-size:10.5px;color:var(--text4);margin-bottom:2px">Caixa</div><div style="font-size:12.5px;font-weight:700;color:var(--text2)">' + t.operator + '</div></div>' +
-        '<div><div style="font-size:10.5px;color:var(--text4);margin-bottom:2px">Vendas hoje</div><div style="font-size:12.5px;font-weight:700;color:var(--text2)">' + fmt(store.salesToday) + '</div></div>' +
-        '<div><div style="font-size:10.5px;color:var(--text4);margin-bottom:2px">Diferença</div><div style="font-size:12.5px;font-weight:700;color:' + diffColor + '">' + diffLabel + '</div></div>' +
-      '</div>' +
+function _mlEscritorioViewLabel(key) {
+  var v = ESCRITORIO_VIEWS.find(function(x) { return x.key === key; });
+  return v ? v.label : key;
+}
+
+window._mlShowEscritorioViewPicker = function() {
+  var body = '<div class="hist-export-options">' +
+    ESCRITORIO_VIEWS.map(function(v) {
+      var active = _mlEscritorioView === v.key;
+      var iconAttrs = v.iconClass ? (' class="hist-export-icon ' + v.iconClass + '"') : (' class="hist-export-icon" style="' + v.iconStyle + '"');
+      return '<div class="hist-export-option" onclick="window._mlSelectEscritorioView(\'' + v.key + '\')" style="' + (active ? "border-color:var(--primary,#5b21b6)" : "") + '">' +
+        '<div' + iconAttrs + '><i data-lucide="' + v.icon + '"></i></div>' +
+        '<div class="hist-export-info">' +
+          '<div class="hist-export-title">' + v.label + (active ? ' <span style="color:var(--primary,#5b21b6);font-weight:700">· atual</span>' : '') + '</div>' +
+          '<div class="hist-export-desc">' + v.desc + '</div>' +
+        '</div>' +
+        '<i data-lucide="chevron-right" class="hist-export-arrow"></i>' +
+      '</div>';
+    }).join("") +
+  '</div>';
+  openModal("Ver secção", body);
+  refreshIcons(document.getElementById("modal-box") || document.body);
+};
+
+window._mlSelectEscritorioView = function(key) {
+  _mlEscritorioView = key;
+  closeModal();
+  var wrap = document.getElementById("multilojas-content");
+  if (wrap) _mlRenderEscritorioContent(wrap, (_mlStoresCache || []).find(function(s) { return s.id === _mlEscritorioStoreId; }));
+};
+
+function _mlEscritorioPickerHtml() {
+  return '<button onclick="window._mlShowEscritorioViewPicker()" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:10px 12px;margin-bottom:14px;font-family:inherit;cursor:pointer">' +
+    '<span style="font-size:13px;font-weight:700;color:var(--text)">' + _mlEscritorioViewLabel(_mlEscritorioView) + '</span>' +
+    '<i data-lucide="chevron-down" style="width:15px;height:15px;color:var(--text4)"></i>' +
+  '</button>';
+}
+
+function _mlTurnoBox(label, value, valueColor) {
+  return '<div style="background:var(--bg,#f4f4f5);border-radius:var(--radius-sm);padding:10px 12px">' +
+    '<div style="font-size:10px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">' + label + '</div>' +
+    '<div style="font-size:14px;font-weight:800;color:' + (valueColor || "var(--text)") + '">' + value + '</div>' +
+  '</div>';
+}
+
+function _mlTurnoSectionHtml(store) {
+  var session = _mlEscritorioSession;
+
+  if (!session || !session.available) {
+    return '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px">' +
+      '<div style="font-size:10.5px;font-weight:700;color:var(--primary,#5b21b6);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Turno</div>' +
+      '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:10px">' + store.name + '</div>' +
+      '<div style="font-size:12.5px;color:var(--text4)">' + ((session && session.message) || "Sem sessões sincronizadas ainda") + '</div>' +
     '</div>';
+  }
 
+  var isOpen = session.status === "open" || session.status === "aberto";
+  var statusMeta = isOpen
+    ? { label: "Aberto",  color: "var(--primary,#5b21b6)", bg: "var(--primary-light,#ede9fe)" }
+    : { label: "Fechado", color: "var(--text3)",           bg: "var(--bg,#f4f4f5)" };
+
+  var diff = session.cashDiff;
+  var diffColor = "var(--text3)";
+  var diffLabel = "Sem dados de conferência de caixa";
+  if (diff !== null && diff !== undefined) {
+    diffColor = diff === 0 ? "var(--text3)" : (diff < 0 ? "var(--primary,#5b21b6)" : "var(--success,#16a34a)");
+    diffLabel = diff === 0 ? "Sem diferença" : (diff < 0 ? fmt(diff) : "+" + fmt(diff));
+  }
+
+  return '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">' +
+      '<div>' +
+        '<div style="font-size:10.5px;font-weight:700;color:var(--primary,#5b21b6);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Turno</div>' +
+        '<div style="font-size:15px;font-weight:800;color:var(--text)">' + store.name + '</div>' +
+        '<div style="font-size:11px;color:var(--text4);margin-top:2px">desde ' + (session.openedAt ? new Date(session.openedAt).toLocaleString("pt-AO") : "—") + '</div>' +
+      '</div>' +
+      '<span style="font-size:11px;font-weight:700;color:' + statusMeta.color + ';background:' + statusMeta.bg + ';padding:4px 10px;border-radius:20px">' + statusMeta.label + '</span>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+      _mlTurnoBox("Caixa", session.operatorName || "—") +
+      _mlTurnoBox("Vendas do turno", fmt(session.totalVendas || 0)) +
+    '</div>' +
+    _mlTurnoBox("Diferença de caixa", diffLabel, diffColor) +
+  '</div>';
+}
+
+function _mlProdutoItemHtml(p) {
+  var qty = p.stock || 0;
+  var arm = p.warehouseStock || 0;
+  var min = p.minStock != null ? p.minStock : 5;
+  var badgeClass = qty === 0 ? "produto-badge-zero" : (qty <= min ? "produto-badge-low" : "");
+  var tag = qty === 0 ? "Esgotado" : (qty <= min ? "Stock baixo" : "");
+  var cColor = categoryColor(p.category);
+  var initial = (p.name || "P").charAt(0).toUpperCase();
+  var avatarHtml = '<div class="produto-avatar" style="background:' + cColor + '20;color:' + cColor + '">' + initial + '</div>';
+
+  return '<div class="produto-item ' + (qty === 0 ? "produto-item-zero" : (qty <= min ? "produto-item-low" : "")) + '">' +
+    avatarHtml +
+    '<div style="flex:1;min-width:0">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+        '<div class="produto-name">' + p.name + '</div>' +
+        (tag ? '<span class="produto-badge ' + badgeClass + '">' + tag + '</span>' : "") +
+      '</div>' +
+      '<div class="produto-meta">' + (p.category || "") + '</div>' +
+      '<div class="produto-stock-line" style="white-space:normal;overflow:visible;text-overflow:clip">' +
+        '<span><span class="produto-stock-label">Loja</span> ' + _prodAbbrevQty(qty) + '</span>' +
+        '<span><span class="produto-stock-label">Arm.</span> ' + _prodAbbrevQty(arm) + '</span>' +
+        '<span><strong>' + _prodAbbrevQty(qty + arm) + ' ' + _prodAbbrevUnit(p.unit) + '</strong></span>' +
+      '</div>' +
+      '<div class="produto-price" style="margin-top:4px">' + fmt(p.price) + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function _mlProdutosSectionHtml() {
   var products = _mlEspelhoProducts || [];
-  var espelhoHtml =
-    '<div style="margin-bottom:16px">' +
-      '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Produtos em tempo real (Espelho)</div>' +
-      '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);max-height:240px;overflow-y:auto">' +
-        (products.length
-          ? products.map(function(p) {
-              return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid #f4f4f5;font-size:12.5px">' +
-                '<div><div style="font-weight:600;color:var(--text2)">' + p.name + '</div><div style="font-size:10.5px;color:var(--text4)">' + (p.category || "") + ' · stock ' + (p.stock != null ? p.stock : "—") + '</div></div>' +
-                '<div style="font-weight:700;color:var(--text2)">' + fmt(p.price) + '</div>' +
-              '</div>';
-            }).join("")
-          : '<div style="padding:16px;text-align:center;font-size:12px;color:var(--text4)">Sem produtos sincronizados.</div>') +
-      '</div>' +
-      '<div style="font-size:10.5px;color:var(--text4);margin-top:6px">Só leitura — reflete o que a loja tem agora. Editar só é possível no Workspace abaixo.</div>' +
-    '</div>';
+  return '<div>' +
+    '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Inventário da loja</div>' +
+    (products.length
+      ? '<div style="border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
+          products.map(_mlProdutoItemHtml).join("") +
+        '</div>'
+      : '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;text-align:center;font-size:12px;color:var(--text4)">Sem produtos sincronizados.</div>') +
+  '</div>';
+}
 
-  var workspaceHtml = '<div id="ml-workspace-section">' + _mlWorkspaceSectionHtml() + '</div>';
+function _mlRenderEscritorioContent(wrap, store) {
+  var sectionHtml;
+  if (_mlEscritorioView === "turno") {
+    sectionHtml = _mlTurnoSectionHtml(store);
+  } else if (_mlEscritorioView === "produtos") {
+    sectionHtml = _mlProdutosSectionHtml();
+  } else {
+    sectionHtml = '<div id="ml-workspace-section">' + _mlWorkspaceSectionHtml() + '</div>';
+  }
 
-  wrap.innerHTML = turnoHtml + espelhoHtml + workspaceHtml;
+  wrap.innerHTML = _mlEscritorioPickerHtml() + sectionHtml;
   refreshIcons(wrap);
 }
 
