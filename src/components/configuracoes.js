@@ -105,8 +105,6 @@ async function renderConfiguracoes() {
 
     sectionLabel("Últimos erros (" + logs.length + ")") +
     '<div class="vender-card" style="margin-bottom:14px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
-    '<button id="btn-test-backup-crypto" onclick="window._runBackupCryptoTest()" style="width:100%;padding:13px;margin-bottom:14px;background:none;border:1.5px solid var(--primary);color:var(--primary);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
-    '<i data-lucide="flask-conical" style="width:16px;height:16px"></i> Testar cifragem de backup (temporário)</button>' +
     (logs.length === 0
       ? '<div style="font-size:13px;color:var(--text4);text-align:center;padding:16px">Sem erros registados</div>'
       : logs.map(l =>
@@ -257,14 +255,6 @@ window._clearLogs = async () => {
 };
 
 window._closeModal = closeModal;
-
-window._runBackupCryptoTest = async function() {
-  toast("A testar cifragem de backup...", "success");
-  var mod = await import("../crypto.js");
-  var ok = await mod.testBackupCrypto();
-  toast(ok ? "Teste OK — ver Últimos erros" : "Teste falhou — ver Últimos erros", ok ? "success" : "error");
-  await renderConfiguracoes();
-};
 
 // ── ELIMINAR CONTA ───────────────────────────────────────────────────────────
 window._openDeleteAccount = () => {
