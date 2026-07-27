@@ -75,6 +75,23 @@ function _renderStoreSelector() {
   var wrap = document.getElementById("multilojas-store-selector");
   if (!wrap || !_mlStoresCache) return;
 
+  if (!_mlStoresCache.length) {
+    wrap.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:10px 12px;margin-bottom:14px">' +
+        '<span style="font-size:12.5px;color:var(--text4)">Nenhuma loja ligada</span>' +
+        '<div style="display:flex;align-items:center;gap:12px">' +
+          '<button onclick="window._mlShowAddStore()" style="border:none;background:none;color:var(--primary,#5b21b6);font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;padding:0">' +
+            '<i data-lucide="plus" style="width:14px;height:14px"></i> Adicionar' +
+          '</button>' +
+          '<button onclick="window._mlLogout()" title="Sair" style="border:none;background:none;padding:2px;cursor:pointer;flex-shrink:0;display:flex;align-items:center">' +
+            '<i data-lucide="log-out" style="width:15px;height:15px;color:var(--text4)"></i>' +
+          '</button>' +
+        '</div>' +
+      '</div>';
+    refreshIcons(wrap);
+    return;
+  }
+
   var options = '<option value="all"' + (_mlSelectedStoreId === "all" ? ' selected' : '') + '>Todas as lojas</option>' +
     _mlStoresCache.map(function(s) {
       return '<option value="' + s.id + '"' + (_mlSelectedStoreId === s.id ? ' selected' : '') + '>' + s.name + '</option>';
@@ -87,6 +104,12 @@ function _renderStoreSelector() {
         options +
       '</select>' +
       '<i data-lucide="chevron-down" style="width:14px;height:14px;color:var(--text4);flex-shrink:0"></i>' +
+      '<button id="ml-refresh-btn" onclick="window._mlRefreshStores()" title="Atualizar" style="border:none;background:none;padding:2px;cursor:pointer;flex-shrink:0;display:flex;align-items:center">' +
+        '<i data-lucide="refresh-cw" style="width:14px;height:14px;color:var(--text4)"></i>' +
+      '</button>' +
+      '<button onclick="window._mlShowAddStore()" title="Adicionar loja" style="border:none;background:none;padding:2px;cursor:pointer;flex-shrink:0;display:flex;align-items:center">' +
+        '<i data-lucide="plus" style="width:15px;height:15px;color:var(--text4)"></i>' +
+      '</button>' +
       '<button onclick="window._mlLogout()" title="Sair" style="border:none;background:none;padding:2px;cursor:pointer;flex-shrink:0;display:flex;align-items:center">' +
         '<i data-lucide="log-out" style="width:15px;height:15px;color:var(--text4)"></i>' +
       '</button>' +
@@ -121,6 +144,72 @@ function _comingSoonHtml(label) {
     '<div class="empty-state-sub">' + label + ' fica disponível quando os dados relevantes forem sincronizados com o Console.</div>' +
   '</div>';
 }
+
+// ── ADICIONAR LOJA (pareamento loja↔Workspace) ──────────────────────────
+// O dono introduz o store_id PÚBLICO mostrado no Kontaki em
+// Configurações → Segurança → Workspace. Isto cria um store_link
+// "pending" e envia uma mensagem bloqueante à loja — só fica "active"
+// depois de a loja aceitar (link-response, do lado do dispositivo).
+
+function _mlNoStoresHtml() {
+  return '<div class="empty-state">' +
+    '<i data-lucide="store"></i>' +
+    '<div class="empty-state-title">Ainda sem lojas ligadas</div>' +
+    '<div class="empty-state-sub">Liga a tua primeira loja usando o identificador público mostrado no dispositivo, em Configurações → Segurança → Workspace.</div>' +
+    '<button class="btn btn-primary btn-sm" style="margin-top:14px" onclick="window._mlShowAddStore()">Adicionar loja</button>' +
+  '</div>';
+}
+
+window._mlShowAddStore = function() {
+  var body =
+    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:14px;line-height:1.5">No dispositivo da loja, abre Configurações → Segurança → Workspace para veres o identificador público (ou o código QR). Introduz esse código aqui para pedir a ligação — a loja tem de aceitar antes de aparecer aqui.</div>' +
+    '<div class="field" style="margin-bottom:6px"><label>Identificador da loja</label><input id="was-store-id" type="text" placeholder="Ex.: 8f3a1c2b-..."></div>' +
+    '<div id="was-error" style="display:none;font-size:12px;color:#dc2626;background:#fef2f2;border-radius:var(--radius-sm);padding:8px 10px;margin:10px 0"></div>' +
+    '<div class="form-actions" style="margin-top:10px">' +
+      '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+      '<button id="was-submit-btn" class="btn btn-primary btn-full" onclick="window._mlSubmitAddStore()">Pedir ligação</button>' +
+    '</div>';
+  openModal("Adicionar loja", body);
+};
+
+window._mlSubmitAddStore = async function() {
+  var errEl = document.getElementById("was-error");
+  if (errEl) errEl.style.display = "none";
+
+  var storeId = (document.getElementById("was-store-id").value || "").trim();
+  if (!storeId) {
+    if (errEl) { errEl.textContent = "Introduz o identificador da loja."; errEl.style.display = "block"; }
+    return;
+  }
+
+  var btn = document.getElementById("was-submit-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "A processar…"; }
+
+  var res, data;
+  try {
+    res = await _mlAuthFetch("/workspace-auth/link-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storePublicId: storeId }),
+    });
+    data = await res.json();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Pedir ligação"; }
+    if (errEl) { errEl.textContent = "Sem ligação à internet."; errEl.style.display = "block"; }
+    return;
+  }
+
+  if (res.status === 401) { closeModal(); loadMultilojas(); return; }
+
+  if (!res.ok || !data || !data.success) {
+    if (btn) { btn.disabled = false; btn.textContent = "Pedir ligação"; }
+    if (errEl) { errEl.textContent = (data && data.error) || "Erro ao pedir ligação."; errEl.style.display = "block"; }
+    return;
+  }
+
+  closeModal();
+  toast('Pedido enviado para "' + data.storeName + '". Aceita a ligação no dispositivo da loja.', "success");
+};
 
 export async function loadMultilojas() {
   var btn = document.getElementById("btn-back-multilojas");
@@ -313,6 +402,18 @@ window._mlSubmitRecovery = async function() {
   toast("Senha alterada. Entra com a nova senha.", "success");
 };
 
+window._mlRefreshStores = async function() {
+  var refreshBtn = document.getElementById("ml-refresh-btn");
+  var icon = refreshBtn ? refreshBtn.querySelector("i") : null;
+  if (icon) icon.style.animation = "spin 0.6s linear infinite";
+
+  await _loadStoresList();
+  _renderStoreSelector();
+  await _renderContent();
+
+  if (icon) icon.style.animation = "";
+};
+
 async function _loadStoresList() {
   var res;
   try {
@@ -334,6 +435,12 @@ async function _loadStoresList() {
 async function _renderContent() {
   var wrap = document.getElementById("multilojas-content");
   if (!wrap) return;
+
+  if (!_mlStoresCache || !_mlStoresCache.length) {
+    wrap.innerHTML = _mlNoStoresHtml();
+    refreshIcons(wrap);
+    return;
+  }
 
   if (_mlActiveTab === "resumo") {
     return _mlSelectedStoreId === "all" ? _renderResumoAgregado(wrap) : _renderResumoLoja(wrap, _mlSelectedStoreId);
