@@ -425,6 +425,47 @@ export async function postBankTransfer(params) {
   return createJournalEntry(params.date, params.description, "treasury", params.movementId, lines);
 }
 
+// Corrige o lançamento de uma compra já postada, quando o total muda numa
+// edição (quantidade/custo unitário corrigidos). Reaproveita a conta de
+// contrapartida original (Caixa/Banco/Fornecedores) em vez de precisar de
+// saber o payMethod (que não fica guardado no registo da compra) — estorna
+// o lançamento antigo e lança o novo com o total corrigido.
+export async function updatePurchaseJournal(params) {
+  var allEntries = await db.getAll("journalEntries");
+  var originalEntry = allEntries.find(function(e) {
+    return e.sourceType === "purchase" && e.sourceId === params.purchaseId &&
+      (e.lines || []).some(function(l) { return l.account === "26"; });
+  });
+  if (!originalEntry) return null;
+
+  var linha26 = originalEntry.lines.find(function(l) { return l.account === "26"; });
+  var outraLinha = originalEntry.lines.find(function(l) { return l.account !== "26"; });
+  if (!outraLinha) return null;
+
+  if (Math.round(linha26.debit * 100) === Math.round(params.newTotal * 100)) {
+    return null; // total não mudou, nada a corrigir
+  }
+
+  if (await isPeriodClosed(originalEntry.date)) {
+    throw new Error("Não é possível corrigir — o período " + String(originalEntry.date).slice(0,7) + " já está fechado.");
+  }
+  if (await isPeriodClosed(params.date)) {
+    throw new Error("Não é possível lançar — o período " + String(params.date).slice(0,7) + " já está fechado.");
+  }
+
+  var linhasInvertidas = originalEntry.lines.map(function(l) {
+    return { account: l.account, debit: l.credit || 0, credit: l.debit || 0 };
+  });
+  await createJournalEntry(originalEntry.date, "Estorno (correção) — " + originalEntry.description, "purchase", params.purchaseId, linhasInvertidas);
+
+  await createJournalEntry(params.date, "Compra #" + params.purchaseId + " (corrigida)", "purchase", params.purchaseId, [
+    { account: "26", debit: params.newTotal, credit: 0 },
+    { account: outraLinha.account, debit: 0, credit: params.newTotal },
+  ]);
+
+  return true;
+}
+
 // Lançamento de uma despesa: débito conta de custo, crédito Caixa/Depósitos.
 // Em edições, NÃO apaga o lançamento anterior — estorna-o (contrapartida) e
 // lança o novo, preservando o histórico completo no Diário para auditoria

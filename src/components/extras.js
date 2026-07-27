@@ -276,6 +276,7 @@ window._confirmarDevolucao = async function() {
     });
   } catch (pgcErr) {
     console.error("Erro ao lançar devolução na contabilidade:", pgcErr);
+    alert("A devolução foi registada, mas houve um erro ao lançar na contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.");
   }
 
   closeModal();

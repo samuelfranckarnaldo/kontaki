@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { getUser } from "../auth.js";
 import { fmt, refreshIcons } from "../utils.js";
 import { _statCard } from "./produtos.js";
 
@@ -103,9 +104,13 @@ export function computeMonthlyComparison(sales, expenses, products) {
  * Ranking dos produtos mais vendidos num período (por omissão, mês atual).
  * Retorna array ordenado por receita: [{ id, name, qty, receita }, ...]
  */
-export function computeTopProducts(sales, mes, limit) {
+export function computeTopProducts(sales, products, mes, limit) {
   mes = mes || new Date().toISOString().slice(0, 7);
   limit = limit || 5;
+  products = products || [];
+
+  var prodMap = {};
+  products.forEach(function(p) { prodMap[p.id] = p; });
 
   var vendasMes = sales.filter(function(s) { return (s.date || "").startsWith(mes); });
 
@@ -114,15 +119,20 @@ export function computeTopProducts(sales, mes, limit) {
     var propDev = s.total > 0 ? (s.totalDevolvido || 0) / s.total : 0;
     (s.items || []).forEach(function(item) {
       if (!byProduct[item.id]) {
-        byProduct[item.id] = { id: item.id, name: item.name, qty: 0, receita: 0 };
+        byProduct[item.id] = { id: item.id, name: item.name, qty: 0, receita: 0, custo: 0 };
       }
       var qtyEfetiva = item.qty * (1 - propDev);
       byProduct[item.id].qty += qtyEfetiva;
       byProduct[item.id].receita += item.price * qtyEfetiva;
+      var prod = prodMap[item.id];
+      byProduct[item.id].custo += (prod ? (prod.costPrice || 0) : 0) * qtyEfetiva;
     });
   });
 
   var list = Object.values(byProduct);
+  list.forEach(function(p) {
+    p.margem = p.receita > 0 ? Math.round(((p.receita - p.custo) / p.receita) * 100) : 0;
+  });
   list.sort(function(a, b) { return b.receita - a.receita; });
   return list.slice(0, limit);
 }
@@ -392,6 +402,19 @@ export async function loadBI() {
   var wrap = document.getElementById("dash-content");
   if (!wrap) return;
 
+  // BI expõe COGS/margens — dados operacional-confidenciais, mesma
+  // classificação que a Contabilidade (ver perfil.js loadContabilidade).
+  // Só admin.
+  var _user = getUser();
+  if (!_user || _user.role !== "admin") {
+    wrap.innerHTML =
+      '<div style="text-align:center;padding:48px 20px;color:#a1a1aa">' +
+      '<div style="font-size:14px;font-weight:600">Acesso restrito</div>' +
+      '<div style="font-size:13px;margin-top:6px">Esta secção está disponível apenas para administradores.</div>' +
+      '</div>';
+    return;
+  }
+
   wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar análise…</div>';
 
   var results = await Promise.all([
@@ -412,7 +435,7 @@ function _biRender() {
   var trend = computeSalesTrend(sales, days);
   var forecast = computeSalesForecast(trend.days, trend.values, 7);
   var comparison = computeMonthlyComparison(sales, expenses, products);
-  var topProducts = computeTopProducts(sales);
+  var topProducts = computeTopProducts(sales, products);
   var profitTrend = computeProfitTrend(sales, products, days);
   var peakHours = computePeakHours(sales, days);
   var paymentMethods = computePaymentMethods(sales);
@@ -433,6 +456,12 @@ function _biRender() {
     '<div style="font-size:15px;font-weight:800;color:var(--text);margin:24px 0 12px">Produtos mais vendidos</div>' +
     '<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Este mês, por receita</div>' +
     _topProductsHtml(topProducts) +
+
+    '<button onclick="window._estOpenReports && window._estOpenReports()" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;margin:14px 0 28px;cursor:pointer;font-family:inherit">' +
+    '<div style="text-align:left"><div style="font-size:13px;font-weight:700;color:var(--text)">Produtos parados</div>' +
+    '<div style="font-size:11px;color:var(--text3);margin-top:2px">Ver relatório de stock parado e rotatividade</div></div>' +
+    '<i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--text3);flex-shrink:0"></i>' +
+    '</button>' +
 
     '<div style="font-size:15px;font-weight:800;color:var(--text);margin:8px 0 2px">Margem de lucro</div>' +
     '<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Últimos ' + days + ' dias, % sobre receita</div>' +
@@ -526,7 +555,10 @@ function _topProductsHtml(topProducts) {
       return '<div style="margin-bottom:' + (i < topProducts.length - 1 ? '14px' : '0') + '">' +
         '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">' +
           '<span style="font-size:13px;font-weight:700;color:var(--text)">' + (i + 1) + '. ' + p.name + '</span>' +
+          '<span style="display:flex;align-items:center;gap:6px">' +
+          '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:' + (p.margem>=30?"var(--success-light)":p.margem>=15?"var(--warning-light)":"var(--danger-light)") + ';color:' + (p.margem>=30?"var(--success)":p.margem>=15?"var(--warning)":"var(--danger)") + '">' + p.margem + '% margem</span>' +
           '<span style="font-size:12px;font-weight:700;color:var(--text2)">' + fmt(p.receita) + '</span>' +
+          '</span>' +
         '</div>' +
         '<div style="height:6px;background:var(--primary-light, #ede9fe);border-radius:3px;overflow:hidden">' +
           '<div style="height:100%;width:' + pct + '%;background:var(--primary, #5b21b6);border-radius:3px"></div>' +

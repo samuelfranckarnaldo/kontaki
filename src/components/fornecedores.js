@@ -807,6 +807,7 @@ window._saveCompra = async () => {
     }
   } catch (pgcErr) {
     console.error("Erro ao lançar compra na contabilidade:", pgcErr);
+    alert("A compra foi registada, mas houve um erro ao lançar na contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.");
   }
 
   toast("Compra registada. Stock actualizado.", "success");
@@ -1029,6 +1030,17 @@ window._saveEditCompra = async (purchaseId) => {
 
     updatedItems.push({ ...item, qty: newQty, unitCost: newCost });
     total += newQty * newCost;
+  }
+
+  // Corrige o lançamento contabilístico da compra se o total mudou —
+  // sem isto, a conta 26/Fornecedores ficaria permanentemente desalinhada
+  // do que foi realmente editado.
+  try {
+    const { updatePurchaseJournal } = await import("../pgc.js");
+    await updatePurchaseJournal({ purchaseId: purchaseId, date: p.date, newTotal: total });
+  } catch (pgcErr) {
+    toast("Não foi possível corrigir a contabilidade: " + pgcErr.message, "error");
+    return;
   }
 
   await db.put("purchases", {

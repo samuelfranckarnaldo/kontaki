@@ -319,6 +319,7 @@ async function finalizarQm() {
       );
     } catch (pgcErr) {
       console.error("Erro ao lançar venda (quickmode) na contabilidade:", pgcErr);
+      alert("A venda foi registada, mas houve um erro ao lançar na contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.");
     }
 
     if (navigator.vibrate) navigator.vibrate([60,40,60]);

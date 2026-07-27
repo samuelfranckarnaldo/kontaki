@@ -559,6 +559,7 @@ window._updateDespesa = async function(id) {
     await postExpenseJournal(updatedExpense);
   } catch (pgcErr) {
     console.error("Erro ao re-lançar despesa editada na contabilidade:", pgcErr);
+    alert("A despesa foi actualizada, mas houve um erro ao corrigir a contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.");
   }
 
   toast("Despesa actualizada.", "success");
@@ -623,6 +624,7 @@ window._saveDespesa = async function() {
     await postExpenseJournal(Object.assign({ id: newExpenseId }, newExpense));
   } catch (pgcErr) {
     console.error("Erro ao lançar despesa na contabilidade:", pgcErr);
+    alert("A despesa foi registada, mas houve um erro ao lançar na contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.");
   }
 
   toast("Despesa registada.","success");
