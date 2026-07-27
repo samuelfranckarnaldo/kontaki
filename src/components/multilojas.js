@@ -22,6 +22,7 @@ var TABS = [
   { key: "incidentes", label: "Incidentes" },
   { key: "escritorio", label: "Escritório" },
   { key: "registros",  label: "Registos" },
+  { key: "bi",         label: "BI" },
 ];
 
 async function _getLicenseCode() {
@@ -448,6 +449,7 @@ async function _renderContent() {
   if (_mlActiveTab === "incidentes") { return _renderIncidentes(wrap); }
   if (_mlActiveTab === "escritorio") { return _renderEscritorio(wrap); }
   if (_mlActiveTab === "registros")  { return _renderRegistos(wrap); }
+  if (_mlActiveTab === "bi")         { return _renderBI(wrap); }
 }
 
 
@@ -1251,6 +1253,116 @@ function _healthScoreHtml(store, stock) {
         }).join("") +
       '</div>' +
     '</div>';
+}
+
+
+// ── BI — CONSOLIDADO MULTI-LOJA ──────────────────────────────────────────
+// Produtos mais vendidos e métodos de pagamento cobrem toda a receita do
+// período. O lucro bruto só cobre itens gravados após catalogId/
+// costPrice/subtotal existirem na venda — ver profit.coveragePct.
+
+var PAYMENT_METHOD_LABELS = {
+  cash: "Numerário", card: "Cartão", transfer: "Transferência",
+  mobile: "Multicaixa Express", credit: "Fiado",
+};
+
+function _mlPaymentLabel(method) {
+  return PAYMENT_METHOD_LABELS[method] || method;
+}
+
+async function _renderBI(wrap) {
+  wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
+
+  if (!_mlStoresCache || !_mlStoresCache.length) {
+    wrap.innerHTML = _errorHtml("Sem lojas para mostrar.");
+    return;
+  }
+
+  var res;
+  try {
+    res = await _mlAuthFetch("/reports/multi-store/bi?days=30");
+  } catch (e) {
+    wrap.innerHTML = _errorHtml("Sem ligação à internet. Verifica a rede e tenta novamente.");
+    return;
+  }
+  if (res.status === 401) { loadMultilojas(); return; }
+  if (!res.ok) {
+    var errData = await res.json().catch(function() { return {}; });
+    wrap.innerHTML = _errorHtml(errData.error || "Erro ao carregar BI.");
+    return;
+  }
+
+  var data = await res.json();
+  if (!data || !data.success) { wrap.innerHTML = _errorHtml("Resposta inválida do servidor."); return; }
+
+  var profit = data.profit;
+  var maxPaymentTotal = data.paymentMethods.length ? data.paymentMethods[0].total : 1;
+
+  wrap.innerHTML =
+    '<div style="margin-bottom:14px">' +
+      '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px">BI consolidado</div>' +
+      '<div style="font-size:12px;color:var(--text3)">Todas as lojas · últimos ' + data.days + ' dias</div>' +
+    '</div>' +
+
+    '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Lucro bruto</div>' +
+    (profit.available ? (
+      '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;margin-bottom:8px">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">' +
+          '<div>' +
+            '<div style="font-size:10.5px;color:var(--text4);margin-bottom:2px">Margem</div>' +
+            '<div style="font-size:18px;font-weight:800;color:var(--success,#16a34a)">' + profit.margemPct + '%</div>' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-size:10.5px;color:var(--text4);margin-bottom:2px">Lucro</div>' +
+            '<div style="font-size:18px;font-weight:800;color:var(--text)">' + fmt(profit.receita - profit.custo) + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--text4)">Receita: ' + fmt(profit.receita) + ' · Custo: ' + fmt(profit.custo) + '</div>' +
+      '</div>' +
+      (profit.coveragePct < 100
+        ? '<div style="font-size:11px;color:var(--text4);margin-bottom:24px">Baseado em ' + profit.coveragePct + '% da receita do período — vendas mais antigas ainda não têm dados de custo por item.</div>'
+        : '<div style="margin-bottom:24px"></div>')
+    ) : (
+      '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;margin-bottom:24px;text-align:center">' +
+        '<div style="font-size:12.5px;color:var(--text3)">Sem dados de custo suficientes neste período ainda.</div>' +
+        '<div style="font-size:11px;color:var(--text4);margin-top:4px">O lucro bruto passa a aparecer à medida que novas vendas forem sincronizadas.</div>' +
+      '</div>'
+    )) +
+
+    '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Produtos mais vendidos</div>' +
+    (data.topProducts.length
+      ? '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:24px">' +
+        data.topProducts.map(function(p, i) {
+          return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:' + (i < data.topProducts.length - 1 ? '10px' : '0') + ';font-size:13px">' +
+            '<span style="color:var(--text)">' + (i + 1) + '. ' + p.name + '</span>' +
+            '<div style="text-align:right">' +
+              '<div style="font-weight:700;color:var(--text2)">' + fmt(p.receita) + '</div>' +
+              '<div style="font-size:10.5px;color:var(--text4)">' + p.qty + ' un.</div>' +
+            '</div>' +
+          '</div>';
+        }).join("") +
+        '</div>'
+      : '<div style="font-size:12px;color:var(--text4);margin-bottom:24px">Sem vendas registadas neste período.</div>') +
+
+    '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Métodos de pagamento</div>' +
+    (data.paymentMethods.length
+      ? '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px">' +
+        data.paymentMethods.map(function(m, i) {
+          var pct = Math.round((m.total / maxPaymentTotal) * 100);
+          return '<div style="margin-bottom:' + (i < data.paymentMethods.length - 1 ? '14px' : '0') + '">' +
+            '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">' +
+              '<span style="font-size:13px;font-weight:700;color:var(--text)">' + _mlPaymentLabel(m.method) + '</span>' +
+              '<span style="font-size:12px;font-weight:700;color:var(--text2)">' + fmt(m.total) + ' · ' + m.count + ' venda' + (m.count !== 1 ? 's' : '') + '</span>' +
+            '</div>' +
+            '<div style="height:6px;background:#f4f4f5;border-radius:3px;overflow:hidden">' +
+              '<div style="height:100%;width:' + pct + '%;background:var(--primary,#5b21b6);border-radius:3px"></div>' +
+            '</div>' +
+          '</div>';
+        }).join("") +
+        '</div>'
+      : '<div style="font-size:12px;color:var(--text4)">Sem vendas registadas neste período.</div>');
+
+  refreshIcons(wrap);
 }
 
 
