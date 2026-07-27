@@ -289,7 +289,9 @@ export async function unwrapMasterKeyWithRecoveryCode(wrapped, code, storeId) {
   return importRawKey(raw, false);
 }
 
-export async function encryptBackup(backupObject, masterKey) {
+// meta = { storeId, deviceId, appVersion, sequence? } — crypto.js não
+// conhece a aplicação; quem sabe da loja/dispositivo/contador é quem chama.
+export async function encryptBackup(backupObject, masterKey, meta) {
   const dek = await generateAESKey(true);
   const plaintext = new TextEncoder().encode(JSON.stringify(backupObject));
   const { iv, ciphertext } = await encryptWithKey(dek, plaintext);
@@ -297,24 +299,92 @@ export async function encryptBackup(backupObject, masterKey) {
   const rawDek = await exportRawKey(dek);
   const { iv: dekIv, ciphertext: wrappedDEK } = await encryptWithKey(masterKey, rawDek);
 
+  const metadata = {
+    storeId: meta.storeId,
+    deviceId: meta.deviceId,
+    backupId: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    appVersion: meta.appVersion,
+    encryption: BACKUP_ALGORITHM,
+    wrapping: BACKUP_ALGORITHM, // mesma primitiva AES-GCM, aplicada aos bytes da DEK em vez do backup
+    kdf: "PBKDF2-SHA256",
+    wrapVersion: WRAP_VERSION,
+    plaintextSize: plaintext.length
+  };
+  if (meta.sequence != null) metadata.sequence = meta.sequence;
+
   return {
     version: 1,
-    algorithm: BACKUP_ALGORITHM,
-    createdAt: new Date().toISOString(),
-    iv: iv,
-    ciphertext: ciphertext,
-    wrappedDEK: wrappedDEK,
-    wrappedDEKIv: dekIv
+    metadata: metadata,
+    crypto: {
+      dek: { wrapped: wrappedDEK, iv: dekIv },
+      backup: { iv: iv, ciphertext: ciphertext }
+    }
   };
 }
 
-export async function decryptBackup(backupPayload, masterKey) {
-  if (backupPayload.algorithm !== BACKUP_ALGORITHM) {
-    throw new Error("Algoritmo de backup não suportado: " + backupPayload.algorithm);
+
+
+// ── TESTE MANUAL TEMPORÁRIO — remover depois de validado ──────────────────
+export async function testBackupCrypto() {
+  const { logger } = await import("./logger.js");
+  const storeId = "test-store-123";
+  const fakeCode = "ABCD-1234";
+
+  try {
+    logger.info("[testBackupCrypto] 1/5 — a gerar Master Key...");
+    let masterKey = await generateMasterKey();
+
+    logger.info("[testBackupCrypto] 2/5 — a embrulhar Master Key com código de teste...");
+    const wrapped = await wrapMasterKeyWithRecoveryCode(masterKey, fakeCode, storeId);
+    masterKey = await makeMasterKeyNonExtractable(masterKey);
+
+    logger.info("[testBackupCrypto] 3/5 — a desembrulhar Master Key (simula restauro)...");
+    const unwrapped = await unwrapMasterKeyWithRecoveryCode(wrapped, fakeCode, storeId);
+
+    const probe = new TextEncoder().encode("kontaki-probe");
+    const probeEnc = await encryptWithKey(masterKey, probe);
+    const probeDec = await decryptWithKey(unwrapped, probeEnc.iv, probeEnc.ciphertext);
+    if (new TextDecoder().decode(probeDec) !== "kontaki-probe") {
+      throw new Error("Master Key desembrulhada não é equivalente à original");
+    }
+    logger.info("[testBackupCrypto] ✓ Master Key desembrulhada correctamente");
+
+    logger.info("[testBackupCrypto] 4/5 — a cifrar backup de teste (formato final, com metadata)...");
+    const fakeBackup = { produtos: [{ nome: "Teste", preco: 1000 }], criadoEm: new Date().toISOString() };
+    const meta = { storeId: storeId, deviceId: "test-device-abc", appVersion: "1.0.0-test", sequence: 1 };
+    const encrypted = await encryptBackup(fakeBackup, unwrapped, meta);
+
+    logger.info("[testBackupCrypto] metadata: " + JSON.stringify(encrypted.metadata));
+
+    logger.info("[testBackupCrypto] 5/5 — a decifrar e comparar...");
+    const decrypted = await decryptBackup(encrypted, unwrapped);
+
+    if (JSON.stringify(decrypted) !== JSON.stringify(fakeBackup)) {
+      throw new Error("Backup decifrado não bate com o original");
+    }
+
+    logger.info("[testBackupCrypto] ✓✓✓ TESTE COMPLETO COM SUCESSO — formato final validado");
+    return true;
+  } catch (e) {
+    logger.error("[testBackupCrypto] ✗ FALHOU", e);
+    return false;
   }
-  const rawDek = await decryptWithKey(masterKey, backupPayload.wrappedDEKIv, backupPayload.wrappedDEK);
+}
+
+window._testBackupCrypto = testBackupCrypto;
+
+export async function decryptBackup(backupPayload, masterKey) {
+  const meta = backupPayload.metadata || {};
+  if (meta.encryption !== BACKUP_ALGORITHM) {
+    throw new Error("Algoritmo de backup não suportado: " + meta.encryption);
+  }
+  if (meta.wrapVersion !== WRAP_VERSION) {
+    throw new Error("Versão de embrulho não suportada: " + meta.wrapVersion);
+  }
+  const rawDek = await decryptWithKey(masterKey, backupPayload.crypto.dek.iv, backupPayload.crypto.dek.wrapped);
   const dek = await importRawKey(rawDek, false);
-  const plaintextBytes = await decryptWithKey(dek, backupPayload.iv, backupPayload.ciphertext);
+  const plaintextBytes = await decryptWithKey(dek, backupPayload.crypto.backup.iv, backupPayload.crypto.backup.ciphertext);
   const json = new TextDecoder().decode(plaintextBytes);
   return JSON.parse(json);
 }
