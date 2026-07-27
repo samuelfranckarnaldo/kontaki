@@ -55,6 +55,21 @@ export const CHART_OF_ACCOUNTS = [
   { code:"72", name:"Custos com o pessoal",            classe:7, tipo:"custo", natureza:"devedora" },
   { code:"73", name:"Amortizações do exercício",       classe:7, tipo:"custo", natureza:"devedora" },
   { code:"75", name:"Outros custos e perdas operacionais", classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.1",  name:"Renda",                        classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.2",  name:"Electricidade",                 classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.3",  name:"Água",                          classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.4",  name:"Transporte",                    classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.5",  name:"Manutenção",                    classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.6",  name:"Internet/Telefone",             classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.7",  name:"Impostos e Taxas",              classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.8",  name:"Combustível",                   classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.9",  name:"Marketing e Publicidade",       classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.10", name:"Seguros",                       classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.11", name:"Material de Escritório",        classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.12", name:"Limpeza",                       classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.13", name:"Segurança",                     classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.14", name:"Comissões",                     classe:7, tipo:"custo", natureza:"devedora" },
+  { code:"75.15", name:"Despesas diversas (Outro)",     classe:7, tipo:"custo", natureza:"devedora" },
   { code:"76", name:"Custos e perdas financeiras",     classe:7, tipo:"custo", natureza:"devedora" },
   { code:"78", name:"Outros custos não operacionais",  classe:7, tipo:"custo", natureza:"devedora" },
   { code:"79", name:"Custos e perdas extraordinários", classe:7, tipo:"custo", natureza:"devedora" },
@@ -198,9 +213,26 @@ function expensePaymentAccount(method) {
 }
 
 // Mapeia categoria de despesa -> conta de custo
+var EXPENSE_ACCOUNT_MAP = {
+  "salários": "72", "salarios": "72",
+  "renda": "75.1",
+  "electricidade": "75.2",
+  "água": "75.3", "agua": "75.3",
+  "transporte": "75.4",
+  "manutenção": "75.5", "manutencao": "75.5",
+  "internet/telefone": "75.6",
+  "impostos e taxas": "75.7",
+  "combustível": "75.8", "combustivel": "75.8",
+  "marketing e publicidade": "75.9",
+  "seguros": "75.10",
+  "material de escritório": "75.11", "material de escritorio": "75.11",
+  "limpeza": "75.12",
+  "segurança": "75.13", "seguranca": "75.13",
+  "comissões": "75.14", "comissoes": "75.14",
+};
 function expenseCostAccount(category) {
-  if ((category||"").toLowerCase() === "salários" || (category||"").toLowerCase() === "salarios") return "72"; // Custos com o pessoal
-  return "75"; // Outros custos e perdas operacionais
+  var cat = (category || "").toLowerCase();
+  return EXPENSE_ACCOUNT_MAP[cat] || "75.15"; // "Outro" e qualquer categoria não mapeada
 }
 
 // ── FECHO DE EXERCÍCIO (mensal) ──────────────────────────────────────────────
@@ -440,4 +472,18 @@ export async function postExpenseJournal(expense) {
     { account: acctCusto, debit: expense.amount, credit: 0 },
     { account: acctCredito, debit: 0, credit: expense.amount },
   ]);
+}
+
+// Lançamento de um ajuste de caixa (contagem física vs esperado). Sobra
+// (diff > 0) credita um proveito (63); falta (diff < 0) debita um custo (75).
+// A conta 45 é sempre ajustada para bater com a contagem física real.
+export async function postAjusteCaixaJournal(params) {
+  if (!params.diff) return null;
+  var valor = Math.abs(params.diff);
+  var lines = params.diff > 0
+    ? [ { account: "45", debit: valor, credit: 0 },
+        { account: "63", debit: 0, credit: valor } ]
+    : [ { account: "75", debit: valor, credit: 0 },
+        { account: "45", debit: 0, credit: valor } ];
+  return createJournalEntry(params.date, "Ajuste de caixa — " + (params.description || "Contagem física"), "treasury_adjustment", params.movementId, lines);
 }

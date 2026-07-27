@@ -5,7 +5,7 @@ import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { openField } from "../date-picker.js";
 window._openDateField = openField;
-import { postOwnerContribution, postBankTransfer, getAccountBalance } from "../pgc.js";
+import { postOwnerContribution, postBankTransfer, getAccountBalance, postAjusteCaixaJournal } from "../pgc.js";
 import { verifyAdminPin } from "../services.js";
 
 var ADMIN_OPS = [
@@ -193,32 +193,48 @@ export async function loadTesouraria() {
 
 // ── AJUSTE DE CAIXA ──────────────────────────────────────────────────────────
 // Regularização baseada em contagem física (Esperado vs Contado), não num valor
-// arbitrário. Sem lançamento contabilístico (mesma decisão de Sangria/Reforço).
+// arbitrário. Gera lançamento contabilístico (63 se sobra, 75 se falta) —
 // Se quem estiver a operar não for admin, exige PIN de administrador antes de
 // gravar — reaproveita verifyAdminPin(), já usado para vendas com incidente.
 async function _saveAjuste(p) {
   var saveBtn = document.getElementById("tes-ajuste-save");
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "A gravar..."; }
 
+  var movimento = {
+    type: "ajuste",
+    date: p.date,
+    amount: p.diff,
+    description: p.motivo,
+    origem: null,
+    expected: p.esperado,
+    counted: p.contado,
+    sessionId: p.session.id,
+    userId: p.user ? p.user.id : null,
+    journalEntryId: null,
+    createdAt: new Date().toISOString(),
+  };
+  var movId;
   try {
-    await db.add("treasuryMovements", {
-      type: "ajuste",
-      date: p.date,
-      amount: p.diff,
-      description: p.motivo,
-      origem: null,
-      expected: p.esperado,
-      counted: p.contado,
-      sessionId: p.session.id,
-      userId: p.user ? p.user.id : null,
-      journalEntryId: null,
-      createdAt: new Date().toISOString(),
+    movId = await db.add("treasuryMovements", movimento);
+
+    // Sobra/falta na contagem física é uma variação real de caixa — tem de
+    // ir para o Diário, senão a conta 45 nunca reflete a contagem real.
+    var journalEntryId = await postAjusteCaixaJournal({
+      date: p.date, diff: p.diff, description: p.motivo, movementId: movId,
     });
+    if (journalEntryId) {
+      movimento.id = movId;
+      movimento.journalEntryId = journalEntryId;
+      await db.put("treasuryMovements", movimento);
+    }
 
     toast("Ajuste de caixa registado.", "success");
     closeModal();
     await loadTesouraria();
   } catch (err) {
+    // Reverte o movimento se o lançamento contabilístico falhar (ex: período
+    // fechado) — evita um ajuste sem a contrapartida no Diário.
+    if (movId) await db.delete("treasuryMovements", movId);
     toast("Erro ao registar ajuste: " + err.message, "error");
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Confirmar Ajuste"; }
   }
@@ -272,7 +288,7 @@ function openAjusteModal(prefill) {
     openModal("Ajuste de Caixa",
       '<div style="display:flex;flex-direction:column;gap:14px">' +
       '<div style="background:var(--warning-muted-light);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--warning-muted);display:flex;align-items:center;gap:8px">' +
-      '<i data-lucide="info" style="width:15px;height:15px;flex-shrink:0"></i> Operação sem lançamento contabilístico — regulariza o saldo operacional do caixa.</div>' +
+      '<i data-lucide="info" style="width:15px;height:15px;flex-shrink:0"></i> Diferença é lançada na contabilidade (sobra: proveito · falta: custo).</div>' +
       '<div class="field"><label>Saldo esperado (Kz)</label><input type="text" value="' + esperado.toLocaleString("pt-AO") + '" disabled style="background:var(--bg);color:var(--text3)"/></div>' +
       '<div class="field"><label>Valor contado (Kz) *</label><input type="number" id="tes-ajuste-contado" placeholder="0" value="' + (prefill.contado != null ? prefill.contado : "") + '"/></div>' +
       '<div id="tes-ajuste-diff-preview" style="display:none;padding:12px;border-radius:10px;text-align:center;font-weight:700;font-size:15px"></div>' +
