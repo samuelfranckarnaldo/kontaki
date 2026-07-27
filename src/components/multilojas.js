@@ -12,6 +12,11 @@ var _mlStoresCache = null;      // [{id, name, status, lastSeenAt, salesThisMont
 var _mlChartInstance = null;
 var _mlAuthMode = "login"; // login | register — estado do ecrã de autenticação Workspace
 
+var _mlWorkspaceStoreId = null;
+var _mlWorkspaceStoreName = null;
+var _mlWorkspaceCache = null;    // { id, store_id, version, status, ... }
+var _mlWorkspaceProducts = null; // [{ catalog_id, name, price, stock, category, active, ... }, ...]
+
 var TABS = [
   { key: "resumo",     label: "Resumo" },
   { key: "incidentes", label: "Incidentes" },
@@ -556,8 +561,8 @@ async function _renderEscritorio(wrap) {
               '<div style="font-size:12.5px;font-weight:700;color:' + diffColor + '">' + diffLabel + '</div>' +
             '</div>' +
           '</div>' +
-          '<button onclick="window._mlOpenKtkcat(\'' + s.id + '\', \'' + s.name.replace(/'/g, "\\'") + '\')" style="width:100%;margin-top:12px;padding:9px;border-radius:var(--radius-sm);border:1.5px solid var(--primary,#5b21b6);background:transparent;color:var(--primary,#5b21b6);font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">' +
-            '<i data-lucide="package-plus" style="width:14px;height:14px"></i> Gerar catálogo' +
+          '<button onclick="window._mlOpenWorkspaceEditor(\'' + s.id + '\', \'' + s.name.replace(/'/g, "\\'") + '\')" style="width:100%;margin-top:12px;padding:9px;border-radius:var(--radius-sm);border:1.5px solid var(--primary,#5b21b6);background:transparent;color:var(--primary,#5b21b6);font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">' +
+            '<i data-lucide="pencil" style="width:14px;height:14px"></i> Editar catálogo' +
           '</button>' +
         '</div>';
       }).join("") +
@@ -670,105 +675,265 @@ async function _renderRegistos(wrap) {
 }
 
 
-// ── GERAÇÃO DE .ktkcat (protótipo, dados mocados) ───────────────────────
-// TODO (Opção D, ADR-0010): este fluxo gera um ficheiro descarregável no
-// browser do dono, mas a arquitetura validada usa o dispositivo a
-// descarregar o catálogo publicado via HTTPS (syncWorkspaceCatalog →
-// GET /api/sync/workspace-catalog), não um ficheiro gerado aqui. Este
-// botão deve ser substituído por um link/atalho para o Workspace real
-// assim que o URL do frontend do Workspace estiver definido.
+// ── WORKSPACE — EDITOR DE CATÁLOGO (Opção D / ADR-0010) ─────────────────
+// O dispositivo descarrega o catálogo publicado via HTTPS autenticado
+// (syncWorkspaceCatalog → GET /api/sync/workspace-catalog). Este ecrã só
+// edita o rascunho no Console (workspace_products); nunca escreve nada
+// diretamente na loja — publicar (export) apenas liberta o catálogo para
+// o próximo sync do dispositivo.
 
-function _mockCatalogChanges(storeId) {
-  var seed = (storeId || "").split("").reduce(function(a, c) { return a + c.charCodeAt(0); }, 0);
-  return {
-    newProducts: [
-      { name: "Sumo Manga 1L", price: 850 },
-      { name: "Bolachas Maria 200g", price: 450 },
-    ].slice(0, 1 + (seed % 2)),
-    priceChanges: [
-      { name: "Óleo Girassol 1L", from: 2200, to: 2450 },
-      { name: "Arroz 5kg", from: 4800, to: 5100 },
-    ].slice(0, 1 + (seed % 2)),
-    stockCorrections: [
-      { name: "Água 1.5L (pack 6)", from: 12, to: 20 },
-    ],
-  };
+function _mlSetModalBody(html) {
+  openModal("Catálogo — " + _mlWorkspaceStoreName, html);
+  refreshIcons(document.getElementById("modal-box") || document.body);
 }
 
-window._mlOpenKtkcat = function(storeId, storeName) {
-  var changes = _mockCatalogChanges(storeId);
-  var totalChanges = changes.newProducts.length + changes.priceChanges.length + changes.stockCorrections.length;
-
-  var body =
-    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:16px;line-height:1.5">Revê as alterações antes de gerar o ficheiro para <strong>' + storeName + '</strong>. O funcionário importa este ficheiro no Kontaki — nada é aplicado automaticamente.</div>' +
-
-    (changes.newProducts.length ? (
-      '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Produtos novos (' + changes.newProducts.length + ')</div>' +
-      '<div style="background:#f0fdf4;border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px">' +
-        changes.newProducts.map(function(p) {
-          return '<div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--text2);margin-bottom:4px"><span>' + p.name + '</span><span style="font-weight:700">' + fmt(p.price) + '</span></div>';
-        }).join("") +
-      '</div>'
-    ) : '') +
-
-    (changes.priceChanges.length ? (
-      '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Alterações de preço (' + changes.priceChanges.length + ')</div>' +
-      '<div style="background:#eff6ff;border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px">' +
-        changes.priceChanges.map(function(p) {
-          return '<div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--text2);margin-bottom:4px"><span>' + p.name + '</span><span>' + fmt(p.from) + ' → <strong>' + fmt(p.to) + '</strong></span></div>';
-        }).join("") +
-      '</div>'
-    ) : '') +
-
-    (changes.stockCorrections.length ? (
-      '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Correções de stock (' + changes.stockCorrections.length + ')</div>' +
-      '<div style="background:#fffbeb;border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px">' +
-        changes.stockCorrections.map(function(p) {
-          return '<div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--text2);margin-bottom:4px"><span>' + p.name + '</span><span>' + p.from + ' → <strong>' + p.to + '</strong> un.</span></div>';
-        }).join("") +
-      '</div>'
-    ) : '') +
-
-    '<div class="field" style="margin-top:10px">' +
-      '<label>Mensagem para a loja (opcional)</label>' +
-      '<textarea id="ktkcat-msg" rows="2" style="width:100%;border:1.5px solid #e4e4e7;border-radius:var(--radius-sm);padding:10px 12px;font-family:inherit;font-size:13px;resize:vertical" placeholder="Ex.: Confirmar stock físico antes de aplicar."></textarea>' +
-    '</div>' +
-
+function _workspaceErrorBody(msg) {
+  return '<div class="empty-state">' +
+    '<i data-lucide="wifi-off"></i>' +
+    '<div class="empty-state-title">Não foi possível carregar</div>' +
+    '<div class="empty-state-sub">' + msg + '</div>' +
     '<div class="form-actions" style="margin-top:16px">' +
-      '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
-      '<button class="btn btn-primary btn-full" onclick="window._mlGenerateKtkcat(\'' + storeId + '\', \'' + storeName.replace(/'/g, "\\'") + '\')">Gerar .ktkcat (' + totalChanges + ')</button>' +
-    '</div>';
+      '<button class="btn btn-outline btn-full" onclick="window._mlLoadWorkspace()">Tentar novamente</button>' +
+    '</div>' +
+  '</div>';
+}
 
-  openModal("Gerar catálogo", body);
-  refreshIcons(document.getElementById("modal-box") || document.body);
+window._mlOpenWorkspaceEditor = async function(storeId, storeName) {
+  _mlWorkspaceStoreId = storeId;
+  _mlWorkspaceStoreName = storeName;
+  _mlWorkspaceCache = null;
+  _mlWorkspaceProducts = null;
+  openModal("Catálogo — " + storeName, '<div style="padding:30px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>');
+  await window._mlLoadWorkspace();
 };
 
-window._mlGenerateKtkcat = function(storeId, storeName) {
-  var changes = _mockCatalogChanges(storeId);
-  var msgEl = document.getElementById("ktkcat-msg");
-  var message = msgEl ? msgEl.value.trim() : "";
+window._mlLoadWorkspace = async function() {
+  var res;
+  try {
+    res = await _mlAuthFetch("/workspace/" + encodeURIComponent(_mlWorkspaceStoreId));
+  } catch (e) {
+    _mlSetModalBody(_workspaceErrorBody("Sem ligação à internet."));
+    return;
+  }
+  if (res.status === 401) { closeModal(); loadMultilojas(); return; }
+  if (!res.ok) {
+    var errData = await res.json().catch(function() { return {}; });
+    _mlSetModalBody(_workspaceErrorBody(errData.error || "Erro ao carregar workspace."));
+    return;
+  }
 
-  var payload = {
-    version: 1,
-    generatedAt: new Date().toISOString(),
-    storeId: storeId,
-    storeName: storeName,
-    message: message || null,
-    newProducts: changes.newProducts,
-    priceChanges: changes.priceChanges,
-    stockCorrections: changes.stockCorrections,
+  var data = await res.json();
+  if (!data || !data.success) { _mlSetModalBody(_workspaceErrorBody("Resposta inválida do servidor.")); return; }
+
+  if (!data.hasWorkspace) {
+    _mlWorkspaceCache = null;
+    _mlWorkspaceProducts = null;
+    _mlSetModalBody(_mlNoWorkspaceHtml(data.lastExport));
+    return;
+  }
+
+  _mlWorkspaceCache = data.workspace;
+  _mlWorkspaceProducts = data.products || [];
+  window._mlRenderWorkspaceEditor();
+};
+
+function _mlNoWorkspaceHtml(lastExport) {
+  var lastInfo = lastExport
+    ? ('<div style="font-size:11px;color:var(--text4);margin-bottom:16px">Última versão: v' + lastExport.version + ' · ' + (lastExport.status === "exported" ? "publicada" : lastExport.status) + (lastExport.exported_at ? (" em " + new Date(lastExport.exported_at).toLocaleDateString("pt-AO")) : "") + '</div>')
+    : '';
+  return '<div style="text-align:center;padding:10px 0">' +
+    '<i data-lucide="package" style="width:32px;height:32px;color:var(--text4);margin-bottom:10px"></i>' +
+    '<div style="font-size:13px;color:var(--text3);margin-bottom:12px">Sem rascunho de catálogo aberto para esta loja.</div>' +
+    lastInfo +
+    '<button class="btn btn-primary btn-full" onclick="window._mlCreateWorkspace()">Criar novo rascunho</button>' +
+  '</div>';
+}
+
+window._mlCreateWorkspace = async function() {
+  var res, data;
+  try {
+    res = await _mlAuthFetch("/workspace/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storeId: _mlWorkspaceStoreId }),
+    });
+    data = await res.json();
+  } catch (e) {
+    toast("Sem ligação à internet.", "error");
+    return;
+  }
+  if (res.status === 401) { closeModal(); loadMultilojas(); return; }
+  if (!res.ok || !data || !data.success) {
+    toast((data && data.error) || "Erro ao criar rascunho.", "error");
+    return;
+  }
+  toast("Rascunho criado com " + data.productsCopied + " produto(s).", "success");
+  await window._mlLoadWorkspace();
+};
+
+window._mlRenderWorkspaceEditor = function() {
+  var products = _mlWorkspaceProducts || [];
+  var html =
+    '<div style="font-size:11px;color:var(--text4);margin-bottom:12px">Rascunho v' + _mlWorkspaceCache.version + ' · ' + products.length + ' produto' + (products.length !== 1 ? 's' : '') + '</div>' +
+    '<div style="max-height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:14px">' +
+      (products.length
+        ? products.map(function(p) {
+            var inactive = p.active === false;
+            return '<button onclick="window._mlEditWorkspaceProduct(\'' + p.catalog_id + '\')" style="width:100%;text-align:left;border:1px solid #e4e4e7;border-radius:var(--radius-sm);padding:10px 12px;background:' + (inactive ? "#f4f4f5" : "#fff") + ';font-family:inherit;cursor:pointer;display:flex;justify-content:space-between;align-items:center">' +
+              '<div>' +
+                '<div style="font-size:13px;font-weight:700;color:' + (inactive ? "var(--text4)" : "var(--text)") + '">' + (p.name || "(sem nome)") + (inactive ? " · inativo" : "") + '</div>' +
+                '<div style="font-size:11px;color:var(--text4)">' + (p.category || "") + '</div>' +
+              '</div>' +
+              '<div style="font-size:13px;font-weight:700;color:var(--text2)">' + fmt(p.price) + '</div>' +
+            '</button>';
+          }).join("")
+        : '<div style="font-size:12px;color:var(--text4);text-align:center;padding:16px">Sem produtos.</div>') +
+    '</div>' +
+    '<div class="form-actions">' +
+      '<button class="btn btn-outline btn-full" onclick="window._mlReviewWorkspaceDiff()">Rever alterações</button>' +
+      '<button class="btn btn-primary btn-full" onclick="window._mlConfirmExportWorkspace()">Publicar</button>' +
+    '</div>';
+  _mlSetModalBody(html);
+};
+
+window._mlBackToWorkspaceList = function() {
+  window._mlRenderWorkspaceEditor();
+};
+
+window._mlEditWorkspaceProduct = function(catalogId) {
+  var p = (_mlWorkspaceProducts || []).find(function(x) { return x.catalog_id === catalogId; });
+  if (!p) return;
+
+  var html =
+    '<div class="field" style="margin-bottom:10px"><label>Nome</label><input id="wsp-name" type="text" value="' + (p.name || "").replace(/"/g, "&quot;") + '"></div>' +
+    '<div class="field" style="margin-bottom:10px"><label>Preço</label><input id="wsp-price" type="number" step="0.01" value="' + (p.price != null ? p.price : "") + '"></div>' +
+    '<div class="field" style="margin-bottom:10px"><label>Stock</label><input id="wsp-stock" type="number" value="' + (p.stock != null ? p.stock : "") + '"></div>' +
+    '<div class="field" style="margin-bottom:10px"><label>Categoria</label><input id="wsp-category" type="text" value="' + (p.category || "").replace(/"/g, "&quot;") + '"></div>' +
+    '<div class="field" style="margin-bottom:14px;display:flex;align-items:center;gap:8px">' +
+      '<input id="wsp-active" type="checkbox" ' + (p.active !== false ? "checked" : "") + ' style="width:auto">' +
+      '<label style="margin:0">Produto ativo</label>' +
+    '</div>' +
+    '<div class="form-actions">' +
+      '<button class="btn btn-ghost btn-full" onclick="window._mlBackToWorkspaceList()">Voltar</button>' +
+      '<button class="btn btn-primary btn-full" onclick="window._mlSaveWorkspaceProduct(\'' + catalogId + '\')">Guardar</button>' +
+    '</div>';
+
+  _mlSetModalBody(html);
+};
+
+window._mlSaveWorkspaceProduct = async function(catalogId) {
+  var name = document.getElementById("wsp-name").value.trim();
+  var priceVal = document.getElementById("wsp-price").value;
+  var stockVal = document.getElementById("wsp-stock").value;
+  var category = document.getElementById("wsp-category").value.trim();
+  var active = document.getElementById("wsp-active").checked;
+
+  var updates = {
+    name: name,
+    price: priceVal === "" ? null : parseFloat(priceVal),
+    stock: stockVal === "" ? null : parseFloat(stockVal),
+    category: category || null,
+    active: active,
   };
 
-  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  var url = URL.createObjectURL(blob);
-  var fname = "catalogo_" + storeName.toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + new Date().toISOString().slice(0, 10) + ".ktkcat";
+  var res, data;
+  try {
+    res = await _mlAuthFetch("/workspace/" + _mlWorkspaceCache.id + "/product/" + encodeURIComponent(catalogId), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    data = await res.json();
+  } catch (e) {
+    toast("Sem ligação à internet.", "error");
+    return;
+  }
+  if (res.status === 401) { closeModal(); loadMultilojas(); return; }
+  if (!res.ok || !data || !data.success) {
+    toast((data && data.error) || "Erro ao guardar alteração.", "error");
+    return;
+  }
 
-  var a = document.createElement("a");
-  a.href = url; a.download = fname; a.click();
-  URL.revokeObjectURL(url);
+  var idx = _mlWorkspaceProducts.findIndex(function(x) { return x.catalog_id === catalogId; });
+  if (idx >= 0) {
+    _mlWorkspaceProducts[idx] = Object.assign({}, _mlWorkspaceProducts[idx], updates);
+  }
 
+  toast("Produto atualizado.", "success");
+  window._mlRenderWorkspaceEditor();
+};
+
+function _mlDiffSection(title, items, bg, renderItem) {
+  if (!items || !items.length) return '';
+  return '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">' + title + ' (' + items.length + ')</div>' +
+    '<div style="background:' + bg + ';border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px;display:flex;flex-direction:column;gap:6px">' +
+      items.map(function(item) {
+        return '<div style="font-size:12.5px;color:var(--text2)">' + renderItem(item) + '</div>';
+      }).join("") +
+    '</div>';
+}
+
+window._mlReviewWorkspaceDiff = async function() {
+  _mlSetModalBody('<div style="padding:30px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>');
+
+  var res, data;
+  try {
+    res = await _mlAuthFetch("/workspace/" + _mlWorkspaceCache.id + "/diff");
+    data = await res.json();
+  } catch (e) {
+    _mlSetModalBody(_workspaceErrorBody("Sem ligação à internet."));
+    return;
+  }
+  if (res.status === 401) { closeModal(); loadMultilojas(); return; }
+  if (!res.ok || !data || !data.success) {
+    _mlSetModalBody(_workspaceErrorBody((data && data.error) || "Erro ao calcular diferenças."));
+    return;
+  }
+
+  var totalDiff = (data.novos || []).length + (data.alterados || []).length + (data.conflitos || []).length;
+
+  var html =
+    '<div style="font-size:12px;color:var(--text3);margin-bottom:14px">Comparação entre o rascunho e o que está atualmente na loja.</div>' +
+    (totalDiff === 0
+      ? '<div class="empty-state"><div class="empty-state-title">Sem diferenças</div><div class="empty-state-sub">O rascunho está igual ao que a loja tem neste momento.</div></div>'
+      : (
+        _mlDiffSection("Produtos novos", data.novos, "#f0fdf4", function(item) { return '<span>' + item.name + '</span>'; }) +
+        _mlDiffSection("Alterados", data.alterados, "#eff6ff", function(item) { return '<span>' + item.name + '</span><span style="font-size:11px;color:var(--text4)"> — ' + Object.keys(item.fieldsChanged).join(", ") + '</span>'; }) +
+        _mlDiffSection("Conflitos (editados na loja e no rascunho)", data.conflitos, "#fef2f2", function(item) { return '<span>' + item.name + '</span><span style="font-size:11px;color:var(--text4)"> — ' + Object.keys(item.fieldsChanged).join(", ") + '</span>'; })
+      )) +
+    '<div class="form-actions" style="margin-top:16px">' +
+      '<button class="btn btn-ghost btn-full" onclick="window._mlBackToWorkspaceList()">Voltar</button>' +
+    '</div>';
+
+  _mlSetModalBody(html);
+};
+
+window._mlConfirmExportWorkspace = function() {
+  var html =
+    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:16px;line-height:1.5">Ao publicar, o rascunho fica congelado e a loja passa a poder descarregar este catálogo na próxima sincronização. Não é possível editar depois de publicado.</div>' +
+    '<div class="form-actions">' +
+      '<button class="btn btn-ghost btn-full" onclick="window._mlBackToWorkspaceList()">Cancelar</button>' +
+      '<button class="btn btn-primary btn-full" onclick="window._mlExportWorkspace()">Confirmar publicação</button>' +
+    '</div>';
+  _mlSetModalBody(html);
+};
+
+window._mlExportWorkspace = async function() {
+  var res, data;
+  try {
+    res = await _mlAuthFetch("/workspace/" + _mlWorkspaceCache.id + "/export", { method: "POST" });
+    data = await res.json();
+  } catch (e) {
+    toast("Sem ligação à internet.", "error");
+    return;
+  }
+  if (res.status === 401) { closeModal(); loadMultilojas(); return; }
+  if (!res.ok || !data || !data.success) {
+    toast((data && data.error) || "Erro ao publicar catálogo.", "error");
+    return;
+  }
   closeModal();
-  toast("Catálogo gerado. Envia o ficheiro à loja para importação.", "success");
+  toast("Catálogo publicado. A loja recebe na próxima sincronização.", "success");
 };
 
 // ── RESUMO — TODAS AS LOJAS ────────────────────────────────────────────
