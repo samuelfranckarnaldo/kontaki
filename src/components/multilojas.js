@@ -1262,8 +1262,8 @@ function _healthScoreHtml(store, stock) {
 // costPrice/subtotal existirem na venda — ver profit.coveragePct.
 
 var PAYMENT_METHOD_LABELS = {
-  cash: "Numerário", card: "Cartão", transfer: "Transferência",
-  mobile: "Multicaixa Express", credit: "Fiado",
+  dinheiro: "Dinheiro", transferencia: "Transferência",
+  multicaixa: "Multicaixa", fiado: "Fiado",
 };
 
 function _mlPaymentLabel(method) {
