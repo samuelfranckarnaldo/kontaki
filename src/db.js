@@ -1,5 +1,5 @@
 const DB_NAME    = "kontaki_db";
-const DB_VERSION = 21; // v21: adiciona store "fixedAssets" (ativos fixos e amortizações)
+const DB_VERSION = 22; // v22: adiciona store "bankReconciled" (conciliação bancária linha a linha)
 let _db = null;
 
 function openDB() {
@@ -55,6 +55,11 @@ function openDB() {
         // { id, name, category, purchaseDate, purchaseValue, usefulLifeMonths,
         //   active, createdAt } — amortização calculada em pgc.js a partir
         //   dos lançamentos "depreciation" no journalEntries, não guardada aqui.
+
+      ensure("bankReconciled", { keyPath:"entryId" });
+        // { entryId, reconciledAt, userId } — presença de um registo para um
+        // journalEntries.id significa "conciliado com o extrato bancário".
+        // Ausência = pendente. Só existe para lançamentos que tocam a conta 43.
     };
     req.onsuccess = () => {
       _db = req.result;

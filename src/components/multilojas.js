@@ -10,6 +10,7 @@ var _mlActiveTab = "resumo";
 var _mlSelectedStoreId = "all"; // "all" ou o id (uuid) de uma loja
 var _mlStoresCache = null;      // [{id, name, status, lastSeenAt, salesThisMonth}, ...]
 var _mlChartInstance = null;
+var _mlAuthMode = "login"; // login | register — estado do ecrã de autenticação Workspace
 
 var TABS = [
   { key: "resumo",     label: "Resumo" },
@@ -22,6 +23,39 @@ async function _getLicenseCode() {
   var lic = await db.get("settings", "license");
   return lic ? lic.code : null;
 }
+
+// ── AUTENTICAÇÃO WORKSPACE ───────────────────────────────────────────────
+// Token único (Workspace/owner JWT) para TODO o módulo Multi-lojas —
+// nunca licenseCode, em nenhuma aba. licenseCode continua a existir só
+// para ativação/sync da própria loja, nunca para autenticar este módulo.
+
+async function _getWorkspaceToken() {
+  var t = await db.get("settings", "workspaceToken");
+  return t && t.value ? t.value : null;
+}
+
+async function _mlAuthFetch(path, options) {
+  var token = await _getWorkspaceToken();
+  if (!token) {
+    return { ok: false, status: 401, json: async function() { return { error: "Sessão expirada." }; } };
+  }
+
+  options = options || {};
+  var headers = Object.assign({}, options.headers, { Authorization: "Bearer " + token });
+  var res = await fetch(CONSOLE_API + path, Object.assign({}, options, { headers: headers }));
+
+  if (res.status === 401) {
+    // Token inválido/expirado — limpa a sessão local para forçar novo login.
+    await db.put("settings", { key: "workspaceToken", value: null, owner: null });
+  }
+
+  return res;
+}
+
+window._mlLogout = async function() {
+  await db.put("settings", { key: "workspaceToken", value: null, owner: null });
+  loadMultilojas();
+};
 
 function _renderTabs() {
   var wrap = document.getElementById("multilojas-tabs");
@@ -48,6 +82,9 @@ function _renderStoreSelector() {
         options +
       '</select>' +
       '<i data-lucide="chevron-down" style="width:14px;height:14px;color:var(--text4);flex-shrink:0"></i>' +
+      '<button onclick="window._mlLogout()" title="Sair" style="border:none;background:none;padding:2px;cursor:pointer;flex-shrink:0;display:flex;align-items:center">' +
+        '<i data-lucide="log-out" style="width:15px;height:15px;color:var(--text4)"></i>' +
+      '</button>' +
     '</div>';
   refreshIcons(wrap);
 }
@@ -84,6 +121,13 @@ export async function loadMultilojas() {
   var btn = document.getElementById("btn-back-multilojas");
   if (btn) btn.onclick = function() { window._showSubpage(null); };
 
+  var token = await _getWorkspaceToken();
+  if (!token) {
+    _mlAuthMode = "login";
+    _renderWorkspaceAuthGate();
+    return;
+  }
+
   _mlActiveTab = "resumo";
   _mlSelectedStoreId = "all";
   _renderTabs();
@@ -93,18 +137,193 @@ export async function loadMultilojas() {
   await _renderContent();
 }
 
-async function _loadStoresList() {
-  var code = await _getLicenseCode();
-  if (!code) { _mlStoresCache = []; return; }
+// ── AUTENTICAÇÃO — ECRÃ DE LOGIN / REGISTO / RECUPERAÇÃO ────────────────
 
+function _renderWorkspaceAuthGate() {
+  var tabsWrap = document.getElementById("multilojas-tabs");
+  var selectorWrap = document.getElementById("multilojas-store-selector");
+  var wrap = document.getElementById("multilojas-content");
+  if (tabsWrap) tabsWrap.innerHTML = "";
+  if (selectorWrap) selectorWrap.innerHTML = "";
+  if (!wrap) return;
+
+  var isLogin = _mlAuthMode === "login";
+
+  wrap.innerHTML =
+    '<div style="max-width:360px;margin:20px auto;padding:4px">' +
+      '<div style="text-align:center;margin-bottom:20px">' +
+        '<i data-lucide="building-2" style="width:32px;height:32px;color:var(--primary,#5b21b6);margin-bottom:8px"></i>' +
+        '<div style="font-size:16px;font-weight:800;color:var(--text)">Workspace</div>' +
+        '<div style="font-size:12px;color:var(--text4);margin-top:4px">' + (isLogin ? "Entra na tua conta para gerir as tuas lojas" : "Cria uma conta para gerir as tuas lojas") + '</div>' +
+      '</div>' +
+
+      (isLogin ? '' : '<div class="field" style="margin-bottom:10px"><label>Nome</label><input id="wsa-name" type="text" placeholder="O teu nome"></div>') +
+      '<div class="field" style="margin-bottom:10px"><label>Email</label><input id="wsa-email" type="email" placeholder="email@exemplo.com"></div>' +
+      (isLogin ? '' : '<div class="field" style="margin-bottom:10px"><label>Telefone (opcional)</label><input id="wsa-phone" type="tel" placeholder="9XX XXX XXX"></div>') +
+      '<div class="field" style="margin-bottom:6px"><label>Senha</label><input id="wsa-password" type="password" placeholder="••••••••"></div>' +
+      (isLogin
+        ? '<div style="text-align:right;margin-bottom:14px"><button onclick="window._mlShowRecovery()" style="border:none;background:none;color:var(--primary,#5b21b6);font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;padding:0">Esqueci a senha</button></div>'
+        : '<div style="margin-bottom:14px"></div>') +
+
+      '<div id="wsa-error" style="display:none;font-size:12px;color:#dc2626;background:#fef2f2;border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:12px"></div>' +
+
+      '<button id="wsa-submit-btn" class="btn btn-primary btn-full" onclick="window._mlSubmitAuth()">' + (isLogin ? "Entrar" : "Criar conta") + '</button>' +
+
+      '<div style="text-align:center;margin-top:14px;font-size:12px;color:var(--text4)">' +
+        (isLogin ? "Ainda não tens conta? " : "Já tens conta? ") +
+        '<button onclick="window._mlToggleAuthMode()" style="border:none;background:none;color:var(--primary,#5b21b6);font-weight:700;cursor:pointer;font-family:inherit;padding:0;font-size:12px">' + (isLogin ? "Criar conta" : "Entrar") + '</button>' +
+      '</div>' +
+    '</div>';
+
+  refreshIcons(wrap);
+}
+
+window._mlToggleAuthMode = function() {
+  _mlAuthMode = _mlAuthMode === "login" ? "register" : "login";
+  _renderWorkspaceAuthGate();
+};
+
+function _mlShowAuthError(msg) {
+  var el = document.getElementById("wsa-error");
+  if (el) { el.textContent = msg; el.style.display = "block"; }
+}
+
+window._mlSubmitAuth = async function() {
+  var isLogin = _mlAuthMode === "login";
+  var errEl = document.getElementById("wsa-error");
+  if (errEl) errEl.style.display = "none";
+
+  var email = (document.getElementById("wsa-email").value || "").trim();
+  var password = document.getElementById("wsa-password").value || "";
+
+  if (!email || !password) { return _mlShowAuthError("Preenche email e senha."); }
+
+  var body = { email: email, password: password };
+  var path = "/workspace-auth/login";
+
+  if (!isLogin) {
+    var name = (document.getElementById("wsa-name").value || "").trim();
+    var phone = (document.getElementById("wsa-phone").value || "").trim();
+    if (!name) return _mlShowAuthError("Preenche o teu nome.");
+    if (password.length < 8) return _mlShowAuthError("A senha deve ter pelo menos 8 caracteres.");
+    body.name = name;
+    if (phone) body.phone = phone;
+    path = "/workspace-auth/register";
+  }
+
+  var submitBtn = document.getElementById("wsa-submit-btn");
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "A processar…"; }
+
+  var res, data;
   try {
-    var res = await fetch(CONSOLE_API + "/reports/multi-store/stores?code=" + encodeURIComponent(code));
-    if (!res.ok) { _mlStoresCache = []; return; }
-    var data = await res.json();
-    _mlStoresCache = (data && data.success) ? data.stores : [];
+    res = await fetch(CONSOLE_API + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    data = await res.json();
+  } catch (e) {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isLogin ? "Entrar" : "Criar conta"; }
+    return _mlShowAuthError("Sem ligação à internet.");
+  }
+
+  if (!res.ok || !data || !data.success) {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isLogin ? "Entrar" : "Criar conta"; }
+    return _mlShowAuthError((data && data.error) || "Erro ao processar pedido.");
+  }
+
+  await db.put("settings", { key: "workspaceToken", value: data.token, owner: data.owner, createdAt: new Date().toISOString() });
+
+  if (!isLogin && data.recoveryCodes && data.recoveryCodes.length) {
+    _mlShowRecoveryCodes(data.recoveryCodes);
+    return;
+  }
+
+  toast("Sessão iniciada.", "success");
+  loadMultilojas();
+};
+
+function _mlShowRecoveryCodes(codes) {
+  var body =
+    '<div style="font-size:12.5px;color:var(--text3);margin-bottom:14px;line-height:1.5">Guarda estes códigos num local seguro. Cada um serve para recuperar a tua senha uma única vez e não podem ser mostrados de novo.</div>' +
+    '<div style="background:var(--bg,#f4f4f5);border-radius:var(--radius-sm);padding:12px;font-family:monospace;font-size:13px;line-height:2;text-align:center">' +
+      codes.join("<br>") +
+    '</div>' +
+    '<div class="form-actions" style="margin-top:16px">' +
+      '<button class="btn btn-primary btn-full" onclick="window._closeModal(); window._mlReturnAfterRegister();">Já guardei, continuar</button>' +
+    '</div>';
+  openModal("Códigos de recuperação", body);
+}
+
+window._mlReturnAfterRegister = function() {
+  toast("Conta criada.", "success");
+  loadMultilojas();
+};
+
+window._mlShowRecovery = function() {
+  var body =
+    '<div class="field" style="margin-bottom:10px"><label>Email</label><input id="wsr-email" type="email" placeholder="email@exemplo.com"></div>' +
+    '<div class="field" style="margin-bottom:10px"><label>Código de recuperação</label><input id="wsr-code" type="text" placeholder="XXXX-XXXX" style="text-transform:uppercase"></div>' +
+    '<div class="field" style="margin-bottom:6px"><label>Nova senha</label><input id="wsr-password" type="password" placeholder="Mínimo 8 caracteres"></div>' +
+    '<div id="wsr-error" style="display:none;font-size:12px;color:#dc2626;background:#fef2f2;border-radius:var(--radius-sm);padding:8px 10px;margin:10px 0"></div>' +
+    '<div class="form-actions" style="margin-top:10px">' +
+      '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+      '<button class="btn btn-primary btn-full" onclick="window._mlSubmitRecovery()">Repor senha</button>' +
+    '</div>';
+  openModal("Recuperar senha", body);
+};
+
+window._mlSubmitRecovery = async function() {
+  var errEl = document.getElementById("wsr-error");
+  if (errEl) errEl.style.display = "none";
+
+  var email = (document.getElementById("wsr-email").value || "").trim();
+  var code = (document.getElementById("wsr-code").value || "").trim();
+  var newPassword = document.getElementById("wsr-password").value || "";
+
+  if (!email || !code || !newPassword) {
+    if (errEl) { errEl.textContent = "Preenche todos os campos."; errEl.style.display = "block"; }
+    return;
+  }
+
+  var res, data;
+  try {
+    res = await fetch(CONSOLE_API + "/workspace-auth/recover-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, code: code, newPassword: newPassword }),
+    });
+    data = await res.json();
+  } catch (e) {
+    if (errEl) { errEl.textContent = "Sem ligação à internet."; errEl.style.display = "block"; }
+    return;
+  }
+
+  if (!res.ok || !data || !data.success) {
+    if (errEl) { errEl.textContent = (data && data.error) || "Código ou email inválido."; errEl.style.display = "block"; }
+    return;
+  }
+
+  closeModal();
+  toast("Senha alterada. Entra com a nova senha.", "success");
+};
+
+async function _loadStoresList() {
+  var res;
+  try {
+    res = await _mlAuthFetch("/reports/multi-store/stores");
   } catch (e) {
     _mlStoresCache = [];
+    return;
   }
+  if (res.status === 401) {
+    _mlStoresCache = [];
+    loadMultilojas();
+    return;
+  }
+  if (!res.ok) { _mlStoresCache = []; return; }
+  var data = await res.json();
+  _mlStoresCache = (data && data.success) ? data.stores : [];
 }
 
 async function _renderContent() {
@@ -120,42 +339,9 @@ async function _renderContent() {
 }
 
 
-// ── INCIDENTES (protótipo visual, dados mocados) ────────────────────────
-// ATENÇÃO: tudo aqui é mocado. A entidade real (incidents) só chega na
-// Fase 3. Estrutura pronta para trocar por dados reais sem mexer no HTML.
+// ── INCIDENTES — dados reais (por loja e agregados) ─────────────────────
 
 var _mlIncFilterStatus = "open"; // open | resolved | archived | all
-
-// ATENÇÃO: incidentes reais são de RECONCILIAÇÃO DE STOCK, gerados no
-// fecho de turno quando o contado não bate com o esperado (ver .ktk:
-// campo "incidentes" com productName/expected/found/diff). Isto é
-// protótipo até a sincronização real de "incidents" chegar (Fase 3).
-function _mockStockIncidents(stores) {
-  var produtos = ["Arroz", "Maça", "Tomate", "Água", "Sabão", "Frango"];
-  var result = [];
-  stores.forEach(function(s) {
-    var seed = (s.id || "").split("").reduce(function(a, c) { return a + c.charCodeAt(0); }, 0);
-    var count = 1 + (seed % 4);
-    for (var i = 0; i < count; i++) {
-      var expected = 20 + ((seed + i * 3) % 80);
-      var diff = -(1 + ((seed + i * 5) % 20));
-      var statusRoll = (seed + i) % 3;
-      var status = statusRoll === 0 ? "open" : (statusRoll === 1 ? "resolved" : "archived");
-      result.push({
-        storeId: s.id,
-        storeName: s.name,
-        productName: produtos[(seed + i) % produtos.length],
-        expected: expected,
-        found: expected + diff,
-        diff: diff,
-        status: status,
-        operator: MOCK_OPERATORS[(seed + i) % MOCK_OPERATORS.length],
-        when: _relativeTime(new Date(Date.now() - (i + 1) * 1800000 * (seed % 8 + 1)).toISOString()),
-      });
-    }
-  });
-  return result;
-}
 
 window._mlToggleIncident = function(cardId) {
   var body = document.getElementById(cardId);
@@ -172,15 +358,39 @@ window._mlSetIncFilter = function(status) {
 };
 
 async function _fetchRealIncidents(storeId) {
-  var code = await _getLicenseCode();
-  if (!code) return null;
   try {
-    var res = await fetch(CONSOLE_API + "/reports/multi-store/store/" + encodeURIComponent(storeId) + "?code=" + encodeURIComponent(code));
+    var res = await _mlAuthFetch("/reports/multi-store/store/" + encodeURIComponent(storeId));
+    if (res.status === 401) { loadMultilojas(); return null; }
     if (!res.ok) return null;
     var data = await res.json();
     if (!data || !data.success || !data.incidents || !data.incidents.available) return null;
     return data.incidents.items.map(function(i) {
       return {
+        productName: i.productName || (i.type === "caixa" ? "Numerário (Caixa)" : "Produto"),
+        expected: i.expected,
+        found: i.found,
+        diff: i.diff,
+        status: i.archived ? "archived" : (i.status || "open"),
+        operator: "—",
+        when: _relativeTime(i.createdAt),
+      };
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+async function _fetchRealAllIncidents() {
+  try {
+    var res = await _mlAuthFetch("/reports/multi-store/incidents");
+    if (res.status === 401) { loadMultilojas(); return null; }
+    if (!res.ok) return null;
+    var data = await res.json();
+    if (!data || !data.success || !data.incidents || !data.incidents.available) return null;
+    return data.incidents.items.map(function(i) {
+      return {
+        storeId: i.storeId,
+        storeName: i.storeName,
         productName: i.productName || (i.type === "caixa" ? "Numerário (Caixa)" : "Produto"),
         expected: i.expected,
         found: i.found,
@@ -203,17 +413,15 @@ async function _renderIncidentes(wrap) {
     return;
   }
 
-  var isRealData = _mlSelectedStoreId !== "all";
   var all;
-
-  if (isRealData) {
+  if (_mlSelectedStoreId !== "all") {
     all = await _fetchRealIncidents(_mlSelectedStoreId);
-    if (all === null) {
-      wrap.innerHTML = _errorHtml("Não foi possível carregar os incidentes desta loja.");
-      return;
-    }
   } else {
-    all = _mockStockIncidents(_mlStoresCache);
+    all = await _fetchRealAllIncidents();
+  }
+  if (all === null) {
+    wrap.innerHTML = _errorHtml("Não foi possível carregar os incidentes.");
+    return;
   }
 
   var openCount = all.filter(function(i) { return i.status === "open"; }).length;
@@ -232,7 +440,7 @@ async function _renderIncidentes(wrap) {
   wrap.innerHTML =
     '<div style="margin-bottom:4px">' +
       '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px">Incidentes</div>' +
-      '<div style="font-size:11px;color:var(--text4)">' + (isRealData ? "Reconciliação de stock, dados reais da loja" : "Protótipo — dados simulados. Seleciona uma loja para ver dados reais.") + '</div>' +
+      '<div style="font-size:11px;color:var(--text4)">Reconciliação de stock, dados reais</div>' +
     '</div>' +
 
     '<div style="display:flex;background:var(--primary-light,#ede9fe);border-radius:var(--radius-xl);padding:3px;gap:2px;margin:14px 0 14px">' +
@@ -259,7 +467,7 @@ async function _renderIncidentes(wrap) {
             '<div style="font-size:12px;color:var(--text3);margin-bottom:4px">Diferença: <strong style="color:' + diffColor + '">' + inc.diff + ' unidades</strong></div>' +
             '<div style="font-size:11.5px;color:var(--text4);margin-bottom:6px">Esperado: ' + inc.expected + ' → Encontrado: ' + inc.found + '</div>' +
             '<div style="font-size:11px;color:var(--text4);display:flex;justify-content:space-between;align-items:center">' +
-              '<span>' + (isRealData ? "" : ("Turno: " + inc.operator + (_mlSelectedStoreId === "all" ? " · " + inc.storeName : ""))) + '</span>' +
+              '<span>' + (_mlSelectedStoreId === "all" && inc.storeName ? inc.storeName : "") + '</span>' +
               '<span>' + inc.when + '</span>' +
             '</div>' +
             '<div id="' + cardId + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid #f4f4f5;font-size:11.5px;color:var(--text3);line-height:1.6">' +
@@ -361,43 +569,58 @@ async function _renderEscritorio(wrap) {
 
 // ── REGISTOS — AUDITORIA POR FUNCIONÁRIO (protótipo, dados mocados) ─────
 // ATENÇÃO: tudo mocado. A entidade real (auditLog) já existe localmente
-// no Kontaki mas ainda não é sincronizada (Fase 3).
+// no Kontaki mas ainda não é sincronizada para este ecrã (Fase 3).
 
+// ATENÇÃO: por agora, logAudit() só é chamado em produtos.js com a ação
+// "edit" — as restantes ações (create/delete/login) ainda não têm
+// nenhuma chamada real no código e existem aqui para quando forem
+// adicionadas.
 var ACTION_META = {
   create: { label: "criou",    icon: "plus-circle",   color: "#16a34a" },
+  edit:   { label: "editou",   icon: "pencil",         color: "#2563eb" },
   update: { label: "editou",   icon: "pencil",         color: "#2563eb" },
   delete: { label: "eliminou", icon: "trash-2",        color: "#dc2626" },
   login:  { label: "iniciou sessão", icon: "log-in",   color: "#71717a" },
 };
 
-var MOCK_ENTITIES = [
-  { action: "create", entity: "venda",     detail: "Venda #4821 · 3 400 Kz" },
-  { action: "update", entity: "produto",   detail: "Preço de \"Óleo Girassol 1L\" alterado" },
-  { action: "delete", entity: "venda",     detail: "Venda #4790 anulada" },
-  { action: "create", entity: "despesa",   detail: "Despesa de Transporte · 5 000 Kz" },
-  { action: "login",  entity: null,        detail: "Sessão iniciada no dispositivo" },
-  { action: "update", entity: "stock",     detail: "Stock de \"Arroz 5kg\" ajustado" },
-];
+// ATENÇÃO: entityType/action vêm diretamente do logAudit() do Kontaki.
+// A tradução abaixo é uma primeira aproximação — ajustar os nomes se os
+// valores reais gravados forem diferentes.
+var ENTITY_LABELS = {
+  sale: "venda", product: "produto", expense: "despesa",
+  stock: "stock", customer: "cliente", session: "turno",
+};
 
-function _mockAuditLog(stores) {
-  var entries = [];
-  stores.forEach(function(s) {
-    var seed = (s.id || "").split("").reduce(function(a, c) { return a + c.charCodeAt(0); }, 0);
-    var count = 2 + (seed % 4);
-    for (var i = 0; i < count; i++) {
-      var t = MOCK_ENTITIES[(seed + i * 5) % MOCK_ENTITIES.length];
-      var operator = MOCK_OPERATORS[(seed + i) % MOCK_OPERATORS.length];
-      entries.push({
-        storeId: s.id,
-        storeName: s.name,
-        operator: operator,
-        action: t.action,
-        detail: t.detail,
-        when: _relativeTime(new Date(Date.now() - (i + 1) * 1800000 * (seed % 6 + 1)).toISOString()),
-      });
-    }
-  });
-  return entries;
+function _mlAuditDetail(a) {
+  var entityLabel = ENTITY_LABELS[a.entityType] || a.entityType || "registo";
+  var capitalized = entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1);
+  if (a.changes && typeof a.changes === "object") {
+    var fields = Object.keys(a.changes);
+    if (fields.length) return capitalized + " · " + fields.join(", ");
+  }
+  return capitalized + (a.entityId ? " #" + a.entityId : "");
+}
+
+async function _fetchRealAuditLog() {
+  try {
+    var res = await _mlAuthFetch("/reports/multi-store/audit");
+    if (res.status === 401) { loadMultilojas(); return null; }
+    if (!res.ok) return null;
+    var data = await res.json();
+    if (!data || !data.success || !data.audit || !data.audit.available) return null;
+    return data.audit.items.map(function(a) {
+      return {
+        storeId: a.storeId,
+        storeName: a.storeName,
+        operator: a.userName || "—",
+        action: a.action,
+        detail: _mlAuditDetail(a),
+        when: _relativeTime(a.createdAt),
+      };
+    });
+  } catch (e) {
+    return null;
+  }
 }
 
 async function _renderRegistos(wrap) {
@@ -408,22 +631,26 @@ async function _renderRegistos(wrap) {
     return;
   }
 
-  var relevantStores = _mlSelectedStoreId === "all"
-    ? _mlStoresCache
-    : _mlStoresCache.filter(function(s) { return s.id === _mlSelectedStoreId; });
+  var allEntries = await _fetchRealAuditLog();
+  if (allEntries === null) {
+    wrap.innerHTML = _errorHtml("Não foi possível carregar os registos.");
+    return;
+  }
 
-  var entries = _mockAuditLog(relevantStores);
+  var entries = _mlSelectedStoreId === "all"
+    ? allEntries
+    : allEntries.filter(function(e) { return e.storeId === _mlSelectedStoreId; });
 
   wrap.innerHTML =
     '<div style="margin-bottom:14px">' +
       '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px">Registos</div>' +
-      '<div style="font-size:11px;color:var(--text4)">Protótipo — auditoria simulada, aguarda sincronização real</div>' +
+      '<div style="font-size:11px;color:var(--text4)">Auditoria de alterações, dados reais</div>' +
     '</div>' +
 
     (entries.length
       ? '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
         entries.map(function(e, i) {
-          var meta = ACTION_META[e.action];
+          var meta = ACTION_META[e.action] || { label: e.action || "alterou", icon: "circle", color: "var(--text3)" };
           return '<div style="display:flex;gap:10px;padding:12px 14px;' + (i < entries.length - 1 ? 'border-bottom:1px solid #f4f4f5;' : '') + '">' +
             '<i data-lucide="' + meta.icon + '" style="width:15px;height:15px;color:' + meta.color + ';flex-shrink:0;margin-top:1px"></i>' +
             '<div style="flex:1;min-width:0">' +
@@ -444,10 +671,12 @@ async function _renderRegistos(wrap) {
 
 
 // ── GERAÇÃO DE .ktkcat (protótipo, dados mocados) ───────────────────────
-// ATENÇÃO: as alterações de catálogo mostradas são mocadas. Quando os
-// produtos passarem a sincronizar (Fase 3), esta função deve comparar o
-// catálogo real da loja com o catálogo central e gerar o plano de
-// atualização real, em vez desta simulação.
+// TODO (Opção D, ADR-0010): este fluxo gera um ficheiro descarregável no
+// browser do dono, mas a arquitetura validada usa o dispositivo a
+// descarregar o catálogo publicado via HTTPS (syncWorkspaceCatalog →
+// GET /api/sync/workspace-catalog), não um ficheiro gerado aqui. Este
+// botão deve ser substituído por um link/atalho para o Workspace real
+// assim que o URL do frontend do Workspace estiver definido.
 
 function _mockCatalogChanges(storeId) {
   var seed = (storeId || "").split("").reduce(function(a, c) { return a + c.charCodeAt(0); }, 0);
@@ -547,16 +776,15 @@ window._mlGenerateKtkcat = function(storeId, storeName) {
 async function _renderResumoAgregado(wrap) {
   wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
 
-  var code = await _getLicenseCode();
-  if (!code) { wrap.innerHTML = _errorHtml("Licença não encontrada."); return; }
-
   var res;
   try {
-    res = await fetch(CONSOLE_API + "/reports/multi-store/summary?code=" + encodeURIComponent(code) + "&days=30");
+    res = await _mlAuthFetch("/reports/multi-store/summary?days=30");
   } catch (e) {
     wrap.innerHTML = _errorHtml("Sem ligação à internet. Verifica a rede e tenta novamente.");
     return;
   }
+
+  if (res.status === 401) { loadMultilojas(); return; }
 
   if (!res.ok) {
     var errData = await res.json().catch(function() { return {}; });
@@ -768,16 +996,15 @@ function _relativeTime(iso) {
 async function _renderResumoLoja(wrap, storeId) {
   wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
 
-  var code = await _getLicenseCode();
-  if (!code) { wrap.innerHTML = _errorHtml("Licença não encontrada."); return; }
-
   var res;
   try {
-    res = await fetch(CONSOLE_API + "/reports/multi-store/store/" + encodeURIComponent(storeId) + "?code=" + encodeURIComponent(code));
+    res = await _mlAuthFetch("/reports/multi-store/store/" + encodeURIComponent(storeId));
   } catch (e) {
     wrap.innerHTML = _errorHtml("Sem ligação à internet. Verifica a rede e tenta novamente.");
     return;
   }
+
+  if (res.status === 401) { loadMultilojas(); return; }
 
   if (!res.ok) {
     var errData = await res.json().catch(function() { return {}; });

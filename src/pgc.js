@@ -356,6 +356,16 @@ export async function postDepreciationJournal(period) {
   return lancados;
 }
 
+// Lançamento da compra de um ativo fixo: débito Imobilizações Corpóreas (11),
+// crédito Caixa (dinheiro) ou Depósitos à ordem (transferência).
+export async function postFixedAssetPurchaseJournal(params) {
+  var acctCredito = params.payMethod === "transferencia" ? "43" : "45";
+  return createJournalEntry(params.date, "Compra de ativo — " + params.description, "fixed_asset_purchase", params.assetId, [
+    { account: "11", debit: params.amount, credit: 0 },
+    { account: acctCredito, debit: 0, credit: params.amount },
+  ]);
+}
+
 export const OWNER_ACCOUNT = "51";
 
 // Lança um movimento entre Caixa/Banco e a conta do proprietário.

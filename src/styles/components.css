@@ -2937,9 +2937,12 @@
 .ct-tabbar {
   position: relative; display: flex; gap: 0; background: none;
   border-bottom: 1px solid var(--border2); padding: 0; margin-bottom: 16px;
+  overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.ct-tabbar::-webkit-scrollbar { display: none; }
 .ct-tab {
-  flex: 1; padding: 12px 4px; border: none; border-radius: 0;
+  flex: 0 0 auto; white-space: nowrap; padding: 12px 14px; border: none; border-radius: 0;
   background: none; color: var(--text3); font-size: 13px; font-weight: 700;
   font-family: var(--font); cursor: pointer; transition: color .15s, transform .1s;
 }

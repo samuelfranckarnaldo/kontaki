@@ -10,7 +10,7 @@ import { getShortcutDates, getPeriodLabel, fmtChartVal } from "./historico.js";
 import { loadFornecedores } from "./fornecedores.js";
 import { loadEscritorio } from "./escritorio.js";
 import { db }                    from "../db.js";
-import { CHART_OF_ACCOUNTS, closeAccountingPeriod, isPeriodClosed, postDepreciationJournal, getAssetAccumulatedDepreciation } from "../pgc.js";
+import { CHART_OF_ACCOUNTS, closeAccountingPeriod, isPeriodClosed, postDepreciationJournal, getAssetAccumulatedDepreciation, postFixedAssetPurchaseJournal } from "../pgc.js";
 import { el, val, refreshIcons } from "../utils.js";
 import { toast }                 from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
@@ -1111,8 +1111,8 @@ async function loadContactosPage() {
 
 var activeContaTab = "resumo";
 
-var CONTA_TAB_ORDER = ["resumo", "razao", "balancete", "demonstracoes", "ativos"];
-var CONTA_TAB_LABELS = { resumo:"Resumo", razao:"Razão", balancete:"Balancete", demonstracoes:"Demonstrações", ativos:"Ativos" };
+var CONTA_TAB_ORDER = ["resumo", "razao", "balancete", "demonstracoes", "ativos", "fluxo", "concilia"];
+var CONTA_TAB_LABELS = { resumo:"Resumo", razao:"Razão", balancete:"Balancete", demonstracoes:"Demonstrações", ativos:"Ativos", fluxo:"Fluxo", concilia:"Concilia" };
 
 function renderContaTabs() {
   var wrap = document.getElementById("contabilidade-tabs");
@@ -1121,6 +1121,11 @@ function renderContaTabs() {
     return '<button class="ct-tab' + (activeContaTab===id?" active":"") + '" data-tab="' + id + '" onclick="window._contaTab(\'' + id + '\')">' + CONTA_TAB_LABELS[id] + '</button>';
   }).join("") + '<div class="ct-tab-indicator" id="conta-tab-indicator"></div>';
   setupContaSwipe();
+
+  var activeBtn = wrap.querySelector('.ct-tab.active');
+  if (activeBtn && activeBtn.scrollIntoView) {
+    activeBtn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }
 }
 
 function setupContaSwipe() {
@@ -1238,6 +1243,8 @@ async function loadContabilidade() {
   else if (activeContaTab === "balancete")      await loadContaBalancete(wrap);
   else if (activeContaTab === "demonstracoes")  await loadContaDemonstracoes(wrap);
   else if (activeContaTab === "ativos")         await loadContaAtivos(wrap);
+  else if (activeContaTab === "fluxo")          await loadContaFluxo(wrap);
+  else if (activeContaTab === "concilia")       await loadContaConciliacao(wrap);
 }
 
 function accountBalance(entries, code) {
@@ -2270,6 +2277,10 @@ window._novoAtivo = function() {
     '<input id="ativo-valor" type="number" inputmode="decimal" placeholder="0" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;margin-top:4px"/></div>' +
     '<div><label style="font-size:12px;font-weight:600;color:#6b7280">Vida útil (meses)</label>' +
     '<input id="ativo-vida" type="number" inputmode="numeric" placeholder="Ex: 60" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;margin-top:4px"/></div>' +
+    '<div><label style="font-size:12px;font-weight:600;color:#6b7280">Forma de pagamento</label>' +
+    '<select id="ativo-paymethod" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;margin-top:4px">' +
+    '<option value="dinheiro">Dinheiro</option><option value="transferencia">Transferência</option>' +
+    '</select></div>' +
     '<button onclick="window._salvarNovoAtivo()" style="width:100%;padding:13px;background:var(--primary);color:#fff;' +
     'border:none;border-radius:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px">Guardar</button>' +
     '</div>');
@@ -2286,17 +2297,28 @@ window._salvarNovoAtivo = async function() {
   var data  = el("ativo-data") ? el("ativo-data").value : "";
   var valor = Number(el("ativo-valor") ? el("ativo-valor").value : 0) || 0;
   var vida  = Number(el("ativo-vida") ? el("ativo-vida").value : 0) || 0;
+  var payMethod = el("ativo-paymethod") ? el("ativo-paymethod").value : "dinheiro";
 
   if (!nome || !data || valor <= 0 || vida <= 0) {
     toast("Preenche nome, data, valor e vida útil.", "error");
     return;
   }
 
-  await db.add("fixedAssets", {
-    name: nome, category: categoria, purchaseDate: data,
-    purchaseValue: valor, usefulLifeMonths: vida,
-    active: true, createdAt: new Date().toISOString(),
-  });
+  var newId;
+  try {
+    newId = await db.add("fixedAssets", {
+      name: nome, category: categoria, purchaseDate: data,
+      purchaseValue: valor, usefulLifeMonths: vida,
+      active: true, createdAt: new Date().toISOString(),
+    });
+    await postFixedAssetPurchaseJournal({ date: data, description: nome, amount: valor, payMethod: payMethod, assetId: newId });
+  } catch (err) {
+    // Reverte o registo do ativo se o lançamento contabilístico falhar
+    // (ex: período fechado) — evita ficar com um ativo sem a compra lançada.
+    if (newId) await db.delete("fixedAssets", newId);
+    toast("Erro: " + err.message, "error");
+    return;
+  }
 
   closeModal();
   toast("Ativo registado.", "success");
@@ -2334,6 +2356,196 @@ window._lancarAmortizacoesMes = async function() {
     },
     { title: "Lançar amortizações", confirmText: "Lançar", icon: "calendar-check" }
   );
+};
+
+// ── FLUXO DE CAIXA ────────────────────────────────────────────────────────────
+var _fluxoPeriodo = null;
+var _FLUXO_MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+function fluxoPeriodoLabel(periodo) {
+  var partes = periodo.split("-");
+  return _FLUXO_MESES[Number(partes[1]) - 1] + " " + partes[0];
+}
+
+// Fluxo de caixa pelo método direto: classifica os lançamentos por
+// sourceType (operacional/investimento/financiamento) e soma o efeito
+// líquido sobre as contas de meios monetários (41-45). Transferências
+// internas Caixa<->Banco (sourceType "treasury") somam sempre zero porque
+// afetam duas contas de caixa em sentidos opostos — não precisam de
+// tratamento especial. Amortizações não tocam contas de caixa, por isso
+// ficam naturalmente de fora sem precisar de exclusão explícita.
+async function loadContaFluxo(wrap) {
+  var periodo = _fluxoPeriodo || new Date().toISOString().slice(0, 7);
+  var allEntries = await db.getAll("journalEntries");
+  var CASH_ACCOUNTS = ["45", "43", "44", "42", "41"];
+
+  function cashDelta(entriesArr) {
+    var total = 0;
+    entriesArr.forEach(function(e) {
+      (e.lines || []).forEach(function(l) {
+        if (CASH_ACCOUNTS.indexOf(l.account) === -1) return;
+        total += (l.debit || 0) - (l.credit || 0);
+      });
+    });
+    return Math.round(total * 100) / 100;
+  }
+
+  var antesDoPeriodo = allEntries.filter(function(e) { return String(e.date).slice(0, 7) < periodo; });
+  var noPeriodo      = allEntries.filter(function(e) { return String(e.date).slice(0, 7) === periodo; });
+
+  var saldoInicial = cashDelta(antesDoPeriodo);
+
+  function porTipo(sourceTypes) {
+    return cashDelta(noPeriodo.filter(function(e) { return sourceTypes.indexOf(e.sourceType) !== -1; }));
+  }
+
+  var operacional     = porTipo(["sale", "return", "expense", "purchase"]);
+  var investimento    = porTipo(["fixed_asset_purchase"]);
+  var financiamento   = porTipo(["treasury"]);
+  var variacaoLiquida = Math.round((operacional + investimento + financiamento) * 100) / 100;
+  var saldoFinal      = Math.round((saldoInicial + variacaoLiquida) * 100) / 100;
+
+  var navHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
+    '<button onclick="window._fluxoNavMes(-1)" class="hist-nav-arrow"><i data-lucide="chevron-left"></i></button>' +
+    '<div style="font-size:14px;font-weight:700;text-transform:capitalize">' + fluxoPeriodoLabel(periodo) + '</div>' +
+    '<button onclick="window._fluxoNavMes(1)" class="hist-nav-arrow"><i data-lucide="chevron-right"></i></button>' +
+    '</div>';
+
+  var heroHTML =
+    '<div class="hist-hero" style="margin-bottom:14px;background:' + (variacaoLiquida >= 0 ? "var(--gradient-success)" : "var(--gradient-danger)") + '">' +
+    '<div class="hist-hero-label">Variação líquida de caixa</div>' +
+    '<div class="hist-hero-val">' + fmt(variacaoLiquida) + '</div>' +
+    '<div class="hist-hero-sub">' + (variacaoLiquida >= 0 ? "▲ Aumento" : "▼ Redução") + '</div>' +
+    '</div>';
+
+  var detalheHTML =
+    '<div class="conta-card" style="margin-bottom:14px">' +
+    contaRow("Saldo inicial de caixa", fmt(saldoInicial), "var(--text)") +
+    contaRow("Atividades Operacionais", fmt(operacional), operacional >= 0 ? "var(--success)" : "var(--danger)") +
+    contaRow("Atividades de Investimento", fmt(investimento), investimento >= 0 ? "var(--success)" : "var(--danger)") +
+    contaRow("Atividades de Financiamento", fmt(financiamento), financiamento >= 0 ? "var(--success)" : "var(--danger)") +
+    contaRow("Saldo final de caixa", fmt(saldoFinal), "var(--primary)") +
+    '</div>';
+
+  wrap.innerHTML = navHTML + heroHTML + detalheHTML;
+  refreshIcons();
+}
+
+window._fluxoNavMes = function(dir) {
+  var base = _fluxoPeriodo || new Date().toISOString().slice(0, 7);
+  var partes = base.split("-").map(Number);
+  var d = new Date(partes[0], partes[1] - 1 + dir, 1);
+  _fluxoPeriodo = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  var wrap = el("contabilidade-content");
+  if (wrap) loadContaFluxo(wrap);
+};
+
+// ── CONCILIAÇÃO BANCÁRIA ──────────────────────────────────────────────────────
+// Conciliação linha a linha: cada lançamento que toca a conta 43 (Depósitos à
+// ordem) pode ser marcado como conciliado/pendente. Saldo conciliado deve
+// bater com o saldo informado do extrato bancário mais recente.
+async function loadContaConciliacao(wrap) {
+  var allEntries = await db.getAll("journalEntries");
+  var bancoEntries = [];
+  allEntries.forEach(function(e) {
+    var linha43 = (e.lines || []).find(function(l) { return l.account === "43"; });
+    if (linha43) bancoEntries.push({ entry: e, valor: (linha43.debit || 0) - (linha43.credit || 0) });
+  });
+  bancoEntries.sort(function(a, b) { return (a.entry.date || "").localeCompare(b.entry.date || ""); });
+
+  var marks = await db.getAll("bankReconciled");
+  var reconciledIds = {};
+  marks.forEach(function(m) { reconciledIds[m.entryId] = true; });
+
+  var saldoTotal = Math.round(bancoEntries.reduce(function(a, b) { return a + b.valor; }, 0) * 100) / 100;
+  var saldoConciliado = Math.round(bancoEntries.filter(function(b) { return reconciledIds[b.entry.id]; })
+    .reduce(function(a, b) { return a + b.valor; }, 0) * 100) / 100;
+  var saldoPendente = Math.round((saldoTotal - saldoConciliado) * 100) / 100;
+
+  var extratoSetting = await db.get("settings", "bancoExtrato");
+  var saldoExtrato = extratoSetting ? extratoSetting.value.saldo : null;
+  var diferenca = saldoExtrato != null ? Math.round((saldoExtrato - saldoConciliado) * 100) / 100 : null;
+
+  var extratoHTML =
+    '<div class="conta-card" style="margin-bottom:14px">' +
+    '<label style="font-size:12px;font-weight:600;color:#6b7280">Saldo do extrato bancário</label>' +
+    '<input id="extrato-saldo" type="number" inputmode="decimal" placeholder="0" value="' + (saldoExtrato != null ? saldoExtrato : "") + '" ' +
+    'style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;margin-top:6px"/>' +
+    '<button onclick="window._salvarSaldoExtrato()" style="width:100%;margin-top:10px;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Guardar</button>' +
+    '</div>';
+
+  var diffBadge = "";
+  if (diferenca !== null) {
+    var bateOK = diferenca === 0;
+    diffBadge =
+      '<div class="hist-hero" style="margin-bottom:14px;background:' + (bateOK ? "var(--gradient-success)" : "var(--gradient-danger)") + '">' +
+      '<div class="hist-hero-label">' + (bateOK ? "Conciliação bate certo" : "Diferença na conciliação") + '</div>' +
+      '<div class="hist-hero-val">' + fmt(Math.abs(diferenca)) + '</div>' +
+      '<div class="hist-hero-sub">' + (bateOK ? "▲ Tudo confere" : (diferenca > 0 ? "Falta conciliar entradas" : "Falta conciliar saídas")) + '</div>' +
+      '</div>';
+  }
+
+  var resumoHTML =
+    '<div class="conta-card" style="margin-bottom:14px">' +
+    contaRow("Saldo total (Kontaki)", fmt(saldoTotal), "var(--text)") +
+    contaRow("Saldo conciliado", fmt(saldoConciliado), "var(--success)") +
+    contaRow("Saldo pendente", fmt(saldoPendente), "var(--warning)") +
+    '</div>';
+
+  var CONCILIA_ICONS = {
+    sale:"shopping-cart", return:"corner-up-left", expense:"receipt",
+    purchase:"package", fixed_asset_purchase:"box", treasury:"arrow-left-right",
+  };
+  var CONCILIA_COLORS = {
+    sale:"var(--success)", return:"var(--danger)", expense:"var(--danger)",
+    purchase:"var(--danger)", fixed_asset_purchase:"var(--danger)", treasury:"var(--info)",
+  };
+  var CONCILIA_BG = {
+    sale:"var(--success-light)", return:"var(--danger-light)", expense:"var(--danger-light)",
+    purchase:"var(--danger-light)", fixed_asset_purchase:"var(--danger-light)", treasury:"var(--info-light)",
+  };
+
+  var listaHTML = !bancoEntries.length
+    ? '<div style="text-align:center;padding:40px 20px;color:#a1a1aa">' +
+      '<div style="font-size:14px;font-weight:600">Sem movimentos bancários ainda</div>' +
+      '</div>'
+    : '<div class="hist-mov-card">' + bancoEntries.map(function(b) {
+        var isRec = !!reconciledIds[b.entry.id];
+        var tipo = b.entry.sourceType;
+        var icone = CONCILIA_ICONS[tipo] || "circle";
+        var corIcone = CONCILIA_COLORS[tipo] || "var(--text3)";
+        var bgIcone = CONCILIA_BG[tipo] || "var(--border2)";
+        return '<div class="hist-mov-item hist-mov-item--compact" onclick="window._toggleConciliado(' + b.entry.id + ')" style="cursor:pointer;border-left:3px solid ' + (isRec ? "var(--success)" : "var(--warning)") + '">' +
+          '<div class="hist-mov-icon" style="background:' + bgIcone + ';color:' + corIcone + '">' +
+          '<i data-lucide="' + icone + '" style="width:18px;height:18px"></i></div>' +
+          '<div style="flex:1;min-width:0">' +
+          '<div class="hist-mov-name">' + b.entry.description + '</div>' +
+          '<div style="font-size:11px;color:' + (isRec ? "var(--success)" : "var(--warning)") + ';font-weight:600">' + (isRec ? "Conciliado" : "Pendente") + ' · ' + fmtDate(b.entry.date) + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;flex-shrink:0">' +
+          '<div class="hist-mov-qty">' + fmt(b.valor) + '</div>' +
+          '</div></div>';
+      }).join("") + '</div>';
+
+  wrap.innerHTML = extratoHTML + diffBadge + resumoHTML + listaHTML;
+  refreshIcons();
+}
+
+window._toggleConciliado = async function(entryId) {
+  var existing = await db.get("bankReconciled", entryId);
+  if (existing) await db.delete("bankReconciled", entryId);
+  else await db.add("bankReconciled", { entryId: entryId, reconciledAt: new Date().toISOString() });
+  var wrap = el("contabilidade-content");
+  if (wrap) await loadContaConciliacao(wrap);
+};
+
+window._salvarSaldoExtrato = async function() {
+  var v = Number(el("extrato-saldo") ? el("extrato-saldo").value : 0) || 0;
+  await db.put("settings", { key: "bancoExtrato", value: { saldo: v, data: new Date().toISOString().slice(0, 10) } });
+  toast("Saldo do extrato guardado.", "success");
+  var wrap = el("contabilidade-content");
+  if (wrap) await loadContaConciliacao(wrap);
 };
 
 async function loadAssinatura() {
