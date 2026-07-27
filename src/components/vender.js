@@ -326,7 +326,7 @@ function pushToCart(p, incidentAuth) {
     ex.qty++;
     if (incidentAuth) ex.incidentAuth = incidentAuth;
   } else {
-    cart.push({ id:p.id, name:p.name, price:p.price, stock:p.stock, unit:p.unit, qty:1, incidentAuth: incidentAuth||null });
+    cart.push({ id:p.id, catalogId:p.catalogId||null, name:p.name, price:p.price, costPrice:p.costPrice||0, stock:p.stock, unit:p.unit, qty:1, incidentAuth: incidentAuth||null });
   }
   var results = el("search-results");
   if (results) results.style.display = "none";
@@ -465,7 +465,7 @@ async function guardarPedido() {
   var user = getUser();
   var { total } = calcTotal();
   await db.add("pendingSales", {
-    items: cart.map(function(i){ return { id:i.id, name:i.name, price:i.price, qty:i.qty }; }),
+    items: cart.map(function(i){ return { id:i.id, catalogId:i.catalogId||null, name:i.name, price:i.price, costPrice:i.costPrice||0, qty:i.qty, subtotal:(i.price||0)*(i.qty||0) }; }),
     total: total,
     createdAt: new Date().toISOString(),
     userId: user.id,
@@ -1251,7 +1251,7 @@ window._confirmarVenda = async () => {
     const notes      = notesEl ? notesEl.value.trim() : "";
 
     const sid = await db.add("sales", {
-      items: cart.map(i=>({id:i.id,name:i.name,price:i.price,qty:i.qty})),
+      items: cart.map(i=>({id:i.id,catalogId:i.catalogId||null,name:i.name,price:i.price,costPrice:i.costPrice||0,qty:i.qty,subtotal:(i.price||0)*(i.qty||0)})),
       subtotal, discount:da,
       ivaPct, ivaValor:ivaVal,
       notes,
