@@ -193,3 +193,181 @@ export async function verifyInviteSignature(payload, signatureB64) {
     return false;
   }
 }
+
+// ── BACKUP CIFRADO (envelope de duas camadas) ─────────────────────────────
+// Desenho (ADR pendente de documentar em docs/architecture):
+//   Recovery Code → PBKDF2 → KEK → unwrap → Master Key → unwrap → DEK → decrypt → Backup
+//
+// A Master Key é gerada UMA VEZ (quando os 10 Recovery Codes são criados/
+// regenerados) e embrulhada uma vez por código — assim, cada backup só
+// precisa de embrulhar a DEK com a Master Key (1 operação), sem tocar nos
+// 10 códigos a cada backup. O servidor nunca vê nenhuma chave em claro,
+// só os blobs cifrados e os wraps.
+//
+// Nota de modelo de ameaças sobre extractable:false na Master Key local:
+// impede a Web Crypto API de exportar o material da chave, reduzindo
+// significativamente o risco de exfiltração (ex. cópia do IndexedDB).
+// NÃO impede um atacante com execução ativa na origem (ex. XSS same-
+// origin) de invocar operações criptográficas usando a chave enquanto a
+// app está aberta — a propriedade protegida é a exportação, não o uso
+// indevido durante uma sessão já comprometida.
+
+const BACKUP_ALGORITHM = "AES-256-GCM";
+const KEK_ITERATIONS = 300000; // mesmo custo do hashPassword, por consistência
+const WRAP_VERSION = 1;
+
+async function generateAESKey(extractable) {
+  return crypto.subtle.generateKey(
+    { name: "AES-GCM", length: 256 }, extractable !== false, ["encrypt", "decrypt"]
+  );
+}
+
+async function exportRawKey(key) {
+  const raw = await crypto.subtle.exportKey("raw", key);
+  return new Uint8Array(raw);
+}
+
+async function importRawKey(bytes, extractable) {
+  return crypto.subtle.importKey(
+    "raw", bytes, { name: "AES-GCM" }, extractable !== false, ["encrypt", "decrypt"]
+  );
+}
+
+async function encryptWithKey(key, plaintextBytes) {
+  const iv = new Uint8Array(12);
+  crypto.getRandomValues(iv);
+  const ctBuf = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, plaintextBytes);
+  return { iv: toHex(iv), ciphertext: toHex(new Uint8Array(ctBuf)) };
+}
+
+// O authTag do AES-GCM vai embutido no fim do ciphertext; se os dados
+// tiverem sido corrompidos ou adulterados, decrypt() lança excepção —
+// é essa excepção que garante a integridade autenticada do backup.
+async function decryptWithKey(key, ivHex, ciphertextHex) {
+  const iv = fromHex(ivHex);
+  const ct = fromHex(ciphertextHex);
+  const ptBuf = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, ct);
+  return new Uint8Array(ptBuf);
+}
+
+// KEK derivada directamente do Recovery Code — deliberadamente NÃO reaproveita
+// hashRecoveryCode() (esse hash sai do dispositivo, vai para o servidor para
+// autenticação; a KEK tem de ficar sempre local — separação de domínios).
+async function deriveKEKFromRecoveryCode(code, storeId) {
+  const salt = new TextEncoder().encode("kontaki-backup-kek-v1:" + storeId);
+  const derived = await pbkdf2(code.trim().toUpperCase(), salt, KEK_ITERATIONS);
+  return importRawKey(derived, false);
+}
+
+// Gera a Master Key da loja. Extractable=true só temporariamente, para
+// permitir o wrap para os 10 códigos — ver makeMasterKeyNonExtractable().
+export async function generateMasterKey() {
+  return generateAESKey(true);
+}
+
+// Reimporta a Master Key como extractable:false — é esta cópia que deve
+// ficar guardada localmente; a original extraível deve ser descartada
+// pelo chamador logo a seguir a isto.
+export async function makeMasterKeyNonExtractable(masterKey) {
+  const raw = await exportRawKey(masterKey);
+  return importRawKey(raw, false);
+}
+
+export async function wrapMasterKeyWithRecoveryCode(masterKey, code, storeId) {
+  const kek = await deriveKEKFromRecoveryCode(code, storeId);
+  const raw = await exportRawKey(masterKey);
+  const { iv, ciphertext } = await encryptWithKey(kek, raw);
+  return { wrapVersion: WRAP_VERSION, iv: iv, wrappedKey: ciphertext };
+}
+
+export async function unwrapMasterKeyWithRecoveryCode(wrapped, code, storeId) {
+  if (wrapped.wrapVersion !== WRAP_VERSION) {
+    throw new Error("Versão de embrulho não suportada: " + wrapped.wrapVersion);
+  }
+  const kek = await deriveKEKFromRecoveryCode(code, storeId);
+  const raw = await decryptWithKey(kek, wrapped.iv, wrapped.wrappedKey);
+  return importRawKey(raw, false);
+}
+
+export async function encryptBackup(backupObject, masterKey) {
+  const dek = await generateAESKey(true);
+  const plaintext = new TextEncoder().encode(JSON.stringify(backupObject));
+  const { iv, ciphertext } = await encryptWithKey(dek, plaintext);
+
+  const rawDek = await exportRawKey(dek);
+  const { iv: dekIv, ciphertext: wrappedDEK } = await encryptWithKey(masterKey, rawDek);
+
+  return {
+    version: 1,
+    algorithm: BACKUP_ALGORITHM,
+    createdAt: new Date().toISOString(),
+    iv: iv,
+    ciphertext: ciphertext,
+    wrappedDEK: wrappedDEK,
+    wrappedDEKIv: dekIv
+  };
+}
+
+export async function decryptBackup(backupPayload, masterKey) {
+  if (backupPayload.algorithm !== BACKUP_ALGORITHM) {
+    throw new Error("Algoritmo de backup não suportado: " + backupPayload.algorithm);
+  }
+  const rawDek = await decryptWithKey(masterKey, backupPayload.wrappedDEKIv, backupPayload.wrappedDEK);
+  const dek = await importRawKey(rawDek, false);
+  const plaintextBytes = await decryptWithKey(dek, backupPayload.iv, backupPayload.ciphertext);
+  const json = new TextDecoder().decode(plaintextBytes);
+  return JSON.parse(json);
+}
+
+// ── TESTE MANUAL TEMPORÁRIO — remover depois de validado ──────────────────
+// Chamar via window._testBackupCrypto() (ex. botão temporário em
+// Configurações, ou colado numa consola se vieres a ter acesso).
+// Resultados vão para logger — ver em Perfil > Configurações > Últimos erros.
+export async function testBackupCrypto() {
+  const { logger } = await import("./logger.js");
+  const storeId = "test-store-123";
+  const fakeCode = "ABCD-1234";
+
+  try {
+    logger.info("[testBackupCrypto] 1/5 — a gerar Master Key...");
+    let masterKey = await generateMasterKey();
+
+    logger.info("[testBackupCrypto] 2/5 — a embrulhar Master Key com código de teste...");
+    const wrapped = await wrapMasterKeyWithRecoveryCode(masterKey, fakeCode, storeId);
+
+    masterKey = await makeMasterKeyNonExtractable(masterKey);
+
+    logger.info("[testBackupCrypto] 3/5 — a desembrulhar Master Key (simula restauro)...");
+    const unwrapped = await unwrapMasterKeyWithRecoveryCode(wrapped, fakeCode, storeId);
+
+    // Não dá para comparar bytes em claro — ambas as chaves são
+    // extractable:false, de propósito. Confirma de forma funcional:
+    // cifra com a original, decifra com a desembrulhada.
+    const probe = new TextEncoder().encode("kontaki-probe");
+    const probeEnc = await encryptWithKey(masterKey, probe);
+    const probeDec = await decryptWithKey(unwrapped, probeEnc.iv, probeEnc.ciphertext);
+    if (new TextDecoder().decode(probeDec) !== "kontaki-probe") {
+      throw new Error("Master Key desembrulhada não é equivalente à original");
+    }
+    logger.info("[testBackupCrypto] ✓ Master Key desembrulhada correctamente (confirmado funcionalmente)");
+
+    logger.info("[testBackupCrypto] 4/5 — a cifrar backup de teste...");
+    const fakeBackup = { produtos: [{ nome: "Teste", preco: 1000 }], criadoEm: new Date().toISOString() };
+    const encrypted = await encryptBackup(fakeBackup, unwrapped);
+
+    logger.info("[testBackupCrypto] 5/5 — a decifrar e comparar...");
+    const decrypted = await decryptBackup(encrypted, unwrapped);
+
+    if (JSON.stringify(decrypted) !== JSON.stringify(fakeBackup)) {
+      throw new Error("Backup decifrado não bate com o original");
+    }
+
+    logger.info("[testBackupCrypto] ✓✓✓ TESTE COMPLETO COM SUCESSO — cifrar → decifrar → resultado idêntico");
+    return true;
+  } catch (e) {
+    logger.error("[testBackupCrypto] ✗ FALHOU", e);
+    return false;
+  }
+}
+
+window._testBackupCrypto = testBackupCrypto;
