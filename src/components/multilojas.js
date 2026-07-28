@@ -1278,49 +1278,53 @@ function _liveStatusHtml() {
 
 // ── RESUMO — UMA LOJA ───────────────────────────────────────────────────
 
-// ── PAINEL DE SAÚDE (protótipo visual) ──────────────────────────────────
-// ATENÇÃO: a maioria destes sinais está MOCADA para efeitos de desenho de
-// interface. Só "syncRecency" usa um dado real (store.lastSeenAt). Os
-// restantes (backup, stock mínimo, fiados vencidos, conflitos) dependem
-// de entidades ainda não sincronizadas (Fase 3) e devem ser substituídos
-// por cálculos reais antes de ir para produção.
-function _mockHealthSignals(store, stock) {
-  // Determinístico por loja (mesmo id → mesmo resultado), para os sinais
-  // ainda mocados não "saltarem" a cada re-render.
-  var seed = (store.id || "").split("").reduce(function(a, c) { return a + c.charCodeAt(0); }, 0);
-  var pseudoRandom = function(offset) { return ((seed + offset) % 100) / 100; };
-
+// ── ESTADO OPERACIONAL ───────────────────────────────────────────────────
+// 4 sinais reais (sync, stock, caixa, conflitos); backup e fiados ainda
+// sem sincronização nenhuma, marcados como indisponíveis em vez de mocados.
+function _mlOperationalSignals(store, stock, session, conflicts) {
   var minsAgo = store.lastSeenAt ? (Date.now() - new Date(store.lastSeenAt).getTime()) / 60000 : Infinity;
 
   var stockAvailable = stock && stock.available;
   var lowStockCount = stockAvailable ? stock.lowStockCount : 0;
-  var stockOk = stockAvailable ? lowStockCount === 0 : pseudoRandom(3) > 0.3;
   var stockDetail = stockAvailable
     ? (lowStockCount === 0 ? "Sem produtos abaixo do mínimo" : lowStockCount + " produto" + (lowStockCount !== 1 ? "s" : "") + " abaixo do stock mínimo")
-    : (pseudoRandom(3) > 0.3 ? "Sem produtos abaixo do mínimo" : "2 produtos abaixo do stock mínimo");
+    : "Sem dados de stock sincronizados";
+
+  var sessionAvailable = session && session.available;
+  var cashDiff = sessionAvailable ? session.cashDiff : null;
+  var caixaOk = cashDiff === null || cashDiff === undefined ? null : cashDiff === 0;
+  var caixaDetail = !sessionAvailable
+    ? "Sem sessões sincronizadas"
+    : (cashDiff === null || cashDiff === undefined
+        ? "Sem conferência de caixa no último turno"
+        : (cashDiff === 0 ? "Sem divergências no último fecho" : "Divergência de " + fmt(cashDiff) + " no último turno"));
+
+  var conflictsAvailable = conflicts && conflicts.available;
+  var conflictCount = conflictsAvailable ? conflicts.count : 0;
 
   return [
-    { key: "sync",     label: "Última sincronização",      ok: minsAgo <= 30,        detail: isFinite(minsAgo) ? _relativeTime(store.lastSeenAt) : "nunca sincronizada", real: true },
-    { key: "backup",   label: "Backup atualizado",          ok: pseudoRandom(1) > 0.2, detail: pseudoRandom(1) > 0.2 ? "Backup feito há menos de 24h" : "Sem backup recente", real: false },
-    { key: "conflicts",label: "Sem conflitos de dados",     ok: pseudoRandom(2) > 0.15, detail: pseudoRandom(2) > 0.15 ? "Nenhum conflito detetado" : "1 conflito de storeId por resolver", real: false },
-    { key: "stock",    label: "Stock consistente",          ok: stockOk, detail: stockDetail, real: stockAvailable },
-    { key: "caixa",    label: "Caixa reconciliado",         ok: pseudoRandom(4) > 0.25, detail: pseudoRandom(4) > 0.25 ? "Sem divergências no último fecho" : "Divergência de -2 500 Kz no último turno", real: false },
-    { key: "fiados",   label: "Fiados em dia",              ok: pseudoRandom(5) > 0.35, detail: pseudoRandom(5) > 0.35 ? "Sem fiados vencidos" : "1 fiado vencido há mais de 30 dias", real: false },
+    { key: "sync",      label: "Última sincronização", available: true, ok: minsAgo <= 30, detail: isFinite(minsAgo) ? _relativeTime(store.lastSeenAt) : "nunca sincronizada" },
+    { key: "stock",     label: "Stock consistente",    available: stockAvailable, ok: stockAvailable ? lowStockCount === 0 : false, detail: stockDetail },
+    { key: "caixa",     label: "Caixa reconciliado",   available: sessionAvailable && caixaOk !== null, ok: !!caixaOk, detail: caixaDetail },
+    { key: "conflicts", label: "Sem conflitos de dados", available: conflictsAvailable, ok: conflictsAvailable ? conflictCount === 0 : false, detail: conflictsAvailable ? (conflictCount === 0 ? "Nenhum conflito detetado" : conflictCount + " conflito" + (conflictCount !== 1 ? "s" : "") + " de storeId registado" + (conflictCount !== 1 ? "s" : "")) : "Sem dados de conflitos" },
+    { key: "backup",    label: "Backup atualizado",    available: false, ok: false, detail: "Sem dados disponíveis" },
+    { key: "fiados",    label: "Fiados em dia",        available: false, ok: false, detail: "Sem dados disponíveis" },
   ];
 }
 
 function _computeHealthScore(signals) {
-  var okCount = signals.filter(function(s) { return s.ok; }).length;
-  return Math.round((okCount / signals.length) * 100);
+  var available = signals.filter(function(s) { return s.available; });
+  if (!available.length) return 0;
+  var okCount = available.filter(function(s) { return s.ok; }).length;
+  return Math.round((okCount / available.length) * 100);
 }
 
-function _healthScoreHtml(store, stock) {
-  var signals = _mockHealthSignals(store, stock);
+function _healthScoreHtml(store, stock, session, conflicts) {
+  var signals = _mlOperationalSignals(store, stock, session, conflicts);
   var score = _computeHealthScore(signals);
   var scoreColor = score >= 85 ? "var(--success,#16a34a)" : score >= 60 ? "var(--warning,#d97706)" : "var(--danger,#dc2626)";
 
-  return '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px">Saúde da loja</div>' +
-    '<div style="font-size:11px;color:var(--text4);margin-bottom:10px">Protótipo — a maioria dos sinais ainda é simulada</div>' +
+  return '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Estado operacional</div>' +
     '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;margin-bottom:24px">' +
       '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">' +
         '<div style="width:56px;height:56px;border-radius:50%;border:4px solid ' + scoreColor + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
@@ -1328,13 +1332,13 @@ function _healthScoreHtml(store, stock) {
         '</div>' +
         '<div>' +
           '<div style="font-size:13px;font-weight:700;color:var(--text)">' + (score >= 85 ? "Saudável" : score >= 60 ? "Precisa de atenção" : "Requer ação") + '</div>' +
-          '<div style="font-size:11px;color:var(--text4)">Pontuação de 0 a 100</div>' +
+          '<div style="font-size:11px;color:var(--text4)">Pontuação de 0 a 100, com base nos sinais disponíveis</div>' +
         '</div>' +
       '</div>' +
       '<div style="display:flex;flex-direction:column;gap:9px">' +
         signals.map(function(s) {
-          var icon = s.ok ? "check-circle-2" : "alert-triangle";
-          var color = s.ok ? "var(--success,#16a34a)" : "var(--warning,#d97706)";
+          var icon = !s.available ? "minus-circle" : (s.ok ? "check-circle-2" : "alert-triangle");
+          var color = !s.available ? "var(--text4)" : (s.ok ? "var(--success,#16a34a)" : "var(--warning,#d97706)");
           return '<div style="display:flex;align-items:center;gap:8px">' +
             '<i data-lucide="' + icon + '" style="width:14px;height:14px;color:' + color + ';flex-shrink:0"></i>' +
             '<div style="flex:1;min-width:0">' +
@@ -1498,11 +1502,11 @@ async function _renderResumoLoja(wrap, storeId) {
     '<div style="font-size:12px;color:var(--text4);margin-bottom:20px">' + (data.store.lastSeenAt ? _relativeTime(data.store.lastSeenAt) : "nunca sincronizada") + '</div>' +
 
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px">' +
-      _statCard({ label: "Vendas", value: fmt(totalVendas), sub: "últimos registos", color: "var(--bg)", iconColor: "var(--text3)", icon: "shopping-bag" }) +
-      _statCard({ label: "Transações", value: data.sales.length, sub: "sincronizadas", color: "var(--bg)", iconColor: "var(--text3)", icon: "receipt" }) +
+      _statCard({ label: "Vendas", value: fmt(totalVendas), sub: "últimos registos", color: "var(--primary)", icon: "shopping-bag" }) +
+      _statCard({ label: "Transações", value: data.sales.length, sub: "sincronizadas", color: "var(--info,#2563eb)", icon: "receipt" }) +
     '</div>' +
 
-    _healthScoreHtml(data.store, data.stock) +
+    _healthScoreHtml(data.store, data.stock, data.session, data.conflicts) +
 
     '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Produtos mais vendidos</div>' +
     (data.topProducts.length
@@ -1515,6 +1519,14 @@ async function _renderResumoLoja(wrap, storeId) {
         }).join("") +
         '</div>'
       : '<div style="font-size:12px;color:var(--text4);margin-bottom:24px">Sem vendas registadas ainda.</div>') +
+
+    '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Outros dados</div>' +
+    '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;display:flex;flex-direction:column;gap:10px;margin-bottom:24px">' +
+      _pendingRow("Produtos", data.products.available ? (data.products.count + " sincronizados") : data.products.message) +
+      _pendingRow("Stock", data.stock.available ? (data.stock.lowStockCount + " abaixo do mínimo") : data.stock.message) +
+      _pendingRow("Clientes", data.customers.message) +
+      _pendingRow("Despesas", data.expenses.message) +
+    '</div>' +
 
     '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Histórico de vendas</div>' +
     (data.sales.length
@@ -1529,15 +1541,7 @@ async function _renderResumoLoja(wrap, storeId) {
           '</div>';
         }).join("") +
         '</div>'
-      : '<div style="font-size:12px;color:var(--text4);margin-bottom:24px">Sem vendas registadas ainda.</div>') +
-
-    '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Outros dados</div>' +
-    '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;display:flex;flex-direction:column;gap:10px">' +
-      _pendingRow("Produtos", data.products.available ? (data.products.count + " sincronizados") : data.products.message) +
-      _pendingRow("Stock", data.stock.available ? (data.stock.lowStockCount + " abaixo do mínimo") : data.stock.message) +
-      _pendingRow("Clientes", data.customers.message) +
-      _pendingRow("Despesas", data.expenses.message) +
-    '</div>';
+      : '<div style="font-size:12px;color:var(--text4);margin-bottom:24px">Sem vendas registadas ainda.</div>');
 
   refreshIcons(wrap);
 }

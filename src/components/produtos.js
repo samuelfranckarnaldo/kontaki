@@ -630,6 +630,7 @@ window._deactivateProd = (id) => {
   confirmDialog("Tens a certeza que queres desativar este produto?", async () => {
     const p = await db.get("products",id);
     await db.put("products",{...p,active:false});
+    await logAudit("product", p.id, "delete", [{ field: "Nome", before: p.name, after: null }]);
     toast("Produto desativado.","success");
     closeModal();
     products = await db.getAll("products");
@@ -934,6 +935,7 @@ window._saveProduto = async (id) => {
     const initialShop = Number((el("pf-stock") ? el("pf-stock").value : "")||0);
     const initialWh    = Number((el("pf-warehouse") ? el("pf-warehouse").value : "")||0);
     const newId = await db.add("products", { ...baseData, stock:0, warehouseStock:0, createdAt:new Date().toISOString() });
+    await logAudit("product", newId, "create", [{ field: "Nome", before: null, after: name }]);
     if (initialShop > 0) {
       await addStockMovement({ productId:newId, productName:name, type:"purchase", location:"shop", qty:initialShop, reference:"create", note:"Stock inicial", sessionId:null });
     }

@@ -2,7 +2,7 @@ import { db } from "./db.js";
 import { getUser } from "./auth.js";
 import { getTurnoDuration as _getTurnoDurationUtil } from "./utils.js";
 import { verifyPassword } from "./crypto.js";
-import { logger } from "./logger.js";
+import { logger, logAudit } from "./logger.js";
 
 export function generateUUID() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -458,6 +458,7 @@ export const sessionService = {
         note:`Abertura de turno — ${userName}`,createdAt:new Date().toISOString(),
       });
     }
+    await logAudit("session", sessionId, "open", [{ field: "Estado", before: null, after: "aberto" }]);
     return {sessionId,sessionUuid};
   },
   async closeSession(sessionId) {
@@ -479,6 +480,7 @@ export const sessionService = {
     }
     const closedAt=new Date().toISOString();
     await db.put("sessions",{...session,status:"closed",closedAt,stockEsperado,totalVendas,nVendas:sessionSales.length});
+    await logAudit("session", sessionId, "close", [{ field: "Estado", before: "aberto", after: "fechado" }]);
     return {stockEsperado,totalVendas,sessionSales,closedAt};
   },
   async checkDuplicate(ktkUuid) {
@@ -505,6 +507,7 @@ export const incidentService = {
     if(!inc) throw new Error("Incidente não encontrado.");
     if(inc.status!=="open") throw new Error("Incidente já resolvido.");
     await db.put("incidents",{...inc,status,resolvedBy:getUser().id,resolvedAt:new Date().toISOString(),resolution:note||""});
+    await logAudit("incident", incidentId, status==="resolved"?"resolve":"ignore", [{ field: "Status", before: "open", after: status }]);
     await addStockMovement({
       productId:inc.productId||0,productName:inc.productName,
       type:"incident_resolved",location:"shop",qty:0,
