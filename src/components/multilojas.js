@@ -18,11 +18,12 @@ var _mlWorkspaceCache = null;    // { id, store_id, version, status, ... }
 var _mlWorkspaceProducts = null; // [{ catalog_id, name, price, stock, category, active, ... }, ...]
 
 var TABS = [
-  { key: "resumo",     label: "Resumo" },
-  { key: "incidentes", label: "Incidentes" },
-  { key: "escritorio", label: "Escritório" },
-  { key: "registros",  label: "Registos" },
-  { key: "bi",         label: "BI" },
+  { key: "resumo",        label: "Resumo" },
+  { key: "bi",             label: "BI" },
+  { key: "contabilidade", label: "Contabilidade" },
+  { key: "escritorio",    label: "Escritório" },
+  { key: "incidentes",    label: "Incidentes" },
+  { key: "registros",     label: "Registos" },
 ];
 
 async function _getLicenseCode() {
@@ -68,8 +69,28 @@ function _renderTabs() {
   if (!wrap) return;
   wrap.innerHTML = TABS.map(function(t) {
     var active = _mlActiveTab === t.key;
-    return '<button onclick="window._mlSwitchTab(\'' + t.key + '\')" style="flex:1;padding:9px 4px;border:none;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;background:' + (active ? "#fff" : "transparent") + ';color:' + (active ? "#5b21b6" : "#71717a") + ';box-shadow:' + (active ? "0 1px 3px rgba(0,0,0,.08)" : "none") + '">' + t.label + '</button>';
-  }).join("");
+    return '<button class="ct-tab' + (active ? " active" : "") + '" data-tab="' + t.key + '" onclick="window._mlSwitchTab(\'' + t.key + '\')">' + t.label + '</button>';
+  }).join("") + '<div class="ct-tab-indicator" id="ml-tab-indicator"></div>';
+  _mlSetupTabIndicator();
+
+  var activeBtn = wrap.querySelector('.ct-tab.active');
+  if (activeBtn && activeBtn.scrollIntoView) {
+    activeBtn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }
+}
+
+function _mlSetupTabIndicator() {
+  var wrap = document.getElementById("multilojas-tabs");
+  var indicator = document.getElementById("ml-tab-indicator");
+  if (!wrap || !indicator) return;
+
+  var activeBtn = wrap.querySelector('.ct-tab[data-tab="' + _mlActiveTab + '"]');
+  if (!activeBtn) return;
+
+  indicator.style.width = "1px";
+  indicator.style.transformOrigin = "left center";
+  indicator.style.willChange = "transform";
+  indicator.style.transform = "translateX(" + activeBtn.offsetLeft + "px) scaleX(" + activeBtn.offsetWidth + ")";
 }
 
 function _renderStoreSelector() {
@@ -470,6 +491,16 @@ async function _renderContent() {
   if (_mlActiveTab === "escritorio") { return _renderEscritorio(wrap); }
   if (_mlActiveTab === "registros")  { return _renderRegistos(wrap); }
   if (_mlActiveTab === "bi")         { return _renderBI(wrap); }
+  if (_mlActiveTab === "contabilidade") { return _renderContabilidadePlaceholder(wrap); }
+}
+
+function _renderContabilidadePlaceholder(wrap) {
+  wrap.innerHTML = '<div class="empty-state">' +
+    '<i data-lucide="landmark"></i>' +
+    '<div class="empty-state-title">Em breve</div>' +
+    '<div class="empty-state-sub">A contabilidade consolidada fica disponível quando os lançamentos (PGC) forem sincronizados para o Console.</div>' +
+  '</div>';
+  refreshIcons(wrap);
 }
 
 
