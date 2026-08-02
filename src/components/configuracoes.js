@@ -73,6 +73,9 @@ async function renderConfiguracoes() {
     '<button onclick="window._exportBackupEncrypted()" style="width:100%;padding:13px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
     '<i data-lucide="shield-check" style="width:16px;height:16px"></i> Exportar Backup Seguro (.ktkbackup)</button>' +
     '<div style="font-size:12px;color:var(--text4);margin-top:-4px;margin-bottom:4px">Cifrado, para recuperar a loja ou enviar ao Kontaki Console.</div>' +
+    '<button id="btn-upload-backup" onclick="window._uploadBackupToConsole()" style="width:100%;padding:13px;background:var(--success);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
+    '<i data-lucide="cloud-upload" style="width:16px;height:16px"></i> Enviar Backup para o Console</button>' +
+    '<div style="font-size:12px;color:var(--text4);margin-top:-4px;margin-bottom:4px">Envia o backup cifrado directamente, sem precisares de guardar o ficheiro.</div>' +
     '<button onclick="window._exportBackup()" style="width:100%;padding:13px;background:none;border:1.5px solid var(--border2);color:var(--text2);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
     '<i data-lucide="download" style="width:16px;height:16px"></i> Exportar Dados (.json)</button>' +
     '<div style="font-size:12px;color:var(--text4);margin-top:-4px;margin-bottom:4px">Em claro, para migração, análise ou suporte técnico.</div>' +
@@ -206,6 +209,26 @@ window._exportBackupEncrypted = async () => {
     toast("Backup seguro exportado. ID: " + backupId.slice(0, 8) + "…", "success");
   } catch(err) {
     toast(err.message || "Erro ao exportar backup seguro.", "error");
+  }
+};
+
+window._uploadBackupToConsole = async () => {
+  const licMod = await import("../license.js");
+  if (!licMod.hasFeature("backup")) {
+    licMod.showUpgradeBanner("Backup disponível a partir do plano Pro. Contacta a Introxeer para upgrade.");
+    return;
+  }
+  const btn = document.getElementById("btn-upload-backup");
+  if (btn) btn.disabled = true;
+  try {
+    const backupId = await backupService.uploadToConsole(function (status) {
+      toast(status, "success");
+    });
+    toast("Backup enviado com sucesso. ID: " + backupId.slice(0, 8) + "…", "success");
+  } catch (err) {
+    toast(err.message || "Erro ao enviar backup para o Console.", "error");
+  } finally {
+    if (btn) btn.disabled = false;
   }
 };
 

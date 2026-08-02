@@ -2,6 +2,8 @@ import { db, getAllStoreNames } from "./db.js";
 import { encryptBackup } from "./crypto.js";
 import { hasMasterKey, getOrCreateMasterKey } from "./recovery-codes.js";
 
+const CONSOLE_API = "https://kontaki-console.vercel.app/api";
+
 // Backup completo: lê a lista real de stores da base de dados em vez de
 // manter uma lista fixa à parte — evita o problema que já aconteceu uma vez
 // (backup.js ficou desatualizado à medida que a app cresceu, deixando de
@@ -45,10 +47,13 @@ export const backupService = {
   // Backup cifrado (.ktkbackup) — formato oficial de recuperação, ligado
   // ao Kontaki Console. Distinto de download() acima, que continua a
   // servir exportação/migração/suporte em JSON claro, sem alterações.
-  async downloadEncrypted() {
+  // Monta o backup cifrado completo (payload + storeId + deviceId), reaproveitado
+  // por downloadEncrypted() e uploadToConsole() — evita duplicar a lógica de
+  // Master Key/sequence/meta nos dois sítios.
+  async _buildEncryptedBackup() {
     const ready = await hasMasterKey();
     if (!ready) {
-      throw new Error("Gera os teus códigos de recuperação antes de exportar um backup seguro.");
+      throw new Error("Gera os teus códigos de recuperação antes de criar um backup seguro.");
     }
     const masterKey = await getOrCreateMasterKey();
 
@@ -73,6 +78,12 @@ export const backupService = {
       sequence: sequence,
     });
 
+    return { payload: payload, storeId: storeId, deviceId: deviceId };
+  },
+
+  async downloadEncrypted() {
+    const { payload } = await this._buildEncryptedBackup();
+
     const json = JSON.stringify(payload);
     const blob = new Blob([json], { type: "application/json" });
     const url  = URL.createObjectURL(blob);
@@ -83,6 +94,43 @@ export const backupService = {
     a.click();
     URL.revokeObjectURL(url);
     return payload.metadata.backupId;
+  },
+
+  // Envia o backup cifrado directamente ao Console, sem gerar ficheiro local.
+  async uploadToConsole(onStatus) {
+    const notify = onStatus || function () {};
+    notify("A preparar backup...");
+    const { payload, storeId, deviceId } = await this._buildEncryptedBackup();
+
+    const licMod = await import("./license.js");
+    const lic = licMod.getLicense();
+    if (!lic || !lic.code) throw new Error("Sem licença ativa — não é possível enviar ao Console.");
+
+    notify("A enviar...");
+    let res;
+    try {
+      res = await fetch(CONSOLE_API + "/backup/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          licenseCode: lic.code,
+          storeId: storeId,
+          deviceId: deviceId,
+          backup: payload,
+        }),
+      });
+    } catch (e) {
+      throw new Error("Sem ligação à internet. Tenta novamente mais tarde.");
+    }
+
+    let result;
+    try { result = await res.json(); }
+    catch { throw new Error("Resposta inválida do Console."); }
+
+    if (!res.ok || !result.success) {
+      throw new Error(result.error || "Erro ao enviar backup ao Console.");
+    }
+    return result.backupId;
   },
 
   async import(jsonText) {
