@@ -12,8 +12,13 @@ export async function ensureStoreId() {
   var id = "STORE-" + Date.now().toString(36).toUpperCase() + "-" + Math.random().toString(36).slice(2,8).toUpperCase();
   if (store) {
     store.storeId = id;
-    await db.put("settings", store);
+  } else {
+    // Loja ainda sem registo settings.store nenhum (nunca aconteceu setup
+    // completo até aqui) — cria já com o storeId, em vez de gerar um id
+    // que se perdia sem nunca ser gravado.
+    store = { key: "store", storeId: id };
   }
+  await db.put("settings", store);
   return id;
 }
 

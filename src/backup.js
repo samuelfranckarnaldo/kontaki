@@ -1,6 +1,7 @@
 import { db, getAllStoreNames } from "./db.js";
 import { encryptBackup } from "./crypto.js";
 import { hasMasterKey, getOrCreateMasterKey } from "./recovery-codes.js";
+import { ensureStoreId } from "./invite.js";
 
 const CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
@@ -57,9 +58,7 @@ export const backupService = {
     }
     const masterKey = await getOrCreateMasterKey();
 
-    const store = await db.get("settings", "store");
-    const storeId = store && store.storeId;
-    if (!storeId) throw new Error("Loja sem storeId definido — não é possível gerar backup seguro.");
+    const storeId = await ensureStoreId();
 
     const deviceIdRow = await db.get("settings", "deviceId");
     const deviceId = deviceIdRow && deviceIdRow.value;
