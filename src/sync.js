@@ -1,6 +1,7 @@
 import { db } from "./db.js";
 import { logger } from "./logger.js";
 import { catalogService } from "./services.js";
+import { ensureStoreId } from "./invite.js";
 
 var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
@@ -15,8 +16,10 @@ async function getDeviceId() {
 }
 
 async function getStoreId() {
-  var s = await db.get("settings", "storeId");
-  return s ? s.value : null;
+  // Fonte única de verdade — a mesma usada por backup.js e recovery-codes.js.
+  // (Antes, sync.js lia de settings.storeId, uma chave separada nunca
+  // escrita por ninguém; ensureStoreId() grava em settings.store.storeId.)
+  return await ensureStoreId();
 }
 
 async function getLicenseCode() {
