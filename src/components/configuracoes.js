@@ -108,6 +108,8 @@ async function renderConfiguracoes() {
     '<div style="font-size:13px;color:var(--text3);margin-bottom:12px;line-height:1.5">Se esta loja deixou de sincronizar corretamente com o Console (ex.: depois de testes ou troca de dispositivo), podes gerar um novo identificador de sincronização. A loja continua a funcionar normalmente offline.</div>' +
     '<button id="btn-regenerate-sync-id" onclick="window._regenerateSyncId()" style="width:100%;padding:13px;background:none;border:1.5px solid var(--warning);color:var(--warning);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
     '<i data-lucide="refresh-cw" style="width:16px;height:16px"></i> Regenerar identificador de sincronização</button>' +
+    '<button id="btn-reset-storeid" onclick="window._resetLocalStoreId()" style="width:100%;padding:10px;margin-top:8px;background:none;border:1px dashed var(--text4);color:var(--text4);border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">' +
+    '<i data-lucide="flask-conical" style="width:14px;height:14px"></i> [debug] Limpar storeId local</button>' +
     '</div>' +
 
     sectionLabel("Últimos erros (" + logs.length + ")") +
@@ -298,6 +300,15 @@ window._clearLogs = async () => {
 };
 
 window._closeModal = closeModal;
+
+window._resetLocalStoreId = async function() {
+  var store = await db.get("settings", "store");
+  if (store) {
+    delete store.storeId;
+    await db.put("settings", store);
+  }
+  toast("storeId local limpo. Testa o upload agora.", "success");
+};
 
 window._runBackupCryptoTest = async function() {
   toast("A testar cifragem de backup...", "success");

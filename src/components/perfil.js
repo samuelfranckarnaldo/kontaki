@@ -732,28 +732,49 @@ async function loadEquipa() {
       '<div class="team-card">' +
       '<div class="team-card-avatar team-card-avatar--' + (u.role==="admin"?"admin":"caixa") + '">' + u.name.charAt(0).toUpperCase() + '</div>' +
       '<div class="team-card-info">' +
+      '<div class="team-card-top-row">' +
       '<div class="team-card-name">' + u.name + (isMe ? ' <span class="team-card-you">(tu)</span>' : '') + '</div>' +
+      '<span class="team-card-badge" style="background:' + (u.active?"#dcfce7":"#fee2e2") + ';color:' + (u.active?"var(--success)":"var(--danger)") + '">' + (u.active?"Activo":"Inactivo") + '</span>' +
+      '</div>' +
       '<div class="team-card-meta">@' + u.username + ' · ' + (u.role==="admin"?"Administrador":"Caixa") + ' · ' + ns + ' sessões</div>' +
       '</div>' +
-      '<div class="team-card-actions">' +
-      '<span class="badge-status" style="background:' + (u.active?"#dcfce7":"#fee2e2") + ';color:' + (u.active?"var(--success)":"var(--danger)") + '">' + (u.active?"Activo":"Inactivo") + '</span>' +
       (!isMe ?
-        (u.role === "caixa" ?
-          '<button class="team-card-btn" onclick="window._abrirResetPin(' + u.id + ')" title="Repor PIN">' +
-          '<i data-lucide="key"></i></button>' +
-          '<button class="team-card-btn" onclick="window._abrirPermissoes(' + u.id + ')" title="Permissões">' +
-          '<i data-lucide="shield-check"></i></button>'
-          : '') +
-        '<button class="team-card-btn" onclick="window._toggleUser(' + u.id + ')" title="' + (u.active?"Desactivar":"Activar") + '">' +
-        '<i data-lucide="' + (u.active?"user-x":"user-check") + '"></i></button>' +
-        '<button class="team-card-btn team-card-btn--danger" onclick="window._deleteUser(' + u.id + ')" title="Eliminar">' +
-        '<i data-lucide="trash-2"></i></button>'
+        '<button class="team-card-more-btn" onclick="window._openTeamCardMenu(' + u.id + ')" title="Mais opções">' +
+        '<i data-lucide="more-vertical"></i></button>'
         : '') +
-      '</div></div>'
+      '</div>'
     );
   }).join("");
   refreshIcons(el("users-list"));
 }
+
+window._openTeamCardMenu = async function(userId) {
+  const u = await db.get("users", userId);
+  if (!u) return;
+  const items = [];
+  if (u.role === "caixa") {
+    items.push({ icon: "key", label: "Repor PIN", desc: "Define um novo PIN de acesso", iconClass: "hist-export-icon--edit", action: "window._abrirResetPin(" + u.id + ")" });
+    items.push({ icon: "shield-check", label: "Permissões", desc: "Escolher o que este funcionário pode fazer", iconClass: "hist-export-icon--csv", action: "window._abrirPermissoes(" + u.id + ")" });
+  }
+  items.push({ icon: (u.active?"user-x":"user-check"), label: (u.active?"Desactivar":"Activar"), desc: (u.active?"Deixa de conseguir entrar na conta":"Volta a poder entrar na conta"), iconClass: "hist-export-icon--pdf", action: "window._toggleUser(" + u.id + ")" });
+  items.push({ icon: "trash-2", label: "Eliminar", desc: "Remove definitivamente este utilizador", iconClass: "hist-export-icon--cancel", action: "window._deleteUser(" + u.id + ")" });
+
+  openModal("Mais opções — " + u.name,
+    '<div class="hist-export-options">' +
+    items.map(function(it) {
+      return '<button class="hist-export-option" onclick="window._closeModal();' + it.action + '">' +
+        '<div class="hist-export-icon ' + it.iconClass + '"><i data-lucide="' + it.icon + '"></i></div>' +
+        '<div class="hist-export-info">' +
+        '<div class="hist-export-title">' + it.label + '</div>' +
+        '<div class="hist-export-desc">' + it.desc + '</div>' +
+        '</div>' +
+        '<i data-lucide="chevron-right" class="hist-export-arrow"></i>' +
+        '</button>';
+    }).join("") +
+    '</div>'
+  );
+  refreshIcons(el("modal-box"));
+};
 
 window._abrirResetPin = function(userId) {
   window._resetPinTargetId = userId;
