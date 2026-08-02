@@ -4,22 +4,42 @@ import { getLicense } from "./license.js";
 
 const CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
-// Gera um storeId único e persistente para esta loja (uma vez, no setup)
+// Gera um storeId único e persistente para esta loja (uma vez, no setup).
+// Antes de gerar um valor novo, consulta o servidor: se já existir um
+// storeId registado para a licença activa (ex. dispositivo reinstalado,
+// dados locais limpos, mas o servidor já tinha um valor sticky de uma
+// sincronização anterior), adopta esse em vez de inventar outro — evita
+// o mismatch "storeId não corresponde à loja desta licença".
 export async function ensureStoreId() {
   var store = await db.get("settings", "store");
   if (store && store.storeId) return store.storeId;
 
-  var id = "STORE-" + Date.now().toString(36).toUpperCase() + "-" + Math.random().toString(36).slice(2,8).toUpperCase();
+  var remoteId = await _fetchRemoteStoreId();
+
+  var id = remoteId || ("STORE-" + Date.now().toString(36).toUpperCase() + "-" + Math.random().toString(36).slice(2,8).toUpperCase());
   if (store) {
     store.storeId = id;
   } else {
-    // Loja ainda sem registo settings.store nenhum (nunca aconteceu setup
-    // completo até aqui) — cria já com o storeId, em vez de gerar um id
-    // que se perdia sem nunca ser gravado.
     store = { key: "store", storeId: id };
   }
   await db.put("settings", store);
   return id;
+}
+
+async function _fetchRemoteStoreId() {
+  try {
+    var licMod = await import("./license.js");
+    var lic = licMod.getLicense();
+    if (!lic || !lic.code) return null;
+
+    var res = await fetch(CONSOLE_API + "/sync/status?licenseCode=" + encodeURIComponent(lic.code));
+    if (!res.ok) return null;
+    var data = await res.json();
+    return data.storeId || null;
+  } catch (e) {
+    // Sem rede ou erro — segue sem storeId remoto, gera-se um novo local.
+    return null;
+  }
 }
 
 // Gera o payload do convite e pede a assinatura ao Console.
