@@ -70,8 +70,12 @@ async function renderConfiguracoes() {
     sectionLabel("Backup") +
     '<div class="vender-card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
     '<div style="font-size:13px;color:var(--text3);margin-bottom:4px;line-height:1.5">Exporta todos os dados da app para um ficheiro JSON. Usa para fazer backup ou transferir dados.</div>' +
-    '<button onclick="window._exportBackup()" style="width:100%;padding:13px;background:var(--success);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
-    '<i data-lucide="download" style="width:16px;height:16px"></i> Exportar backup</button>' +
+    '<button onclick="window._exportBackupEncrypted()" style="width:100%;padding:13px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
+    '<i data-lucide="shield-check" style="width:16px;height:16px"></i> Exportar Backup Seguro (.ktkbackup)</button>' +
+    '<div style="font-size:12px;color:var(--text4);margin-top:-4px;margin-bottom:4px">Cifrado, para recuperar a loja ou enviar ao Kontaki Console.</div>' +
+    '<button onclick="window._exportBackup()" style="width:100%;padding:13px;background:none;border:1.5px solid var(--border2);color:var(--text2);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
+    '<i data-lucide="download" style="width:16px;height:16px"></i> Exportar Dados (.json)</button>' +
+    '<div style="font-size:12px;color:var(--text4);margin-top:-4px;margin-bottom:4px">Em claro, para migração, análise ou suporte técnico.</div>' +
     '<label style="display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border:2px dashed var(--border2);border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;color:var(--primary)">' +
     '<i data-lucide="upload" style="width:16px;height:16px"></i> Importar backup' +
     '<input type="file" accept=".json" style="display:none" onchange="window._importBackup(this)"/>' +
@@ -188,6 +192,20 @@ window._exportBackup = async () => {
     toast("Backup exportado. Checksum: " + checksum.split(",").length + " stores.", "success");
   } catch(err) {
     toast("Erro ao exportar: " + err.message, "error");
+  }
+};
+
+window._exportBackupEncrypted = async () => {
+  const licMod = await import("../license.js");
+  if (!licMod.hasFeature("backup")) {
+    licMod.showUpgradeBanner("Backup disponível a partir do plano Pro. Contacta a Introxeer para upgrade.");
+    return;
+  }
+  try {
+    const backupId = await backupService.downloadEncrypted();
+    toast("Backup seguro exportado. ID: " + backupId.slice(0, 8) + "…", "success");
+  } catch(err) {
+    toast(err.message || "Erro ao exportar backup seguro.", "error");
   }
 };
 
