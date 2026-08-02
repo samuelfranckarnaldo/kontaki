@@ -1168,6 +1168,113 @@ window._mlExportWorkspace = async function() {
   _mlRerenderWorkspaceSection();
 };
 
+// ── REGISTOS — AUDITORIA POR FUNCIONÁRIO (dados reais) ──────────────────
+var ACTION_META = {
+  create:  { label: "criou",              icon: "plus-circle",       color: "#16a34a" },
+  edit:    { label: "editou",             icon: "pencil",            color: "#2563eb" },
+  update:  { label: "editou",             icon: "pencil",            color: "#2563eb" },
+  delete:  { label: "eliminou",           icon: "trash-2",           color: "#dc2626" },
+  login:   { label: "iniciou sessão",     icon: "log-in",            color: "#71717a" },
+  resolve: { label: "resolveu incidente", icon: "check-circle",      color: "#16a34a" },
+  ignore:  { label: "ignorou incidente",  icon: "x-circle",          color: "#71717a" },
+  open:    { label: "abriu turno",        icon: "unlock",            color: "#16a34a" },
+  close:   { label: "fechou turno",       icon: "lock",              color: "#71717a" },
+  reforco:                { label: "registou reforço",           icon: "arrow-up-circle",   color: "#16a34a" },
+  sangria:                { label: "registou sangria",           icon: "arrow-down-circle", color: "#d97706" },
+  ajuste:                 { label: "registou ajuste de caixa",   icon: "sliders-horizontal", color: "#2563eb" },
+  levantamento_bancario:  { label: "levantou do banco",          icon: "landmark",          color: "#d97706" },
+  deposito_bancario:      { label: "depositou no banco",         icon: "landmark",          color: "#16a34a" },
+  retirada_proprietario:  { label: "fez retirada",               icon: "user-minus",        color: "#dc2626" },
+  aporte_capital:         { label: "fez aporte de capital",      icon: "user-plus",         color: "#16a34a" },
+};
+
+// ATENÇÃO: entityType/action vêm diretamente do logAudit() do Kontaki.
+// A tradução abaixo é uma primeira aproximação — ajustar os nomes se os
+// valores reais gravados forem diferentes.
+var ENTITY_LABELS = {
+  sale: "venda", product: "produto", expense: "despesa",
+  stock: "stock", customer: "cliente", session: "turno",
+  incident: "incidente", treasury: "movimento de tesouraria",
+};
+
+function _mlAuditDetail(a) {
+  var entityLabel = ENTITY_LABELS[a.entityType] || a.entityType || "registo";
+  var capitalized = entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1);
+  if (a.changes && typeof a.changes === "object") {
+    var fields = Object.keys(a.changes);
+    if (fields.length) return capitalized + " · " + fields.join(", ");
+  }
+  return capitalized + (a.entityId ? " #" + a.entityId : "");
+}
+
+async function _fetchRealAuditLog() {
+  try {
+    var res = await _mlAuthFetch("/reports/multi-store/audit");
+    if (res.status === 401) { loadMultilojas(); return null; }
+    if (!res.ok) return null;
+    var data = await res.json();
+    if (!data || !data.success || !data.audit || !data.audit.available) return null;
+    return data.audit.items.map(function(a) {
+      return {
+        storeId: a.storeId,
+        storeName: a.storeName,
+        operator: a.userName || "—",
+        action: a.action,
+        detail: _mlAuditDetail(a),
+        when: _relativeTime(a.createdAt),
+      };
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+async function _renderRegistos(wrap) {
+  wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
+
+  if (!_mlStoresCache || !_mlStoresCache.length) {
+    wrap.innerHTML = _errorHtml("Sem lojas para mostrar.");
+    return;
+  }
+
+  var allEntries = await _fetchRealAuditLog();
+  if (allEntries === null) {
+    wrap.innerHTML = _errorHtml("Não foi possível carregar os registos.");
+    return;
+  }
+
+  var entries = _mlSelectedStoreId === "all"
+    ? allEntries
+    : allEntries.filter(function(e) { return e.storeId === _mlSelectedStoreId; });
+
+  wrap.innerHTML =
+    '<div style="margin-bottom:14px">' +
+      '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px">Registos</div>' +
+      '<div style="font-size:11px;color:var(--text4)">Auditoria de alterações, dados reais</div>' +
+    '</div>' +
+
+    (entries.length
+      ? '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
+        entries.map(function(e, i) {
+          var meta = ACTION_META[e.action] || { label: e.action || "alterou", icon: "circle", color: "var(--text3)" };
+          return '<div style="display:flex;gap:10px;padding:12px 14px;' + (i < entries.length - 1 ? 'border-bottom:1px solid #f4f4f5;' : '') + '">' +
+            '<i data-lucide="' + meta.icon + '" style="width:15px;height:15px;color:' + meta.color + ';flex-shrink:0;margin-top:1px"></i>' +
+            '<div style="flex:1;min-width:0">' +
+              '<div style="font-size:12.5px;color:var(--text2);margin-bottom:2px">' +
+                '<span style="font-weight:700;color:var(--text)">' + e.operator + '</span> ' + meta.label +
+                (_mlSelectedStoreId === "all" ? ' em <span style="font-weight:600">' + e.storeName + '</span>' : '') +
+              '</div>' +
+              '<div style="font-size:11.5px;color:var(--text3)">' + e.detail + '</div>' +
+            '</div>' +
+            '<span style="font-size:10px;color:var(--text4);white-space:nowrap;flex-shrink:0">' + e.when + '</span>' +
+          '</div>';
+        }).join("") +
+        '</div>'
+      : '<div class="empty-state"><div class="empty-state-title">Sem registos</div></div>');
+
+  refreshIcons(wrap);
+}
+
 // ── RESUMO — TODAS AS LOJAS ────────────────────────────────────────────
 
 async function _renderResumoAgregado(wrap) {
