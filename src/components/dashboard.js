@@ -1,6 +1,7 @@
 import { db }         from "../db.js";
 import { fmt, fmtDate, refreshIcons } from "../utils.js";
 import { getUser, getSession } from "../auth.js";
+import { hasPermission } from "../permissions.js";
 
 window._closeDashboard = function() {
   var ov = document.getElementById("dashboard-overlay");
@@ -103,7 +104,7 @@ export async function loadDashboard() {
   // 04-data-classification.md) — só visível a admin. Operadores de
   // caixa veem o número de vendas do mês no lugar, para manter o
   // grid 2x2 sem espaço vazio.
-  var isAdmin = user && user.role === "admin";
+  var isAdmin = hasPermission(user, "ver_custos_margem");
   kpiGrid.innerHTML =
     _kpi("Vendas hoje",  fmt(totalHoje),  vendasHoje.length+" transações") +
     _kpi("Caixa",        fmt(saldoCaixa), "dinheiro físico") +

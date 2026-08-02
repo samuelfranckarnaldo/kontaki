@@ -107,6 +107,7 @@ window._readUnitValue = (idPrefix) => {
 import { toast } from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
+import { hasPermission } from "../permissions.js";
 import { initCamera } from "./camera.js";
 
 let products = [];
@@ -582,8 +583,8 @@ window._openProdMenu = (id) => {
 
     // Info detalhes
     `<div class="stagger-item" style="background:var(--bg);border-radius:var(--radius-lg);padding:2px var(--space-4);margin-bottom:var(--space-5);animation-delay:80ms">` +
-    (user.role==="admin" && p.costPrice ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Preço custo</span><span style="font-weight:var(--weight-strong);color:var(--text)">${fmt(p.costPrice)}</span></div>` : "") +
-    (user.role==="admin" && margin!==null ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Margem</span><span style="font-weight:var(--weight-strong);color:${margin<0?"var(--danger)":"var(--success)"}">${fmt(p.price-p.costPrice)} (${margin}%)</span></div>` : "") +
+    (hasPermission(user, "ver_custos_margem") && p.costPrice ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Preço custo</span><span style="font-weight:var(--weight-strong);color:var(--text)">${fmt(p.costPrice)}</span></div>` : "") +
+    (hasPermission(user, "ver_custos_margem") && margin!==null ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Margem</span><span style="font-weight:var(--weight-strong);color:${margin<0?"var(--danger)":"var(--success)"}">${fmt(p.price-p.costPrice)} (${margin}%)</span></div>` : "") +
     `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;font-size:var(--text-sm)"><span style="color:var(--text3)">Stock mínimo</span><span style="font-weight:var(--weight-strong);color:var(--text)">${p.minStock||5} ${p.unit||"un"}</span></div>` +
     (p.barcode ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-top:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">Código de barras</span><span style="font-family:monospace;font-weight:var(--weight-strong);color:var(--text)">${p.barcode}</span></div>` : "") +
     (p.sku ? `<div style="display:flex;justify-content:space-between;padding:var(--space-3) 0;border-top:1px solid var(--border2);font-size:var(--text-sm)"><span style="color:var(--text3)">SKU</span><span style="font-family:monospace;font-weight:var(--weight-strong);color:var(--text)">${p.sku}</span></div>` : "") +
@@ -599,7 +600,7 @@ window._openProdMenu = (id) => {
     `</div>` +
 
     // Acções
-    (user.role==="admin" ?
+    (hasPermission(user, "editar_produtos") ?
       `<div class="prod-modal-actions stagger-item" style="display:flex;flex-direction:column;gap:var(--space-2);animation-delay:120ms">
         <div style="display:flex;justify-content:center;gap:var(--space-5);padding:var(--space-2) 0">
           <button onclick="window._editProd(${p.id})" style="background:none;border:none;color:var(--text3);font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:var(--space-1)">
@@ -856,6 +857,10 @@ window._applyAdjust = async (id) => {
 };
 
 window._saveProduto = async (id) => {
+  if (!hasPermission(getUser(), "editar_produtos")) {
+    toast("Não tens permissão para criar ou editar produtos.", "error");
+    return;
+  }
   const name  = (el("pf-name") ? el("pf-name").value.trim() : "");
   const price = Number((el("pf-price") ? el("pf-price").value : ""));
   const cost  = Number((el("pf-cost") ? el("pf-cost").value : "")||0);

@@ -2,6 +2,7 @@ import { db } from "../db.js";
 import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { productService } from "../services.js";
 import { getUser } from "../auth.js";
+import { hasPermission } from "../permissions.js";
 import { openModal, closeModal } from "../modal.js";
 import { toast } from "../toast.js";
 
@@ -243,7 +244,7 @@ function renderEstoqueList() {
 
 function _estActionsBar(p) {
   const user = getUser();
-  const isAdmin = user && user.role === "admin";
+  const isAdmin = hasPermission(user, "ajustar_stock");
   const qty = p.stock || 0;
   const min = p.minStock || 5;
   const isLow = qty <= min;
@@ -453,7 +454,7 @@ window._estViewInfo = (id) => {
   const cColor = categoryColor(p.category);
   const shopS = p.stock || 0;
   const whS   = p.warehouseStock || 0;
-  const margin = (user.role === "admin" && p.costPrice) ? Math.round(((p.price-p.costPrice)/p.price)*100) : null;
+  const margin = (hasPermission(user, "ver_custos_margem") && p.costPrice) ? Math.round(((p.price-p.costPrice)/p.price)*100) : null;
 
   openModal("",
     `<div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
@@ -491,7 +492,7 @@ window._estViewInfo = (id) => {
     </div>` +
 
     `<div style="background:var(--bg);border-radius:12px;padding:2px 16px">` +
-    (user.role==="admin" && p.costPrice ? `<div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Preço custo</span><span style="font-weight:700;color:var(--text)">${fmt(p.costPrice)}</span></div>` : "") +
+    (hasPermission(user, "ver_custos_margem") && p.costPrice ? `<div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Preço custo</span><span style="font-weight:700;color:var(--text)">${fmt(p.costPrice)}</span></div>` : "") +
     (margin!==null ? `<div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Margem</span><span style="font-weight:700;color:${margin<0?"var(--danger)":"var(--success)"}">${fmt(p.price-p.costPrice)} (${margin}%)</span></div>` : "") +
     `<div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Stock mínimo</span><span style="font-weight:700;color:var(--text)">${p.minStock||5} ${p.unit||"un"}</span></div>` +
     (p.barcode ? `<div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border2);font-size:13px"><span style="color:var(--text3)">Código de barras</span><span style="font-family:monospace;font-weight:700;color:var(--text)">${p.barcode}</span></div>` : "") +

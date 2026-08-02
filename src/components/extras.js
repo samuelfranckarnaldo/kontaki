@@ -5,6 +5,7 @@ import { fmt, fmtDate, refreshIcons } from "../utils.js";
 import { toast }         from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { getUser }       from "../auth.js";
+import { hasPermission } from "../permissions.js";
 import { addStockMovement } from "../services.js";
 
 // ── MODO ESCURO ───────────────────────────────────────────────────────────────
@@ -76,6 +77,10 @@ export async function checkBadges() {
 
 // ── DEVOLUÇÃO DE PRODUTOS ─────────────────────────────────────────────────────
 export async function openDevolucao(saleId) {
+  if (!hasPermission(getUser(), "processar_devolucao")) {
+    toast("Não tens permissão para registar devoluções.", "error");
+    return;
+  }
   var { getSession } = await import("../auth.js");
   if (!getSession()) { toast("Abre um turno primeiro.", "error"); return; }
 
@@ -292,8 +297,8 @@ export async function gerarRelatorioPDF(from, to) {
   // perfil.js, mas a função em si também verifica — para que um
   // futuro ponto de chamada não fique desprotegido por esquecimento.
   const _user = getUser();
-  if (!_user || _user.role !== "admin") {
-    toast("Apenas administradores podem gerar este relatório.", "error");
+  if (!hasPermission(_user, "ver_contabilidade")) {
+    toast("Não tens permissão para gerar este relatório.", "error");
     return;
   }
 

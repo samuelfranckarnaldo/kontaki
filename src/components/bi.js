@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import { getUser } from "../auth.js";
+import { hasPermission } from "../permissions.js";
 import { fmt, refreshIcons } from "../utils.js";
 import { _statCard } from "./produtos.js";
 
@@ -404,9 +405,9 @@ export async function loadBI() {
 
   // BI expõe COGS/margens — dados operacional-confidenciais, mesma
   // classificação que a Contabilidade (ver perfil.js loadContabilidade).
-  // Só admin.
+  // Admin tem sempre acesso; caixa só com "ver_contabilidade" activa.
   var _user = getUser();
-  if (!_user || _user.role !== "admin") {
+  if (!hasPermission(_user, "ver_contabilidade")) {
     wrap.innerHTML =
       '<div style="text-align:center;padding:48px 20px;color:#a1a1aa">' +
       '<div style="font-size:14px;font-weight:600">Acesso restrito</div>' +

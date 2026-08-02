@@ -4,6 +4,7 @@ import { hashPassword, verifyPassword } from "./crypto.js";
 import { toast } from "./toast.js";
 import { confirmDialog } from "./modal.js";
 import { getTurnoDuration } from "./utils.js";
+import { defaultPermissions } from "./permissions.js";
 
 let currentUser    = null;
 let currentSession = null;
@@ -764,10 +765,29 @@ export async function createUser(name, username, password, role) {
     password: null,
     role: "caixa",
     active: true,
+    permissions: defaultPermissions(),
     avatar: name.charAt(0).toUpperCase(),
     createdAt: new Date().toISOString(),
   };
 
   const id = await db.add("users", newUser);
   return id;
+}
+
+// Actualiza as permissões granulares de um operador de caixa. Só admin
+// pode chamar isto, e só se aplica a utilizadores role==="caixa" — admin
+// já tem tudo por definição (ver hasPermission em permissions.js), não
+// faz sentido ter um registo de permissions para ele.
+export async function updateUserPermissions(targetUserId, permissions) {
+  if (!currentUser || currentUser.role !== "admin") {
+    throw new Error("Apenas administradores podem alterar permissões.");
+  }
+  const target = await db.get("users", targetUserId);
+  if (!target) throw new Error("Utilizador não encontrado.");
+  if (target.role !== "caixa") {
+    throw new Error("Só é possível definir permissões para operadores de caixa.");
+  }
+  const updated = { ...target, permissions: permissions };
+  await db.put("users", updated);
+  return updated;
 }

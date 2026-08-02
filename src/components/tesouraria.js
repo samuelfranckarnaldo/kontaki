@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import { getUser, getSession } from "../auth.js";
+import { hasPermission } from "../permissions.js";
 import { refreshIcons, el } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
@@ -7,6 +8,7 @@ import { openField } from "../date-picker.js";
 window._openDateField = openField;
 import { postOwnerContribution, postBankTransfer, getAccountBalance, postAjusteCaixaJournal } from "../pgc.js";
 import { verifyAdminPin } from "../services.js";
+import { logAudit } from "../logger.js";
 
 var ADMIN_OPS = [
   { key: "aporte",       label: "Aporte de capital",        sub: "Entrada de capital do proprietário",   icon: "trending-up",        color: "#dcfce7", iconColor: "#16a34a", section: "Capital" },
@@ -116,7 +118,7 @@ export async function loadTesouraria() {
   var wrap = document.getElementById("tesouraria-content");
   if (!wrap) return;
 
-  var isAdmin = user && user.role === "admin";
+  var isAdmin = hasPermission(user, "tesouraria_avancada");
   var ops = isAdmin ? ADMIN_OPS : CAIXA_OPS;
 
   var todosMovimentos = await db.getAll("treasuryMovements");
@@ -216,6 +218,7 @@ async function _saveAjuste(p) {
   var movId;
   try {
     movId = await db.add("treasuryMovements", movimento);
+    await logAudit("treasury", movId, "ajuste", [{ field: "Diferença", before: null, after: p.diff }]);
 
     // Sobra/falta na contagem física é uma variação real de caixa — tem de
     // ir para o Diário, senão a conta 45 nunca reflete a contagem real.
@@ -335,7 +338,7 @@ function openAjusteModal(prefill) {
 
       var payload = { esperado: esperado, contado: contado, diff: diff, motivo: motivo, date: date, session: session, user: user };
 
-      if (user && user.role !== "admin") {
+      if (!hasPermission(user, "ajustar_caixa_sem_aprovacao")) {
         openAjusteAuthModal(payload);
         return;
       }
@@ -394,7 +397,7 @@ function openReforcoModal() {
     saveBtn.textContent = "A gravar...";
 
     try {
-      await db.add("treasuryMovements", {
+      var movId = await db.add("treasuryMovements", {
         type: "reforco",
         date: date,
         amount: amount,
@@ -405,6 +408,7 @@ function openReforcoModal() {
         journalEntryId: null,
         createdAt: new Date().toISOString(),
       });
+      await logAudit("treasury", movId, "reforco", [{ field: "Valor", before: null, after: amount }]);
 
       toast("Reforço registado.", "success");
       closeModal();
@@ -463,7 +467,7 @@ function openSangriaModal() {
     saveBtn.textContent = "A gravar...";
 
     try {
-      await db.add("treasuryMovements", {
+      var movId = await db.add("treasuryMovements", {
         type: "sangria",
         date: date,
         amount: amount,
@@ -474,6 +478,7 @@ function openSangriaModal() {
         journalEntryId: null,
         createdAt: new Date().toISOString(),
       });
+      await logAudit("treasury", movId, "sangria", [{ field: "Valor", before: null, after: amount }]);
 
       toast("Sangria registada.", "success");
       closeModal();
@@ -488,6 +493,10 @@ function openSangriaModal() {
 
 // ── LEVANTAMENTO BANCÁRIO ────────────────────────────────────────────────────
 function openLevantamentoModal() {
+  if (!hasPermission(getUser(), "tesouraria_avancada")) {
+    toast("Não tens permissão para movimentos bancários.", "error");
+    return;
+  }
   openModal("Levantamento Bancário",
     '<div style="display:flex;flex-direction:column;gap:14px">' +
     '<div style="background:var(--info-light);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--info);display:flex;align-items:center;gap:8px">' +
@@ -537,6 +546,7 @@ function openLevantamentoModal() {
         journalEntryId: null,
         createdAt: new Date().toISOString(),
       });
+      await logAudit("treasury", movementId, "levantamento_bancario", [{ field: "Valor", before: null, after: amount }]);
 
       var journalEntryId = await postBankTransfer({
         date: date,
@@ -562,6 +572,10 @@ function openLevantamentoModal() {
 
 // ── DEPÓSITO BANCÁRIO ────────────────────────────────────────────────────────
 function openDepositoModal() {
+  if (!hasPermission(getUser(), "tesouraria_avancada")) {
+    toast("Não tens permissão para movimentos bancários.", "error");
+    return;
+  }
   openModal("Depósito Bancário",
     '<div style="display:flex;flex-direction:column;gap:14px">' +
     '<div style="background:var(--info-light);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--info);display:flex;align-items:center;gap:8px">' +
@@ -611,6 +625,7 @@ function openDepositoModal() {
         journalEntryId: null,
         createdAt: new Date().toISOString(),
       });
+      await logAudit("treasury", movementId, "deposito_bancario", [{ field: "Valor", before: null, after: amount }]);
 
       var journalEntryId = await postBankTransfer({
         date: date,
@@ -636,6 +651,10 @@ function openDepositoModal() {
 
 // ── RETIRADA DO PROPRIETÁRIO ─────────────────────────────────────────────────
 function openRetiradaModal() {
+  if (!hasPermission(getUser(), "tesouraria_avancada")) {
+    toast("Não tens permissão para movimentos de capital.", "error");
+    return;
+  }
   openModal("Retirada do Proprietário",
     '<div style="display:flex;flex-direction:column;gap:14px">' +
     '<div class="field"><label>Valor (Kz) *</label><input type="number" id="tes-retirada-amount" placeholder="0"/></div>' +
@@ -704,6 +723,7 @@ function openRetiradaModal() {
         journalEntryId: null,
         createdAt: new Date().toISOString(),
       });
+      await logAudit("treasury", movementId, "retirada_proprietario", [{ field: "Valor", before: null, after: amount }]);
 
       var journalEntryId = await postOwnerContribution({
         date: date,
@@ -730,6 +750,10 @@ function openRetiradaModal() {
 
 // ── APORTE DE CAPITAL ────────────────────────────────────────────────────────
 function openAporteModal() {
+  if (!hasPermission(getUser(), "tesouraria_avancada")) {
+    toast("Não tens permissão para movimentos de capital.", "error");
+    return;
+  }
   openModal("Aporte de Capital",
     '<div style="display:flex;flex-direction:column;gap:14px">' +
     '<div class="field"><label>Valor (Kz) *</label><input type="number" id="tes-aporte-amount" placeholder="0"/></div>' +
@@ -791,6 +815,7 @@ function openAporteModal() {
         journalEntryId: null,
         createdAt: new Date().toISOString(),
       });
+      await logAudit("treasury", movementId, "aporte_capital", [{ field: "Valor", before: null, after: amount }]);
 
       var journalEntryId = await postOwnerContribution({
         date: date,

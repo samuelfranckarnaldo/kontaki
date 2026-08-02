@@ -3,6 +3,7 @@ import { fmt, fmtDate, el, val, setVal, refreshIcons, generateQR, haptic, setWak
 import { toast } from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
+import { hasPermission } from "../permissions.js";
 import { initCamera } from "./camera.js";
 import { addStockMovement, getStock, getOpenIncidentForProduct, getStockIncidentPolicy, verifyAdminPin, clientService } from "../services.js";
 import { gerarReciboPDF, partilharReciboPDF, printReciboHTML, payMethodLabel, totalExtenso } from "./recibo-pdf.js";
@@ -940,7 +941,7 @@ async function openCheckout() {
       </div>
     </details>
 
-    <div class="ck-notes-wrap">
+    ${hasPermission(getUser(), "aplicar_desconto") ? `<div class="ck-notes-wrap">
       <button type="button" class="ck-notes-toggle" onclick="window._ckToggleDiscUI()" id="ck-disc-toggle">
         <i data-lucide="percent"></i> Aplicar desconto
       </button>
@@ -951,7 +952,7 @@ async function openCheckout() {
         <button type="button" id="btn-disc-type" onclick="window._ckToggleDiscType()"
           style="background:var(--border2);border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--text)">Kz</button>
       </div>
-    </div>
+    </div>` : ""}
 
     <div class="ck-notes-wrap">
       <button type="button" class="ck-notes-toggle" onclick="window._ckToggleNotes()" id="ck-notes-toggle">
@@ -1187,6 +1188,10 @@ async function openCheckout() {
 }
 
 window._confirmarVenda = async () => {
+  if ((window._checkoutDa||0) > 0 && !hasPermission(getUser(), "aplicar_desconto")) {
+    toast("Não tens permissão para aplicar desconto.", "error");
+    return;
+  }
   const licMod = await import("../license.js");
   if (licMod.getLicense().status === "none") {
     licMod.showUpgradeBanner("Ativa um plano para começar a vender. Contacta a Introxeer.");

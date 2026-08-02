@@ -17,7 +17,8 @@ import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { openPicker } from "../picker.js";
 import { openField } from "../date-picker.js";
 import { generateInvite } from "../invite.js";
-import { getUser, logout, changePasswordAuth, createUser, resetUserPin } from "../auth.js";
+import { getUser, logout, changePasswordAuth, createUser, resetUserPin, updateUserPermissions } from "../auth.js";
+import { PERMISSIONS, hasPermission } from "../permissions.js";
 import { generateCodesForUser } from "../recovery-codes.js";
 import { showRecoveryCodesScreen } from "../setup.js";
 import { getLicense, loadLicense, activateLicense, PLANS, showUpgradeBanner } from "../license.js";
@@ -125,6 +126,26 @@ function renderMenu() {
     { label: "Escritório",        sub: "Importar ficheiros de turno",    icon: "archive",        color: "var(--bg)", iconColor: "var(--text3)", page: "escritorio",    group: "Diário"     },
     { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "var(--bg)", iconColor: "var(--text3)", page: "seguranca",     group: "Diário"     },
   ];
+
+  // Itens extra do menu do caixa: só aparecem se a permissão granular
+  // correspondente estiver activa (ver permissions.js). Sem isto, activar
+  // a permissão não tinha efeito nenhum visível — a página existia mas
+  // não havia ícone nenhum para lá chegar.
+  if (user.role === "caixa") {
+    if (hasPermission(user, "resolver_incidentes")) {
+      caixaItems.push({ label: "Incidentes", sub: "Divergências de stock", icon: "alert-triangle", color: "var(--bg)", iconColor: "var(--text3)", page: "incidentes", group: "Diário" });
+    }
+    if (hasPermission(user, "ver_contabilidade")) {
+      caixaItems.push({ label: "Contabilidade", sub: "Receitas, lucros e despesas", icon: "bar-chart-2", color: "var(--bg)", iconColor: "var(--text3)", page: "contabilidade", group: "Financeiro" });
+      caixaItems.push({ label: "Business Intelligence", sub: "Tendências, comparações e análise", icon: "line-chart", color: "var(--bg)", iconColor: "var(--text3)", page: "dashboard", group: "Negócio" });
+    }
+    if (hasPermission(user, "editar_compras")) {
+      caixaItems.push({ label: "Fornecedores", sub: "Compras e fornecedores", icon: "truck", color: "var(--bg)", iconColor: "var(--text3)", page: "fornecedores", group: "Financeiro" });
+    }
+    if (hasPermission(user, "ajustar_stock")) {
+      caixaItems.push({ label: "Gestão de Stock", sub: "Produtos e inventário", icon: "package", color: "var(--bg)", iconColor: "var(--text3)", page: "stock", group: "Negócio" });
+    }
+  }
 
   const commonItems = [
     { label: "Alterar PIN",       sub: "Mudar PIN de acesso",            icon: "lock",           color: "var(--bg)", iconColor: "var(--text3)", page: "senha",         group: "Sistema"    },
@@ -571,7 +592,7 @@ async function loadIncidentes() {
     ? '<div class="empty-state"><div class="empty-state-title">Sem incidentes' + ((_incFilterStatus!=="all"||_incFilterType!=="all") ? " com este filtro" : "") + '</div></div>'
     : filtered.map(function(i) {
         var isOpen        = i.status === "open";
-        var canResolve     = isOpen && getUser().role === "admin";
+        var canResolve     = isOpen && hasPermission(getUser(), "resolver_incidentes");
         var resolverName   = (i.resolvedBy != null && usersById[i.resolvedBy]) ? usersById[i.resolvedBy].name : null;
         var diff           = i.diff||0;
         var diffColor      = diff < 0 ? "var(--danger)" : diff > 0 ? "var(--success)" : "var(--text3)";
@@ -654,7 +675,7 @@ window._clearResolvedIncidents = function() {
 };
 
 window._openResolveModal = function(id) {
-  if (!getUser() || getUser().role !== "admin") { toast("Só administradores podem resolver incidentes.", "error"); return; }
+  if (!hasPermission(getUser(), "resolver_incidentes")) { toast("Não tens permissão para resolver incidentes.", "error"); return; }
   openModal("Resolver Incidente",
     '<div style="font-size:13px;color:#71717a;margin-bottom:12px;line-height:1.5">Escreve uma justificação antes de marcar como resolvido — isto fica gravado na auditoria.</div>' +
     '<div class="field"><label>Justificação *</label>' +
@@ -671,7 +692,7 @@ window._confirmResolveInc = async function(id) {
   var noteEl = document.getElementById("resolve-note");
   var note = noteEl ? noteEl.value.trim() : "";
   if (!note) { toast("Escreve uma justificação antes de resolver.", "error"); return; }
-  if (!getUser() || getUser().role !== "admin") { toast("Só administradores podem resolver incidentes.", "error"); return; }
+  if (!hasPermission(getUser(), "resolver_incidentes")) { toast("Não tens permissão para resolver incidentes.", "error"); return; }
 
   const i = await db.get("incidents", id);
   await db.put("incidents", Object.assign({}, i, {
@@ -719,7 +740,9 @@ async function loadEquipa() {
       (!isMe ?
         (u.role === "caixa" ?
           '<button class="team-card-btn" onclick="window._abrirResetPin(' + u.id + ')" title="Repor PIN">' +
-          '<i data-lucide="key"></i></button>'
+          '<i data-lucide="key"></i></button>' +
+          '<button class="team-card-btn" onclick="window._abrirPermissoes(' + u.id + ')" title="Permissões">' +
+          '<i data-lucide="shield-check"></i></button>'
           : '') +
         '<button class="team-card-btn" onclick="window._toggleUser(' + u.id + ')" title="' + (u.active?"Desactivar":"Activar") + '">' +
         '<i data-lucide="' + (u.active?"user-x":"user-check") + '"></i></button>' +
@@ -771,6 +794,43 @@ window._confirmResetPin = async function() {
     closeModal();
     loadEquipa();
   } catch(err) {
+    toast(err.message, "error");
+  }
+};
+
+window._abrirPermissoes = async function(userId) {
+  const u = await db.get("users", userId);
+  if (!u) return;
+  const perms = u.permissions || {};
+  window._permTargetId = userId;
+  openModal("Permissões — " + u.name,
+    '<div style="font-size:13px;color:#71717a;margin-bottom:14px;line-height:1.5">Activa apenas o que este funcionário precisa. Podes alterar a qualquer momento.</div>' +
+    '<div style="display:flex;flex-direction:column;gap:2px">' +
+    PERMISSIONS.map(function(p) {
+      return '<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border2);cursor:pointer">' +
+        '<input type="checkbox" class="perm-check" data-key="' + p.key + '" ' + (perms[p.key] ? "checked" : "") + ' style="margin-top:3px"/>' +
+        '<div><div style="font-size:13px;font-weight:700;color:var(--text)">' + p.label + '</div>' +
+        '<div style="font-size:12px;color:var(--text3)">' + p.desc + '</div></div>' +
+        '</label>';
+    }).join("") +
+    '</div>' +
+    '<div class="form-actions" style="margin-top:14px">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+    '<button class="btn btn-primary btn-full" onclick="window._confirmPermissoes()">Guardar</button>' +
+    '</div>');
+  refreshIcons(el("modal-box"));
+};
+
+window._confirmPermissoes = async function() {
+  const checks = document.querySelectorAll(".perm-check");
+  const newPerms = {};
+  checks.forEach(function(c) { newPerms[c.getAttribute("data-key")] = c.checked; });
+  try {
+    await updateUserPermissions(window._permTargetId, newPerms);
+    toast("Permissões actualizadas.", "success");
+    closeModal();
+    loadEquipa();
+  } catch (err) {
     toast(err.message, "error");
   }
 };
@@ -1219,9 +1279,10 @@ async function loadContabilidade() {
 
   // Contabilidade expõe COGS, margens e accountingArchive — dados
   // operacional-confidenciais (ver docs/architecture/
-  // 04-data-classification.md). Só admin. Ver Threat Model, Cenário 3.
+  // 04-data-classification.md, Threat Model Cenário 3). Admin tem
+  // sempre acesso; caixa só com a permissão "ver_contabilidade" activa.
   var _user = getUser();
-  if (!_user || _user.role !== "admin") {
+  if (!hasPermission(_user, "ver_contabilidade")) {
     wrap.innerHTML =
       '<div style="text-align:center;padding:48px 20px;color:#a1a1aa">' +
       '<div style="font-size:14px;font-weight:600">Acesso restrito</div>' +

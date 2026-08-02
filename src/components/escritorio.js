@@ -3,6 +3,7 @@ import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
+import { hasPermission } from "../permissions.js";
 import { ktkService, sessionService, validateKtkHash, catalogService, productService } from "../services.js";
 
 export async function loadEscritorio() {
@@ -49,7 +50,7 @@ export async function loadEscritorio() {
     wrap.appendChild(invSection);
   }
 
-  if (user.role === "admin") {
+  if (hasPermission(user, "exportar_dados")) {
     var exportSection = document.createElement("div");
     exportSection.className = "esc-import-section";
     exportSection.innerHTML =

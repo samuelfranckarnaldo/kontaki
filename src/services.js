@@ -1,5 +1,6 @@
 import { db } from "./db.js";
 import { getUser } from "./auth.js";
+import { hasPermission } from "./permissions.js";
 import { getTurnoDuration as _getTurnoDurationUtil } from "./utils.js";
 import { verifyPassword } from "./crypto.js";
 import { logger, logAudit } from "./logger.js";
@@ -346,7 +347,8 @@ export const productService = {
     return db.put("products",{...ex,...data,updatedAt:new Date().toISOString()});
   },
   async adjustStock(productId, newShop, newWarehouse, reason) {
-    requireRole("admin");
+    const _u1 = requireAuth();
+    if (!hasPermission(_u1, "ajustar_stock")) throw new Error("Permissão negada. É necessária a permissão de ajustar stock.");
     const p=await db.get("products",productId);
     if(!p) throw new Error("Produto não encontrado.");
     const cs=await getStock(productId,"shop");
@@ -355,7 +357,8 @@ export const productService = {
     if(newWarehouse-cw!==0) await addStockMovement({productId,productName:p.name,type:"adjustment",location:"warehouse",qty:newWarehouse-cw,reference:"adjust",note:reason||"Ajuste manual",sessionId:null});
   },
   async transfer(productId, qty, from, to) {
-    requireRole("admin");
+    const _u2 = requireAuth();
+    if (!hasPermission(_u2, "ajustar_stock")) throw new Error("Permissão negada. É necessária a permissão de ajustar stock.");
     const p=await db.get("products",productId);
     const c=await getStock(productId,from);
     if(qty>c) throw new Error("Stock insuficiente.");
@@ -766,7 +769,8 @@ export const ktkService = {
 
 export const catalogService = {
   async generate() {
-    requireRole("admin");
+    const _u3 = requireAuth();
+    if (!hasPermission(_u3, "exportar_dados")) throw new Error("Permissão negada. É necessária a permissão de exportar dados.");
     const products=await db.getAll("products");
     const active=products.filter(p=>p.active!==false);
     const items=[];

@@ -2953,6 +2953,7 @@
   background: var(--primary); transition: transform .25s ease, width .25s ease;
   will-change: transform, width;
 }
+.ct-tabbar--evenly .ct-tab { flex: 1 1 0; text-align: center; }
 
 .ct-hero-badge {
   display: inline-block; margin-top: 8px;

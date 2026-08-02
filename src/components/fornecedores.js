@@ -4,6 +4,7 @@ import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
+import { hasPermission } from "../permissions.js";
 
 async function _refreshStockIfVisible() {
   const stockPage = document.getElementById("subpage-stock");
@@ -915,9 +916,9 @@ window._openCompraDetail = async (purchaseId) => {
 };
 
 window._openCompraMenu = (purchaseId) => {
-  const isAdmin = getUser().role === "admin";
+  const podeEditar = hasPermission(getUser(), "editar_compras");
   const items = [];
-  if (isAdmin) {
+  if (podeEditar) {
     items.push({ icon: "edit-3", label: "Editar", desc: "Alterar quantidades e custos desta compra", iconClass: "hist-export-icon--edit", action: "window._editCompra(" + purchaseId + ")" });
   }
   items.push({ icon: "archive", label: "Arquivar", desc: "Sai da lista activa, fica guardada para auditoria", iconClass: "hist-export-icon--cancel", action: "window._archivePurchase(" + purchaseId + ")" });
@@ -987,8 +988,8 @@ window._editCompra = async (purchaseId) => {
 
 window._saveEditCompra = async (purchaseId) => {
   const _user = getUser();
-  if (!_user || _user.role !== "admin") {
-    toast("Apenas administradores podem editar compras.", "error");
+  if (!hasPermission(_user, "editar_compras")) {
+    toast("Não tens permissão para editar compras.", "error");
     return;
   }
 

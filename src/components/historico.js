@@ -4,6 +4,7 @@ import { fmt, fmtDate, today, el, val, setVal, refreshIcons } from "../utils.js"
 import { openModal, closeModal }        from "../modal.js";
 import { initCalendar, getCalSelection } from "../calendar.js";
 import { getUser }                      from "../auth.js";
+import { hasPermission }                from "../permissions.js";
 import { printRecibo }                  from "../print.js";
 import { openDevolucao, gerarRelatorioPDF } from "./extras.js";
 
@@ -191,7 +192,7 @@ window._openExportMenu = async function(filtered) {
     licMod.showUpgradeBanner("Exportação de relatórios disponível a partir do plano Standard. Contacta a Introxeer para upgrade.");
     return;
   }
-  var isAdmin = getUser().role === "admin";
+  var isAdmin = hasPermission(getUser(), "exportar_dados");
   var body =
     '<div class="hist-export-options">' +
       '<button class="hist-export-option" onclick="window._exportChoice(\'csv\')">' +
@@ -313,7 +314,7 @@ function renderTabs() {
     { id:"geral",     label:"Geral"     },
     { id:"stock",     label:"Stock"     },
   ];
-  if (user && user.role === "admin") {
+  if (hasPermission(user, "ver_auditoria")) {
     tabs.push({ id:"auditoria", label:"Auditoria" });
   }
   var wrap = el("historico-tabs");
@@ -376,7 +377,7 @@ async function loadData() {
   if (activeTab === "stock")     await loadStock(from, to);
   if (activeTab === "auditoria") {
     var _u = getUser();
-    if (_u && _u.role === "admin") await loadAuditoria(from, to);
+    if (hasPermission(_u, "ver_auditoria")) await loadAuditoria(from, to);
   }
 
   var searchWrapDone = el("hist-search-wrap");
@@ -1499,7 +1500,7 @@ window._openSaleDetail = async function(id) {
 
   var hasDev   = s.temDevolucao && (s.totalDevolvido||0) > 0;
   var totalLiq = (s.total||0) - (s.totalDevolvido||0);
-  var isAdmin  = getUser().role === "admin";
+  var isAdmin  = hasPermission(getUser(), "processar_devolucao");
   var color    = payColor(s.payMethod);
   var nItems   = s.items ? s.items.length : 0;
   var idx      = 0;
