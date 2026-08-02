@@ -98,29 +98,32 @@ function renderMenu() {
   const user = getUser();
 
   const adminItems = [
-    // ── Gestão ──
-    { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "var(--bg)", iconColor: "var(--text3)", page: "turno",         group: "Gestão"     },
-    { label: "Tesouraria",        sub: "Caixa, banco e capital",         icon: "wallet",         color: "var(--bg)", iconColor: "var(--text3)", page: "tesouraria",    group: "Gestão"     },
-    { label: "Contabilidade",     sub: "Receitas, lucros e despesas",    icon: "bar-chart-2",    color: "var(--bg)", iconColor: "var(--text3)", page: "contabilidade", group: "Gestão"     },
-    { label: "Business Intelligence", sub: "Tendências, comparações e análise", icon: "line-chart", color: "var(--bg)", iconColor: "var(--text3)", page: "dashboard",     group: "Gestão"     },
-    { label: "Multi-lojas", sub: "Relatórios e dados entre lojas", icon: "network", color: "var(--bg)", iconColor: "var(--text3)", page: "multilojas",    group: "Gestão"     },
-    { label: "Gestão de Stock",   sub: "Produtos e inventário",          icon: "package",        color: "var(--bg)", iconColor: "var(--text3)", page: "stock",         group: "Gestão"     },
-    { label: "Fornecedores",      sub: "Compras e fornecedores",         icon: "truck",          color: "var(--bg)", iconColor: "var(--text3)", page: "fornecedores",  group: "Gestão"     },
-    { label: "Despesas",          sub: "Renda, salários e outros custos",icon: "receipt",        color: "var(--bg)", iconColor: "var(--text3)", page: "despesas",      group: "Gestão"     },
-    { label: "Escritório",        sub: "Importar e confirmar turnos",    icon: "archive",        color: "var(--bg)", iconColor: "var(--text3)", page: "escritorio",    group: "Gestão"     },
-    { label: "Incidentes",        sub: "Divergências de stock",          icon: "alert-triangle", color: "var(--bg)", iconColor: "var(--text3)", page: "incidentes",    group: "Gestão"     },
-    { label: "Equipa",            sub: "Funcionários e acessos",         icon: "users-2",        color: "var(--bg)", iconColor: "var(--text3)", page: "equipa",        group: "Gestão"     },
-    { label: "Dados da Loja",     sub: "Nome, logo, endereço e IVA",     icon: "store",          color: "var(--bg)", iconColor: "var(--text3)", page: "loja",          group: "Gestão"     },
+    // ── Diário ──
+    { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "var(--bg)", iconColor: "var(--text3)", page: "turno",         group: "Diário"     },
+    { label: "Tesouraria",        sub: "Caixa, banco e capital",         icon: "wallet",         color: "var(--bg)", iconColor: "var(--text3)", page: "tesouraria",    group: "Diário"     },
+    { label: "Incidentes",        sub: "Divergências de stock",          icon: "alert-triangle", color: "var(--bg)", iconColor: "var(--text3)", page: "incidentes",    group: "Diário"     },
+    // ── Financeiro ──
+    { label: "Contabilidade",     sub: "Receitas, lucros e despesas",    icon: "bar-chart-2",    color: "var(--bg)", iconColor: "var(--text3)", page: "contabilidade", group: "Financeiro" },
+    { label: "Despesas",          sub: "Renda, salários e outros custos",icon: "receipt",        color: "var(--bg)", iconColor: "var(--text3)", page: "despesas",      group: "Financeiro" },
+    { label: "Fornecedores",      sub: "Compras e fornecedores",         icon: "truck",          color: "var(--bg)", iconColor: "var(--text3)", page: "fornecedores",  group: "Financeiro" },
+    // ── Negócio ──
+    { label: "Business Intelligence", sub: "Tendências, comparações e análise", icon: "line-chart", color: "var(--bg)", iconColor: "var(--text3)", page: "dashboard",     group: "Negócio"    },
+    { label: "Multi-lojas", sub: "Relatórios e dados entre lojas", icon: "network", color: "var(--bg)", iconColor: "var(--text3)", page: "multilojas",    group: "Negócio"    },
+    { label: "Gestão de Stock",   sub: "Produtos e inventário",          icon: "package",        color: "var(--bg)", iconColor: "var(--text3)", page: "stock",         group: "Negócio"    },
+    // ── Loja ──
+    { label: "Equipa",            sub: "Funcionários e acessos",         icon: "users-2",        color: "var(--bg)", iconColor: "var(--text3)", page: "equipa",        group: "Loja"       },
+    { label: "Dados da Loja",     sub: "Nome, logo, endereço e IVA",     icon: "store",          color: "var(--bg)", iconColor: "var(--text3)", page: "loja",          group: "Loja"       },
+    { label: "Escritório",        sub: "Importar e confirmar turnos",    icon: "archive",        color: "var(--bg)", iconColor: "var(--text3)", page: "escritorio",    group: "Loja"       },
     // ── Sistema ──
     { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "var(--bg)", iconColor: "var(--text3)", page: "seguranca",     group: "Sistema"    },
     { label: "Configurações",     sub: "Backup, logs e dados",           icon: "settings",       color: "var(--bg)", iconColor: "var(--text3)", page: "configuracoes", group: "Sistema"    },
   ];
 
   const caixaItems = [
-    { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "var(--bg)", iconColor: "var(--text3)", page: "turno",         group: "Gestão"     },
-    { label: "Tesouraria",        sub: "Sangria, reforço e ajustes",     icon: "wallet",         color: "var(--bg)", iconColor: "var(--text3)", page: "tesouraria",    group: "Gestão"     },
-    { label: "Escritório",        sub: "Importar ficheiros de turno",    icon: "archive",        color: "var(--bg)", iconColor: "var(--text3)", page: "escritorio",    group: "Gestão"     },
-    { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "var(--bg)", iconColor: "var(--text3)", page: "seguranca",     group: "Gestão"     },
+    { label: "Meu Turno",         sub: "Abrir, fechar e exportar turno", icon: "clock",          color: "var(--bg)", iconColor: "var(--text3)", page: "turno",         group: "Diário"     },
+    { label: "Tesouraria",        sub: "Sangria, reforço e ajustes",     icon: "wallet",         color: "var(--bg)", iconColor: "var(--text3)", page: "tesouraria",    group: "Diário"     },
+    { label: "Escritório",        sub: "Importar ficheiros de turno",    icon: "archive",        color: "var(--bg)", iconColor: "var(--text3)", page: "escritorio",    group: "Diário"     },
+    { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "var(--bg)", iconColor: "var(--text3)", page: "seguranca",     group: "Diário"     },
   ];
 
   const commonItems = [
@@ -153,7 +156,7 @@ function renderMenu() {
     if (groupOrder.indexOf(i.group) === -1) groupOrder.push(i.group);
   });
 
-  var groupIcons = { "Gestão": "briefcase", "Sistema": "settings", "Sobre": "info" };
+  var groupIcons = { "Diário": "clock", "Financeiro": "wallet", "Negócio": "trending-up", "Loja": "store", "Sistema": "settings", "Sobre": "info" };
 
   var html = groupOrder.map(function(groupName) {
     var groupItems = grouped.filter(function(i) { return i.group === groupName; });

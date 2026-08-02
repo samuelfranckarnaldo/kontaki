@@ -1043,10 +1043,21 @@ window._saveEditCompra = async (purchaseId) => {
     return;
   }
 
+  // Realinha amountPaid/paymentStatus com o novo total. Se a compra foi
+  // paga integralmente no acto (nao a credito), o valor pago acompanha a
+  // correcao do total. Caso contrario (credito/parcial), o valor pago fica
+  // como estava (representa dinheiro ja entregue ao fornecedor), so
+  // limitado para nao ultrapassar o novo total.
+  const eraPagaIntegralmente = p.paymentStatus === "paid" && (p.amountPaid||0) >= (p.total||0);
+  let newAmountPaid = eraPagaIntegralmente ? total : Math.min(p.amountPaid||0, total);
+  const newPaymentStatus = newAmountPaid >= total ? "paid" : (newAmountPaid > 0 ? "partial" : "pending");
+
   await db.put("purchases", {
     ...p,
     items: updatedItems,
     total,
+    amountPaid: newAmountPaid,
+    paymentStatus: newPaymentStatus,
     notes: newNotes,
     editedAt: new Date().toISOString(),
   });
