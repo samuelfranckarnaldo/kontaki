@@ -1,5 +1,5 @@
 import { db } from "./db.js";
-import { generateRecoveryCodesBatch, hashRecoveryCode } from "./crypto.js";
+import { generateRecoveryCodesBatch, hashRecoveryCode, generateMasterKey, makeMasterKeyNonExtractable, wrapMasterKeyWithRecoveryCode } from "./crypto.js";
 
 const CONSOLE_API = "https://kontaki-console.vercel.app/api";
 const LOW_CODES_WARNING = 3; // avisa quando restarem <= 3
@@ -16,6 +16,26 @@ async function getAll() {
 // (histórico, nunca apaga) qualquer conjunto anterior ativo. Devolve
 // os códigos em claro UMA VEZ; localmente só se guardam os hashes.
 // Marca o backup como pendente de sincronização com o Console.
+// A Master Key é a raiz criptográfica permanente da loja (ver crypto.js).
+// Gerada UMA ÚNICA VEZ; nunca recriada por uma regeneração de códigos —
+// só re-embrulhada para os novos códigos. Isto garante que backups
+// antigos continuam sempre legíveis, seja qual for o estado actual dos
+// Recovery Codes.
+export async function getOrCreateMasterKey() {
+  const existing = await db.get("settings", "backupMasterKey");
+  if (existing && existing.value) return existing.value;
+
+  let key = await generateMasterKey();
+  key = await makeMasterKeyNonExtractable(key);
+  await db.put("settings", { key: "backupMasterKey", value: key });
+  return key;
+}
+
+export async function hasMasterKey() {
+  const existing = await db.get("settings", "backupMasterKey");
+  return !!(existing && existing.value);
+}
+
 export async function generateCodesForUser(userId) {
   if (!userId) throw new Error("userId obrigatório");
 
@@ -38,7 +58,20 @@ export async function generateCodesForUser(userId) {
     });
   }
 
-  await _markPendingAndTrySync(userId, codes);
+  const masterKey = await getOrCreateMasterKey();
+  const store = await db.get("settings", "store");
+  const storeId = store && store.storeId;
+
+  const wraps = [];
+  if (storeId) {
+    for (const code of codes) {
+      const hash = await hashRecoveryCode(code);
+      const wrapped = await wrapMasterKeyWithRecoveryCode(masterKey, code, storeId);
+      wraps.push({ hash: hash, wrapVersion: wrapped.wrapVersion, iv: wrapped.iv, wrappedKey: wrapped.wrappedKey });
+    }
+  }
+
+  await _markPendingAndTrySync(userId, codes, wraps);
   return codes; // mostrar uma única vez; chamador nunca persiste isto
 }
 
@@ -73,7 +106,7 @@ export async function redeemRecoveryCode(inputCode) {
 // que os códigos existem em claro). Fila simples: marca pending, tenta
 // logo; se falhar (sem internet), fica para a próxima tentativa.
 
-async function _markPendingAndTrySync(userId, codes) {
+async function _markPendingAndTrySync(userId, codes, wraps) {
   const state = (await db.get("recoveryBackupState", "state")) || { key: "state", version: 0 };
   const newVersion = (state.version || 0) + 1;
 
@@ -82,7 +115,7 @@ async function _markPendingAndTrySync(userId, codes) {
     version: newVersion,
     pending: true,
     lastSync: state.lastSync || null,
-    _pendingPayload: { userId: userId, codes: codes, version: newVersion },
+    _pendingPayload: { userId: userId, codes: codes, wraps: wraps || [], version: newVersion },
   });
 
   await triggerPendingSync();
@@ -111,6 +144,7 @@ export async function triggerPendingSync() {
         version: payload.version,
         userId: payload.userId,
         codes: payload.codes,
+        wraps: payload.wraps || [],
       }),
     });
     const data = await res.json();
