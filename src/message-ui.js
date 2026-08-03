@@ -99,7 +99,9 @@ window._rejectWorkspaceLink = async function(m) {
 function severityColor(sev) {
   if (sev === "danger") return "var(--danger)";
   if (sev === "warning") return "var(--warning)";
-  return "var(--info)";
+  // "info" usa a cor de identidade do Kontaki (roxo), não a --info
+  // genérica de sistema (azul) — mantém consistência com o resto do app.
+  return "var(--primary)";
 }
 
 function severityIcon(sev) {
@@ -153,22 +155,66 @@ function syncIllustrationSVG() {
   );
 }
 
+// Corpo da mensagem suporta uma sintaxe opcional de lista com ícones:
+// cada linha no formato "icone-lucide|texto" vira um item com ícone,
+// ex.: "shield-check|Segurança reforçada". Linhas sem esse padrão são
+// tratadas como parágrafo normal. Permite ao Console escrever mensagens
+// com destaques visuais (como as novidades de produto do Claude), sem
+// exigir HTML.
+function parseBody(body) {
+  var lines = String(body || "").split("\n").map(function(l) { return l.trim(); }).filter(Boolean);
+  var bulletPattern = /^([a-z0-9-]+)\|(.+)$/i;
+  var bullets = lines.map(function(l) { return l.match(bulletPattern); });
+  var allBullets = lines.length > 1 && bullets.every(Boolean);
+
+  if (allBullets) {
+    return { type: "bullets", items: bullets.map(function(match) { return { icon: match[1], text: match[2] }; }) };
+  }
+  return { type: "paragraph", text: String(body || "") };
+}
+
+function bodyHtml(parsed) {
+  if (parsed.type === "bullets") {
+    return '<div style="display:flex;flex-direction:column;gap:14px;margin-bottom:26px;text-align:left">' +
+      parsed.items.map(function(item) {
+        return '<div style="display:flex;align-items:flex-start;gap:12px">' +
+          '<i data-lucide="' + item.icon + '" style="width:18px;height:18px;color:var(--primary);flex-shrink:0;margin-top:1px"></i>' +
+          '<span style="font-size:13.5px;color:var(--text2);line-height:1.5">' + item.text + '</span>' +
+        '</div>';
+      }).join("") +
+    '</div>';
+  }
+
+  var text = parsed.text;
+  var isLong = text.length > 160;
+  var alignment = isLong ? "text-align:left" : "text-align:center";
+
+  if (!isLong) {
+    return '<div id="msg-body-text" style="font-size:13.5px;color:var(--text3);line-height:1.55;margin-bottom:24px;' + alignment + '">' + text + '</div>';
+  }
+
+  return (
+    '<div id="msg-body-text" style="font-size:13.5px;color:var(--text3);line-height:1.55;margin-bottom:6px;' + alignment + ';' +
+      'display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">' + text + '</div>' +
+    '<button id="msg-readmore-btn" style="background:none;border:none;color:var(--primary);font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;padding:0;margin-bottom:24px;display:block">Ler mais</button>'
+  );
+}
+
 function cardHtml(m, opts) {
   var color = severityColor(m.severity);
   var hasAction = m.action_type && m.action_type !== "none" && m.action_value;
+  var parsedBody = parseBody(m.body);
   return (
-    '<div style="padding:4px 0 10px">' + syncIllustrationSVG() + '</div>' +
-    '<div style="display:flex;justify-content:center;margin-bottom:16px">' +
-      '<span style="display:inline-flex;align-items:center;gap:6px;font-family:ui-monospace,\'SFMono-Regular\',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#6D28D9;background:#F6F4FD;border:1px solid #EDE9FB;padding:5px 12px 5px 10px;border-radius:999px">' +
-        '<span style="width:6px;height:6px;border-radius:50%;background:' + color + ';flex-shrink:0"></span>Introxeer' +
-      '</span>' +
+    '<div style="padding:0 0 6px">' + syncIllustrationSVG() + '</div>' +
+    '<div style="font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:var(--text4);margin-bottom:14px">' +
+      'Introxeer' +
     '</div>' +
-    '<div style="font-size:19px;font-weight:800;color:var(--text);margin-bottom:10px;text-align:center;letter-spacing:-0.01em">' + (m.title || "Aviso") + '</div>' +
-    '<div style="font-size:14px;color:var(--text3);line-height:1.6;margin-bottom:28px;text-align:center">' + m.body + '</div>' +
+    '<div style="font-size:19px;font-weight:800;color:var(--text);margin-bottom:8px;letter-spacing:-0.01em">' + (m.title || "Aviso") + '</div>' +
+    bodyHtml(parsedBody) +
     '<div style="display:flex;flex-direction:column;gap:10px">' +
       (m.action_type === "workspace_link"
         ? '<button id="msg-accept-btn" style="background:' + color + ';color:#fff;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Aceitar</button>' +
-          '<button id="msg-reject-btn" style="background:transparent;color:var(--danger);border:1.5px solid var(--danger);border-radius:14px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Rejeitar</button>'
+          '<button id="msg-reject-btn" style="background:transparent;color:var(--danger);border:none;padding:11px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit">Rejeitar</button>'
         : (hasAction ? '<button id="msg-action-btn" style="background:' + color + ';color:#fff;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">' + actionLabel(m) + '</button>' : '')) +
       (opts.dismissible ? '<button id="msg-dismiss-btn" style="background:transparent;color:var(--text3);border:none;padding:11px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit">Agora não</button>' : '') +
       (opts.blocking ? '<button id="msg-recheck-btn" style="background:transparent;color:var(--text4);border:none;padding:8px;font-size:11.5px;cursor:pointer;font-family:inherit">Verificar novamente</button>' : '') +
@@ -193,6 +239,16 @@ function renderBlocking(m) {
 
   var rejectBtn = document.getElementById("msg-reject-btn");
   if (rejectBtn) rejectBtn.onclick = function() { window._rejectWorkspaceLink(m); };
+
+  var readMoreBtn = document.getElementById("msg-readmore-btn");
+  if (readMoreBtn) readMoreBtn.onclick = function() {
+    var bodyEl = document.getElementById("msg-body-text");
+    if (bodyEl) {
+      bodyEl.style.webkitLineClamp = "unset";
+      bodyEl.style.display = "block";
+    }
+    readMoreBtn.style.display = "none";
+  };
 
   var recheckBtn = document.getElementById("msg-recheck-btn");
   if (recheckBtn) recheckBtn.onclick = async function() {
@@ -221,6 +277,16 @@ function renderModal(m) {
   if (actionBtn) actionBtn.onclick = function() {
     runAction(m);
     overlay.style.display = "none";
+  };
+
+  var readMoreBtnModal = document.getElementById("msg-readmore-btn");
+  if (readMoreBtnModal) readMoreBtnModal.onclick = function() {
+    var bodyEl = document.getElementById("msg-body-text");
+    if (bodyEl) {
+      bodyEl.style.webkitLineClamp = "unset";
+      bodyEl.style.display = "block";
+    }
+    readMoreBtnModal.style.display = "none";
   };
 
   var dismissBtn = document.getElementById("msg-dismiss-btn");
