@@ -40,6 +40,16 @@ export var PLANS = {
       "relatorio_funcionario","equipe","logotipo","backup",
     ],
   },
+  // Não é um plano vendável — é o estado por omissão antes de qualquer
+  // código ser ativado. hasFeature()/getPlanLimit() já tratam
+  // status:"none" antes de chegarem a ler isto, mas o ecrã de
+  // Assinatura lê PLANS[lic.plan] diretamente, por isso isto precisa
+  // de existir com valores reais (não o fallback de Básico a 500 Kz).
+  none: {
+    name: "Sem plano", price: 0,
+    maxProducts: 0, maxClients: 0, maxUsers: 0,
+    features: [],
+  },
 };
 
 var ALL_FEATURES = Array.from(new Set(
@@ -56,7 +66,7 @@ export async function loadLicense() {
   try {
     var lic = await db.get("settings", "license");
     if (!lic || !lic.plan) {
-      _license = { plan: "basic", status: "none", daysLeft: 0, expiresAt: null, code: null };
+      _license = { plan: "none", status: "none", daysLeft: 0, expiresAt: null, code: null };
     } else {
       var now      = Date.now();
       var exp      = lic.expiresAt ? new Date(lic.expiresAt).getTime() : null;
@@ -73,13 +83,13 @@ export async function loadLicense() {
       };
     }
   } catch(e) {
-    _license = { plan: "basic", status: "none", daysLeft: 0, expiresAt: null };
+    _license = { plan: "none", status: "none", daysLeft: 0, expiresAt: null };
   }
   return _license;
 }
 
 export function getLicense() {
-  return _license || { plan: "basic", status: "none", daysLeft: 0 };
+  return _license || { plan: "none", status: "none", daysLeft: 0 };
 }
 
 export function hasFeature(feature) {
