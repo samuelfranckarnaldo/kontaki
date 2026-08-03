@@ -10,13 +10,26 @@ const CONSOLE_API = "https://kontaki-console.vercel.app/api";
 // dados locais limpos, mas o servidor já tinha um valor sticky de uma
 // sincronização anterior), adopta esse em vez de inventar outro — evita
 // o mismatch "storeId não corresponde à loja desta licença".
+function _uuidFallback() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0;
+    var v = c === "x" ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 export async function ensureStoreId() {
   var store = await db.get("settings", "store");
   if (store && store.storeId) return store.storeId;
 
   var remoteId = await _fetchRemoteStoreId();
 
-  var id = remoteId || ("STORE-" + Date.now().toString(36).toUpperCase() + "-" + Math.random().toString(36).slice(2,8).toUpperCase());
+  // storeId é um identificador TÉCNICO (a coluna stores.store_id no
+  // Supabase é do tipo UUID) — não um código pensado para digitação
+  // manual. Antes gerava um formato customizado (STORE-XXXX-XXXX) que o
+  // Postgres rejeitava com erro de tipo, fazendo o registo desta loja
+  // falhar silenciosamente no Console. Usa sempre UUID real agora.
+  var id = remoteId || ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : _uuidFallback());
   if (store) {
     store.storeId = id;
   } else {
