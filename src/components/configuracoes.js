@@ -55,6 +55,42 @@ function sectionLabel(text) {
   return '<div style="font-size:12.5px;font-weight:600;color:var(--text3);margin-bottom:8px;margin-top:4px">' + text + '</div>';
 }
 
+var _cfgActiveTab = "geral";
+var _cfgLogFilter = "all"; // "all" | "warnerror"
+var CFG_TABS = [
+  { key: "geral",     label: "Geral" },
+  { key: "registos",  label: "Registos" },
+  { key: "avancado",  label: "Avançado" },
+];
+
+window._cfgSwitchTab = function(tab) {
+  _cfgActiveTab = tab;
+  renderConfiguracoes();
+};
+
+window._cfgSetLogFilter = function(filter) {
+  _cfgLogFilter = filter;
+  renderConfiguracoes();
+};
+
+function _renderCfgTabs(wrap) {
+  var tabsEl = wrap.querySelector("#cfg-tabs");
+  if (!tabsEl) return;
+  tabsEl.innerHTML = CFG_TABS.map(function(t) {
+    var active = _cfgActiveTab === t.key;
+    return '<button class="ct-tab' + (active ? " active" : "") + '" data-tab="' + t.key + '" onclick="window._cfgSwitchTab(\'' + t.key + '\')">' + t.label + '</button>';
+  }).join("") + '<div class="ct-tab-indicator" id="cfg-tab-indicator"></div>';
+
+  var indicator = tabsEl.querySelector("#cfg-tab-indicator");
+  var activeBtn = tabsEl.querySelector('.ct-tab[data-tab="' + _cfgActiveTab + '"]');
+  if (indicator && activeBtn) {
+    indicator.style.width = "1px";
+    indicator.style.transformOrigin = "left center";
+    indicator.style.willChange = "transform";
+    indicator.style.transform = "translateX(" + activeBtn.offsetLeft + "px) scaleX(" + activeBtn.offsetWidth + ")";
+  }
+}
+
 async function renderConfiguracoes() {
   const wrap = document.getElementById("configuracoes-content");
   if (!wrap) return;
@@ -70,9 +106,19 @@ async function renderConfiguracoes() {
   }
 
   const store = (await db.get("settings","store")) || {};
-  const logs  = await getLogs(5);
 
-  wrap.innerHTML =
+  var body = "";
+  if (_cfgActiveTab === "geral")    body = await _renderCfgGeral(store);
+  if (_cfgActiveTab === "registos") body = await _renderCfgRegistos();
+  if (_cfgActiveTab === "avancado") body = _renderCfgAvancado();
+
+  wrap.innerHTML = '<div class="ct-tabbar ct-tabbar--evenly" id="cfg-tabs"></div>' + body;
+  _renderCfgTabs(wrap);
+  refreshIcons(wrap);
+}
+
+async function _renderCfgGeral(store) {
+  return (
     sectionLabel("Backup") +
     '<div class="vender-card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
     '<div style="font-size:13px;color:var(--text3);margin-bottom:4px;line-height:1.5">Exporta todos os dados da app para um ficheiro JSON. Usa para fazer backup ou transferir dados.</div>' +
@@ -107,19 +153,30 @@ async function renderConfiguracoes() {
     '</div>' +
     _devolucaoPolicyOption("bloquear", store, "lock", "Bloquear fora do prazo", "Depois do limite de dias, a devolução não pode ser feita por ninguém.") +
     _devolucaoPolicyOption("avisar", store, "alert-triangle", "Apenas avisar (mais liberdade)", "Depois do limite de dias, mostra um aviso mas continua a permitir a devolução.") +
+    '</div>'
+  );
+}
+
+async function _renderCfgRegistos() {
+  const allLogs = await getLogs(30);
+  const logs = _cfgLogFilter === "warnerror"
+    ? allLogs.filter(function(l) { return l.level === "warn" || l.level === "error"; })
+    : allLogs;
+
+  return (
+    sectionLabel("Registos (" + logs.length + ")") +
+    '<div class="vender-card" style="margin-bottom:14px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
+
+    '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+    '<button onclick="window._cfgSetLogFilter(\'all\')" style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;border:1.5px solid ' + (_cfgLogFilter === "all" ? "var(--primary)" : "var(--border2)") + ';background:' + (_cfgLogFilter === "all" ? "var(--primary)" : "none") + ';color:' + (_cfgLogFilter === "all" ? "#fff" : "var(--text3)") + '">Todos</button>' +
+    '<button onclick="window._cfgSetLogFilter(\'warnerror\')" style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;border:1.5px solid ' + (_cfgLogFilter === "warnerror" ? "var(--primary)" : "var(--border2)") + ';background:' + (_cfgLogFilter === "warnerror" ? "var(--primary)" : "none") + ';color:' + (_cfgLogFilter === "warnerror" ? "#fff" : "var(--text3)") + '">Avisos e erros</button>' +
     '</div>' +
 
-    sectionLabel("Sincronização") +
-    '<div class="vender-card" style="margin-bottom:14px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
-    '<div style="font-size:13px;color:var(--text3);margin-bottom:12px;line-height:1.5">Se esta loja deixou de sincronizar corretamente com o Console (ex.: depois de testes ou troca de dispositivo), podes gerar um novo identificador de sincronização. A loja continua a funcionar normalmente offline.</div>' +
-    '<button id="btn-regenerate-sync-id" onclick="window._regenerateSyncId()" style="width:100%;padding:10px;background:none;border:1px solid var(--border2);color:var(--text3);border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">' +
-    '<i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Regenerar identificador de sincronização</button>' +
-    '</div>' +
+    '<button onclick="window._cfgCopyLogs()" style="width:100%;padding:11px;margin-bottom:14px;background:none;border:1.5px solid var(--primary);color:var(--primary);border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">' +
+    '<i data-lucide="clipboard-copy" style="width:15px;height:15px"></i> Copiar registos (para enviar ao suporte)</button>' +
 
-    sectionLabel("Últimos erros (" + logs.length + ")") +
-    '<div class="vender-card" style="margin-bottom:14px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
     (logs.length === 0
-      ? '<div style="font-size:13px;color:var(--text4);text-align:center;padding:16px">Sem erros registados</div>'
+      ? '<div style="font-size:13px;color:var(--text4);text-align:center;padding:16px">Sem registos' + (_cfgLogFilter === "warnerror" ? " de avisos/erros" : "") + '</div>'
       : logs.map(l =>
           '<div style="padding:8px 0;border-bottom:1px solid var(--border2);font-size:12px">' +
           '<div style="display:flex;justify-content:space-between;margin-bottom:2px">' +
@@ -130,17 +187,50 @@ async function renderConfiguracoes() {
           '</div>'
         ).join("")
     ) +
-    (logs.length > 0
+    (allLogs.length > 0
       ? '<button onclick="window._clearLogs()" style="width:100%;padding:10px;background:none;border:none;color:var(--danger);font-size:13px;font-weight:600;cursor:pointer;margin-top:8px">Limpar logs</button>'
       : "") +
+    '</div>'
+  );
+}
+
+function _renderCfgAvancado() {
+  return (
+    sectionLabel("Sincronização") +
+    '<div class="vender-card" style="margin-bottom:14px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
+    '<div style="font-size:13px;color:var(--text3);margin-bottom:12px;line-height:1.5">Se esta loja deixou de sincronizar corretamente com o Console (ex.: depois de testes ou troca de dispositivo), podes gerar um novo identificador de sincronização. A loja continua a funcionar normalmente offline.</div>' +
+    '<button id="btn-regenerate-sync-id" onclick="window._regenerateSyncId()" style="width:100%;padding:10px;background:none;border:1px solid var(--border2);color:var(--text3);border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">' +
+    '<i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Regenerar identificador de sincronização</button>' +
     '</div>' +
 
     '<div style="text-align:center;margin-top:24px;padding-bottom:8px">' +
     '<button onclick="window._openDeleteAccount()" style="background:none;border:none;color:var(--text4);font-size:12px;font-weight:600;cursor:pointer;padding:8px">Eliminar conta</button>' +
-    '</div>';
-
-  refreshIcons(wrap);
+    '</div>'
+  );
 }
+
+window._cfgCopyLogs = async function() {
+  const allLogs = await getLogs(30);
+  const logs = _cfgLogFilter === "warnerror"
+    ? allLogs.filter(function(l) { return l.level === "warn" || l.level === "error"; })
+    : allLogs;
+
+  if (logs.length === 0) {
+    toast("Sem registos para copiar.", "info");
+    return;
+  }
+
+  const text = logs.map(function(l) {
+    return "[" + l.level.toUpperCase() + "] " + new Date(l.date).toLocaleString("pt-AO") + " — " + l.message;
+  }).join("\n");
+
+  try {
+    await navigator.clipboard.writeText(text);
+    toast("Registos copiados. Cola numa mensagem para o suporte.", "success");
+  } catch {
+    toast("Não foi possível copiar.", "error");
+  }
+};
 
 function _incidentPolicyOption(value, store, icon, title, desc) {
   const policy = store.stockIncidentPolicy || "block";
