@@ -6,6 +6,7 @@ import { storeKeyService, verifyAdminPin } from "../services.js";
 import { getUser }           from "../auth.js";
 import { countAvailableCodes, isLowOnCodes, generateCodesForUser } from "../recovery-codes.js";
 import { showRecoveryCodesScreen } from "../setup.js";
+import { ensureStoreId } from "../invite.js";
 
 window._togglePwVisibility = function(id) {
   var input = document.getElementById(id);
@@ -35,8 +36,9 @@ async function renderSeguranca() {
 
   const wsLink   = await db.get("settings","workspaceLink");
   const isLinked = !!(wsLink && wsLink.status === "active");
-  const storeIdRec = await db.get("settings","storeId");
-  const publicStoreId = storeIdRec ? storeIdRec.value : null;
+  // storeId real (o mesmo que sync.js envia ao Console) — settings.storeId
+  // era uma chave órfã nunca lida por ninguém além deste ecrã.
+  const publicStoreId = await ensureStoreId();
 
   const user = getUser();
   const codesLeft = user ? await countAvailableCodes(user.id) : 0;
@@ -246,8 +248,7 @@ async function renderSeguranca() {
 }
 
 window._copyStoreId = async function() {
-  const storeIdRec = await db.get("settings","storeId");
-  const publicStoreId = storeIdRec ? storeIdRec.value : null;
+  const publicStoreId = await ensureStoreId();
   if (!publicStoreId) return;
   try {
     await navigator.clipboard.writeText(publicStoreId);
