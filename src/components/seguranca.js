@@ -25,6 +25,35 @@ export async function loadSeguranca() {
   await renderSeguranca();
 }
 
+var _segActiveTab = "geral";
+var SEG_TABS = [
+  { key: "geral", label: "Geral" },
+  { key: "chave", label: "Chave da loja" },
+];
+
+window._segSwitchTab = function(tab) {
+  _segActiveTab = tab;
+  renderSeguranca();
+};
+
+function _renderSegTabs(wrap) {
+  var tabsEl = wrap.querySelector("#seg-tabs");
+  if (!tabsEl) return;
+  tabsEl.innerHTML = SEG_TABS.map(function(t) {
+    var active = _segActiveTab === t.key;
+    return '<button class="ct-tab' + (active ? " active" : "") + '" data-tab="' + t.key + '" onclick="window._segSwitchTab(\'' + t.key + '\')">' + t.label + '</button>';
+  }).join("") + '<div class="ct-tab-indicator" id="seg-tab-indicator"></div>';
+
+  var indicator = tabsEl.querySelector("#seg-tab-indicator");
+  var activeBtn = tabsEl.querySelector('.ct-tab[data-tab="' + _segActiveTab + '"]');
+  if (indicator && activeBtn) {
+    indicator.style.width = "1px";
+    indicator.style.transformOrigin = "left center";
+    indicator.style.willChange = "transform";
+    indicator.style.transform = "translateX(" + activeBtn.offsetLeft + "px) scaleX(" + activeBtn.offsetWidth + ")";
+  }
+}
+
 async function renderSeguranca() {
   const wrap = document.getElementById("seguranca-content");
   if (!wrap) return;
@@ -44,8 +73,7 @@ async function renderSeguranca() {
   const codesLeft = user ? await countAvailableCodes(user.id) : 0;
   const isLow = isLowOnCodes(codesLeft);
 
-  wrap.innerHTML = `
-
+  const geralHtml = `
     <!-- Códigos de recuperação -->
     <div style="background:${isLow?"#fffbeb":"#f0fdf4"};border:1.5px solid ${isLow?"#fde68a":"#bbf7d0"};
                 border-radius:12px;padding:10px 12px;margin-bottom:10px">
@@ -83,6 +111,49 @@ async function renderSeguranca() {
       </button>` : ""}
     </div>
 
+    <!-- Workspace -->
+    <div class="list-card" style="padding:16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="width:32px;height:32px;border-radius:9px;background:#ede9fe;
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i data-lucide="network" style="width:16px;height:16px;color:#5b21b6"></i>
+        </div>
+        <div style="font-size:14.5px;font-weight:700;color:#18181b">Workspace</div>
+      </div>
+      ${isLinked ? `
+      <div style="font-size:13px;color:#71717a;margin-bottom:12px;line-height:1.5">
+        Esta loja está ligada ao Workspace desde ${new Date(wsLink.linkedAt).toLocaleDateString("pt-AO")}.
+        O dono da empresa pode gerir esta loja remotamente.
+      </div>
+      <button onclick="window._removeWorkspaceLink()"
+              style="width:100%;padding:13px;background:transparent;color:var(--danger);
+                     border:1.5px solid var(--danger);border-radius:12px;font-size:14px;font-weight:700;
+                     cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+        <i data-lucide="unlink" style="width:16px;height:16px"></i>
+        Remover ligação
+      </button>` : `
+      <div style="font-size:13px;color:#71717a;margin-bottom:12px;line-height:1.5">
+        Para ligar esta loja ao Workspace, o dono precisa deste identificador. Introduz este
+        ID na app Workspace, ou pede-lhe para ler o código abaixo.
+      </div>
+      <div style="background:var(--bg2);border-radius:10px;padding:12px;margin-bottom:12px;
+                  display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span style="font-family:ui-monospace,monospace;font-size:13px;color:var(--text2);word-break:break-all">
+          ${publicStoreId || "—"}
+        </span>
+        ${publicStoreId ? `
+        <button onclick="window._copyStoreId()" style="background:none;border:none;color:#5b21b6;
+                flex-shrink:0;cursor:pointer;padding:4px;display:flex">
+          <i data-lucide="copy" style="width:16px;height:16px"></i>
+        </button>` : ""}
+      </div>
+      ${publicStoreId ? `
+      <div style="display:flex;justify-content:center;padding:12px 0">
+        <div id="workspace-qr"></div>
+      </div>` : ""}`}
+    </div>`;
+
+  const chaveHtml = `
     <!-- Status da chave -->
     <div style="background:${hasKey?"#f0fdf4":"#fff5f5"};border:1.5px solid ${hasKey?"#bbf7d0":"#fca5a5"};
                 border-radius:12px;padding:10px 12px;margin-bottom:10px">
@@ -153,48 +224,6 @@ async function renderSeguranca() {
       </button>
     </div>` : ""}
 
-    <!-- Workspace -->
-    <div class="list-card" style="padding:16px;margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div style="width:32px;height:32px;border-radius:9px;background:#ede9fe;
-                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <i data-lucide="network" style="width:16px;height:16px;color:#5b21b6"></i>
-        </div>
-        <div style="font-size:14.5px;font-weight:700;color:#18181b">Workspace</div>
-      </div>
-      ${isLinked ? `
-      <div style="font-size:13px;color:#71717a;margin-bottom:12px;line-height:1.5">
-        Esta loja está ligada ao Workspace desde ${new Date(wsLink.linkedAt).toLocaleDateString("pt-AO")}.
-        O dono da empresa pode gerir esta loja remotamente.
-      </div>
-      <button onclick="window._removeWorkspaceLink()"
-              style="width:100%;padding:13px;background:transparent;color:var(--danger);
-                     border:1.5px solid var(--danger);border-radius:12px;font-size:14px;font-weight:700;
-                     cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
-        <i data-lucide="unlink" style="width:16px;height:16px"></i>
-        Remover ligação
-      </button>` : `
-      <div style="font-size:13px;color:#71717a;margin-bottom:12px;line-height:1.5">
-        Para ligar esta loja ao Workspace, o dono precisa deste identificador. Introduz este
-        ID na app Workspace, ou pede-lhe para ler o código abaixo.
-      </div>
-      <div style="background:var(--bg2);border-radius:10px;padding:12px;margin-bottom:12px;
-                  display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <span style="font-family:ui-monospace,monospace;font-size:13px;color:var(--text2);word-break:break-all">
-          ${publicStoreId || "—"}
-        </span>
-        ${publicStoreId ? `
-        <button onclick="window._copyStoreId()" style="background:none;border:none;color:#5b21b6;
-                flex-shrink:0;cursor:pointer;padding:4px;display:flex">
-          <i data-lucide="copy" style="width:16px;height:16px"></i>
-        </button>` : ""}
-      </div>
-      ${publicStoreId ? `
-      <div style="display:flex;justify-content:center;padding:12px 0">
-        <div id="workspace-qr"></div>
-      </div>` : ""}`}
-    </div>
-
     <!-- Importar chave -->
     <div class="list-card" style="padding:16px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -239,9 +268,13 @@ async function renderSeguranca() {
       </button>
     </div>`;
 
+  wrap.innerHTML = '<div class="ct-tabbar ct-tabbar--evenly" id="seg-tabs" style="margin-bottom:14px"></div>' +
+    (_segActiveTab === "geral" ? geralHtml : chaveHtml);
+
+  _renderSegTabs(wrap);
   refreshIcons(wrap);
 
-  if (!isLinked && publicStoreId) {
+  if (_segActiveTab === "geral" && !isLinked && publicStoreId) {
     const qrEl = document.getElementById("workspace-qr");
     if (qrEl) generateQR(publicStoreId, qrEl, 140);
   }
