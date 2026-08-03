@@ -5,6 +5,34 @@ import { ensureStoreId } from "./invite.js";
 
 var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
+// ── CICLO COMPLETO DE SINCRONIZAÇÃO ──────────────────────────────────────
+// Orquestra as 7 sincronizações na ordem correta, com trava contra
+// sobreposição — evita que dois ciclos corram ao mesmo tempo (ex.: boot +
+// evento "online" + intervalo periódico disparando juntos numa rede lenta).
+// Usado por main.js (boot), license.js (evento online e intervalo).
+var _fullSyncRunning = false;
+
+export async function runFullSyncCycle() {
+  if (_fullSyncRunning) {
+    logger.info("[sync] runFullSyncCycle ignorado: ciclo anterior ainda em curso");
+    return;
+  }
+  _fullSyncRunning = true;
+  try {
+    await syncRegister();
+    await syncSales();
+    await syncProducts();
+    await syncIncidents();
+    await syncSessions();
+    await syncAuditLog();
+    await syncWorkspaceCatalog();
+  } catch (e) {
+    logger.error("[sync] runFullSyncCycle falhou", e);
+  } finally {
+    _fullSyncRunning = false;
+  }
+}
+
 // ── IDENTIDADE ───────────────────────────────────────────────────────────
 
 async function getDeviceId() {

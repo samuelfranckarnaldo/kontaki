@@ -184,23 +184,21 @@ if (typeof window !== "undefined") {
     } catch (e) {}
     try {
       const syncMod = await import("./sync.js");
-      await syncMod.syncRegister();
-      await syncMod.syncSales();
-      await syncMod.syncProducts();
-      await syncMod.syncIncidents();
-      await syncMod.syncSessions();
+      await syncMod.runFullSyncCycle();
     } catch (e) {}
   });
 
-  // Revalidação periódica enquanto estiver online — sem isto, uma
-  // licença revogada só era detetada na próxima transição
-  // offline->online ou no próximo arranque da app.
+  // Revalidação periódica — verifica navigator.onLine a cada minuto,
+  // em vez de depender só do evento "online" (que no Android nem sempre
+  // dispara de forma confiável). Isto garante que os dados chegam ao
+  // Console/Workspace assim que a rede estiver disponível, sem esperar
+  // até 15 minutos como antes.
   setInterval(function () {
     if (navigator.onLine) {
       validateLicenseOnline().catch(function () {});
-      import("./sync.js").then(function(m) { m.syncRegister().then(function(){ return m.syncSales(); }).then(function(){ return m.syncProducts(); }).then(function(){ return m.syncIncidents(); }).then(function(){ return m.syncSessions(); }).then(function(){ return m.syncAuditLog(); }).then(function(){ return m.syncWorkspaceCatalog(); }); }).catch(function() {});
+      import("./sync.js").then(function(m) { return m.runFullSyncCycle(); }).catch(function() {});
     }
-  }, 15 * 60 * 1000);
+  }, 60 * 1000);
 }
 
 // Ecrã de bloqueio total — só para licença REVOGADA (ação

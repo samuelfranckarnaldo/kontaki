@@ -63,13 +63,7 @@ async function boot() {
   });
 
   import("./sync.js").then(function(m) {
-    return m.syncRegister()
-      .then(function(){ return m.syncSales(); })
-      .then(function(){ return m.syncProducts(); })
-      .then(function(){ return m.syncIncidents(); })
-      .then(function(){ return m.syncSessions(); })
-      .then(function(){ return m.syncAuditLog(); })
-      .then(function(){ return m.syncWorkspaceCatalog(); });
+    return m.runFullSyncCycle();
   }).catch(function() {});
 
   const users = await db.getAll("users");
