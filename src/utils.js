@@ -115,8 +115,10 @@ export function getQrDataUrl(text) {
 export function generateQR(text, container, size) {
   size = size || 120;
   if (!container) return;
-  // QRCode.js max ~512 chars no modo M — garante limite
-  if (text && text.length > 200) text = text.slice(0, 200);
+  // QRCode.js max ~512 chars no modo M — garante limite (era 200 por
+  // engano, o que cortava e corrompia payloads assinados de convite,
+  // gerando QR com JSON invalido/truncado).
+  if (text && text.length > 480) text = text.slice(0, 480);
   if (!container) return;
   container.innerHTML = "";
 

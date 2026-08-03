@@ -101,6 +101,17 @@ export async function verifyInvite(payload) {
   var valid = await verifyInviteSignature(check, payload.signature);
   if (!valid) throw new Error("Convite adulterado ou inválido. Pede um novo ao teu patrão.");
 
+  // Expira 48h depois de gerado — evita que um QR fotografado ou um
+  // ficheiro .ktkinvite esquecido numa pasta continue valido
+  // indefinidamente. Verificacao 100% local (createdAt vem assinado,
+  // nao pode ser adulterado sem invalidar a assinatura), sem depender
+  // de rede — mantem a verificacao offline (ADR-0004).
+  var INVITE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+  var createdAtMs = new Date(payload.createdAt).getTime();
+  if (!createdAtMs || (Date.now() - createdAtMs) > INVITE_MAX_AGE_MS) {
+    throw new Error("Este convite expirou. Pede um novo convite ao teu patrão.");
+  }
+
   return payload;
 }
 

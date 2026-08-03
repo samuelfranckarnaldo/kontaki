@@ -778,6 +778,11 @@ window._openTeamCardMenu = async function(userId) {
 
 window._abrirResetPin = function(userId) {
   window._resetPinTargetId = userId;
+  closeModal();
+  setTimeout(function() { _abrirResetPinModal(userId); }, 50);
+};
+
+function _abrirResetPinModal(userId) {
   openModal("Repor PIN",
     '<div style="font-size:13px;color:#71717a;margin-bottom:14px;line-height:1.5">Define um novo PIN para este funcionário. Ele não precisa de saber o PIN antigo.</div>' +
     '<div class="field"><label>Novo PIN (6 dígitos)</label>' +
@@ -795,7 +800,7 @@ window._abrirResetPin = function(userId) {
     '<button class="btn btn-primary btn-full" onclick="window._confirmResetPin()">Repor PIN</button>' +
     '</div>');
   refreshIcons(el("modal-box"));
-};
+}
 
 window._toggleRpPin = function(btn, inputId) {
   var input = document.getElementById(inputId);
@@ -820,6 +825,11 @@ window._confirmResetPin = async function() {
 };
 
 window._abrirPermissoes = async function(userId) {
+  closeModal();
+  setTimeout(function() { _abrirPermissoesModal(userId); }, 50);
+};
+
+async function _abrirPermissoesModal(userId) {
   const u = await db.get("users", userId);
   if (!u) return;
   const perms = u.permissions || {};
@@ -828,10 +838,10 @@ window._abrirPermissoes = async function(userId) {
     '<div style="font-size:13px;color:#71717a;margin-bottom:14px;line-height:1.5">Activa apenas o que este funcionário precisa. Podes alterar a qualquer momento.</div>' +
     '<div style="display:flex;flex-direction:column;gap:2px">' +
     PERMISSIONS.map(function(p) {
-      return '<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border2);cursor:pointer">' +
-        '<input type="checkbox" class="perm-check" data-key="' + p.key + '" ' + (perms[p.key] ? "checked" : "") + ' style="margin-top:3px"/>' +
-        '<div><div style="font-size:13px;font-weight:700;color:var(--text)">' + p.label + '</div>' +
-        '<div style="font-size:12px;color:var(--text3)">' + p.desc + '</div></div>' +
+      return '<label class="perm-item">' +
+        '<input type="checkbox" class="perm-check" data-key="' + p.key + '" ' + (perms[p.key] ? "checked" : "") + '/>' +
+        '<div><div class="perm-item-title">' + p.label + '</div>' +
+        '<div class="perm-item-desc">' + p.desc + '</div></div>' +
         '</label>';
     }).join("") +
     '</div>' +
@@ -840,7 +850,7 @@ window._abrirPermissoes = async function(userId) {
     '<button class="btn btn-primary btn-full" onclick="window._confirmPermissoes()">Guardar</button>' +
     '</div>');
   refreshIcons(el("modal-box"));
-};
+}
 
 window._confirmPermissoes = async function() {
   const checks = document.querySelectorAll(".perm-check");
@@ -862,14 +872,24 @@ function openInviteDevice() {
     '<div style="display:flex;flex-direction:column;gap:14px">' +
     '<div style="font-size:13px;color:#71717a;line-height:1.5">Cria um código curto para o teu funcionário usar noutro telemóvel.</div>' +
 
+    '<div style="background:var(--info-light);border:1px solid var(--info);border-radius:10px;padding:10px 12px;display:flex;gap:8px;align-items:flex-start">' +
+    '<i data-lucide="wifi" style="width:15px;height:15px;color:var(--info);flex-shrink:0;margin-top:1px"></i>' +
+    '<div style="font-size:12px;color:var(--info);line-height:1.5">Gerar o convite requer internet — o código é assinado pelo servidor. Se a rede estiver instável, prefere <strong>descarregar o ficheiro</strong> em vez do QR.</div>' +
+    '</div>' +
+
     '<div class="field"><label>Código de Convite *</label><input id="inv-code" placeholder="Ex: MERC2026" style="text-transform:uppercase"/></div>' +
     '<button class="btn btn-primary btn-full" onclick="window._generateInviteQR()">' +
     '<i data-lucide="qr-code"></i> Gerar Convite</button>' +
-    '<div id="inv-qr-wrap" style="display:none;flex-direction:column;align-items:center;gap:12px;padding-top:8px">' +
-    '<div id="inv-qr-box" style="padding:12px;background:#fff;border-radius:14px;border:1.5px solid #e4e4e7"></div>' +
-    '<div id="inv-code-display" style="font-size:13px;color:#71717a;text-align:center"></div>' +
+    '<div id="inv-qr-wrap" style="display:none;flex-direction:column;align-items:center;gap:14px;padding-top:6px">' +
+    '<div id="inv-qr-box" style="padding:14px;background:#fff;border-radius:16px;border:1.5px solid #e4e4e7;box-shadow:var(--shadow-sm)"></div>' +
+    '<div id="inv-code-display" style="font-size:13px;font-weight:700;color:var(--text);text-align:center;letter-spacing:.3px"></div>' +
+    '<div style="display:flex;align-items:center;gap:10px;width:100%">' +
+    '<div style="flex:1;height:1px;background:var(--border2)"></div>' +
+    '<span style="font-size:11px;color:var(--text4);font-weight:700;text-transform:uppercase;letter-spacing:.4px">ou</span>' +
+    '<div style="flex:1;height:1px;background:var(--border2)"></div>' +
+    '</div>' +
     '<button class="btn btn-outline btn-full" onclick="window._downloadInviteFile()">' +
-    '<i data-lucide="download"></i> Descarregar ficheiro</button>' +
+    '<i data-lucide="download"></i> Descarregar ficheiro (recomendado)</button>' +
     '</div>' +
     '</div>' +
     '<div class="form-actions">' +
@@ -903,7 +923,7 @@ window._generateInviteQR = async function() {
     if (codeDisplay) codeDisplay.textContent = "Código: " + payload.inviteCode;
 
     var { generateQR } = await import("../utils.js");
-    generateQR(JSON.stringify(payload), qrBox, 180);
+    generateQR(JSON.stringify(payload), qrBox, 230);
   } catch (err) {
     toast(err.message || "Erro ao gerar convite.", "error");
   }
