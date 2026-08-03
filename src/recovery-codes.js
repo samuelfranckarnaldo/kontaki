@@ -1,5 +1,5 @@
 import { db } from "./db.js";
-import { generateRecoveryCodesBatch, hashRecoveryCode, generateMasterKey, makeMasterKeyNonExtractable, wrapMasterKeyWithRecoveryCode } from "./crypto.js";
+import { generateRecoveryCodesBatch, hashRecoveryCode, generateMasterKey, wrapMasterKeyWithRecoveryCode } from "./crypto.js";
 
 const CONSOLE_API = "https://kontaki-console.vercel.app/api";
 const LOW_CODES_WARNING = 3; // avisa quando restarem <= 3
@@ -21,12 +21,21 @@ async function getAll() {
 // só re-embrulhada para os novos códigos. Isto garante que backups
 // antigos continuam sempre legíveis, seja qual for o estado actual dos
 // Recovery Codes.
+//
+// DECISÃO DE ARQUITETURA: guardada localmente como extractable:true.
+// extractable:false protegeria especificamente contra exportação via
+// Web Crypto API — mas a regeneração dos Recovery Codes exige voltar a
+// embrulhar a mesma Master Key, o que requer acesso ao seu material
+// criptográfico; a API não permite isso para chaves não-extraíveis.
+// Como regenerar códigos é um requisito funcional da arquitetura,
+// extractable:true é a única opção viável. A Master Key nunca é
+// transmitida ao servidor; toda a manipulação dos seus bytes fica
+// encapsulada em crypto.js.
 export async function getOrCreateMasterKey() {
   const existing = await db.get("settings", "backupMasterKey");
   if (existing && existing.value) return existing.value;
 
-  let key = await generateMasterKey();
-  key = await makeMasterKeyNonExtractable(key);
+  const key = await generateMasterKey();
   await db.put("settings", { key: "backupMasterKey", value: key });
   return key;
 }

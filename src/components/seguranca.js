@@ -322,10 +322,16 @@ window._regenerateRecoveryCodes = async function() {
   confirmDialog(
     "Gerar um novo conjunto de 10 códigos? Os códigos antigos deixam de funcionar.",
     async function() {
-      const codes = await generateCodesForUser(user.id);
-      showRecoveryCodesScreen(codes, function() {
-        renderSeguranca();
-      });
+      try {
+        const codes = await generateCodesForUser(user.id);
+        showRecoveryCodesScreen(codes, function() {
+          renderSeguranca();
+        });
+      } catch (e) {
+        const { logger } = await import("../logger.js");
+        logger.error("[_regenerateRecoveryCodes] falhou", e);
+        toast(e.message || "Erro ao gerar códigos de recuperação.", "error");
+      }
     },
     { danger: true, confirmText: "Gerar" }
   );
