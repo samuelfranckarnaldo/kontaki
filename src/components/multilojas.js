@@ -256,9 +256,9 @@ export async function loadMultilojas() {
 // ── AUTENTICAÇÃO — ECRÃ DE LOGIN / REGISTO / RECUPERAÇÃO ────────────────
 
 function _mlAuthFeatureRow(label) {
-  return '<div style="display:flex;align-items:center;gap:8px">' +
-    '<i data-lucide="check-circle-2" style="width:15px;height:15px;color:var(--success,#16a34a);flex-shrink:0"></i>' +
-    '<span style="font-size:12.5px;color:var(--text2)">' + label + '</span>' +
+  return '<div class="ws-auth-feature">' +
+    '<i data-lucide="check-circle-2"></i>' +
+    '<span>' + label + '</span>' +
   '</div>';
 }
 
@@ -273,46 +273,48 @@ function _renderWorkspaceAuthGate() {
   var isLogin = _mlAuthMode === "login";
 
   wrap.innerHTML =
-    '<div style="max-width:360px;margin:20px auto;padding:4px">' +
-      '<div style="text-align:center;margin-bottom:20px">' +
-        '<div style="width:56px;height:56px;border-radius:16px;background:var(--primary-light,#ede9fe);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">' +
-          '<i data-lucide="store" style="width:26px;height:26px;color:var(--primary,#5b21b6)"></i>' +
-        '</div>' +
-        '<div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:6px">Multi-lojas</div>' +
-        '<div style="font-size:13px;color:var(--text3);line-height:1.5;padding:0 12px">Gere todas as tuas lojas a partir de uma única conta.</div>' +
+    '<div class="ws-auth-wrap"><div class="ws-auth-card">' +
+      '<div class="ws-auth-header">' +
+        '<div class="ws-auth-icon"><i data-lucide="store"></i></div>' +
+        '<div class="ws-auth-title">Workspace</div>' +
+        '<div class="ws-auth-subtitle">Gere todas as tuas lojas a partir de uma única conta.</div>' +
       '</div>' +
 
-      '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">' +
+      '<div class="ws-auth-features">' +
         _mlAuthFeatureRow("Várias lojas num único lugar") +
         _mlAuthFeatureRow("Equipa e permissões partilhadas") +
         _mlAuthFeatureRow("Sincronização e backup automático") +
       '</div>' +
 
-      '<div style="height:1px;background:#e4e4e7;margin-bottom:20px"></div>' +
+      '<div class="ws-auth-form">' +
+      (isLogin ? '' : '<div class="field"><label>Nome</label><input id="wsa-name" type="text" placeholder="O teu nome"></div>') +
+      '<div class="field"><label>Email</label><input id="wsa-email" type="email" placeholder="email@exemplo.com"></div>' +
+      (isLogin ? '' : '<div class="field"><label>Telefone (opcional)</label><input id="wsa-phone" type="tel" placeholder="9XX XXX XXX"></div>') +
+      '<div class="field"><label>Senha</label><div class="pin-input-wrap"><input id="wsa-password" type="password" placeholder="••••••••" style="padding-right:42px"/>' +
+      '<button type="button" class="pin-eye-btn" onclick="window._mlTogglePw(this,\'wsa-password\')"><i data-lucide="eye"></i></button></div></div>' +
+      '<div class="ws-auth-forgot">' + (isLogin ? '<button onclick="window._mlShowRecovery()">Esqueci a senha</button>' : '') + '</div>' +
 
-      (isLogin ? '' : '<div class="field" style="margin-bottom:10px"><label>Nome</label><input id="wsa-name" type="text" placeholder="O teu nome"></div>') +
-      '<div class="field" style="margin-bottom:10px"><label>Email</label><input id="wsa-email" type="email" placeholder="email@exemplo.com"></div>' +
-      (isLogin ? '' : '<div class="field" style="margin-bottom:10px"><label>Telefone (opcional)</label><input id="wsa-phone" type="tel" placeholder="9XX XXX XXX"></div>') +
-      '<div class="field" style="margin-bottom:6px"><label>Senha</label><input id="wsa-password" type="password" placeholder="••••••••"></div>' +
-      (isLogin
-        ? '<div style="text-align:right;margin-bottom:14px"><button onclick="window._mlShowRecovery()" style="border:none;background:none;color:var(--primary,#5b21b6);font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;padding:0">Esqueci a senha</button></div>'
-        : '<div style="margin-bottom:14px"></div>') +
-
-      '<div id="wsa-error" style="display:none;font-size:12px;color:#dc2626;background:#fef2f2;border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:12px"></div>' +
+      '<div id="wsa-error" class="ws-auth-error"></div>' +
 
       '<button id="wsa-submit-btn" class="btn btn-primary btn-full" onclick="window._mlSubmitAuth()">' + (isLogin ? "Entrar" : "Criar conta") + '</button>' +
 
-      '<div style="display:flex;align-items:center;gap:10px;margin:16px 0">' +
-        '<div style="flex:1;height:1px;background:#e4e4e7"></div>' +
-        '<span style="font-size:11px;color:var(--text4)">ou</span>' +
-        '<div style="flex:1;height:1px;background:#e4e4e7"></div>' +
-      '</div>' +
+      '<div class="ws-auth-divider"><div class="ws-auth-divider-line"></div><span class="ws-auth-divider-label">ou</span><div class="ws-auth-divider-line"></div></div>' +
 
       '<button class="btn btn-outline btn-full" onclick="window._mlToggleAuthMode()">' + (isLogin ? "Criar conta" : "Já tenho conta — Entrar") + '</button>' +
-    '</div>';
+      '</div>' +
+    '</div></div>';
 
   refreshIcons(wrap);
 }
+
+window._mlTogglePw = function(btn, inputId) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  var isHidden = input.type === "password";
+  input.type = isHidden ? "text" : "password";
+  btn.innerHTML = '<i data-lucide="' + (isHidden?"eye-off":"eye") + '"></i>';
+  refreshIcons(btn.parentElement);
+};
 
 window._mlToggleAuthMode = function() {
   _mlAuthMode = _mlAuthMode === "login" ? "register" : "login";
@@ -400,7 +402,8 @@ window._mlShowRecovery = function() {
   var body =
     '<div class="field" style="margin-bottom:10px"><label>Email</label><input id="wsr-email" type="email" placeholder="email@exemplo.com"></div>' +
     '<div class="field" style="margin-bottom:10px"><label>Código de recuperação</label><input id="wsr-code" type="text" placeholder="XXXX-XXXX" style="text-transform:uppercase"></div>' +
-    '<div class="field" style="margin-bottom:6px"><label>Nova senha</label><input id="wsr-password" type="password" placeholder="Mínimo 8 caracteres"></div>' +
+    '<div class="field" style="margin-bottom:6px"><label>Nova senha</label><div class="pin-input-wrap"><input id="wsr-password" type="password" placeholder="Mínimo 8 caracteres" style="padding-right:42px"/>' +
+    '<button type="button" class="pin-eye-btn" onclick="window._mlTogglePw(this,\'wsr-password\')"><i data-lucide="eye"></i></button></div></div>' +
     '<div id="wsr-error" style="display:none;font-size:12px;color:#dc2626;background:#fef2f2;border-radius:var(--radius-sm);padding:8px 10px;margin:10px 0"></div>' +
     '<div class="form-actions" style="margin-top:10px">' +
       '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
