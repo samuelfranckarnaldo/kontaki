@@ -388,7 +388,8 @@ export async function gerarRelatorioPDF(from, to) {
   var porClasse = {};
   contasBalancete.forEach(function(c){ porClasse[c.classe] = porClasse[c.classe]||[]; porClasse[c.classe].push(c); });
 
-  var saldoCaixaBanco = acctBal(balanceEntries,"45")+acctBal(balanceEntries,"43")+acctBal(balanceEntries,"44")+acctBal(balanceEntries,"42")+acctBal(balanceEntries,"41");
+  var saldoCaixa = acctBal(balanceEntries,"45");
+  var saldoBanco = acctBal(balanceEntries,"43")+acctBal(balanceEntries,"44")+acctBal(balanceEntries,"42")+acctBal(balanceEntries,"41");
   var contasAReceber  = acctBal(balanceEntries,"31");
   var contasAPagar    = acctBal(balanceEntries,"32");
   var ivaAPagar       = acctBal(balanceEntries,"34");
@@ -496,7 +497,8 @@ export async function gerarRelatorioPDF(from, to) {
 
     '<h2>Posição Financeira</h2>' +
     '<div class="kpis">' +
-    kpiBox("Caixa + Banco", fmt(saldoCaixaBanco), "#5b21b6") +
+    kpiBox("Caixa", fmt(saldoCaixa), "#5b21b6") +
+    kpiBox("Banco", fmt(saldoBanco), "#5b21b6") +
     kpiBox("A Receber", fmt(contasAReceber), "#d97706") +
     kpiBox("A Pagar", fmt(contasAPagar), "#dc2626") +
     kpiBox("IVA a Pagar", fmt(ivaAPagar), "#dc2626") +

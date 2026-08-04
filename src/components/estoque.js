@@ -351,22 +351,30 @@ window._estTransfer = (id) => {
   openModal("Transferir Stock — " + p.name,
     `<div style="margin-bottom:var(--space-4)">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-4)">
-        <div class="stat-card" style="border-left:3px solid #5b21b6;text-align:center">
-          <div style="font-size:var(--text-xs);color:#5b21b6;font-weight:var(--weight-strong)">LOJA</div>
-          <div style="font-size:var(--text-lg);font-weight:var(--weight-strong);color:#5b21b6">${shopStock}</div>
-          <div style="font-size:var(--text-xs);color:#71717a">${_abbrevUnit(p.unit)}</div>
+        <div style="background:var(--bg);border-radius:var(--radius-sm);padding:var(--space-3);text-align:center">
+          <div style="font-size:var(--text-xs);color:var(--text3);font-weight:var(--weight-medium)">LOJA</div>
+          <div style="font-size:var(--text-lg);font-weight:var(--weight-strong);color:var(--text);font-variant-numeric:tabular-nums">${shopStock}</div>
+          <div style="font-size:var(--text-xs);color:var(--text3)">${_abbrevUnit(p.unit)}</div>
         </div>
-        <div class="stat-card" style="border-left:3px solid #d97706;text-align:center">
-          <div style="font-size:var(--text-xs);color:#d97706;font-weight:var(--weight-strong)">ARMAZÉM</div>
-          <div style="font-size:var(--text-lg);font-weight:var(--weight-strong);color:#d97706">${whStock}</div>
-          <div style="font-size:var(--text-xs);color:#71717a">${_abbrevUnit(p.unit)}</div>
+        <div style="background:var(--bg);border-radius:var(--radius-sm);padding:var(--space-3);text-align:center">
+          <div style="font-size:var(--text-xs);color:var(--text3);font-weight:var(--weight-medium)">ARMAZÉM</div>
+          <div style="font-size:var(--text-lg);font-weight:var(--weight-strong);color:var(--text);font-variant-numeric:tabular-nums">${whStock}</div>
+          <div style="font-size:var(--text-xs);color:var(--text3)">${_abbrevUnit(p.unit)}</div>
         </div>
       </div>
       <div class="field" style="margin-bottom:var(--space-3)">
         <label style="text-transform:none;font-weight:600;letter-spacing:0;font-size:12px;color:var(--text2)">Direcção da transferência</label>
-        <div style="display:flex;gap:8px">
-          <button type="button" class="btn btn-outline btn-sm" style="flex:1" id="est-tr-dir-lw" onclick="window._estTrDir('lw')">Loja → Armazém</button>
-          <button type="button" class="btn btn-outline btn-sm" style="flex:1" id="est-tr-dir-wl" onclick="window._estTrDir('wl')">Armazém → Loja</button>
+        <div class="tr-dir-group">
+          <div class="tr-dir-card" id="est-tr-dir-lw" onclick="window._estTrDir('lw')">
+            <i data-lucide="arrow-right" class="tr-dir-card-arrow"></i>
+            <span class="tr-dir-card-label">Loja → Armazém</span>
+            <i data-lucide="check" class="tr-dir-card-check"></i>
+          </div>
+          <div class="tr-dir-card" id="est-tr-dir-wl" onclick="window._estTrDir('wl')">
+            <i data-lucide="arrow-right" class="tr-dir-card-arrow"></i>
+            <span class="tr-dir-card-label">Armazém → Loja</span>
+            <i data-lucide="check" class="tr-dir-card-check"></i>
+          </div>
         </div>
       </div>
       <div class="field">
@@ -384,14 +392,14 @@ window._estTransfer = (id) => {
     </div>`
   );
   refreshIcons(document.getElementById("modal-box") || document.body);
-  window._estTrDirection = "lw";
+  window._estTrDir("lw");
 }
 
 window._estTrDir = (dir) => {
   window._estTrDirection = dir;
   const lw = el("est-tr-dir-lw"), wl = el("est-tr-dir-wl");
-  if (lw) lw.classList.toggle("btn-primary", dir === "lw");
-  if (wl) wl.classList.toggle("btn-primary", dir === "wl");
+  if (lw) lw.classList.toggle("selected", dir === "lw");
+  if (wl) wl.classList.toggle("selected", dir === "wl");
 }
 
 window._estTransferSave = async (id) => {

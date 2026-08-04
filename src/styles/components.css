@@ -3362,3 +3362,96 @@
 }
 .perm-check:focus { outline: none; box-shadow: 0 0 0 3px var(--primary-light); }
 .perm-check:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-light); }
+\n
+/* ── WORKSPACE AUTH (ecra de login/registo do Workspace) ──────────────────────── */
+.ws-auth-wrap { max-width: 400px; margin: 0 auto var(--space-5); }
+.ws-auth-card {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.ws-auth-header { text-align: center; padding: var(--space-5); }
+.ws-auth-icon {
+  width: 60px; height: 60px; border-radius: var(--radius);
+  background: var(--primary-light); display: flex; align-items: center; justify-content: center;
+  margin: 0 auto var(--space-4); box-shadow: 0 6px 16px rgba(91,33,182,.14);
+}
+.ws-auth-icon i { width: 28px; height: 28px; color: var(--primary); }
+.ws-auth-title { font-size: var(--text-xl); font-weight: var(--weight-strong); color: var(--text); margin-bottom: var(--space-2); letter-spacing: -.2px; }
+.ws-auth-subtitle { font-size: var(--text-sm); color: var(--text3); line-height: 1.5; padding: 0 var(--space-3); }
+
+.ws-auth-features {
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border2); border-bottom: 1px solid var(--border2);
+  background: var(--bg);
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+.ws-auth-feature { display: flex; align-items: center; gap: var(--space-3); }
+.ws-auth-feature i { width: 16px; height: 16px; color: var(--success); flex-shrink: 0; }
+.ws-auth-feature span { font-size: var(--text-sm); color: var(--text2); font-weight: var(--weight-medium); }
+
+.ws-auth-form { padding: var(--space-5); }
+.ws-auth-form .field { margin-bottom: var(--space-3); }
+.ws-auth-forgot { text-align: right; margin-bottom: var(--space-4); min-height: 16px; }
+.ws-auth-forgot button { border: none; background: none; color: var(--primary); font-size: var(--text-xs); font-weight: var(--weight-strong); cursor: pointer; font-family: inherit; padding: 0; }
+.ws-auth-error { display: none; font-size: var(--text-xs); color: var(--danger); background: var(--danger-light); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); margin-bottom: var(--space-3); }
+.ws-auth-divider { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-4) 0; }
+.ws-auth-divider-line { flex: 1; height: 1px; background: var(--border2); }
+.ws-auth-divider-label { font-size: var(--text-2xs); color: var(--text4); font-weight: var(--weight-strong); text-transform: uppercase; letter-spacing: .5px; }
+
+/* TRANSFERENCIA STOCK - cards de direcao selecionaveis */
+.tr-dir-group{display:flex;gap:8px}
+.tr-dir-card{
+  flex:1;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px;
+  border:1.5px solid var(--border);
+  border-radius:var(--radius-sm);
+  cursor:pointer;
+  transition:border-color .15s ease,background .15s ease;
+}
+.tr-dir-card-arrow{width:16px;height:16px;color:var(--text3);flex-shrink:0}
+.tr-dir-card-label{font-size:13px;font-weight:600;color:var(--text2);flex:1}
+.tr-dir-card-check{
+  width:16px;height:16px;color:var(--primary);
+  opacity:0;transform:scale(.6);
+  transition:opacity .15s ease,transform .15s ease;
+  flex-shrink:0;
+}
+.tr-dir-card.selected{
+  border-color:var(--primary);
+  background:var(--primary-light);
+}
+.tr-dir-card.selected .tr-dir-card-arrow{color:var(--primary)}
+.tr-dir-card.selected .tr-dir-card-label{color:var(--primary)}
+.tr-dir-card.selected .tr-dir-card-check{opacity:1;transform:scale(1)}
+\n
+/* ── MULTI-LOJAS / WORKSPACE — seletor de loja ─────────────────────────────────── */
+.ml-store-row { display: grid; grid-template-columns: 1fr 44px; align-items: stretch; gap: 8px; margin-bottom: 16px; width: 100%; }
+.ml-store-select-btn {
+  display: flex; align-items: center; gap: 12px; min-width: 0; width: 100%; box-sizing: border-box;
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 14px 16px; cursor: pointer; transition: var(--transition);
+}
+.ml-store-select-btn:active { background: var(--border2); transform: scale(.99); }
+.ml-store-select-icon {
+  width: 40px; height: 40px; border-radius: var(--radius-sm); flex-shrink: 0;
+  background: var(--bg); display: flex; align-items: center; justify-content: center;
+}
+.ml-store-select-icon i { width: 20px; height: 20px; color: var(--text3); }
+.ml-store-select-text { display: block; flex: 1; min-width: 0; text-align: left; }
+.ml-store-select-label { display: block; font-size: var(--text-sm); font-weight: var(--weight-strong); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ml-store-select-sub { display: block; font-size: var(--text-2xs); color: var(--text4); font-weight: var(--weight-medium); margin-top: 1px; }
+.ml-store-select-chevron { width: 16px; height: 16px; color: var(--text4); flex-shrink: 0; }
+.ml-store-more-btn {
+  width: 100%; height: 100%; box-sizing: border-box; min-width: 0;
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius-lg);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: var(--transition);
+}
+.ml-store-more-btn:active { background: var(--border2); transform: scale(.98); }
+.ml-store-more-btn i { width: 18px; height: 18px; color: var(--text3); }
+

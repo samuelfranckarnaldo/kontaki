@@ -10,6 +10,7 @@ var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
 var _mlActiveTab = "resumo";
 var _mlSelectedStoreId = "all"; // "all" ou o id (uuid) de uma loja
+var _mlRenderToken = 0; // incrementado a cada troca de aba/loja — protege contra race condition de fetches lentos
 var _mlStoresCache = null;      // [{id, name, status, lastSeenAt, salesThisMonth}, ...]
 var _mlChartInstance = null;
 var _mlAuthMode = "login"; // login | register — estado do ecrã de autenticação Workspace
@@ -180,12 +181,14 @@ window._mlOpenStoreMenu = function() {
 };
 
 window._mlSwitchTab = function(tab) {
+  _mlRenderToken++;
   _mlActiveTab = tab;
   _renderTabs();
   _renderContent();
 };
 
 window._mlSelectStore = function(storeId) {
+  _mlRenderToken++;
   _mlSelectedStoreId = storeId;
   _renderStoreSelector();
   _renderContent();
@@ -630,9 +633,11 @@ async function _fetchRealAllIncidents() {
 }
 
 async function _renderIncidentes(wrap) {
+  var _token = _mlRenderToken;
   wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
 
   if (!_mlStoresCache || !_mlStoresCache.length) {
+    if (_token !== _mlRenderToken) return;
     wrap.innerHTML = _errorHtml("Sem lojas para mostrar.");
     return;
   }
@@ -643,6 +648,7 @@ async function _renderIncidentes(wrap) {
   } else {
     all = await _fetchRealAllIncidents();
   }
+  if (_token !== _mlRenderToken) return;
   if (all === null) {
     wrap.innerHTML = _errorHtml("Não foi possível carregar os incidentes.");
     return;
@@ -742,6 +748,8 @@ var _mlWorkspaceDiffData = null;
 var _mlWorkspaceDiffError = null;
 
 async function _renderEscritorio(wrap) {
+  var _token = _mlRenderToken;
+
   if (_mlSelectedStoreId === "all") {
     wrap.innerHTML =
       '<div class="empty-state">' +
@@ -766,9 +774,11 @@ async function _renderEscritorio(wrap) {
     storeRes = await _mlAuthFetch("/reports/multi-store/store/" + encodeURIComponent(store.id));
     storeData = await storeRes.json();
   } catch (e) {
+    if (_token !== _mlRenderToken) return;
     wrap.innerHTML = _errorHtml("Sem ligação à internet.");
     return;
   }
+  if (_token !== _mlRenderToken) return;
   if (storeRes.status === 401) { loadMultilojas(); return; }
   if (!storeRes.ok || !storeData || !storeData.success) {
     wrap.innerHTML = _errorHtml((storeData && storeData.error) || "Erro ao carregar dados da loja.");
@@ -789,9 +799,11 @@ async function _renderEscritorio(wrap) {
     wsRes = await _mlAuthFetch("/workspace/" + encodeURIComponent(store.id));
     wsData = await wsRes.json();
   } catch (e) {
+    if (_token !== _mlRenderToken) return;
     wrap.innerHTML = _errorHtml("Sem ligação à internet.");
     return;
   }
+  if (_token !== _mlRenderToken) return;
   if (wsRes.status === 401) { loadMultilojas(); return; }
   if (!wsRes.ok || !wsData || !wsData.success) {
     wrap.innerHTML = _errorHtml((wsData && wsData.error) || "Erro ao carregar workspace.");
@@ -817,6 +829,7 @@ async function _renderEscritorio(wrap) {
   }
   _mlInventarioReports = (invData && invData.success) ? (invData.reports || []) : [];
 
+  if (_token !== _mlRenderToken) return;
   _mlRenderEscritorioContent(wrap, store);
 }
 
@@ -1590,6 +1603,7 @@ async function _fetchRealAuditLog() {
 }
 
 async function _renderRegistos(wrap) {
+  var _token = _mlRenderToken;
   wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
 
   if (!_mlStoresCache || !_mlStoresCache.length) {
@@ -1598,6 +1612,7 @@ async function _renderRegistos(wrap) {
   }
 
   var allEntries = await _fetchRealAuditLog();
+  if (_token !== _mlRenderToken) return;
   if (allEntries === null) {
     wrap.innerHTML = _errorHtml("Não foi possível carregar os registos.");
     return;
@@ -1638,25 +1653,30 @@ async function _renderRegistos(wrap) {
 // ── RESUMO — TODAS AS LOJAS ────────────────────────────────────────────
 
 async function _renderResumoAgregado(wrap) {
+  var _token = _mlRenderToken;
   wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
 
   var res;
   try {
     res = await _mlAuthFetch("/reports/multi-store/summary?days=30");
   } catch (e) {
+    if (_token !== _mlRenderToken) return;
     wrap.innerHTML = _errorHtml("Sem ligação à internet. Verifica a rede e tenta novamente.");
     return;
   }
+  if (_token !== _mlRenderToken) return;
 
   if (res.status === 401) { loadMultilojas(); return; }
 
   if (!res.ok) {
     var errData = await res.json().catch(function() { return {}; });
+    if (_token !== _mlRenderToken) return;
     wrap.innerHTML = _errorHtml(errData.error || "Erro ao carregar o resumo.");
     return;
   }
 
   var data = await res.json();
+  if (_token !== _mlRenderToken) return;
   if (!data || !data.success) { wrap.innerHTML = _errorHtml("Resposta inválida do servidor."); return; }
 
   var multiStore = data.storeCount > 1;
@@ -1865,6 +1885,7 @@ function _mlPaymentLabel(method) {
 }
 
 async function _renderBI(wrap) {
+  var _token = _mlRenderToken;
   wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
 
   if (!_mlStoresCache || !_mlStoresCache.length) {
@@ -1876,17 +1897,21 @@ async function _renderBI(wrap) {
   try {
     res = await _mlAuthFetch("/reports/multi-store/bi?days=30");
   } catch (e) {
+    if (_token !== _mlRenderToken) return;
     wrap.innerHTML = _errorHtml("Sem ligação à internet. Verifica a rede e tenta novamente.");
     return;
   }
+  if (_token !== _mlRenderToken) return;
   if (res.status === 401) { loadMultilojas(); return; }
   if (!res.ok) {
     var errData = await res.json().catch(function() { return {}; });
+    if (_token !== _mlRenderToken) return;
     wrap.innerHTML = _errorHtml(errData.error || "Erro ao carregar BI.");
     return;
   }
 
   var data = await res.json();
+  if (_token !== _mlRenderToken) return;
   if (!data || !data.success) { wrap.innerHTML = _errorHtml("Resposta inválida do servidor."); return; }
 
   var profit = data.profit;
@@ -1993,25 +2018,31 @@ async function _renderResumoLoja(wrap, storeId) {
     '<div class="hist-sale-card hist-skel"><div class="skel-circle"></div><div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div><div class="skel-line skel-line--price"></div></div>' +
     '<div class="hist-sale-card hist-skel"><div class="skel-circle"></div><div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div><div class="skel-line skel-line--price"></div></div>' +
     '<div class="hist-sale-card hist-skel"><div class="skel-circle"></div><div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div><div class="skel-line skel-line--price"></div></div>';
+  var _token = _mlRenderToken;
   await _mlMinDelay(280);
+  if (_token !== _mlRenderToken) return;
 
   var res;
   try {
     res = await _mlAuthFetch("/reports/multi-store/store/" + encodeURIComponent(storeId));
   } catch (e) {
+    if (_token !== _mlRenderToken) return;
     wrap.innerHTML = _errorHtml("Sem ligação à internet. Verifica a rede e tenta novamente.");
     return;
   }
+  if (_token !== _mlRenderToken) return;
 
   if (res.status === 401) { loadMultilojas(); return; }
 
   if (!res.ok) {
     var errData = await res.json().catch(function() { return {}; });
+    if (_token !== _mlRenderToken) return;
     wrap.innerHTML = _errorHtml(errData.error || "Erro ao carregar a loja.");
     return;
   }
 
   var data = await res.json();
+  if (_token !== _mlRenderToken) return;
   if (!data || !data.success) { wrap.innerHTML = _errorHtml("Resposta inválida do servidor."); return; }
 
   var totalVendas = data.sales.reduce(function(a, s) { return a + (s.total || 0); }, 0);

@@ -109,7 +109,7 @@ function renderMenu() {
     { label: "Fornecedores",      sub: "Compras e fornecedores",         icon: "truck",          color: "var(--bg)", iconColor: "var(--text3)", page: "fornecedores",  group: "Financeiro" },
     // ── Negócio ──
     { label: "Business Intelligence", sub: "Tendências, comparações e análise", icon: "line-chart", color: "var(--bg)", iconColor: "var(--text3)", page: "dashboard",     group: "Negócio"    },
-    { label: "Multi-lojas", sub: "Relatórios e dados entre lojas", icon: "network", color: "var(--bg)", iconColor: "var(--text3)", page: "multilojas",    group: "Negócio"    },
+    { label: "Workspace", sub: "Relatórios e dados entre lojas", icon: "network", color: "var(--bg)", iconColor: "var(--text3)", page: "multilojas",    group: "Negócio"    },
     { label: "Gestão de Stock",   sub: "Produtos e inventário",          icon: "package",        color: "var(--bg)", iconColor: "var(--text3)", page: "stock",         group: "Negócio"    },
     // ── Loja ──
     { label: "Equipa",            sub: "Funcionários e acessos",         icon: "users-2",        color: "var(--bg)", iconColor: "var(--text3)", page: "equipa",        group: "Loja"       },
@@ -276,7 +276,7 @@ window._perfilNav = async (page) => {
 
 var SUBPAGE_TITLES = {
   stock: "Stock", incidentes: "Incidentes", equipa: "Equipa", loja: "Loja",
-  senha: "Senha", dashboard: "Business Intelligence", multilojas: "Multi-lojas", fornecedores: "Fornecedores",
+  senha: "Senha", dashboard: "Business Intelligence", multilojas: "Workspace", fornecedores: "Fornecedores",
   turno: "Turno", tesouraria: "Tesouraria", seguranca: "Segurança", configuracoes: "Configurações",
   contabilidade: "Contabilidade", despesas: "Despesas", assinatura: "Assinatura",
   contactos: "Contactos", escritorio: "Escritório", sobre: "Sobre",
@@ -1462,7 +1462,8 @@ async function loadContaResumo(wrap) {
   var devMes = atual.vendas.reduce(function(a,s){ return a+(s.totalDevolvido||0); },0);
 
   // ── Posição financeira (fonte: livro razão) ──
-  var saldoCaixaBanco = accountBalance(entries, "45") + accountBalance(entries, "43") + accountBalance(entries, "44") + accountBalance(entries, "42") + accountBalance(entries, "41");
+  var saldoCaixa = accountBalance(entries, "45");
+  var saldoBanco = accountBalance(entries, "43") + accountBalance(entries, "44") + accountBalance(entries, "42") + accountBalance(entries, "41");
   var contasAReceber  = accountBalance(entries, "31");
   var contasAPagar    = accountBalance(entries, "32");
   var ivaAPagar       = accountBalance(entries, "34");
@@ -1514,7 +1515,9 @@ async function loadContaResumo(wrap) {
     // ── Posição financeira ──
     '<div class="hist-mov-card">' +
     '<div class="hist-day-label--inset"><i data-lucide="landmark" style="width:13px;height:13px"></i>Posição financeira</div>' +
-    iconRow("wallet", "var(--info)", "var(--info-light)", "Caixa + Banco", "Dinheiro disponível agora", fmt(saldoCaixaBanco), "var(--text)") +
+    iconRow("banknote", "var(--info)", "var(--info-light)", "Caixa", "Dinheiro físico disponível", fmt(saldoCaixa), "var(--text)") +
+    iconRow("landmark", "var(--info)", "var(--info-light)", "Banco", "Saldo em contas bancárias", fmt(saldoBanco), "var(--text)") +
+    '<div class="conta-wf-row conta-wf-row--subtotal"><span class="conta-wf-label">Total disponível</span><span class="conta-wf-val">' + fmt(saldoCaixa + saldoBanco) + '</span></div>' +
     iconRow("arrow-down-left", "var(--warning)", "var(--warning-light)", "A receber (vendas a crédito)", null, fmt(contasAReceber), contasAReceber>0?"var(--warning)":"var(--text)") +
     iconRow("arrow-up-right", "var(--danger-muted)", "var(--danger-muted-light)", "A pagar (fornecedores)", hasOverduePayable?"Há valores vencidos":null, fmt(contasAPagar), hasOverduePayable?"var(--danger)":"var(--text)") +
     iconRow("landmark", "var(--danger-muted)", "var(--danger-muted-light)", "IVA a pagar ao Estado", null, fmt(ivaAPagar), ivaAPagar>0?"var(--danger)":"var(--text)") +
@@ -2673,7 +2676,7 @@ async function loadAssinatura() {
   hero.innerHTML =
     '<div class="lic-hero-icon"><i data-lucide="award"></i></div>' +
     '<div class="lic-hero-plan">' + plan.name + '</div>' +
-    '<div class="lic-hero-price">' + plan.price.toLocaleString() + ' Kz<span>/mês</span></div>' +
+    '<div class="lic-hero-price">' + (isTrial ? (daysLeft + ' dia' + (daysLeft!==1?"s":"") + ' restante' + (daysLeft!==1?"s":"")) : (plan.price.toLocaleString() + ' Kz<span>/mês</span>')) + '</div>' +
     '<div class="lic-hero-badge lic-hero-badge--' + (isExpired?"expired":isTrial?"trial":"active") + '">' +
       '<i data-lucide="' + (isExpired?"x-circle":isTrial?"clock":"check-circle") + '" style="width:14px;height:14px"></i>' +
       (isExpired ? "Licença expirada" : isTrial ? "Período de avaliação" : "Licença activa") +

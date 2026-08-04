@@ -26,7 +26,7 @@ export async function loadEscritorio() {
       '</label>' : '') +
     '<label class="esc-import-btn">' +
     '<input type="file" accept=".ktkcat,.json,application/json" style="display:none" onchange="window._handleKtkcatImport(this)"/>' +
-    '<i data-lucide="package"></i> Importar catálogo (.ktkcat)' +
+    '<i data-lucide="package"></i> Importar catálogo (.json)' +
     '</label>';
   wrap.appendChild(importSection);
 
@@ -55,7 +55,7 @@ export async function loadEscritorio() {
     exportSection.className = "esc-import-section";
     exportSection.innerHTML =
       '<button class="esc-import-btn" onclick="window._exportarCatalogo()">' +
-      '<i data-lucide="download"></i> Exportar catálogo (.ktkcat)' +
+      '<i data-lucide="download"></i> Exportar catálogo (.json)' +
       '</button>';
     wrap.appendChild(exportSection);
 
@@ -403,11 +403,12 @@ window._handleKtkcatImport = async function(input) {
   try {
     var result = await catalogService.apply(cat);
     toast("Catálogo importado — " + result.created + " novo(s), " + result.updated + " actualizado(s).","success");
+    await loadEscritorio();
     if (result.discontinuedWithStock.length) {
       showDiscontinuedModal(result.discontinuedWithStock);
     }
   } catch(err) {
-    if (err.message === "INVALID_FORMAT") toast("Formato .ktkcat inválido.","error");
+    if (err.message === "INVALID_FORMAT") toast("Formato .json inválido.","error");
     else if (err.message === "INVALID_HASH") toast("Hash inválido — ficheiro modificado.","error");
     else toast("Erro: "+err.message,"error");
   }
