@@ -5,6 +5,7 @@ import { toast }           from "./toast.js";
 import { generateCodesForUser } from "./recovery-codes.js";
 import { backupService } from "./backup.js";
 import { openPicker } from "./picker.js";
+import { openModal, closeModal } from "./modal.js";
 
 export async function checkSetup() {
   const first = await isFirstTime();
@@ -91,6 +92,9 @@ function showSetup() {
         '<i data-lucide="upload-cloud" style="width:15px;height:15px"></i> Já usei o Kontaki? Restaurar',
         '<input type="file" accept=".json" style="display:none" onchange="window._restoreBackupLogin(this)"/>',
       '</label>',
+      '<button id="setup-restore-console-btn" onclick="window._openRestoreFromConsole()" style="display:inline-flex;align-items:center;gap:8px;background:none;border:1.5px solid #e4e4e7;border-radius:12px;padding:9px 14px;cursor:pointer;font-size:12.5px;font-weight:700;color:#3f3f46;margin-left:8px;font-family:inherit">',
+        '<i data-lucide="shield-check" style="width:15px;height:15px"></i> Restaurar com Recovery Code',
+      '</button>',
     '</div>',
 
     // PROGRESS
@@ -310,6 +314,41 @@ function showSetup() {
     if (header) header.style.padding = "20px 24px 14px";
     if (footer) footer.style.padding = "8px";
   }
+
+  window._openRestoreFromConsole = function() {
+    openModal("Restaurar Loja",
+      '<div style="font-size:13px;color:#71717a;line-height:1.5;margin-bottom:18px">Introduz o Store ID e um dos teus Recovery Codes para restaurar o backup mais recente enviado ao Kontaki Console.</div>' +
+      '<div class="field" style="margin-bottom:14px"><label>Store ID</label><input id="restore-console-storeid" placeholder="STORE-..."/></div>' +
+      '<div class="field" style="margin-bottom:18px"><label>Recovery Code</label><input id="restore-console-code" placeholder="XXXX-XXXX"/></div>' +
+      '<div id="restore-console-status" style="font-size:12.5px;color:#71717a;margin-bottom:12px;min-height:16px"></div>' +
+      '<div class="form-actions">' +
+      '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+      '<button class="btn btn-primary btn-full" id="restore-console-submit" onclick="window._submitRestoreFromConsole()"><i data-lucide="shield-check"></i> Restaurar</button>' +
+      '</div>');
+    refreshIcons(document.getElementById("modal-box"));
+  };
+
+  window._submitRestoreFromConsole = async function() {
+    var storeId = (document.getElementById("restore-console-storeid") || {}).value;
+    var code = (document.getElementById("restore-console-code") || {}).value;
+    var statusEl = document.getElementById("restore-console-status");
+    var submitBtn = document.getElementById("restore-console-submit");
+    if (!storeId || !code) { toast("Preenche o Store ID e o Recovery Code.", "error"); return; }
+
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      var results = await backupService.restoreFromConsole(storeId.trim(), code.trim(), function(status) {
+        if (statusEl) statusEl.textContent = status;
+      });
+      var total = Object.values(results).reduce(function(a, b) { return a + b; }, 0);
+      toast("Loja restaurada: " + total + " registos.", "success");
+      setTimeout(function() { window.location.reload(); }, 600);
+    } catch (err) {
+      if (submitBtn) submitBtn.disabled = false;
+      if (statusEl) statusEl.textContent = "";
+      toast(err.message || "Erro ao restaurar loja.", "error");
+    }
+  };
 
   window._restoreBackupLogin = async function(input) {
     var file = input.files[0];

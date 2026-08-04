@@ -1,5 +1,5 @@
 import { db, getAllStoreNames } from "./db.js";
-import { encryptBackup } from "./crypto.js";
+import { encryptBackup, decryptBackup, hashRecoveryCode, unwrapMasterKeyWithRecoveryCode } from "./crypto.js";
 import { hasMasterKey, getOrCreateMasterKey } from "./recovery-codes.js";
 import { ensureStoreId } from "./invite.js";
 
@@ -136,7 +136,12 @@ export const backupService = {
     let data;
     try { data = JSON.parse(jsonText); }
     catch { throw new Error("Ficheiro de backup inválido."); }
+    return this.importObject(data);
+  },
 
+  // Partilhado por import() (ficheiro JSON) e restoreFromConsole() (backup
+  // cifrado já decifrado em memória) — mesma lógica de escrita no IndexedDB.
+  async importObject(data) {
     if (!data.stores || !data.version) throw new Error("Formato de backup inválido.");
 
     // Só tenta restaurar stores que existem de facto na base de dados atual
@@ -155,6 +160,64 @@ export const backupService = {
       results[store] = count;
     }
     return results;
+  },
+
+  // Restauro completo a partir do Console: Store ID + Recovery Code em
+  // claro nunca saem do dispositivo — só o hash local. O servidor devolve
+  // wrappedMasterKey (nunca a chave em claro); a Master Key só existe
+  // decifrada em memória, neste dispositivo, o tempo que durar a função.
+  async restoreFromConsole(storeId, recoveryCode, onStatus) {
+    const notify = onStatus || function () {};
+
+    notify("A validar código...");
+    const recoveryHash = await hashRecoveryCode(recoveryCode);
+
+    let res;
+    try {
+      res = await fetch(CONSOLE_API + "/backup/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId: storeId, recoveryHash: recoveryHash }),
+      });
+    } catch (e) {
+      throw new Error("Sem ligação à internet.");
+    }
+    let result;
+    try { result = await res.json(); }
+    catch { throw new Error("Resposta inválida do servidor."); }
+    if (!res.ok) throw new Error(result.error || "Código de recuperação inválido.");
+
+    notify("A desbloquear a chave da loja...");
+    const masterKey = await unwrapMasterKeyWithRecoveryCode(
+      { wrapVersion: result.wrapVersion, wrappedKey: result.wrappedMasterKey, iv: result.wrapIv },
+      recoveryCode,
+      storeId
+    );
+
+    notify("A transferir backup...");
+    let dlRes;
+    try {
+      dlRes = await fetch(CONSOLE_API + "/backup/download", {
+        headers: { "Authorization": "Bearer " + result.recoveryToken },
+      });
+    } catch (e) {
+      throw new Error("Sem ligação à internet durante a transferência.");
+    }
+    let backupPayload;
+    try { backupPayload = await dlRes.json(); }
+    catch { throw new Error("Resposta inválida ao transferir backup."); }
+    if (!dlRes.ok) throw new Error(backupPayload.error || "Erro ao transferir backup.");
+
+    notify("A decifrar...");
+    let data;
+    try {
+      data = await decryptBackup(backupPayload, masterKey);
+    } catch (e) {
+      throw new Error("Backup corrompido, adulterado, ou código incorreto — não foi possível decifrar.");
+    }
+
+    notify("A restaurar dados...");
+    return await this.importObject(data);
   },
 
   validate(data) {
