@@ -827,7 +827,7 @@ var ESCRITORIO_VIEWS = [
   { key: "turno",       label: "Turno",       desc: "Estado do turno, operador e diferença de caixa", icon: "clipboard-list", iconClass: "hist-export-icon--edit" },
   { key: "produtos",    label: "Produtos",    desc: "Inventário da loja, só leitura",                   icon: "package",        iconStyle: "background:#eff6ff;color:#2563eb" },
   { key: "catalogo",    label: "Catálogo",    desc: "Editar produtos e publicar alterações",           icon: "pencil",         iconClass: "hist-export-icon--csv" },
-  { key: "inventario",  label: "Inventário Periódico", desc: "Relatórios arquivados de stock + caixa/banco, só leitura", icon: "camera", iconStyle: "background:#f0fdf4;color:#16a34a" },
+  { key: "inventario",  label: "Inventário Periódico", desc: "Relatórios arquivados de stock + caixa/banco, só leitura", icon: "clipboard-list", iconStyle: "background:#f0fdf4;color:#16a34a" },
 ];
 
 function _mlEscritorioViewLabel(key) {
@@ -962,10 +962,14 @@ function _mlInventarioSectionHtml(store) {
     ? '<div style="border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
       reports.map(function(r) {
         var date = r.generated_at ? new Date(r.generated_at).toLocaleString("pt-AO") : "—";
+        var count = r.divergences_count || 0;
+        var summary = count > 0
+          ? '<span style="color:#dc2626;font-weight:700">' + count + ' divergência' + (count !== 1 ? "s" : "") + '</span>'
+          : 'Sem divergências';
         return '<div onclick="window._mlViewInventoryReport(\'' + r.id + '\')" style="padding:12px;border-bottom:1px solid var(--border2);cursor:pointer;display:flex;justify-content:space-between;align-items:center">' +
           '<div>' +
             '<div style="font-size:13px;font-weight:700;color:var(--text)">' + date + '</div>' +
-            '<div style="font-size:11px;color:var(--text4);margin-top:2px">Caixa ' + fmt(r.cash_balance || 0) + ' · Banco ' + fmt(r.bank_balance || 0) + '</div>' +
+            '<div style="font-size:11.5px;color:var(--text3);margin-top:2px">' + summary + '</div>' +
           '</div>' +
           '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text4)"></i>' +
         '</div>';
