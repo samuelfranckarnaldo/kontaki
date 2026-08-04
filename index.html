@@ -35,6 +35,16 @@
 
 <!-- LOGIN -->
 <div id="login-page" style="display:none">
+  <!-- Recarregar discreto — mitigação para quando o carregamento dos
+  perfis ou do ecrã de PIN falha silenciosamente (ex.: IndexedDB lento
+  a abrir) e a tela fica presa sem alternativa visível para o utilizador. -->
+  <button onclick="window.location.reload()"
+          style="position:fixed;top:calc(14px + env(safe-area-inset-top));right:14px;z-index:50;
+                 width:34px;height:34px;border-radius:10px;background:rgba(0,0,0,.04);
+                 border:1px solid rgba(0,0,0,.08);color:#a1a1aa;display:flex;
+                 align-items:center;justify-content:center;cursor:pointer">
+    <i data-lucide="refresh-cw" style="width:16px;height:16px"></i>
+  </button>
   <div class="login-box">
     <div class="login-logo">
       <div id="login-logo-wrap" class="login-symbol">
