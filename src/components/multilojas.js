@@ -776,6 +776,7 @@ async function _renderEscritorio(wrap) {
   }
   _mlEspelhoProducts = (storeData.products && storeData.products.items) || [];
   _mlEscritorioSession = storeData.session || { available: false, message: "Sem sessões sincronizadas ainda" };
+  _mlEscritorioBalances = storeData.balances || { cash: null, bank: null };
 
   _mlWorkspaceStoreId = store.id;
   _mlWorkspaceStoreName = store.name;
@@ -820,6 +821,7 @@ async function _renderEscritorio(wrap) {
 }
 
 var _mlInventarioReports = [];
+var _mlEscritorioBalances = { cash: null, bank: null };
 
 var ESCRITORIO_VIEWS = [
   { key: "turno",       label: "Turno",       desc: "Estado do turno, operador e diferença de caixa", icon: "clipboard-list", iconClass: "hist-export-icon--edit" },
@@ -979,25 +981,69 @@ function _mlInventarioSectionHtml(store) {
   '</div>';
 }
 
-window._mlOpenInventarioContagem = function() {
+window._mlOpenInventarioContagem = async function() {
   var products = (_mlEspelhoProducts || []).slice();
+
+  var draftRes, draftData, draft = null;
+  try {
+    draftRes = await _mlAuthFetch("/workspace/" + encodeURIComponent(_mlEscritorioStoreId) + "/inventory-draft");
+    draftData = await draftRes.json();
+    if (draftRes.ok && draftData && draftData.success) draft = draftData.draft;
+  } catch (e) { draft = null; }
+
+  var draftCountsByCatalogId = {};
+  (draft && Array.isArray(draft.counts) ? draft.counts : []).forEach(function(c) {
+    if (c && c.catalogId) draftCountsByCatalogId[c.catalogId] = c;
+  });
+
+  var expCash = (_mlEscritorioBalances && _mlEscritorioBalances.cash != null) ? _mlEscritorioBalances.cash : 0;
+  var expBank = (_mlEscritorioBalances && _mlEscritorioBalances.bank != null) ? _mlEscritorioBalances.bank : 0;
+  var valCash = (draft && draft.found_cash != null) ? draft.found_cash : expCash;
+  var valBank = (draft && draft.found_bank != null) ? draft.found_bank : expBank;
+  var hasDraft = !!draft && (Object.keys(draftCountsByCatalogId).length > 0 || draft.found_cash != null || draft.found_bank != null);
+  var moneyChanged = (valCash !== expCash) || (valBank !== expBank);
+
+  var moneyRowHtml = '<div class="ml-inv-money-row" data-exp-cash="' + expCash + '" data-exp-bank="' + expBank + '" ' +
+    'style="padding:10px 8px;border-bottom:2px solid var(--border2);border-left:3px solid ' + (moneyChanged?"var(--primary)":"transparent") + ';background:' + (moneyChanged?"var(--primary-light)":"transparent") + ';margin-bottom:10px;border-radius:8px;transition:background .15s">' +
+    '<div style="font-size:13px;font-weight:700;margin-bottom:6px">Caixa e Banco</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div style="flex:1">' +
+    '<div style="font-size:10.5px;color:var(--text3);margin-bottom:3px">Caixa (esp. ' + fmt(expCash) + ')</div>' +
+    '<input type="number" class="ml-inv-input-cash" value="' + valCash + '" ' +
+    'oninput="window._mlInvMoneyRowChanged(this)" ' +
+    'style="width:100%;padding:7px;border:1.5px solid var(--border2);border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
+    '</div>' +
+    '<div style="flex:1">' +
+    '<div style="font-size:10.5px;color:var(--text3);margin-bottom:3px">Banco (esp. ' + fmt(expBank) + ')</div>' +
+    '<input type="number" class="ml-inv-input-bank" value="' + valBank + '" ' +
+    'oninput="window._mlInvMoneyRowChanged(this)" ' +
+    'style="width:100%;padding:7px;border:1.5px solid var(--border2);border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
+    '</div>' +
+    '</div>' +
+  '</div>';
 
   var rowsHtml = products.length
     ? products.map(function(p) {
         var espLoja = p.stock || 0;
         var espArm = p.warehouseStock || 0;
-        return '<div class="ml-inv-row" data-catalog-id="' + p.catalogId + '" ' +
-          'style="padding:10px 8px;border-bottom:1px solid var(--border2)">' +
+        var draftCount = p.catalogId ? draftCountsByCatalogId[p.catalogId] : null;
+        var valLoja = (draftCount && draftCount.foundStock != null) ? draftCount.foundStock : espLoja;
+        var valArm = (draftCount && draftCount.foundWarehouseStock != null) ? draftCount.foundWarehouseStock : espArm;
+        var rowChanged = (valLoja !== espLoja) || (valArm !== espArm);
+        return '<div class="ml-inv-row" data-catalog-id="' + (p.catalogId || "") + '" data-exp-loja="' + espLoja + '" data-exp-arm="' + espArm + '" ' +
+          'style="padding:10px 8px;border-bottom:1px solid var(--border2);border-left:3px solid ' + (rowChanged?"var(--primary)":"transparent") + ';background:' + (rowChanged?"var(--primary-light)":"transparent") + ';transition:background .15s">' +
           '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px">' + p.name + '</div>' +
           '<div style="display:flex;gap:8px">' +
           '<div style="flex:1">' +
           '<div style="font-size:10.5px;color:var(--text3);margin-bottom:3px">Loja (esp. ' + espLoja + ' ' + _prodAbbrevUnit(p.unit) + ')</div>' +
-          '<input type="number" class="ml-inv-input-loja" min="0" value="' + espLoja + '" ' +
+          '<input type="number" class="ml-inv-input-loja" min="0" value="' + valLoja + '" ' +
+          'oninput="window._mlInvRowChanged(this)" ' +
           'style="width:100%;padding:7px;border:1.5px solid var(--border2);border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
           '</div>' +
           '<div style="flex:1">' +
           '<div style="font-size:10.5px;color:var(--text3);margin-bottom:3px">Armazém (esp. ' + espArm + ' ' + _prodAbbrevUnit(p.unit) + ')</div>' +
-          '<input type="number" class="ml-inv-input-arm" min="0" value="' + espArm + '" ' +
+          '<input type="number" class="ml-inv-input-arm" min="0" value="' + valArm + '" ' +
+          'oninput="window._mlInvRowChanged(this)" ' +
           'style="width:100%;padding:7px;border:1.5px solid var(--border2);border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
           '</div>' +
           '</div>' +
@@ -1006,35 +1052,91 @@ window._mlOpenInventarioContagem = function() {
     : '<div style="font-size:12px;color:var(--text4);text-align:center;padding:16px">Sem produtos sincronizados para contar.</div>';
 
   openModal("Contagem — Inventário Periódico",
-    '<div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">Preenche o valor encontrado por produto. Ao confirmar, o relatório é calculado e guardado com as divergências — não altera o stock da loja nem cria incidentes.</div>' +
-    '<div style="max-height:55vh;overflow-y:auto">' + rowsHtml + '</div>' +
+    (hasDraft ?
+      '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--primary-light);border-radius:8px;padding:8px 12px;margin-bottom:10px">' +
+      '<span style="font-size:11.5px;color:var(--primary);font-weight:600">A continuar contagem anterior</span>' +
+      '<button onclick="window._mlInvContagemReset()" style="background:none;border:none;color:var(--primary);font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit">Recomeçar</button>' +
+      '</div>' : "") +
+    '<div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">Preenche o valor encontrado por produto e o saldo de caixa/banco. Ao confirmar, o relatório é calculado e guardado com as divergências — não altera o stock da loja nem cria incidentes. Podes fechar e continuar mais tarde — o progresso fica guardado no servidor.</div>' +
+    moneyRowHtml +
+    '<div style="max-height:46vh;overflow-y:auto">' + rowsHtml + '</div>' +
     '<div style="display:flex;gap:8px;margin-top:14px">' +
-    '<button class="btn btn-ghost btn-full" onclick="window._closeModal ? window._closeModal() : null">Cancelar</button>' +
+    '<button class="btn btn-ghost btn-full" onclick="window._mlCloseInventarioContagem()">Fechar (guarda progresso)</button>' +
     '<button class="btn btn-primary btn-full" id="ml-inv-confirm-btn" onclick="window._mlConfirmInventarioContagem()"><i data-lucide="check"></i> Calcular e Guardar</button>' +
     '</div>'
   );
   refreshIcons(document.getElementById("modal-box") || document.body);
 };
 
-window._mlConfirmInventarioContagem = async function() {
-  var btn = document.getElementById("ml-inv-confirm-btn");
-  if (btn) { btn.disabled = true; btn.innerHTML = "A guardar…"; }
+window._mlInvRowChanged = function(input) {
+  var row = input.closest(".ml-inv-row");
+  var loja = row.querySelector(".ml-inv-input-loja");
+  var arm = row.querySelector(".ml-inv-input-arm");
+  var espLoja = Number(row.getAttribute("data-exp-loja"));
+  var espArm = Number(row.getAttribute("data-exp-arm"));
+  var changed = Number(loja.value || 0) !== espLoja || Number(arm.value || 0) !== espArm;
+  row.style.background = changed ? "var(--primary-light)" : "transparent";
+  row.style.borderLeftColor = changed ? "var(--primary)" : "transparent";
+};
 
+window._mlInvMoneyRowChanged = function(input) {
+  var row = input.closest(".ml-inv-money-row");
+  var cash = row.querySelector(".ml-inv-input-cash");
+  var bank = row.querySelector(".ml-inv-input-bank");
+  var expCash = Number(row.getAttribute("data-exp-cash"));
+  var expBank = Number(row.getAttribute("data-exp-bank"));
+  var changed = Number(cash.value || 0) !== expCash || Number(bank.value || 0) !== expBank;
+  row.style.background = changed ? "var(--primary-light)" : "transparent";
+  row.style.borderLeftColor = changed ? "var(--primary)" : "transparent";
+};
+
+function _mlGatherInventarioContagem() {
   var rows = document.querySelectorAll(".ml-inv-row");
   var counts = [];
   rows.forEach(function(row) {
     var catalogId = row.getAttribute("data-catalog-id");
+    if (!catalogId) return;
     var foundLoja = Number(row.querySelector(".ml-inv-input-loja").value || 0);
     var foundArm = Number(row.querySelector(".ml-inv-input-arm").value || 0);
     counts.push({ catalogId: catalogId, foundStock: foundLoja, foundWarehouseStock: foundArm });
   });
+  var moneyRow = document.querySelector(".ml-inv-money-row");
+  var foundCash = moneyRow ? Number(moneyRow.querySelector(".ml-inv-input-cash").value || 0) : null;
+  var foundBank = moneyRow ? Number(moneyRow.querySelector(".ml-inv-input-bank").value || 0) : null;
+  return { counts: counts, foundCash: foundCash, foundBank: foundBank };
+}
+
+window._mlCloseInventarioContagem = async function() {
+  var payload = _mlGatherInventarioContagem();
+  try {
+    await _mlAuthFetch("/workspace/" + encodeURIComponent(_mlEscritorioStoreId) + "/inventory-draft", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) { /* falha a guardar rascunho não deve bloquear o fecho do modal */ }
+  closeModal();
+};
+
+window._mlInvContagemReset = async function() {
+  try {
+    await _mlAuthFetch("/workspace/" + encodeURIComponent(_mlEscritorioStoreId) + "/inventory-draft", { method: "DELETE" });
+  } catch (e) { /* ignora falha, reabre na mesma */ }
+  window._mlOpenInventarioContagem();
+};
+
+window._mlConfirmInventarioContagem = async function() {
+  var btn = document.getElementById("ml-inv-confirm-btn");
+  if (btn) { btn.disabled = true; btn.innerHTML = "A guardar…"; }
+
+  var payload = _mlGatherInventarioContagem();
 
   var res, data;
   try {
     res = await _mlAuthFetch("/workspace/" + encodeURIComponent(_mlEscritorioStoreId) + "/inventory-report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ counts: counts }),
+      body: JSON.stringify(payload),
     });
     data = await res.json();
   } catch (e) {
@@ -1110,9 +1212,23 @@ window._mlViewInventoryReport = async function(reportId) {
   openModal("Relatório de Inventário",
     '<div style="font-size:11.5px;color:var(--text4);margin-bottom:4px">Gerado em ' + date + '</div>' +
     '<div style="font-size:11px;color:var(--text4);margin-bottom:14px">Dados sincronizados até ' + syncedAs + '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">' +
-      _mlTurnoBox("Caixa", fmt(r.cash_balance || 0)) +
-      _mlTurnoBox("Banco", fmt(r.bank_balance || 0)) +
+    '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:12px;margin-bottom:14px;display:flex;gap:18px;font-size:12.5px;color:var(--text3)">' +
+      (function() {
+        var cashDiff = r.cash_found != null ? (r.cash_found - (r.cash_balance || 0)) : null;
+        var bankDiff = r.bank_found != null ? (r.bank_found - (r.bank_balance || 0)) : null;
+        function part(label, expected, found, diff) {
+          var txt = fmt(expected || 0);
+          if (found != null) {
+            txt += " → " + fmt(found);
+            if (diff) {
+              var color = diff < 0 ? "#dc2626" : "#16a34a";
+              txt += ' <strong style="color:' + color + '">(' + (diff > 0 ? "+" : "") + fmt(diff) + ")</strong>";
+            }
+          }
+          return "<span>" + label + ": " + txt + "</span>";
+        }
+        return part("Caixa", r.cash_balance, r.cash_found, cashDiff) + part("Banco", r.bank_balance, r.bank_found, bankDiff);
+      })() +
     '</div>' +
     '<div style="font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Produtos (' + products.length + ')</div>' +
     '<div style="max-height:50vh;overflow-y:auto">' + rowsHtml + '</div>' +
@@ -1851,8 +1967,29 @@ function _relativeTime(iso) {
   return "há " + days + " dia" + (days !== 1 ? "s" : "");
 }
 
+function _mlMinDelay(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
+}
+
 async function _renderResumoLoja(wrap, storeId) {
-  wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
+  wrap.innerHTML =
+    '<div class="skel-line skel-line--title" style="margin-bottom:6px;width:50%"></div>' +
+    '<div class="skel-line skel-line--sub" style="margin-bottom:20px;width:30%"></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px">' +
+      '<div class="prod-stat-card hist-skel" style="height:96px"></div>' +
+      '<div class="prod-stat-card hist-skel" style="height:96px"></div>' +
+    '</div>' +
+    '<div class="hist-mov-card hist-skel" style="margin-bottom:24px">' +
+      '<div class="skel-line skel-line--title" style="margin-bottom:12px"></div>' +
+      '<div class="skel-line skel-line--sub" style="margin-bottom:10px"></div>' +
+      '<div class="skel-line skel-line--sub" style="margin-bottom:10px"></div>' +
+      '<div class="skel-line skel-line--sub"></div>' +
+    '</div>' +
+    '<div class="skel-line skel-line--title" style="margin-bottom:10px;width:40%"></div>' +
+    '<div class="hist-sale-card hist-skel"><div class="skel-circle"></div><div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div><div class="skel-line skel-line--price"></div></div>' +
+    '<div class="hist-sale-card hist-skel"><div class="skel-circle"></div><div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div><div class="skel-line skel-line--price"></div></div>' +
+    '<div class="hist-sale-card hist-skel"><div class="skel-circle"></div><div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div><div class="skel-line skel-line--price"></div></div>';
+  await _mlMinDelay(280);
 
   var res;
   try {
