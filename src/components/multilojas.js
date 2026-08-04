@@ -974,30 +974,83 @@ function _mlInventarioSectionHtml(store) {
   return '<div>' +
     '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Inventário Periódico — arquivo</div>' +
     '<div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">Cada relatório é uma fotografia do stock (loja/armazém) e do saldo de caixa/banco no momento em que foi gerado, com base na última sincronização — não altera nada na loja.</div>' +
-    '<button class="btn btn-primary btn-full" style="margin-bottom:14px" id="ml-inv-gen-btn" onclick="window._mlGenerateInventoryReport()"><i data-lucide="camera"></i> Gerar Relatório Agora</button>' +
+    '<button class="btn btn-primary btn-full" style="margin-bottom:14px" id="ml-inv-gen-btn" onclick="window._mlOpenInventarioContagem()"><i data-lucide="clipboard-list"></i> Nova Contagem</button>' +
     listHtml +
   '</div>';
 }
 
-window._mlGenerateInventoryReport = async function() {
-  var btn = document.getElementById("ml-inv-gen-btn");
-  if (btn) { btn.disabled = true; btn.innerHTML = "A gerar…"; }
+window._mlOpenInventarioContagem = function() {
+  var products = (_mlEspelhoProducts || []).slice();
+
+  var rowsHtml = products.length
+    ? products.map(function(p) {
+        var espLoja = p.stock || 0;
+        var espArm = p.warehouseStock || 0;
+        return '<div class="ml-inv-row" data-catalog-id="' + p.catalogId + '" ' +
+          'style="padding:10px 8px;border-bottom:1px solid var(--border2)">' +
+          '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px">' + p.name + '</div>' +
+          '<div style="display:flex;gap:8px">' +
+          '<div style="flex:1">' +
+          '<div style="font-size:10.5px;color:var(--text3);margin-bottom:3px">Loja (esp. ' + espLoja + ' ' + _prodAbbrevUnit(p.unit) + ')</div>' +
+          '<input type="number" class="ml-inv-input-loja" min="0" value="' + espLoja + '" ' +
+          'style="width:100%;padding:7px;border:1.5px solid var(--border2);border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
+          '</div>' +
+          '<div style="flex:1">' +
+          '<div style="font-size:10.5px;color:var(--text3);margin-bottom:3px">Armazém (esp. ' + espArm + ' ' + _prodAbbrevUnit(p.unit) + ')</div>' +
+          '<input type="number" class="ml-inv-input-arm" min="0" value="' + espArm + '" ' +
+          'style="width:100%;padding:7px;border:1.5px solid var(--border2);border-radius:8px;text-align:center;font-size:14px;font-weight:700;font-family:inherit"/>' +
+          '</div>' +
+          '</div>' +
+          '</div>';
+      }).join("")
+    : '<div style="font-size:12px;color:var(--text4);text-align:center;padding:16px">Sem produtos sincronizados para contar.</div>';
+
+  openModal("Contagem — Inventário Periódico",
+    '<div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">Preenche o valor encontrado por produto. Ao confirmar, o relatório é calculado e guardado com as divergências — não altera o stock da loja nem cria incidentes.</div>' +
+    '<div style="max-height:55vh;overflow-y:auto">' + rowsHtml + '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:14px">' +
+    '<button class="btn btn-ghost btn-full" onclick="window._closeModal ? window._closeModal() : null">Cancelar</button>' +
+    '<button class="btn btn-primary btn-full" id="ml-inv-confirm-btn" onclick="window._mlConfirmInventarioContagem()"><i data-lucide="check"></i> Calcular e Guardar</button>' +
+    '</div>'
+  );
+  refreshIcons(document.getElementById("modal-box") || document.body);
+};
+
+window._mlConfirmInventarioContagem = async function() {
+  var btn = document.getElementById("ml-inv-confirm-btn");
+  if (btn) { btn.disabled = true; btn.innerHTML = "A guardar…"; }
+
+  var rows = document.querySelectorAll(".ml-inv-row");
+  var counts = [];
+  rows.forEach(function(row) {
+    var catalogId = row.getAttribute("data-catalog-id");
+    var foundLoja = Number(row.querySelector(".ml-inv-input-loja").value || 0);
+    var foundArm = Number(row.querySelector(".ml-inv-input-arm").value || 0);
+    counts.push({ catalogId: catalogId, foundStock: foundLoja, foundWarehouseStock: foundArm });
+  });
+
   var res, data;
   try {
-    res = await _mlAuthFetch("/workspace/" + encodeURIComponent(_mlEscritorioStoreId) + "/inventory-report", { method: "POST" });
+    res = await _mlAuthFetch("/workspace/" + encodeURIComponent(_mlEscritorioStoreId) + "/inventory-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ counts: counts }),
+    });
     data = await res.json();
   } catch (e) {
     toast("Sem ligação à internet.", "error");
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="camera"></i> Gerar Relatório Agora'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="check"></i> Calcular e Guardar'; }
     return;
   }
   if (res.status === 401) { loadMultilojas(); return; }
   if (!res.ok || !data || !data.success) {
-    toast((data && data.error) || "Erro ao gerar relatório.", "error");
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="camera"></i> Gerar Relatório Agora'; }
+    toast((data && data.error) || "Erro ao guardar relatório.", "error");
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="check"></i> Calcular e Guardar'; }
     return;
   }
-  toast("Relatório gerado.", "success");
+
+  closeModal();
+  toast("Relatório de inventário guardado.", "success");
   await _mlReloadInventarioReports();
 };
 
@@ -1029,11 +1082,27 @@ window._mlViewInventoryReport = async function(reportId) {
   var syncedAs = r.synced_as_of ? new Date(r.synced_as_of).toLocaleString("pt-AO") : "—";
   var products = r.products || [];
 
+  function _mlInvDiffPart(label, expected, found, diff) {
+    var unitTxt = "";
+    var valueTxt = _prodAbbrevQty(expected || 0);
+    if (found !== null && found !== undefined) {
+      valueTxt += " → " + _prodAbbrevQty(found);
+      if (diff) {
+        var diffColor = diff < 0 ? "#dc2626" : "#16a34a";
+        valueTxt += ' <strong style="color:' + diffColor + '">(' + (diff > 0 ? "+" : "") + diff + ")</strong>";
+      }
+    }
+    return '<span>' + label + ': ' + valueTxt + '</span>';
+  }
+
   var rowsHtml = products.length
     ? products.map(function(p) {
-        return '<div style="padding:8px 0;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center">' +
-          '<div style="font-size:12.5px;font-weight:600;color:var(--text)">' + p.name + '</div>' +
-          '<div style="font-size:12px;color:var(--text3)">Loja ' + (p.stock || 0) + ' · Arm. ' + (p.warehouseStock || 0) + ' ' + (p.unit || "") + '</div>' +
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--border2)">' +
+          '<div style="font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:3px">' + p.name + (p.counted ? "" : ' <span style="font-size:10.5px;font-weight:600;color:var(--text4)">(não contado)</span>') + '</div>' +
+          '<div style="display:flex;gap:14px;font-size:11.5px;color:var(--text3)">' +
+            _mlInvDiffPart("Loja " + _prodAbbrevUnit(p.unit), p.expectedStock, p.foundStock, p.diffStock) +
+            _mlInvDiffPart("Arm. " + _prodAbbrevUnit(p.unit), p.expectedWarehouseStock, p.foundWarehouseStock, p.diffWarehouseStock) +
+          '</div>' +
         '</div>';
       }).join("")
     : '<div style="font-size:12px;color:var(--text4);text-align:center;padding:12px">Sem produtos neste relatório.</div>';
