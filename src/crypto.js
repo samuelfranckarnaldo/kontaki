@@ -265,6 +265,21 @@ export async function generateMasterKey() {
   return generateAESKey(true);
 }
 
+// Guardar CryptoKey directamente via IndexedDB (structured clone) tem
+// suporte inconsistente entre browsers/versões (confirmado em teste real:
+// valor voltava como objecto genérico, não CryptoKey). Guardamos os bytes
+// em hex — uma string simples, sempre suportada — e reimportamos sempre
+// que a chave é necessária. Master Key já é extractable:true, por isso
+// isto não perde nada.
+export async function exportMasterKeyHex(key) {
+  const raw = await exportRawKey(key);
+  return toHex(raw);
+}
+
+export async function importMasterKeyHex(hex) {
+  return importRawKey(fromHex(hex), true);
+}
+
 // Reimporta a Master Key como extractable:false — é esta cópia que deve
 // ficar guardada localmente; a original extraível deve ser descartada
 // pelo chamador logo a seguir a isto.

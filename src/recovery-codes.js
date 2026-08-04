@@ -1,5 +1,5 @@
 import { db } from "./db.js";
-import { generateRecoveryCodesBatch, hashRecoveryCode, generateMasterKey, wrapMasterKeyWithRecoveryCode } from "./crypto.js";
+import { generateRecoveryCodesBatch, hashRecoveryCode, generateMasterKey, wrapMasterKeyWithRecoveryCode, exportMasterKeyHex, importMasterKeyHex } from "./crypto.js";
 
 const CONSOLE_API = "https://kontaki-console.vercel.app/api";
 const LOW_CODES_WARNING = 3; // avisa quando restarem <= 3
@@ -32,23 +32,25 @@ async function getAll() {
 // transmitida ao servidor; toda a manipulação dos seus bytes fica
 // encapsulada em crypto.js.
 export async function getOrCreateMasterKey() {
-  const existing = await db.get("settings", "backupMasterKey");
+  const existing = await db.get("settings", "backupMasterKeyHex");
   if (existing && existing.value) {
-    const { logger } = await import("./logger.js");
-    const isRealKey = existing.value instanceof CryptoKey;
-    if (!isRealKey) {
-      logger.error("[getOrCreateMasterKey] valor guardado NÃO é CryptoKey — tipo: " + Object.prototype.toString.call(existing.value));
-    }
-    return existing.value;
+    return importMasterKeyHex(existing.value);
   }
 
+  // Migração: se existir uma entrada antiga (settings.backupMasterKey,
+  // guardada como CryptoKey directo — suporte inconsistente entre
+  // browsers, confirmado em teste real). Não há forma de recuperar bytes
+  // de um valor já corrompido nesse formato; gera-se uma nova. Aceitável
+  // agora (fase de testes); em produção precisaria de aviso ao utilizador
+  // sobre perda de acesso a backups antigos.
   const key = await generateMasterKey();
-  await db.put("settings", { key: "backupMasterKey", value: key });
+  const hex = await exportMasterKeyHex(key);
+  await db.put("settings", { key: "backupMasterKeyHex", value: hex });
   return key;
 }
 
 export async function hasMasterKey() {
-  const existing = await db.get("settings", "backupMasterKey");
+  const existing = await db.get("settings", "backupMasterKeyHex");
   return !!(existing && existing.value);
 }
 
