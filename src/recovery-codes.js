@@ -33,7 +33,14 @@ async function getAll() {
 // encapsulada em crypto.js.
 export async function getOrCreateMasterKey() {
   const existing = await db.get("settings", "backupMasterKey");
-  if (existing && existing.value) return existing.value;
+  if (existing && existing.value) {
+    const { logger } = await import("./logger.js");
+    const isRealKey = existing.value instanceof CryptoKey;
+    if (!isRealKey) {
+      logger.error("[getOrCreateMasterKey] valor guardado NÃO é CryptoKey — tipo: " + Object.prototype.toString.call(existing.value));
+    }
+    return existing.value;
+  }
 
   const key = await generateMasterKey();
   await db.put("settings", { key: "backupMasterKey", value: key });
@@ -157,13 +164,18 @@ export async function triggerPendingSync() {
       }),
     });
     const data = await res.json();
+    const { logger } = await import("./logger.js");
     if (data.success) {
+      logger.info("[recovery] triggerPendingSync OK — wraps enviados: " + ((payload.wraps || []).length));
       await db.put("recoveryBackupState", {
         key: "state", version: payload.version,
         pending: false, lastSync: new Date().toISOString(),
       });
+    } else {
+      logger.warn("[recovery] triggerPendingSync falhou: " + JSON.stringify(data));
     }
   } catch (e) {
-    // Sem rede — fica pending, tenta-se de novo na próxima oportunidade.
+    const { logger } = await import("./logger.js");
+    logger.error("[recovery] triggerPendingSync erro de rede/fetch", e);
   }
 }

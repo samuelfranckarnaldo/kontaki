@@ -119,7 +119,9 @@ export const backupService = {
         }),
       });
     } catch (e) {
-      throw new Error("Sem ligação à internet. Tenta novamente mais tarde.");
+      const { logger } = await import("./logger.js");
+      logger.error("[uploadToConsole] fetch falhou: " + (e.name || "") + " " + (e.message || ""), e);
+      throw new Error("Falha de rede: " + (e.message || e.name || "desconhecida") + ". Ver Últimos erros.");
     }
 
     let result;
@@ -180,7 +182,9 @@ export const backupService = {
         body: JSON.stringify({ storeId: storeId, recoveryHash: recoveryHash }),
       });
     } catch (e) {
-      throw new Error("Sem ligação à internet.");
+      const { logger } = await import("./logger.js");
+      logger.error("[restoreFromConsole] fetch /restore falhou: " + (e.name || "") + " " + (e.message || ""), e);
+      throw new Error("Falha de rede: " + (e.message || e.name || "desconhecida") + ". Ver Últimos erros.");
     }
     let result;
     try { result = await res.json(); }
@@ -201,7 +205,9 @@ export const backupService = {
         headers: { "Authorization": "Bearer " + result.recoveryToken },
       });
     } catch (e) {
-      throw new Error("Sem ligação à internet durante a transferência.");
+      const { logger } = await import("./logger.js");
+      logger.error("[restoreFromConsole] fetch /download falhou: " + (e.name || "") + " " + (e.message || ""), e);
+      throw new Error("Falha de rede durante a transferência: " + (e.message || e.name || "desconhecida") + ". Ver Últimos erros.");
     }
     let backupPayload;
     try { backupPayload = await dlRes.json(); }

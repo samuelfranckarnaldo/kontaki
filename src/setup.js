@@ -316,6 +316,7 @@ function showSetup() {
   }
 
   window._openRestoreFromConsole = function() {
+    try {
     openModal("Restaurar Loja",
       '<div style="font-size:13px;color:#71717a;line-height:1.5;margin-bottom:18px">Introduz o Store ID e um dos teus Recovery Codes para restaurar o backup mais recente enviado ao Kontaki Console.</div>' +
       '<div class="field" style="margin-bottom:14px"><label>Store ID</label><input id="restore-console-storeid" placeholder="STORE-..."/></div>' +
@@ -325,7 +326,16 @@ function showSetup() {
       '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
       '<button class="btn btn-primary btn-full" id="restore-console-submit" onclick="window._submitRestoreFromConsole()"><i data-lucide="shield-check"></i> Restaurar</button>' +
       '</div>');
+    // O overlay do setup usa z-index:9999-10001; o modal partilhado não
+    // define z-index próprio (pensado para a app normal, com stacking
+    // mais baixo) — sem isto, o modal renderiza escondido atrás do setup.
+    var mo = document.getElementById("modal-overlay");
+    if (mo) mo.style.zIndex = "10002";
     refreshIcons(document.getElementById("modal-box"));
+    } catch (e) {
+      toast("Erro ao abrir modal: " + e.message, "error");
+      import("./logger.js").then(function(m) { m.logger.error("[_openRestoreFromConsole] falhou", e); });
+    }
   };
 
   window._submitRestoreFromConsole = async function() {
