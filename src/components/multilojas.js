@@ -1,8 +1,10 @@
 import { db } from "../db.js";
-import { fmt, refreshIcons } from "../utils.js";
+import { fmt, refreshIcons, el } from "../utils.js";
 import { _statCard, _prodAbbrevQty, _prodAbbrevUnit, categoryColor } from "./produtos.js";
 import { openModal, closeModal } from "../modal.js";
 import { toast } from "../toast.js";
+import { openPicker } from "../picker.js";
+import { canOpenWorkspace } from "../license.js";
 
 var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
@@ -114,30 +116,68 @@ function _renderStoreSelector() {
     return;
   }
 
-  var options = '<option value="all"' + (_mlSelectedStoreId === "all" ? ' selected' : '') + '>Todas as lojas</option>' +
-    _mlStoresCache.map(function(s) {
-      return '<option value="' + s.id + '"' + (_mlSelectedStoreId === s.id ? ' selected' : '') + '>' + s.name + '</option>';
-    }).join("");
+  var currentLabel = _mlSelectedStoreId === "all" ? "Todas as lojas" :
+    ((_mlStoresCache.find(function(s) { return s.id === _mlSelectedStoreId; }) || {}).name || "Todas as lojas");
+
+  var storeCountLabel = _mlStoresCache.length + (_mlStoresCache.length === 1 ? " loja ligada" : " lojas ligadas");
 
   wrap.innerHTML =
-    '<div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:10px 12px;margin-bottom:14px">' +
-      '<i data-lucide="store" style="width:16px;height:16px;color:var(--text3);flex-shrink:0"></i>' +
-      '<select onchange="window._mlSelectStore(this.value)" style="flex:1;border:none;outline:none;font-family:inherit;font-size:13px;font-weight:700;color:var(--text);background:transparent;-webkit-appearance:none;appearance:none">' +
-        options +
-      '</select>' +
-      '<i data-lucide="chevron-down" style="width:14px;height:14px;color:var(--text4);flex-shrink:0"></i>' +
-      '<button id="ml-refresh-btn" onclick="window._mlRefreshStores()" title="Atualizar" style="border:none;background:none;padding:2px;cursor:pointer;flex-shrink:0;display:flex;align-items:center">' +
-        '<i data-lucide="refresh-cw" style="width:14px;height:14px;color:var(--text4)"></i>' +
+    '<div style="display:flex;align-items:stretch;gap:10px;margin-bottom:16px;width:100%;box-sizing:border-box">' +
+      '<button class="ml-store-select-btn" style="flex:1 1 auto;min-width:0" onclick="window._mlOpenStorePicker()">' +
+        '<span class="ml-store-select-icon"><i data-lucide="store"></i></span>' +
+        '<span class="ml-store-select-text">' +
+          '<span class="ml-store-select-label">' + currentLabel + '</span>' +
+          '<span class="ml-store-select-sub">' + storeCountLabel + '</span>' +
+        '</span>' +
+        '<i data-lucide="chevron-down" class="ml-store-select-chevron"></i>' +
       '</button>' +
-      '<button onclick="window._mlShowAddStore()" title="Adicionar loja" style="border:none;background:none;padding:2px;cursor:pointer;flex-shrink:0;display:flex;align-items:center">' +
-        '<i data-lucide="plus" style="width:15px;height:15px;color:var(--text4)"></i>' +
-      '</button>' +
-      '<button onclick="window._mlLogout()" title="Sair" style="border:none;background:none;padding:2px;cursor:pointer;flex-shrink:0;display:flex;align-items:center">' +
-        '<i data-lucide="log-out" style="width:15px;height:15px;color:var(--text4)"></i>' +
+      '<button onclick="window._mlOpenStoreMenu()" title="Mais opções" style="flex:0 0 52px;width:52px;box-sizing:border-box;background:var(--primary-light);border:1px solid var(--border2);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;cursor:pointer">' +
+        '<i data-lucide="more-vertical" style="width:20px;height:20px;color:var(--primary)"></i>' +
       '</button>' +
     '</div>';
   refreshIcons(wrap);
 }
+
+// Picker customizado (evita o <select> nativo, que no Android usa o
+// menu suspenso do sistema com fundo escuro, destoando do resto do app).
+window._mlOpenStorePicker = function() {
+  var labels = ["Todas as lojas"].concat(_mlStoresCache.map(function(s) { return s.name; }));
+  var current = _mlSelectedStoreId === "all" ? "Todas as lojas" :
+    ((_mlStoresCache.find(function(s) { return s.id === _mlSelectedStoreId; }) || {}).name || "Todas as lojas");
+  openPicker("Selecionar loja", labels, current, function(val) {
+    if (val === "Todas as lojas") {
+      window._mlSelectStore("all");
+    } else {
+      var match = _mlStoresCache.find(function(s) { return s.name === val; });
+      if (match) window._mlSelectStore(match.id);
+    }
+  });
+};
+
+// Consolida Atualizar/Adicionar/Sair num unico botao "..." — mesmo
+// padrao de "Mais opcoes" ja usado em Equipa, Fornecedores e Estoque.
+window._mlOpenStoreMenu = function() {
+  var items = [
+    { icon: "refresh-cw", label: "Atualizar", desc: "Sincronizar dados das lojas", iconClass: "hist-export-icon--csv", action: "window._mlRefreshStores()" },
+    { icon: "plus", label: "Adicionar loja", desc: "Ligar outra loja a este workspace", iconClass: "hist-export-icon--edit", action: "window._mlShowAddStore()" },
+    { icon: "log-out", label: "Sair", desc: "Terminar sessão do Workspace neste dispositivo", iconClass: "hist-export-icon--cancel", action: "window._mlLogout()" },
+  ];
+  openModal("Mais opções",
+    '<div class="hist-export-options">' +
+    items.map(function(it) {
+      return '<button class="hist-export-option" onclick="window._closeModal();' + it.action + '">' +
+        '<div class="hist-export-icon ' + it.iconClass + '"><i data-lucide="' + it.icon + '"></i></div>' +
+        '<div class="hist-export-info">' +
+        '<div class="hist-export-title">' + it.label + '</div>' +
+        '<div class="hist-export-desc">' + it.desc + '</div>' +
+        '</div>' +
+        '<i data-lucide="chevron-right" class="hist-export-arrow"></i>' +
+        '</button>';
+    }).join("") +
+    '</div>'
+  );
+  refreshIcons(el("modal-box"));
+};
 
 window._mlSwitchTab = function(tab) {
   _mlActiveTab = tab;
@@ -147,6 +187,7 @@ window._mlSwitchTab = function(tab) {
 
 window._mlSelectStore = function(storeId) {
   _mlSelectedStoreId = storeId;
+  _renderStoreSelector();
   _renderContent();
 };
 
@@ -237,6 +278,23 @@ export async function loadMultilojas() {
   var btn = document.getElementById("btn-back-multilojas");
   if (btn) btn.onclick = function() { window._showSubpage(null); };
 
+  // Gate por licença — Multilojas/Workspace é feature Pro (ver license.js canOpenWorkspace)
+  if (!canOpenWorkspace()) {
+    var wrap0 = document.getElementById("multilojas-content");
+    var tabsWrap0 = document.getElementById("multilojas-tabs");
+    var selectorWrap0 = document.getElementById("multilojas-store-selector");
+    if (tabsWrap0) tabsWrap0.innerHTML = "";
+    if (selectorWrap0) selectorWrap0.innerHTML = "";
+    if (wrap0) {
+      wrap0.innerHTML =
+        '<div style="text-align:center;padding:48px 20px;color:#a1a1aa">' +
+        '<div style="font-size:14px;font-weight:600">Funcionalidade Pro</div>' +
+        '<div style="font-size:13px;margin-top:6px">O Multilojas está disponível apenas no plano Pro.</div>' +
+        '</div>';
+    }
+    return;
+  }
+
   var token = await _getWorkspaceToken();
   if (!token) {
     _mlAuthMode = "login";
@@ -275,8 +333,6 @@ function _renderWorkspaceAuthGate() {
   wrap.innerHTML =
     '<div class="ws-auth-wrap"><div class="ws-auth-card">' +
       '<div class="ws-auth-header">' +
-        '<div class="ws-auth-icon"><i data-lucide="store"></i></div>' +
-        '<div class="ws-auth-title">Workspace</div>' +
         '<div class="ws-auth-subtitle">Gere todas as tuas lojas a partir de uma única conta.</div>' +
       '</div>' +
 
@@ -751,13 +807,25 @@ async function _renderEscritorio(wrap) {
     _mlWorkspaceProducts = wsData.products || [];
   }
 
+  var invRes, invData;
+  try {
+    invRes = await _mlAuthFetch("/workspace/" + encodeURIComponent(store.id) + "/inventory-reports");
+    invData = await invRes.json();
+  } catch (e) {
+    invData = null;
+  }
+  _mlInventarioReports = (invData && invData.success) ? (invData.reports || []) : [];
+
   _mlRenderEscritorioContent(wrap, store);
 }
 
+var _mlInventarioReports = [];
+
 var ESCRITORIO_VIEWS = [
-  { key: "turno",     label: "Turno",    desc: "Estado do turno, operador e diferença de caixa", icon: "clipboard-list", iconClass: "hist-export-icon--edit" },
-  { key: "produtos",  label: "Produtos", desc: "Inventário da loja, só leitura",                   icon: "package",        iconStyle: "background:#eff6ff;color:#2563eb" },
-  { key: "catalogo",  label: "Catálogo", desc: "Editar produtos e publicar alterações",           icon: "pencil",         iconClass: "hist-export-icon--csv" },
+  { key: "turno",       label: "Turno",       desc: "Estado do turno, operador e diferença de caixa", icon: "clipboard-list", iconClass: "hist-export-icon--edit" },
+  { key: "produtos",    label: "Produtos",    desc: "Inventário da loja, só leitura",                   icon: "package",        iconStyle: "background:#eff6ff;color:#2563eb" },
+  { key: "catalogo",    label: "Catálogo",    desc: "Editar produtos e publicar alterações",           icon: "pencil",         iconClass: "hist-export-icon--csv" },
+  { key: "inventario",  label: "Inventário Periódico", desc: "Relatórios arquivados de stock + caixa/banco, só leitura", icon: "camera", iconStyle: "background:#f0fdf4;color:#16a34a" },
 ];
 
 function _mlEscritorioViewLabel(key) {
@@ -886,12 +954,112 @@ function _mlProdutosSectionHtml() {
   '</div>';
 }
 
+function _mlInventarioSectionHtml(store) {
+  var reports = _mlInventarioReports || [];
+  var listHtml = reports.length
+    ? '<div style="border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
+      reports.map(function(r) {
+        var date = r.generated_at ? new Date(r.generated_at).toLocaleString("pt-AO") : "—";
+        return '<div onclick="window._mlViewInventoryReport(\'' + r.id + '\')" style="padding:12px;border-bottom:1px solid var(--border2);cursor:pointer;display:flex;justify-content:space-between;align-items:center">' +
+          '<div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text)">' + date + '</div>' +
+            '<div style="font-size:11px;color:var(--text4);margin-top:2px">Caixa ' + fmt(r.cash_balance || 0) + ' · Banco ' + fmt(r.bank_balance || 0) + '</div>' +
+          '</div>' +
+          '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text4)"></i>' +
+        '</div>';
+      }).join("") +
+      '</div>'
+    : '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;text-align:center;font-size:12px;color:var(--text4)">Ainda sem relatórios gerados para esta loja.</div>';
+
+  return '<div>' +
+    '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Inventário Periódico — arquivo</div>' +
+    '<div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">Cada relatório é uma fotografia do stock (loja/armazém) e do saldo de caixa/banco no momento em que foi gerado, com base na última sincronização — não altera nada na loja.</div>' +
+    '<button class="btn btn-primary btn-full" style="margin-bottom:14px" id="ml-inv-gen-btn" onclick="window._mlGenerateInventoryReport()"><i data-lucide="camera"></i> Gerar Relatório Agora</button>' +
+    listHtml +
+  '</div>';
+}
+
+window._mlGenerateInventoryReport = async function() {
+  var btn = document.getElementById("ml-inv-gen-btn");
+  if (btn) { btn.disabled = true; btn.innerHTML = "A gerar…"; }
+  var res, data;
+  try {
+    res = await _mlAuthFetch("/workspace/" + encodeURIComponent(_mlEscritorioStoreId) + "/inventory-report", { method: "POST" });
+    data = await res.json();
+  } catch (e) {
+    toast("Sem ligação à internet.", "error");
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="camera"></i> Gerar Relatório Agora'; }
+    return;
+  }
+  if (res.status === 401) { loadMultilojas(); return; }
+  if (!res.ok || !data || !data.success) {
+    toast((data && data.error) || "Erro ao gerar relatório.", "error");
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="camera"></i> Gerar Relatório Agora'; }
+    return;
+  }
+  toast("Relatório gerado.", "success");
+  await _mlReloadInventarioReports();
+};
+
+async function _mlReloadInventarioReports() {
+  var res, data;
+  try {
+    res = await _mlAuthFetch("/workspace/" + encodeURIComponent(_mlEscritorioStoreId) + "/inventory-reports");
+    data = await res.json();
+  } catch (e) { return; }
+  if (!res.ok || !data || !data.success) return;
+  _mlInventarioReports = data.reports || [];
+  var wrap = document.getElementById("multilojas-content");
+  if (wrap && _mlEscritorioView === "inventario") {
+    _mlRenderEscritorioContent(wrap, (_mlStoresCache || []).find(function(s) { return s.id === _mlEscritorioStoreId; }));
+  }
+}
+
+window._mlViewInventoryReport = async function(reportId) {
+  var res, data;
+  try {
+    res = await _mlAuthFetch("/workspace/" + encodeURIComponent(_mlEscritorioStoreId) + "/inventory-reports/" + encodeURIComponent(reportId));
+    data = await res.json();
+  } catch (e) { toast("Sem ligação à internet.", "error"); return; }
+  if (res.status === 401) { loadMultilojas(); return; }
+  if (!res.ok || !data || !data.success) { toast((data && data.error) || "Erro ao carregar relatório.", "error"); return; }
+
+  var r = data.report;
+  var date = r.generated_at ? new Date(r.generated_at).toLocaleString("pt-AO") : "—";
+  var syncedAs = r.synced_as_of ? new Date(r.synced_as_of).toLocaleString("pt-AO") : "—";
+  var products = r.products || [];
+
+  var rowsHtml = products.length
+    ? products.map(function(p) {
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center">' +
+          '<div style="font-size:12.5px;font-weight:600;color:var(--text)">' + p.name + '</div>' +
+          '<div style="font-size:12px;color:var(--text3)">Loja ' + (p.stock || 0) + ' · Arm. ' + (p.warehouseStock || 0) + ' ' + (p.unit || "") + '</div>' +
+        '</div>';
+      }).join("")
+    : '<div style="font-size:12px;color:var(--text4);text-align:center;padding:12px">Sem produtos neste relatório.</div>';
+
+  openModal("Relatório de Inventário",
+    '<div style="font-size:11.5px;color:var(--text4);margin-bottom:4px">Gerado em ' + date + '</div>' +
+    '<div style="font-size:11px;color:var(--text4);margin-bottom:14px">Dados sincronizados até ' + syncedAs + '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">' +
+      _mlTurnoBox("Caixa", fmt(r.cash_balance || 0)) +
+      _mlTurnoBox("Banco", fmt(r.bank_balance || 0)) +
+    '</div>' +
+    '<div style="font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Produtos (' + products.length + ')</div>' +
+    '<div style="max-height:50vh;overflow-y:auto">' + rowsHtml + '</div>' +
+    '<button class="btn btn-ghost btn-full" style="margin-top:14px" onclick="window._closeModal ? window._closeModal() : null">Fechar</button>'
+  );
+  refreshIcons(document.getElementById("modal-box") || document.body);
+};
+
 function _mlRenderEscritorioContent(wrap, store) {
   var sectionHtml;
   if (_mlEscritorioView === "turno") {
     sectionHtml = _mlTurnoSectionHtml(store);
   } else if (_mlEscritorioView === "produtos") {
     sectionHtml = _mlProdutosSectionHtml();
+  } else if (_mlEscritorioView === "inventario") {
+    sectionHtml = _mlInventarioSectionHtml(store);
   } else {
     sectionHtml = '<div id="ml-workspace-section">' + _mlWorkspaceSectionHtml() + '</div>';
   }
@@ -1312,8 +1480,8 @@ async function _renderResumoAgregado(wrap) {
     '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px 12px 8px;margin-bottom:20px;height:200px"><canvas id="ml-trend-canvas"></canvas></div>' +
 
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px">' +
-      _statCard({ label: "Total geral", value: fmt(data.grandTotal), sub: "últimos 30 dias", color: "var(--bg)", iconColor: "var(--text3)", icon: "banknote" }) +
-      _statCard({ label: "Lojas ativas", value: data.storeCount, sub: "na empresa", color: "var(--bg)", iconColor: "var(--text3)", icon: "store" }) +
+      _statCard({ label: "Total geral", value: fmt(data.grandTotal), sub: "últimos 30 dias", color: "var(--primary)", icon: "banknote" }) +
+      _statCard({ label: "Lojas ativas", value: data.storeCount, sub: "na empresa", color: "var(--info,#2563eb)", icon: "store" }) +
     '</div>' +
 
     _liveStatusHtml() +

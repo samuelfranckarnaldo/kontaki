@@ -23,6 +23,7 @@ export async function runFullSyncCycle() {
     await syncSales();
     await syncProducts();
     await syncIncidents();
+    await syncBalances();
     await syncSessions();
     await syncAuditLog();
     await syncWorkspaceCatalog();
@@ -367,6 +368,50 @@ export async function syncIncidents() {
     logger.info("[sync] syncIncidents OK: status=" + res.status);
   } catch (e) {
     logger.error("[sync] syncIncidents erro de rede/execução", e);
+  }
+}
+
+// ── SINCRONIZAÇÃO DE SALDOS (Caixa 45 / Banco 43) ────────────────────────
+// Envia só os dois saldos calculados, nunca o razão contabilístico
+// completo — o Workspace usa isto para o relatório de Inventário
+// Periódico (leitura, snapshot da última sincronização).
+export async function syncBalances() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+
+  try {
+    var storeId = await getStoreId();
+    var licenseCode = await getLicenseCode();
+    if (!storeId || !licenseCode) {
+      logger.warn("[sync] syncBalances abortado: storeId ou licenseCode em falta");
+      return;
+    }
+
+    var pgcMod = await import("./pgc.js");
+    var cashBalance = await pgcMod.getAccountBalance("45");
+    var bankBalance = await pgcMod.getAccountBalance("43");
+
+    var deviceId = await getDeviceId();
+
+    var res = await fetch(CONSOLE_API + "/sync/balances", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        storeId: storeId,
+        licenseCode: licenseCode,
+        deviceId: deviceId,
+        cashBalance: cashBalance,
+        bankBalance: bankBalance,
+      }),
+    });
+
+    var resBody = await res.text();
+    if (!res.ok) {
+      logger.error("[sync] syncBalances falhou: status=" + res.status + " body=" + resBody.slice(0, 300));
+      return;
+    }
+    logger.info("[sync] syncBalances OK: caixa=" + cashBalance + " banco=" + bankBalance);
+  } catch (e) {
+    logger.error("[sync] syncBalances erro de rede/execução", e);
   }
 }
 
