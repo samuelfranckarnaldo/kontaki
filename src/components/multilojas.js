@@ -850,12 +850,15 @@ async function _renderEscritorio(wrap) {
 
 var _mlInventarioReports = [];
 var _mlEscritorioBalances = { cash: null, bank: null };
+var _mlHistoricoTurnos = [];
+var _mlHistoricoTurnosLoading = false;
 
 var ESCRITORIO_VIEWS = [
   { key: "turno",       label: "Turno",       desc: "Estado do turno, operador e diferença de caixa", icon: "clipboard-list", iconClass: "hist-export-icon--edit" },
   { key: "produtos",    label: "Produtos",    desc: "Inventário da loja, só leitura",                   icon: "package",        iconStyle: "background:#eff6ff;color:#2563eb" },
   { key: "catalogo",    label: "Catálogo",    desc: "Editar produtos e publicar alterações",           icon: "pencil",         iconClass: "hist-export-icon--csv" },
   { key: "inventario",  label: "Inventário Periódico", desc: "Relatórios arquivados de stock + caixa/banco, só leitura", icon: "clipboard-list", iconStyle: "background:#f0fdf4;color:#16a34a" },
+  { key: "historico_turnos", label: "Histórico de Turnos", desc: "Turnos sincronizados: stock declarado e incidentes, só leitura", icon: "history", iconStyle: "background:#faf5ff;color:#7c3aed" },
 ];
 
 function _mlEscritorioViewLabel(key) {
@@ -887,6 +890,7 @@ window._mlSelectEscritorioView = function(key) {
   closeModal();
   var wrap = document.getElementById("multilojas-content");
   if (wrap) _mlRenderEscritorioContent(wrap, (_mlStoresCache || []).find(function(s) { return s.id === _mlEscritorioStoreId; }));
+  if (key === "historico_turnos" && _mlHistoricoTurnos.length === 0) _mlLoadHistoricoTurnos();
 };
 
 function _mlEscritorioPickerHtml() {
@@ -1269,6 +1273,108 @@ window._mlViewInventoryReport = async function(reportId) {
   refreshIcons(document.getElementById("modal-box") || document.body);
 };
 
+function _mlHistoricoTurnosSectionHtml() {
+  var sessions = _mlHistoricoTurnos || [];
+  var listHtml = sessions.length
+    ? '<div style="border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
+      sessions.map(function(s) {
+        var opened = s.opened_at ? new Date(s.opened_at).toLocaleString("pt-AO") : "—";
+        var closedLabel = s.status === "open" ? "Aberto" : (s.closed_at ? new Date(s.closed_at).toLocaleString("pt-AO") : "—");
+        var incBadge = (s.has_incidents) ? '<span style="color:#dc2626;font-weight:700">⚠</span> ' : "";
+        return '<div onclick="window._mlViewTurnoDetail(\'' + s.id + '\')" style="padding:12px;border-bottom:1px solid var(--border2);cursor:pointer;display:flex;justify-content:space-between;align-items:center">' +
+          '<div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text)">' + incBadge + (s.user_name || "—") + '</div>' +
+            '<div style="font-size:11px;color:var(--text4);margin-top:2px">' + opened + ' → ' + closedLabel + '</div>' +
+            '<div style="font-size:11.5px;color:var(--text3);margin-top:2px">' + fmt(s.total_vendas || 0) + ' · ' + (s.n_vendas || 0) + ' vendas' + (s.cash_diff ? ' · Dif. caixa ' + (s.cash_diff > 0 ? "+" : "") + fmt(s.cash_diff) : "") + '</div>' +
+          '</div>' +
+          '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text4)"></i>' +
+        '</div>';
+      }).join("") +
+      '</div>'
+    : (_mlHistoricoTurnosLoading
+        ? '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>'
+        : '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;text-align:center;font-size:12px;color:var(--text4)">Sem turnos sincronizados ainda.</div>');
+
+  return '<div>' +
+    '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Histórico de Turnos</div>' +
+    '<div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">Turnos sincronizam sozinhos ao abrir/fechar — esta lista mostra o que já chegou ao Console, sem precisares de gerar nada.</div>' +
+    listHtml +
+  '</div>';
+}
+
+async function _mlLoadHistoricoTurnos() {
+  _mlHistoricoTurnosLoading = true;
+  var res, data;
+  try {
+    res = await _mlAuthFetch("/workspace/" + encodeURIComponent(_mlEscritorioStoreId) + "/sessions?limit=30");
+    data = await res.json();
+  } catch (e) { _mlHistoricoTurnosLoading = false; return; }
+  _mlHistoricoTurnosLoading = false;
+  if (!res.ok || !data || !data.success) return;
+  _mlHistoricoTurnos = data.sessions || [];
+  var wrap = document.getElementById("multilojas-content");
+  if (wrap && _mlEscritorioView === "historico_turnos") {
+    _mlRenderEscritorioContent(wrap, (_mlStoresCache || []).find(function(s) { return s.id === _mlEscritorioStoreId; }));
+  }
+}
+
+window._mlViewTurnoDetail = async function(sessionId) {
+  var res, data;
+  try {
+    res = await _mlAuthFetch("/workspace/" + encodeURIComponent(_mlEscritorioStoreId) + "/sessions/" + encodeURIComponent(sessionId));
+    data = await res.json();
+  } catch (e) { toast("Sem ligação à internet.", "error"); return; }
+  if (res.status === 401) { loadMultilojas(); return; }
+  if (!res.ok || !data || !data.success) { toast((data && data.error) || "Erro ao carregar turno.", "error"); return; }
+
+  var s = data.session;
+  var incidents = data.incidents || [];
+  var opened = s.opened_at ? new Date(s.opened_at).toLocaleString("pt-AO") : "—";
+  var closedLabel = s.status === "open" ? "Aberto" : (s.closed_at ? new Date(s.closed_at).toLocaleString("pt-AO") : "—");
+
+  var stockRows = Object.values(s.stock_esperado || {});
+  var stockHtml = stockRows.length
+    ? '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 8px">Stock Declarado</div>' +
+      '<div style="background:#fff;border-radius:10px;border:1px solid #f4f4f5;overflow:hidden">' +
+      '<div style="display:grid;grid-template-columns:1fr 60px 60px 60px;padding:8px 12px;background:#f4f4f5;font-size:10px;font-weight:700;color:#71717a;text-transform:uppercase">' +
+      '<span>Produto</span><span style="text-align:center">Recebeu</span><span style="text-align:center">Vendeu</span><span style="text-align:right">Esperado</span></div>' +
+      stockRows.map(function(r) {
+        var color = r.expected < 0 ? "#dc2626" : r.expected < 2 ? "#d97706" : "#16a34a";
+        return '<div style="display:grid;grid-template-columns:1fr 60px 60px 60px;padding:9px 12px;border-top:1px solid #f4f4f5;align-items:center">' +
+          '<span style="font-size:13px;font-weight:600">' + r.productName + '</span>' +
+          '<span style="text-align:center;font-size:13px;color:#71717a">' + r.received + '</span>' +
+          '<span style="text-align:center;font-size:13px;color:#dc2626">' + r.sold + '</span>' +
+          '<span style="text-align:right;font-size:13px;font-weight:700;color:' + color + '">' + r.expected + '</span>' +
+          '</div>';
+      }).join("") + '</div>'
+    : '';
+
+  var incHtml = incidents.length
+    ? '<div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.4px;margin:14px 0 8px">⚠ Incidentes (' + incidents.length + ')</div>' +
+      incidents.map(function(i) {
+        return '<div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:10px;padding:10px;margin-bottom:6px">' +
+          '<div style="font-size:13px;font-weight:700;color:#dc2626">' + (i.product_name || (i.type === "stock" ? "Produto" : "Numerário (Caixa)")) + '</div>' +
+          '<div style="font-size:12px;color:#71717a;margin-top:4px">Esperado: <strong>' + i.expected + '</strong> · Encontrado: <strong>' + i.found + '</strong> · Dif: <strong style="color:#dc2626">' + (i.diff > 0 ? "+" : "") + i.diff + '</strong></div>' +
+          '</div>';
+      }).join("")
+    : '';
+
+  openModal("Turno — " + (s.user_name || "—"),
+    '<div style="background:linear-gradient(135deg,#7c3aed,#5b21b6);border-radius:12px;padding:14px;margin-bottom:12px;color:#fff">' +
+      '<div style="font-size:14px;font-weight:700">' + (s.user_name || "—") + '</div>' +
+      '<div style="font-size:11.5px;opacity:.85;margin-top:2px">' + opened + ' → ' + closedLabel + '</div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">' +
+      _mlTurnoBox("Total Vendido", fmt(s.total_vendas || 0), "#16a34a") +
+      _mlTurnoBox("Incidentes", String(incidents.length), incidents.length ? "#dc2626" : "var(--text)") +
+    '</div>' +
+    stockHtml +
+    incHtml +
+    '<button class="btn btn-ghost btn-full" style="margin-top:14px" onclick="window._closeModal ? window._closeModal() : null">Fechar</button>'
+  );
+  refreshIcons(document.getElementById("modal-box") || document.body);
+};
+
 function _mlRenderEscritorioContent(wrap, store) {
   var sectionHtml;
   if (_mlEscritorioView === "turno") {
@@ -1277,6 +1383,8 @@ function _mlRenderEscritorioContent(wrap, store) {
     sectionHtml = _mlProdutosSectionHtml();
   } else if (_mlEscritorioView === "inventario") {
     sectionHtml = _mlInventarioSectionHtml(store);
+  } else if (_mlEscritorioView === "historico_turnos") {
+    sectionHtml = _mlHistoricoTurnosSectionHtml();
   } else {
     sectionHtml = '<div id="ml-workspace-section">' + _mlWorkspaceSectionHtml() + '</div>';
   }

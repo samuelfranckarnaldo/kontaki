@@ -530,6 +530,8 @@ export async function syncSessions() {
             cashExpected: s.cashExpected,
             cashCounted: s.cashCounted,
             cashDiff: s.cashDiff,
+            stockRecebido: s.stockRecebido || {},
+            stockEsperado: s.stockEsperado || {},
           };
         }),
       }),
