@@ -1118,6 +1118,7 @@ var _mlInventarioReports = [];
 var _mlEscritorioBalances = { cash: null, bank: null };
 var _mlHistoricoTurnos = [];
 var _mlHistoricoTurnosLoading = false;
+var _mlRegistosAllEntries = [];
 
 var ESCRITORIO_VIEWS = [
   { key: "turno",       label: "Turno",       desc: "Estado do turno, operador e diferença de caixa", icon: "clipboard-list", iconClass: "hist-export-icon--edit" },
@@ -1970,6 +1971,27 @@ var ENTITY_LABELS = {
   incident: "incidente", treasury: "movimento de tesouraria",
 };
 
+var REGISTO_CATEGORIES = [
+  { key: "all",         label: "Todos" },
+  { key: "session",     label: "Turno" },
+  { key: "treasury",    label: "Tesouraria" },
+  { key: "product",     label: "Produtos" },
+  { key: "incident",    label: "Incidentes" },
+];
+
+var _mlRegistosFilter = "all";
+
+function _mlFormatDateHeader(isoDate) {
+  var d = new Date(isoDate);
+  var today = new Date();
+  var yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  var sameDay = function(a, b) { return a.toDateString() === b.toDateString(); };
+  if (sameDay(d, today)) return "Hoje";
+  if (sameDay(d, yesterday)) return "Ontem";
+  return d.toLocaleDateString("pt-AO", { day: "2-digit", month: "long", year: "numeric" });
+}
+
 function _mlAuditDetail(a) {
   var entityLabel = ENTITY_LABELS[a.entityType] || a.entityType || "registo";
   var capitalized = entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1);
@@ -1999,8 +2021,10 @@ async function _fetchRealAuditLog() {
         storeName: a.storeName,
         operator: a.userName || "—",
         action: a.action,
+        entityType: a.entityType,
         detail: _mlAuditDetail(a),
         when: _relativeTime(a.createdAt),
+        createdAt: a.createdAt,
       };
     });
   } catch (e) {
@@ -2048,37 +2072,76 @@ async function _renderRegistos(wrap) {
     return;
   }
 
-  var entries = _mlSelectedStoreId === "all"
+  var storeEntries = _mlSelectedStoreId === "all"
     ? allEntries
     : allEntries.filter(function(e) { return e.storeId === _mlSelectedStoreId; });
+
+  _mlRegistosAllEntries = storeEntries;
+  _mlRenderRegistosList(wrap);
+}
+
+function _mlRenderRegistosList(wrap) {
+  var storeEntries = _mlRegistosAllEntries || [];
+  var entries = _mlRegistosFilter === "all"
+    ? storeEntries
+    : storeEntries.filter(function(e) { return e.entityType === _mlRegistosFilter; });
+
+  var chipsHtml = '<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px">' +
+    REGISTO_CATEGORIES.map(function(c) {
+      var active = _mlRegistosFilter === c.key;
+      return '<button onclick="window._mlSetRegistosFilter(\'' + c.key + '\')" style="flex-shrink:0;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;border:1.5px solid ' + (active ? "var(--primary,#5b21b6)" : "#e4e4e7") + ';background:' + (active ? "var(--primary,#5b21b6)" : "#fff") + ';color:' + (active ? "#fff" : "var(--text3)") + '">' + c.label + '</button>';
+    }).join("") +
+  '</div>';
+
+  var groups = [];
+  var groupsByDay = {};
+  entries.forEach(function(e) {
+    var dayKey = e.createdAt ? new Date(e.createdAt).toDateString() : "—";
+    if (!groupsByDay[dayKey]) {
+      groupsByDay[dayKey] = { header: e.createdAt ? _mlFormatDateHeader(e.createdAt) : "—", items: [] };
+      groups.push(groupsByDay[dayKey]);
+    }
+    groupsByDay[dayKey].items.push(e);
+  });
+
+  var listHtml = groups.length
+    ? groups.map(function(g) {
+        return '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin:16px 0 6px">' + g.header + '</div>' +
+          '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
+          g.items.map(function(e, i) {
+            var meta = ACTION_META[e.action] || { label: e.action || "alterou", icon: "circle", color: "var(--text3)" };
+            return '<div style="display:flex;gap:10px;padding:12px 14px;' + (i < g.items.length - 1 ? 'border-bottom:1px solid #f4f4f5;' : '') + '">' +
+              '<i data-lucide="' + meta.icon + '" style="width:15px;height:15px;color:' + meta.color + ';flex-shrink:0;margin-top:1px"></i>' +
+              '<div style="flex:1;min-width:0">' +
+                '<div style="font-size:12.5px;color:var(--text2);margin-bottom:2px">' +
+                  '<span style="font-weight:700;color:var(--text)">' + e.operator + '</span> ' + meta.label +
+                  (_mlSelectedStoreId === "all" ? ' em <span style="font-weight:600">' + e.storeName + '</span>' : '') +
+                '</div>' +
+                '<div style="font-size:11.5px;color:var(--text3)">' + e.detail + '</div>' +
+              '</div>' +
+              '<span style="font-size:10px;color:var(--text4);white-space:nowrap;flex-shrink:0">' + e.when + '</span>' +
+            '</div>';
+          }).join("") +
+          '</div>';
+      }).join("")
+    : '<div class="empty-state"><div class="empty-state-title">Sem registos</div></div>';
 
   wrap.innerHTML =
     '<div style="margin-bottom:14px">' +
       '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px">Registos</div>' +
       '<div style="font-size:11px;color:var(--text4)">Auditoria de alterações, dados reais</div>' +
     '</div>' +
-
-    (entries.length
-      ? '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
-        entries.map(function(e, i) {
-          var meta = ACTION_META[e.action] || { label: e.action || "alterou", icon: "circle", color: "var(--text3)" };
-          return '<div style="display:flex;gap:10px;padding:12px 14px;' + (i < entries.length - 1 ? 'border-bottom:1px solid #f4f4f5;' : '') + '">' +
-            '<i data-lucide="' + meta.icon + '" style="width:15px;height:15px;color:' + meta.color + ';flex-shrink:0;margin-top:1px"></i>' +
-            '<div style="flex:1;min-width:0">' +
-              '<div style="font-size:12.5px;color:var(--text2);margin-bottom:2px">' +
-                '<span style="font-weight:700;color:var(--text)">' + e.operator + '</span> ' + meta.label +
-                (_mlSelectedStoreId === "all" ? ' em <span style="font-weight:600">' + e.storeName + '</span>' : '') +
-              '</div>' +
-              '<div style="font-size:11.5px;color:var(--text3)">' + e.detail + '</div>' +
-            '</div>' +
-            '<span style="font-size:10px;color:var(--text4);white-space:nowrap;flex-shrink:0">' + e.when + '</span>' +
-          '</div>';
-        }).join("") +
-        '</div>'
-      : '<div class="empty-state"><div class="empty-state-title">Sem registos</div></div>');
+    chipsHtml +
+    listHtml;
 
   refreshIcons(wrap);
 }
+
+window._mlSetRegistosFilter = function(key) {
+  _mlRegistosFilter = key;
+  var wrap = document.getElementById("multilojas-content");
+  if (wrap) _mlRenderRegistosList(wrap);
+};
 
 // ── RESUMO — TODAS AS LOJAS ────────────────────────────────────────────
 
