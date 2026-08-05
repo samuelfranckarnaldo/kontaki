@@ -41,3 +41,5 @@ rejeitada também fazia sentido nalgum critério.
 | 0004 | Assinatura Assimétrica de Convites | Aceite | `adrs/ADR-0004-assinatura-convites.md` |
 | 0005 | Identidade e Integridade do Payload `.ktk` | Proposta | `adrs/ADR-0005-identidade-integridade-ktk.md` |
 | 0006 | Movimento como Unidade de Sincronização | Proposta | `adrs/ADR-0006-movimento-unidade-sincronizacao.md` |
+| 0007 | Assinatura de Respostas de Licenciamento | Aceite | `adrs/ADR-0007-assinatura-respostas-licenca.md` |
+| 0008 | Backup Cifrado e Recuperação via Recovery Code | Aceite | `adrs/ADR-0008-backup-cifrado-recuperacao.md` |

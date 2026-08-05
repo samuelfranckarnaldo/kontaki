@@ -90,6 +90,12 @@ Defesa em profundidade adicional (assinatura de resposta do Console,
 para que o cliente não confie cegamente mesmo que TLS falhe) é
 mitigação de hardening, não fundamental para o modelo de ameaça em si.
 
+**Mitigação aplicada (parcial):** assinatura ECDSA P-256 de
+`/verify` e `/activate`, com nonce anti-replay — ver
+`adrs/ADR-0007-assinatura-respostas-licenca.md`. Mensagens
+bloqueantes (`/messages`) e `/sync` permanecem sem assinatura,
+faseamento deliberado (ver Não-decisões do ADR-0007).
+
 ---
 
 ## Cenário 5 — Compromisso do lado do servidor (Supabase, Console)
@@ -198,13 +204,14 @@ token de reset não verificado contra nenhum valor gerado pelo
 servidor), e não existe ainda um endpoint que consuma esse token para
 efetivamente resetar um PIN.
 
-**Dentro do modelo de ameaça**, mas de baixo risco enquanto o fluxo
-permanecer desacoplado do cliente (hoje, "Esqueci o PIN" no Kontaki
-não chama nenhuma API). Mitigação esperada, obrigatória **antes** de
-qualquer trabalho que ligue este endpoint ao reset real: validação de
-posse de loja, geração e comparação de token do lado do servidor
-(nunca aceite do cliente sem verificação), identificadores não
-enumeráveis, e o endpoint de aplicação do reset que hoje não existe.
+**Dentro do modelo de ameaça.** As garantias exigidas aqui —
+validação de posse de loja, token gerado e comparado do lado do
+servidor, identificadores não enumeráveis — foram implementadas ao
+estender o mecanismo de Recovery Code para também autorizar restauro
+de backup. Ver `adrs/ADR-0008-backup-cifrado-recuperacao.md`. O
+"Esqueci o PIN" local (redimir código offline, sem tocar no Console)
+continua distinto e inalterado — este cenário cobre especificamente o
+fluxo que envolve o servidor.
 
 ---
 
@@ -256,6 +263,14 @@ seja pequena na prática, e comunicar claramente ao utilizador (na
 própria app, não só nos termos de uso) quando o último backup foi
 feito — para que a decisão de "correr risco sem backup" seja
 informada, não acidental.
+
+**Mitigação aplicada:** backup cifrado (zero-knowledge para o
+Console), com upload automático disparado por eventos de negócio
+(abrir/fechar turno) mais um fallback de 4h, e restauro completo num
+dispositivo novo via Store ID + Recovery Code. Ver
+`adrs/ADR-0008-backup-cifrado-recuperacao.md`. Pendente: comunicação
+explícita na UI de quando foi feito o último backup (hoje só visível
+via logs).
 
 ---
 
