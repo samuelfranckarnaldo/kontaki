@@ -525,6 +525,10 @@ window._estoqueAddProduct = async () => {
 };
 
 window._estComprar = async () => {
+  if (!hasPermission(getUser(), "editar_compras")) {
+    toast("Não tens permissão para registar compras.", "error");
+    return;
+  }
   const mod = await import("./fornecedores.js");
   mod.openCompraForm();
 };
@@ -532,6 +536,10 @@ window._estComprar = async () => {
 let _invDraft = {};
 
 window._estInventario = async () => {
+  if (!hasPermission(getUser(), "ajustar_stock")) {
+    toast("Não tens permissão para o inventário periódico.", "error");
+    return;
+  }
   const licMod = await import("../license.js");
   if (!licMod.hasFeature("inventario_periodico")) {
     licMod.showUpgradeBanner("Inventário periódico disponível a partir do plano Standard. Contacta a Introxeer para upgrade.");
@@ -641,6 +649,10 @@ window._estInvConfirm = async () => {
 };
 
 window._estGoToIncidents = () => {
+  if (!hasPermission(getUser(), "resolver_incidentes")) {
+    toast("Não tens permissão para ver incidentes de stock.", "error");
+    return;
+  }
   window._closeEstoque();
   window._perfilNav("incidentes").then(() => {
     if (window._setIncFilter) window._setIncFilter("type", "stock");
@@ -648,12 +660,22 @@ window._estGoToIncidents = () => {
 };
 
 window._estOpenMoreMenu = () => {
-  const items = [
-    { icon: "package-plus", label: "Comprar", desc: "Registar nova compra e actualizar stock", iconClass: "hist-export-icon--csv", action: "window._estComprar()" },
-    { icon: "clipboard-list", label: "Inventário Periódico", desc: "Recontar o catálogo e apanhar divergências", iconClass: "hist-export-icon--edit", action: "window._estInventario()" },
-    { icon: "alert-triangle", label: "Incidentes de Stock", desc: "Divergências à espera de revisão de admin", iconClass: "hist-export-icon--pdf", action: "window._estGoToIncidents()" },
-    { icon: "bar-chart-3", label: "Relatórios", desc: "Parados, rotatividade e análise ABC", iconClass: "hist-export-icon--cancel", action: "window._estOpenReports()" },
+  const user = getUser();
+  const allItems = [
+    { icon: "package-plus", label: "Comprar", desc: "Registar nova compra e actualizar stock", iconClass: "hist-export-icon--csv", action: "window._estComprar()", perm: "editar_compras" },
+    { icon: "clipboard-list", label: "Inventário Periódico", desc: "Recontar o catálogo e apanhar divergências", iconClass: "hist-export-icon--edit", action: "window._estInventario()", perm: "ajustar_stock" },
+    { icon: "alert-triangle", label: "Incidentes de Stock", desc: "Divergências à espera de revisão de admin", iconClass: "hist-export-icon--pdf", action: "window._estGoToIncidents()", perm: "resolver_incidentes" },
+    { icon: "bar-chart-3", label: "Relatórios", desc: "Parados, rotatividade e análise ABC", iconClass: "hist-export-icon--cancel", action: "window._estOpenReports()", perm: "ver_custos_margem" },
   ];
+  // Cada ferramenta só aparece se o utilizador tiver a permissão
+  // correspondente — antes qualquer caixa via as 4 opções, independente
+  // de quais permissões o admin lhe tinha realmente concedido.
+  const items = allItems.filter(function(it) { return hasPermission(user, it.perm); });
+
+  if (!items.length) {
+    toast("Não tens permissão para nenhuma destas ferramentas.", "info");
+    return;
+  }
   openModal("Mais opções",
     '<div class="hist-export-options">' +
     items.map(function(it) {
@@ -672,6 +694,10 @@ window._estOpenMoreMenu = () => {
 };
 
 window._estOpenReports = async () => {
+  if (!hasPermission(getUser(), "ver_custos_margem")) {
+    toast("Não tens permissão para ver relatórios de stock.", "error");
+    return;
+  }
   const licMod = await import("../license.js");
   if (!licMod.hasFeature("relatorios_estoque")) {
     licMod.showUpgradeBanner("Relatórios de stock disponíveis a partir do plano Standard. Contacta a Introxeer para upgrade.");
