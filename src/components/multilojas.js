@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { fmt, refreshIcons, el } from "../utils.js";
 import { _statCard, _prodAbbrevQty, _prodAbbrevUnit, categoryColor } from "./produtos.js";
-import { openModal, closeModal } from "../modal.js";
+import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { toast } from "../toast.js";
 import { openPicker } from "../picker.js";
 import { canOpenWorkspace } from "../license.js";
@@ -209,8 +209,11 @@ window._mlOpenStoreMenu = function() {
   var items = [
     { icon: "refresh-cw", label: "Atualizar", desc: "Sincronizar dados das lojas", iconClass: "hist-export-icon--csv", action: "window._mlRefreshStores()" },
     { icon: "plus", label: "Adicionar loja", desc: "Ligar outra loja a este workspace", iconClass: "hist-export-icon--edit", action: "window._mlShowAddStore()" },
-    { icon: "log-out", label: "Sair", desc: "Terminar sessão do Workspace neste dispositivo", iconClass: "hist-export-icon--cancel", action: "window._mlLogout()" },
   ];
+  if (_mlStoresCache && _mlStoresCache.length) {
+    items.push({ icon: "unlink", label: "Remover loja", desc: "Desligar uma loja deste workspace", iconClass: "hist-export-icon--cancel", action: "window._mlShowRemoveStorePicker()" });
+  }
+  items.push({ icon: "log-out", label: "Sair", desc: "Terminar sessão do Workspace neste dispositivo", iconClass: "hist-export-icon--cancel", action: "window._mlLogout()" });
   openModal("Mais opções",
     '<div class="hist-export-options">' +
     items.map(function(it) {
@@ -234,6 +237,56 @@ window._mlSwitchTab = function(tab) {
   _mlSavePref("activeTab", tab);
   _renderTabs();
   _renderContent();
+};
+
+window._mlShowRemoveStorePicker = function() {
+  var stores = _mlStoresCache || [];
+  var body = '<div style="font-size:12.5px;color:var(--text3);margin-bottom:14px;line-height:1.5">Escolhe a loja a desligar deste workspace. A loja deixa de partilhar dados aqui, mas o histórico já sincronizado é mantido.</div>' +
+    '<div style="display:flex;flex-direction:column;gap:8px">' +
+    stores.map(function(s) {
+      return '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg);border-radius:var(--radius-sm);padding:10px 12px">' +
+        '<span style="font-size:13px;font-weight:600;color:var(--text)">' + s.name + '</span>' +
+        '<button onclick="window._mlConfirmRemoveStore(\'' + s.id + '\', \'' + s.name.replace(/'/g, "\\'") + '\')" style="border:none;background:none;color:#dc2626;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;padding:4px 8px">Remover</button>' +
+      '</div>';
+    }).join("") +
+    '</div>';
+  openModal("Remover loja", body);
+  refreshIcons(el("modal-box"));
+};
+
+window._mlConfirmRemoveStore = function(storeId, storeName) {
+  confirmDialog(
+    "Tens a certeza que queres desligar <strong>" + storeName + "</strong> deste workspace? A loja deixa de partilhar dados aqui até seres ligado de novo.",
+    function() { window._mlDoRemoveStore(storeId); },
+    { title: "Remover loja", confirmText: "Remover", danger: true, icon: "unlink" }
+  );
+};
+
+window._mlDoRemoveStore = async function(storeId) {
+  try {
+    var res = await _mlAuthFetch("/workspace-auth/unlink-by-owner", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storeId: storeId }),
+    });
+    var data = await res.json().catch(function() { return {}; });
+    if (!res.ok || !data.success) {
+      toast((data && data.error) || "Erro ao remover loja.", "error");
+      return;
+    }
+    closeModal();
+    toast("Loja removida do workspace.", "success");
+    if (_mlSelectedStoreId === storeId) {
+      _mlSelectedStoreId = "all";
+      _mlSavePref("selectedStoreId", "all");
+    }
+    _mlCache = {};
+    await _loadStoresList();
+    _renderStoreSelector();
+    await _renderContent();
+  } catch (e) {
+    toast("Sem ligação à internet.", "error");
+  }
 };
 
 window._mlSelectStore = function(storeId) {
