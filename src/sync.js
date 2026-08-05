@@ -372,6 +372,7 @@ export async function syncIncidents() {
             status: inc.status || "open",
             note: inc.note || null,
             sessionId: inc.sessionId || null,
+            responsibleSessionId: inc.responsibleSessionId || null,
             createdAt: inc.createdAt,
             resolvedAt: inc.resolvedAt || null,
             archived: !!inc.archived,
