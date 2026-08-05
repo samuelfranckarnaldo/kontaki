@@ -194,6 +194,55 @@ export async function verifyInviteSignature(payload, signatureB64) {
   }
 }
 
+// ── VERIFICAÇÃO DE RESPOSTAS DE LICENÇA (/verify, /activate) ─────────────
+// Defesa em profundidade além do TLS (Threat Model, Cenário 4). Par de
+// chaves próprio, isolado do de convites — raio de impacto limitado se
+// uma das duas chaves for comprometida. O Console assina cada resposta
+// de /verify e /activate; o Kontaki verifica aqui antes de confiar em
+// qualquer decisão de licenciamento (bloquear/desbloquear a app).
+
+const LICENSE_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYocNG50hlscORRz4MnwmI+ebSPm0
+HQT4/uEoo9u7NXDJfC/3/CDNUePL6K/BA8mF0XYyCWtbqEsvArgJz7mFSA==
+-----END PUBLIC KEY-----`;
+
+let _licensePublicKeyCache = null;
+async function getLicensePublicKey() {
+  if (_licensePublicKeyCache) return _licensePublicKeyCache;
+  const keyData = pemToArrayBuffer(LICENSE_PUBLIC_KEY_PEM);
+  _licensePublicKeyCache = await crypto.subtle.importKey(
+    "spki", keyData, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]
+  );
+  return _licensePublicKeyCache;
+}
+
+// 'fields' tem de ser exactamente o mesmo array, pela mesma ordem, que
+// o Console usou em signLicenseResponse() — ver api/routes/licenses.js.
+export async function verifyLicenseSignature(fields, signatureB64) {
+  try {
+    if (!signatureB64) return false;
+    const data = fields.join(":");
+    const key = await getLicensePublicKey();
+    const sigBuf = derToRawSignature(signatureB64);
+    const dataBuf = new TextEncoder().encode(data);
+    return await crypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" }, key, sigBuf, dataBuf
+    );
+  } catch (e) {
+    console.error("Erro ao verificar assinatura de licença:", e);
+    return false;
+  }
+}
+
+// Nonce aleatório enviado a cada pedido de /verify e /activate, incluído
+// na assinatura do servidor — impede replay de uma resposta antiga
+// capturada (ver verifyLicenseSignature acima).
+export function generateNonce() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 // ── BACKUP CIFRADO (envelope de duas camadas) ─────────────────────────────
 // Desenho (ADR pendente de documentar em docs/architecture):
 //   Recovery Code → PBKDF2 → KEK → unwrap → Master Key → unwrap → DEK → decrypt → Backup

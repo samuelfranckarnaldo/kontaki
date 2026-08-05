@@ -12,6 +12,22 @@ var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 // Usado por main.js (boot), license.js (evento online e intervalo).
 var _fullSyncRunning = false;
 
+// Fallback do backup automático: os gatilhos principais são eventos com
+// significado (abrir/fechar turno). Mas se um turno ficar aberto muito
+// tempo sem se fechar (ou a loja não usar turnos formais), nenhum desses
+// eventos dispara — isto garante que, mesmo assim, não passam mais de 4h
+// sem um backup na nuvem.
+var AUTO_BACKUP_FALLBACK_MS = 4 * 60 * 60 * 1000; // 4 horas
+
+async function _checkAutoBackupFallback() {
+  var last = await db.get("settings", "lastCloudBackupAt");
+  var lastTime = last ? new Date(last.value).getTime() : 0;
+  if (Date.now() - lastTime < AUTO_BACKUP_FALLBACK_MS) return;
+
+  var mod = await import("./backup.js");
+  await mod.backupService.autoBackupIfNeeded("fallback_4h");
+}
+
 export async function runFullSyncCycle() {
   if (_fullSyncRunning) {
     logger.info("[sync] runFullSyncCycle ignorado: ciclo anterior ainda em curso");
@@ -24,9 +40,14 @@ export async function runFullSyncCycle() {
     await syncProducts();
     await syncIncidents();
     await syncBalances();
+    await syncAccounting();
     await syncSessions();
     await syncAuditLog();
     await syncWorkspaceCatalog();
+    await _checkAutoBackupFallback();
+
+    var recMod = await import("./recovery-codes.js");
+    await recMod.triggerPendingSync();
   } catch (e) {
     logger.error("[sync] runFullSyncCycle falhou", e);
   } finally {
@@ -412,6 +433,56 @@ export async function syncBalances() {
     logger.info("[sync] syncBalances OK: caixa=" + cashBalance + " banco=" + bankBalance);
   } catch (e) {
     logger.error("[sync] syncBalances erro de rede/execução", e);
+  }
+}
+
+// ── SINCRONIZAÇÃO DO RESUMO CONTABILÍSTICO (mês corrente) ───────────────
+// Envia o resumo agregado (proveitos, custos, resultado, breakdown por
+// conta) do mês corrente para o Console — não envia lançamento a
+// lançamento. Reenviar o mesmo período faz upsert (atualiza o resumo
+// conforme novos lançamentos entram no mês ainda aberto).
+export async function syncAccounting() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+
+  try {
+    var storeId = await getStoreId();
+    var licenseCode = await getLicenseCode();
+    if (!storeId || !licenseCode) {
+      logger.warn("[sync] syncAccounting abortado: storeId ou licenseCode em falta");
+      return;
+    }
+
+    var pgcMod = await import("./pgc.js");
+    var now = new Date();
+    var period = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+    var summary = await pgcMod.computePeriodSummary(period);
+
+    var deviceId = await getDeviceId();
+
+    var res = await fetch(CONSOLE_API + "/sync/accounting", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        storeId: storeId,
+        licenseCode: licenseCode,
+        deviceId: deviceId,
+        period: summary.period,
+        closed: summary.closed,
+        totalReceita: summary.totalReceita,
+        totalCustos: summary.totalCustos,
+        resultadoLiquido: summary.resultadoLiquido,
+        breakdown: summary.breakdown,
+      }),
+    });
+
+    var resBody = await res.text();
+    if (!res.ok) {
+      logger.error("[sync] syncAccounting falhou: status=" + res.status + " body=" + resBody.slice(0, 300));
+      return;
+    }
+    logger.info("[sync] syncAccounting OK: periodo=" + summary.period + " receita=" + summary.totalReceita + " custos=" + summary.totalCustos);
+  } catch (e) {
+    logger.error("[sync] syncAccounting erro de rede/execução", e);
   }
 }
 

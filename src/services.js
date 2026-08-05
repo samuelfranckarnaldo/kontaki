@@ -462,6 +462,7 @@ export const sessionService = {
       });
     }
     await logAudit("session", sessionId, "open", [{ field: "Estado", before: null, after: "aberto" }]);
+    import("./backup.js").then(function(m) { m.backupService.autoBackupIfNeeded("abertura_turno"); });
     return {sessionId,sessionUuid};
   },
   async closeSession(sessionId) {
@@ -484,6 +485,7 @@ export const sessionService = {
     const closedAt=new Date().toISOString();
     await db.put("sessions",{...session,status:"closed",closedAt,stockEsperado,totalVendas,nVendas:sessionSales.length});
     await logAudit("session", sessionId, "close", [{ field: "Estado", before: "aberto", after: "fechado" }]);
+    import("./backup.js").then(function(m) { m.backupService.autoBackupIfNeeded("fecho_turno"); });
     return {stockEsperado,totalVendas,sessionSales,closedAt};
   },
   async checkDuplicate(ktkUuid) {

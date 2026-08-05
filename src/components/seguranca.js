@@ -92,7 +92,7 @@ async function renderSeguranca() {
           </div>
         </div>
         ${!isLow ? `
-        <button onclick="window._regenerateRecoveryCodes()"
+        <button id="regen-codes-btn-sm" onclick="window._regenerateRecoveryCodes()"
                 style="background:none;border:none;color:#16a34a;font-size:11px;font-weight:700;
                        cursor:pointer;font-family:inherit;flex-shrink:0">
           Gerar novos
@@ -102,12 +102,12 @@ async function renderSeguranca() {
       <div style="font-size:12px;color:#92400e;line-height:1.5;margin-bottom:8px">
         Restam poucos códigos. Gera um novo conjunto para não ficares sem acesso de recuperação.
       </div>
-      <button onclick="window._regenerateRecoveryCodes()"
+      <button id="regen-codes-btn-lg" onclick="window._regenerateRecoveryCodes()"
               style="width:100%;padding:9px;background:#fff;border:1.5px solid #fde68a;
                      color:#92400e;border-radius:10px;font-size:12.5px;font-weight:700;
                      cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-        <i data-lucide="refresh-cw" style="width:13px;height:13px"></i>
-        Gerar novo conjunto de códigos
+        <i data-lucide="refresh-cw" id="regen-codes-icon-lg" style="width:13px;height:13px"></i>
+        <span id="regen-codes-label-lg">Gerar novo conjunto de códigos</span>
       </button>` : ""}
     </div>
 
@@ -356,6 +356,21 @@ window._regenerateRecoveryCodes = async function() {
   confirmDialog(
     "Gerar um novo conjunto de 10 códigos? Os códigos antigos deixam de funcionar.",
     async function() {
+      // Feedback de carregamento — gerar códigos envolve hashing e escrita
+      // no IndexedDB, que pode levar um instante percetível; sem isto o
+      // utilizador pode pensar que o clique não teve efeito e repetir.
+      const btnSm = document.getElementById("regen-codes-btn-sm");
+      const btnLg = document.getElementById("regen-codes-btn-lg");
+      const labelLg = document.getElementById("regen-codes-label-lg");
+      const iconLg = document.getElementById("regen-codes-icon-lg");
+      const originalSmText = btnSm ? btnSm.textContent : null;
+      const originalLgText = labelLg ? labelLg.textContent : null;
+
+      if (btnSm) { btnSm.disabled = true; btnSm.style.opacity = "0.5"; btnSm.textContent = "A gerar..."; }
+      if (btnLg) { btnLg.disabled = true; btnLg.style.opacity = "0.6"; btnLg.style.pointerEvents = "none"; }
+      if (labelLg) labelLg.textContent = "A gerar...";
+      if (iconLg) iconLg.style.animation = "boot-spin .8s linear infinite";
+
       try {
         const codes = await generateCodesForUser(user.id);
         showRecoveryCodesScreen(codes, function() {
@@ -365,6 +380,10 @@ window._regenerateRecoveryCodes = async function() {
         const { logger } = await import("../logger.js");
         logger.error("[_regenerateRecoveryCodes] falhou", e);
         toast(e.message || "Erro ao gerar códigos de recuperação.", "error");
+        if (btnSm) { btnSm.disabled = false; btnSm.style.opacity = "1"; btnSm.textContent = originalSmText; }
+        if (btnLg) { btnLg.disabled = false; btnLg.style.opacity = "1"; btnLg.style.pointerEvents = "auto"; }
+        if (labelLg) labelLg.textContent = originalLgText;
+        if (iconLg) iconLg.style.animation = "";
       }
     },
     { danger: true, confirmText: "Gerar" }

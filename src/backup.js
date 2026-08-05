@@ -168,6 +168,37 @@ export const backupService = {
   // claro nunca saem do dispositivo — só o hash local. O servidor devolve
   // wrappedMasterKey (nunca a chave em claro); a Master Key só existe
   // decifrada em memória, neste dispositivo, o tempo que durar a função.
+  // Backup automático em segundo plano (Fase 2) — dispara em eventos com
+  // significado (abertura/fecho de turno, backup manual) em vez de um
+  // relógio curto: reter só os 10 backups mais recentes esgotaria a
+  // janela de histórico em minutos se o upload fosse muito frequente.
+  // DEBOUNCE_MS evita uploads duplicados se dois eventos dispararem perto
+  // um do outro (ex. abrir turno logo a seguir a fechar o anterior).
+  async autoBackupIfNeeded(reason) {
+    const { logger } = await import("./logger.js");
+    try {
+      const ready = await hasMasterKey();
+      if (!ready) return; // loja ainda sem PIN/Recovery Codes — nada a fazer
+
+      const DEBOUNCE_MS = 5 * 60 * 1000; // 5 minutos
+      const last = await db.get("settings", "lastCloudBackupAt");
+      const lastTime = last ? new Date(last.value).getTime() : 0;
+      if (Date.now() - lastTime < DEBOUNCE_MS) {
+        logger.info("[autoBackup] ignorado (debounce): " + reason);
+        return;
+      }
+
+      logger.info("[autoBackup] a disparar por: " + reason);
+      const backupId = await this.uploadToConsole();
+      await db.put("settings", { key: "lastCloudBackupAt", value: new Date().toISOString() });
+      logger.info("[autoBackup] OK — backupId: " + backupId + " (motivo: " + reason + ")");
+    } catch (e) {
+      // Nunca deixa o backup automático interromper o fluxo principal
+      // (abrir/fechar turno tem de funcionar mesmo sem internet).
+      logger.warn("[autoBackup] falhou (" + reason + "): " + (e.message || e));
+    }
+  },
+
   async restoreFromConsole(storeId, recoveryCode, onStatus) {
     const notify = onStatus || function () {};
 
