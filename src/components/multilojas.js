@@ -11,6 +11,19 @@ import { _fallbackCopy } from "../setup.js";
 
 var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
+// ── PREFERENCIAS DE UI (localStorage — nao e dado de negocio) ───────────
+function _mlLoadPref(key, fallback) {
+  try {
+    var v = localStorage.getItem("ml_pref_" + key);
+    return v === null ? fallback : v;
+  } catch (e) {
+    return fallback;
+  }
+}
+function _mlSavePref(key, value) {
+  try { localStorage.setItem("ml_pref_" + key, value); } catch (e) {}
+}
+
 var _mlActiveTab = "resumo";
 var _mlSelectedStoreId = "all"; // "all" ou o id (uuid) de uma loja
 var _mlRenderToken = 0; // incrementado a cada troca de aba/loja — protege contra race condition de fetches lentos
@@ -136,16 +149,17 @@ function _renderStoreSelector() {
 
   if (!_mlStoresCache.length) {
     wrap.innerHTML =
-      '<div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:10px 12px;margin-bottom:14px">' +
-        '<span style="font-size:12.5px;color:var(--text4)">Nenhuma loja ligada</span>' +
-        '<div style="display:flex;align-items:center;gap:12px">' +
-          '<button onclick="window._mlShowAddStore()" style="border:none;background:none;color:var(--primary,#5b21b6);font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;padding:0">' +
-            '<i data-lucide="plus" style="width:14px;height:14px"></i> Adicionar' +
-          '</button>' +
-          '<button onclick="window._mlLogout()" title="Sair" style="border:none;background:none;padding:2px;cursor:pointer;flex-shrink:0;display:flex;align-items:center">' +
-            '<i data-lucide="log-out" style="width:15px;height:15px;color:var(--text4)"></i>' +
-          '</button>' +
-        '</div>' +
+      '<div style="display:flex;align-items:stretch;gap:10px;margin-bottom:16px;width:100%;box-sizing:border-box">' +
+        '<button class="ml-store-select-btn" style="flex:1 1 auto;min-width:0" onclick="window._mlShowAddStore()">' +
+          '<span class="ml-store-select-icon"><i data-lucide="store"></i></span>' +
+          '<span class="ml-store-select-text">' +
+            '<span class="ml-store-select-label" style="color:var(--text4)">Nenhuma loja ligada</span>' +
+            '<span class="ml-store-select-sub">+ Adicionar</span>' +
+          '</span>' +
+        '</button>' +
+        '<button onclick="window._mlOpenStoreMenu()" title="Mais opções" style="flex:0 0 52px;width:52px;box-sizing:border-box;background:var(--primary-light);border:1px solid var(--border2);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;cursor:pointer">' +
+          '<i data-lucide="more-vertical" style="width:20px;height:20px;color:var(--primary)"></i>' +
+        '</button>' +
       '</div>';
     refreshIcons(wrap);
     return;
@@ -217,6 +231,7 @@ window._mlOpenStoreMenu = function() {
 window._mlSwitchTab = function(tab) {
   _mlRenderToken++;
   _mlActiveTab = tab;
+  _mlSavePref("activeTab", tab);
   _renderTabs();
   _renderContent();
 };
@@ -224,6 +239,7 @@ window._mlSwitchTab = function(tab) {
 window._mlSelectStore = function(storeId) {
   _mlRenderToken++;
   _mlSelectedStoreId = storeId;
+  _mlSavePref("selectedStoreId", storeId);
   _renderStoreSelector();
   _renderContent();
 };
@@ -339,9 +355,18 @@ export async function loadMultilojas() {
     return;
   }
 
-  _mlActiveTab = "resumo";
-  _mlSelectedStoreId = "all";
+  _mlActiveTab = _mlLoadPref("activeTab", "resumo");
+  _mlSelectedStoreId = _mlLoadPref("selectedStoreId", "all");
   _renderTabs();
+
+  var selectorWrapInit = document.getElementById("multilojas-store-selector");
+  if (selectorWrapInit && !_mlCacheGet(_mlCacheKey("stores", "global"))) {
+    selectorWrapInit.innerHTML =
+      '<div style="display:flex;align-items:stretch;gap:10px;margin-bottom:16px;width:100%;box-sizing:border-box">' +
+        '<div class="skel-line hist-skel" style="flex:1 1 auto;min-width:0;height:60px;border-radius:var(--radius-lg)"></div>' +
+        '<div class="skel-line hist-skel" style="flex:0 0 52px;width:52px;height:60px;border-radius:var(--radius-lg)"></div>' +
+      '</div>';
+  }
 
   await _loadStoresList();
   _renderStoreSelector();
@@ -597,32 +622,81 @@ window._mlRefreshStores = async function() {
   if (icon) icon.style.animation = "";
 };
 
-async function _loadStoresList() {
+async function _mlFetchStoresList() {
   var res;
   try {
     res = await _mlAuthFetch("/reports/multi-store/stores");
   } catch (e) {
-    _mlStoresCache = [];
-    return;
+    return null;
   }
-  if (res.status === 401) {
-    _mlStoresCache = [];
-    loadMultilojas();
-    return;
-  }
-  if (!res.ok) { _mlStoresCache = []; return; }
+  if (res.status === 401) { loadMultilojas(); return null; }
+  if (!res.ok) return null;
   var data = await res.json();
-  _mlStoresCache = (data && data.success) ? data.stores : [];
+  return (data && data.success) ? data.stores : null;
 }
+
+function _mlRefreshStoresListInBackground() {
+  _mlFetchStoresList().then(function(stores) {
+    if (stores === null) return; // falha — mantem o que ja esta
+    var changed = JSON.stringify(stores) !== JSON.stringify(_mlStoresCache);
+    _mlStoresCache = stores;
+    _mlCacheSet(_mlCacheKey("stores", "global"), stores);
+    if (changed) {
+      _renderStoreSelector();
+      _renderContent();
+    }
+  });
+}
+
+async function _loadStoresList() {
+  var cacheKey = _mlCacheKey("stores", "global");
+  var cached = _mlCacheGet(cacheKey);
+
+  if (cached) {
+    _mlStoresCache = cached.data;
+    if (!cached.isFresh) _mlRefreshStoresListInBackground();
+    return;
+  }
+
+  var stores = await _mlFetchStoresList();
+  _mlStoresCache = stores;
+  if (stores !== null) _mlCacheSet(cacheKey, stores);
+}
+
+window._mlRetryLoadStores = async function() {
+  var wrap = document.getElementById("multilojas-content");
+  if (wrap) wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
+  await _loadStoresList();
+  _renderStoreSelector();
+  await _renderContent();
+};
 
 async function _renderContent() {
   var wrap = document.getElementById("multilojas-content");
   if (!wrap) return;
 
-  if (!_mlStoresCache || !_mlStoresCache.length) {
+  if (_mlStoresCache === null) {
+    wrap.innerHTML =
+      '<div class="empty-state">' +
+        '<i data-lucide="wifi-off"></i>' +
+        '<div class="empty-state-title">Sem ligação</div>' +
+        '<div class="empty-state-sub">Não foi possível verificar as tuas lojas. Confirma a conexão à internet e tenta novamente.</div>' +
+        '<button class="btn btn-primary btn-sm" style="margin-top:14px" onclick="window._mlRetryLoadStores()">Tentar novamente</button>' +
+      '</div>';
+    refreshIcons(wrap);
+    return;
+  }
+
+  if (!_mlStoresCache.length) {
     wrap.innerHTML = _mlNoStoresHtml();
     refreshIcons(wrap);
     return;
+  }
+
+  if (_mlSelectedStoreId !== "all" && !_mlStoresCache.some(function(s) { return s.id === _mlSelectedStoreId; })) {
+    _mlSelectedStoreId = "all";
+    _mlSavePref("selectedStoreId", "all");
+    _renderStoreSelector();
   }
 
   if (_mlActiveTab === "resumo") {
@@ -1174,10 +1248,24 @@ window._mlSelectEscritorioView = function(key) {
 };
 
 function _mlEscritorioPickerHtml() {
-  return '<button onclick="window._mlShowEscritorioViewPicker()" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:10px 12px;margin-bottom:14px;font-family:inherit;cursor:pointer">' +
-    '<span style="font-size:13px;font-weight:700;color:var(--text)">' + _mlEscritorioViewLabel(_mlEscritorioView) + '</span>' +
-    '<i data-lucide="chevron-down" style="width:15px;height:15px;color:var(--text4)"></i>' +
+  var v = ESCRITORIO_VIEWS.find(function(x) { return x.key === _mlEscritorioView; }) || ESCRITORIO_VIEWS[0];
+  var iconAttrs = v.iconClass ? (' class="hist-mov-icon ' + v.iconClass + '"') : (' class="hist-mov-icon" style="' + v.iconStyle + '"');
+  return '<button onclick="window._mlShowEscritorioViewPicker()" style="display:flex;align-items:center;gap:10px;width:100%;background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:10px 12px;margin-bottom:14px;font-family:inherit;cursor:pointer">' +
+    '<div' + iconAttrs + ' style="width:34px;height:34px;' + (v.iconStyle || "") + '"><i data-lucide="' + v.icon + '" style="width:16px;height:16px"></i></div>' +
+    '<span style="flex:1;text-align:left;font-size:13.5px;font-weight:700;color:var(--text)">' + v.label + '</span>' +
+    '<i data-lucide="chevron-down" style="width:15px;height:15px;color:var(--text4);flex-shrink:0"></i>' +
   '</button>';
+}
+
+function _mlFormatDuration(startIso, endIso) {
+  if (!startIso) return null;
+  var start = new Date(startIso).getTime();
+  var end = endIso ? new Date(endIso).getTime() : Date.now();
+  var mins = Math.max(0, Math.round((end - start) / 60000));
+  if (mins < 60) return mins + "min";
+  var hours = Math.floor(mins / 60);
+  var rem = mins % 60;
+  return hours + "h" + (rem > 0 ? " " + rem + "min" : "");
 }
 
 function _mlTurnoBox(label, value, valueColor) {
@@ -1216,7 +1304,7 @@ function _mlTurnoSectionHtml(store) {
       '<div>' +
         '<div style="font-size:10.5px;font-weight:700;color:var(--primary,#5b21b6);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Turno</div>' +
         '<div style="font-size:15px;font-weight:800;color:var(--text)">' + store.name + '</div>' +
-        '<div style="font-size:11px;color:var(--text4);margin-top:2px">desde ' + (session.openedAt ? new Date(session.openedAt).toLocaleString("pt-AO") : "—") + '</div>' +
+        '<div style="font-size:11px;color:var(--text4);margin-top:2px">desde ' + (session.openedAt ? new Date(session.openedAt).toLocaleString("pt-AO") : "—") + (session.openedAt ? ' · ' + _mlFormatDuration(session.openedAt, isOpen ? null : session.closedAt) : '') + '</div>' +
       '</div>' +
       '<span style="font-size:11px;font-weight:700;color:' + statusMeta.color + ';background:' + statusMeta.bg + ';padding:4px 10px;border-radius:20px">' + statusMeta.label + '</span>' +
     '</div>' +
@@ -1271,26 +1359,28 @@ function _mlProdutosSectionHtml() {
 function _mlInventarioSectionHtml(store) {
   var reports = _mlInventarioReports || [];
   var listHtml = reports.length
-    ? '<div style="border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
+    ? '<div class="hist-mov-card">' +
+      '<div class="hist-day-label--inset" style="padding-top:14px"><i data-lucide="archive" style="width:13px;height:13px"></i>Relatórios arquivados</div>' +
       reports.map(function(r) {
         var date = r.generated_at ? new Date(r.generated_at).toLocaleString("pt-AO") : "—";
         var count = r.divergences_count || 0;
-        var summary = count > 0
-          ? '<span style="color:#dc2626;font-weight:700">' + count + ' divergência' + (count !== 1 ? "s" : "") + '</span>'
+        var hasDiv = count > 0;
+        var summary = hasDiv
+          ? count + ' divergência' + (count !== 1 ? "s" : "")
           : 'Sem divergências';
-        return '<div onclick="window._mlViewInventoryReport(\'' + r.id + '\')" style="padding:12px;border-bottom:1px solid var(--border2);cursor:pointer;display:flex;justify-content:space-between;align-items:center">' +
-          '<div>' +
-            '<div style="font-size:13px;font-weight:700;color:var(--text)">' + date + '</div>' +
-            '<div style="font-size:11.5px;color:var(--text3);margin-top:2px">' + summary + '</div>' +
+        return '<button onclick="window._mlViewInventoryReport(\'' + r.id + '\')" class="hist-mov-item hist-mov-item--compact" style="width:100%;border:none;background:none;padding-right:14px;font-family:inherit;text-align:left;cursor:pointer;' + (hasDiv ? 'border-left:3px solid #dc2626' : '') + '">' +
+          '<div class="hist-mov-icon" style="background:' + (hasDiv ? '#fee2e2' : 'var(--success)1a') + ';color:' + (hasDiv ? '#dc2626' : 'var(--success,#16a34a)') + '"><i data-lucide="' + (hasDiv ? "alert-triangle" : "check") + '" style="width:18px;height:18px"></i></div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div class="hist-mov-name">' + date + '</div>' +
+            '<div class="hist-mov-meta" style="color:' + (hasDiv ? '#dc2626' : 'var(--text4)') + ';font-weight:' + (hasDiv ? '700' : '400') + '">' + summary + '</div>' +
           '</div>' +
-          '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text4)"></i>' +
-        '</div>';
+          '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text4);flex-shrink:0"></i>' +
+        '</button>';
       }).join("") +
       '</div>'
-    : '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;text-align:center;font-size:12px;color:var(--text4)">Ainda sem relatórios gerados para esta loja.</div>';
+    : '<div class="hist-mov-card"><div class="hist-day-label--inset" style="padding-top:14px"><i data-lucide="archive" style="width:13px;height:13px"></i>Relatórios arquivados</div><div style="padding:16px;text-align:center;font-size:12px;color:var(--text4)">Ainda sem relatórios gerados para esta loja.</div></div>';
 
   return '<div>' +
-    '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Inventário Periódico — arquivo</div>' +
     '<div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">Cada relatório é uma fotografia do stock (loja/armazém) e do saldo de caixa/banco no momento em que foi gerado, com base na última sincronização — não altera nada na loja.</div>' +
     '<button class="btn btn-primary btn-full" style="margin-bottom:14px" id="ml-inv-gen-btn" onclick="window._mlOpenInventarioContagem()"><i data-lucide="clipboard-list"></i> Nova Contagem</button>' +
     listHtml +
@@ -1441,9 +1531,25 @@ window._mlInvContagemReset = async function() {
   window._mlOpenInventarioContagem();
 };
 
+function _mlShowProcessing(message) {
+  var el = document.createElement("div");
+  el.id = "ml-processing-overlay";
+  el.style.cssText = "position:fixed;inset:0;background:rgba(255,255,255,.92);z-index:99997;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:inherit";
+  el.innerHTML =
+    '<div style="width:38px;height:38px;border:3.5px solid var(--primary-light,#ede9fe);border-top-color:var(--primary,#5b21b6);border-radius:50%;animation:boot-spin .8s linear infinite"></div>' +
+    '<div style="font-size:13px;font-weight:600;color:var(--text2);text-align:center;padding:0 24px">' + (message || "A processar…") + '</div>';
+  document.body.appendChild(el);
+}
+
+function _mlHideProcessing() {
+  var el = document.getElementById("ml-processing-overlay");
+  if (el) el.remove();
+}
+
 window._mlConfirmInventarioContagem = async function() {
   var btn = document.getElementById("ml-inv-confirm-btn");
-  if (btn) { btn.disabled = true; btn.innerHTML = "A guardar…"; }
+  if (btn) btn.disabled = true;
+  _mlShowProcessing("A calcular e guardar o relatório…");
 
   var payload = _mlGatherInventarioContagem();
 
@@ -1456,14 +1562,16 @@ window._mlConfirmInventarioContagem = async function() {
     });
     data = await res.json();
   } catch (e) {
+    _mlHideProcessing();
     toast("Sem ligação à internet.", "error");
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="check"></i> Calcular e Guardar'; }
+    if (btn) btn.disabled = false;
     return;
   }
+  _mlHideProcessing();
   if (res.status === 401) { loadMultilojas(); return; }
   if (!res.ok || !data || !data.success) {
     toast((data && data.error) || "Erro ao guardar relatório.", "error");
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="check"></i> Calcular e Guardar'; }
+    if (btn) btn.disabled = false;
     return;
   }
 
@@ -1553,30 +1661,43 @@ window._mlViewInventoryReport = async function(reportId) {
   refreshIcons(document.getElementById("modal-box") || document.body);
 };
 
+function _mlHistoricoTurnoSkeletonRow() {
+  return '<div class="hist-mov-item hist-mov-item--compact hist-skel">' +
+    '<div class="skel-circle" style="width:40px;height:40px;margin-right:0"></div>' +
+    '<div style="flex:1;min-width:0;padding-left:12px">' +
+      '<div class="skel-line skel-line--title" style="width:50%"></div>' +
+      '<div class="skel-line skel-line--sub" style="width:70%"></div>' +
+    '</div>' +
+  '</div>';
+}
+
 function _mlHistoricoTurnosSectionHtml() {
   var sessions = _mlHistoricoTurnos || [];
   var listHtml = sessions.length
-    ? '<div style="border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
+    ? '<div class="hist-mov-card">' +
+      '<div class="hist-day-label--inset" style="padding-top:14px"><i data-lucide="history" style="width:13px;height:13px"></i>Turnos sincronizados</div>' +
       sessions.map(function(s) {
         var opened = s.opened_at ? new Date(s.opened_at).toLocaleString("pt-AO") : "—";
-        var closedLabel = s.status === "open" ? "Aberto" : (s.closed_at ? new Date(s.closed_at).toLocaleString("pt-AO") : "—");
-        var incBadge = (s.has_incidents) ? '<span style="color:#dc2626;font-weight:700">⚠</span> ' : "";
-        return '<div onclick="window._mlViewTurnoDetail(\'' + s.id + '\')" style="padding:12px;border-bottom:1px solid var(--border2);cursor:pointer;display:flex;justify-content:space-between;align-items:center">' +
-          '<div>' +
-            '<div style="font-size:13px;font-weight:700;color:var(--text)">' + incBadge + (s.user_name || "—") + '</div>' +
-            '<div style="font-size:11px;color:var(--text4);margin-top:2px">' + opened + ' → ' + closedLabel + '</div>' +
-            '<div style="font-size:11.5px;color:var(--text3);margin-top:2px">' + fmt(s.total_vendas || 0) + ' · ' + (s.n_vendas || 0) + ' vendas' + (s.cash_diff ? ' · Dif. caixa ' + (s.cash_diff > 0 ? "+" : "") + fmt(s.cash_diff) : "") + '</div>' +
+        var isOpen = s.status === "open";
+        var closedLabel = isOpen ? "Aberto" : (s.closed_at ? new Date(s.closed_at).toLocaleString("pt-AO") : "—");
+        var hasInc = !!s.has_incidents;
+        var initial = (s.user_name || "?").charAt(0).toUpperCase();
+        return '<button onclick="window._mlViewTurnoDetail(\'' + s.id + '\')" class="hist-mov-item hist-mov-item--compact" style="width:100%;border:none;background:none;padding-right:14px;font-family:inherit;text-align:left;cursor:pointer;' + (hasInc ? 'border-left:3px solid #dc2626' : '') + '">' +
+          '<div class="hist-mov-icon" style="background:' + (isOpen ? 'var(--primary-light,#ede9fe)' : 'var(--border2)') + ';color:' + (isOpen ? 'var(--primary,#5b21b6)' : 'var(--text4)') + ';font-weight:800;font-size:14px">' + initial + '</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div class="hist-mov-name">' + (s.user_name || "—") + (hasInc ? ' <i data-lucide="alert-triangle" style="width:12px;height:12px;color:#dc2626;vertical-align:middle"></i>' : '') + '</div>' +
+            '<div class="hist-mov-meta">' + opened + ' → ' + closedLabel + (s.opened_at ? ' · ' + _mlFormatDuration(s.opened_at, isOpen ? null : s.closed_at) : '') + '</div>' +
+            '<div class="hist-mov-meta">' + fmt(s.total_vendas || 0) + ' · ' + (s.n_vendas || 0) + ' vendas' + (s.cash_diff ? ' · Dif. caixa ' + (s.cash_diff > 0 ? "+" : "") + fmt(s.cash_diff) : "") + '</div>' +
           '</div>' +
-          '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text4)"></i>' +
-        '</div>';
+          '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text4);flex-shrink:0"></i>' +
+        '</button>';
       }).join("") +
       '</div>'
     : (_mlHistoricoTurnosLoading
-        ? '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>'
-        : '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;text-align:center;font-size:12px;color:var(--text4)">Sem turnos sincronizados ainda.</div>');
+        ? '<div class="hist-mov-card">' + _mlHistoricoTurnoSkeletonRow() + _mlHistoricoTurnoSkeletonRow() + _mlHistoricoTurnoSkeletonRow() + '</div>'
+        : '<div class="hist-mov-card"><div class="hist-day-label--inset" style="padding-top:14px"><i data-lucide="history" style="width:13px;height:13px"></i>Turnos sincronizados</div><div style="padding:16px;text-align:center;font-size:12px;color:var(--text4)">Sem turnos sincronizados ainda.</div></div>');
 
   return '<div>' +
-    '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Histórico de Turnos</div>' +
     '<div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">Turnos sincronizam sozinhos ao abrir/fechar — esta lista mostra o que já chegou ao Console, sem precisares de gerar nada.</div>' +
     listHtml +
   '</div>';

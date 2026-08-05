@@ -5,6 +5,7 @@ import { getUser } from "../auth.js";
 import { hasPermission } from "../permissions.js";
 import { openModal, closeModal } from "../modal.js";
 import { toast } from "../toast.js";
+import { logAudit } from "../logger.js";
 
 var typeLabels = {
   sale:"Venda", purchase:"Compra", transfer_in:"Entrada", transfer_out:"Saída",
@@ -409,6 +410,11 @@ window._estTransferSave = async (id) => {
   const to   = window._estTrDirection === "wl" ? "shop" : "warehouse";
   try {
     await productService.transfer(id, qty, from, to);
+    const p = allProducts.find(x => x.id === id);
+    await logAudit("stock", id, "transfer", [
+      { field: "Produto", before: null, after: p ? p.name : ("#" + id) },
+      { field: "Quantidade", before: from === "shop" ? "Loja" : "Armazém", after: to === "shop" ? "Loja" : "Armazém" },
+    ]);
     closeModal();
     toast("Transferência concluída.", "success");
     await _estRefreshData();
