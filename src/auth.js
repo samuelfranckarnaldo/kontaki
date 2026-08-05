@@ -5,6 +5,7 @@ import { toast } from "./toast.js";
 import { confirmDialog } from "./modal.js";
 import { getTurnoDuration } from "./utils.js";
 import { defaultPermissions } from "./permissions.js";
+import { logAudit } from "./logger.js";
 
 let currentUser    = null;
 let currentSession = null;
@@ -421,6 +422,10 @@ async function _verifyPin() {
     if (!valid) {
       const rec = await _registerFailedAttempt(_selectedUser.id);
 
+      if (_selectedUser.role === "admin") {
+        await logAudit("user", _selectedUser.id, "failed_admin_login", [{ field: "Tentativa", before: null, after: "PIN incorrecto" }]);
+      }
+
       const errEl = document.getElementById("login-err");
       const errMsg = document.getElementById("login-err-msg");
       if (errEl) errEl.classList.add("show");
@@ -449,6 +454,8 @@ async function _verifyPin() {
     currentUser = _selectedUser;
     currentSession = null;
     currentUser.sessionId = null;
+
+    await logAudit("user", currentUser.id, "login", [{ field: "Utilizador", before: null, after: currentUser.name }]);
 
     try {
       const sessions = await db.getAll("sessions");

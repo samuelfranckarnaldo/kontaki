@@ -5,6 +5,7 @@ import { toast }         from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser }       from "../auth.js";
 import { postExpenseJournal } from "../pgc.js";
+import { logAudit } from "../logger.js";
 
 var CATEGORIAS = ["Renda","Electricidade","Água","Salários","Transporte","Manutenção","Internet/Telefone","Impostos e Taxas","Combustível","Marketing e Publicidade","Seguros","Material de Escritório","Limpeza","Segurança","Comissões","Outro"];
 
@@ -618,6 +619,7 @@ window._saveDespesa = async function() {
     createdAt: new Date().toISOString(),
   };
   var newExpenseId = await db.add("expenses", newExpense);
+  await logAudit("expense", newExpenseId, "create", [{ field: "Valor", before: null, after: newExpense.amount }]);
 
   // Contabilidade — lançamento de partidas dobradas (PGC)
   try {

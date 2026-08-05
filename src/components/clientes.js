@@ -3,6 +3,7 @@ import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { openModal, closeModal } from "../modal.js";
 import { clientService } from "../services.js";
+import { logAudit } from "../logger.js";
 import "./fiados.js";
 import { isOverdue, daysOverdue, waLink } from "./fiados.js";
 import { payIcon, payColor, payLabel, payClass, fmtChartVal } from "./historico.js";
@@ -509,7 +510,14 @@ window._saveCliente = async (id) => {
   };
   if (id) {
     const ex = await db.get("clients", id);
+    const changes = [];
+    ["name","phone","address","notes"].forEach(function(field) {
+      if ((ex[field]||"") !== (data[field]||"")) {
+        changes.push({ field: field, before: ex[field]||null, after: data[field]||null });
+      }
+    });
     await db.put("clients", { ...ex, ...data });
+    if (changes.length) await logAudit("customer", id, "edit", changes);
     toast("Cliente actualizado.", "success");
   } else {
     const existing = await db.getAll("clients");
@@ -519,7 +527,8 @@ window._saveCliente = async (id) => {
       toast("Limite de " + maxClients + " clientes atingido para o teu plano. Contacta a Introxeer para upgrade.", "error");
       return;
     }
-    await clientService.create(data);
+    const newClientId = await clientService.create(data);
+    await logAudit("customer", newClientId, "create", [{ field: "Nome", before: null, after: data.name }]);
     toast("Cliente adicionado.", "success");
   }
   closeModal();

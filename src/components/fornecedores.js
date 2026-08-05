@@ -5,6 +5,7 @@ import { toast } from "../toast.js";
 import { openModal, closeModal, confirmDialog } from "../modal.js";
 import { getUser } from "../auth.js";
 import { hasPermission } from "../permissions.js";
+import { logAudit } from "../logger.js";
 
 async function _refreshStockIfVisible() {
   const stockPage = document.getElementById("subpage-stock");
@@ -791,6 +792,11 @@ window._saveCompra = async () => {
     userId: getUser().id,
   });
 
+  await logAudit("stock", result.purchaseId, "purchase", [
+    { field: "Fornecedor", before: null, after: supplier ? supplier.name : "Compra avulsa" },
+    { field: "Total", before: null, after: total },
+  ]);
+
   // Contabilidade — lançamentos de partidas dobradas (PGC)
   try {
     await postPurchaseJournal({
@@ -1062,6 +1068,10 @@ window._saveEditCompra = async (purchaseId) => {
     notes: newNotes,
     editedAt: new Date().toISOString(),
   });
+
+  await logAudit("stock", purchaseId, "edit_purchase", [
+    { field: "Total", before: p.total, after: total },
+  ]);
 
   toast("Compra actualizada.", "success");
   closeModal();
