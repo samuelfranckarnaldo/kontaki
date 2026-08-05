@@ -11,6 +11,8 @@ var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 var _mlActiveTab = "resumo";
 var _mlSelectedStoreId = "all"; // "all" ou o id (uuid) de uma loja
 var _mlRenderToken = 0; // incrementado a cada troca de aba/loja — protege contra race condition de fetches lentos
+var _mlResumoSalesCache = null; // vendas da loja atual no Resumo, para o modal "Ver histórico completo"
+var _mlResumoStoreName = null;
 var _mlStoresCache = null;      // [{id, name, status, lastSeenAt, salesThisMonth}, ...]
 var _mlChartInstance = null;
 var _mlAuthMode = "login"; // login | register — estado do ecrã de autenticação Workspace
@@ -634,7 +636,29 @@ async function _fetchRealAllIncidents() {
 
 async function _renderIncidentes(wrap) {
   var _token = _mlRenderToken;
-  wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
+  wrap.innerHTML =
+    '<div class="skel-line skel-line--title" style="margin-bottom:6px;width:35%"></div>' +
+    '<div class="skel-line skel-line--sub" style="margin-bottom:16px;width:50%"></div>' +
+    '<div style="display:flex;gap:6px;margin-bottom:16px">' +
+      '<div class="skel-line hist-skel" style="height:28px;border-radius:999px;flex:1"></div>' +
+      '<div class="skel-line hist-skel" style="height:28px;border-radius:999px;flex:1"></div>' +
+      '<div class="skel-line hist-skel" style="height:28px;border-radius:999px;flex:1"></div>' +
+      '<div class="skel-line hist-skel" style="height:28px;border-radius:999px;flex:1"></div>' +
+    '</div>' +
+    '<div class="hist-mov-card hist-skel" style="margin-bottom:8px">' +
+      '<div class="skel-line skel-line--title" style="margin-bottom:8px"></div>' +
+      '<div class="skel-line skel-line--sub"></div>' +
+    '</div>' +
+    '<div class="hist-mov-card hist-skel" style="margin-bottom:8px">' +
+      '<div class="skel-line skel-line--title" style="margin-bottom:8px"></div>' +
+      '<div class="skel-line skel-line--sub"></div>' +
+    '</div>' +
+    '<div class="hist-mov-card hist-skel">' +
+      '<div class="skel-line skel-line--title" style="margin-bottom:8px"></div>' +
+      '<div class="skel-line skel-line--sub"></div>' +
+    '</div>';
+  await _mlMinDelay(280);
+  if (_token !== _mlRenderToken) return;
 
   if (!_mlStoresCache || !_mlStoresCache.length) {
     if (_token !== _mlRenderToken) return;
@@ -715,27 +739,7 @@ async function _renderIncidentes(wrap) {
 }
 
 
-// ── ESCRITÓRIO — turno (mock), Espelho (real) e Workspace (real) ───────
-// ATENÇÃO: turno/operador/diferença de caixa continuam mocados (falta
-// sincronização de sessions). Espelho e Workspace já são dados reais.
-
-var TURNO_STATUS_META = {
-  aberto:     { label: "Em funcionamento", color: "#16a34a", bg: "#f0fdf4", dot: "#16a34a" },
-  fechando:   { label: "Aguardando fecho", color: "#d97706", bg: "#fffbeb", dot: "#d97706" },
-  incidente:  { label: "Incidente",        color: "#dc2626", bg: "#fef2f2", dot: "#dc2626" },
-  fechado:    { label: "Fechado",          color: "#71717a", bg: "#f4f4f5", dot: "#a1a1aa" },
-};
-var MOCK_OPERATORS = ["João", "Maria", "Ana", "Pedro", "Carla"];
-
-function _mockTurnoStatus(store) {
-  var seed = (store.id || "").split("").reduce(function(a, c) { return a + c.charCodeAt(0); }, 0);
-  var statusKeys = Object.keys(TURNO_STATUS_META);
-  var status = statusKeys[seed % statusKeys.length];
-  var operator = MOCK_OPERATORS[seed % MOCK_OPERATORS.length];
-  var diffSeed = (seed % 7) - 3;
-  var caixaDiff = status === "incidente" ? -(2500 + Math.abs(diffSeed) * 1500) : (diffSeed === 0 ? 0 : diffSeed * 200);
-  return { status: status, operator: operator, caixaDiff: caixaDiff };
-}
+// ── ESCRITÓRIO — turno, Espelho e Workspace (dados reais) ──────────────
 
 var _mlEspelhoProducts = null;
 var _mlEscritorioSession = null;
@@ -767,7 +771,18 @@ async function _renderEscritorio(wrap) {
     return;
   }
 
-  wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
+  wrap.innerHTML =
+    '<div class="skel-line hist-skel" style="height:40px;border-radius:var(--radius-lg);margin-bottom:14px"></div>' +
+    '<div class="hist-mov-card hist-skel">' +
+      '<div class="skel-line skel-line--label" style="margin-bottom:6px"></div>' +
+      '<div class="skel-line skel-line--title" style="margin-bottom:14px"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+        '<div class="skel-line hist-skel" style="height:52px;border-radius:var(--radius-sm)"></div>' +
+        '<div class="skel-line hist-skel" style="height:52px;border-radius:var(--radius-sm)"></div>' +
+      '</div>' +
+    '</div>';
+  await _mlMinDelay(280);
+  if (_token !== _mlRenderToken) return;
 
   var storeRes, storeData;
   try {
@@ -1654,7 +1669,21 @@ async function _renderRegistos(wrap) {
 
 async function _renderResumoAgregado(wrap) {
   var _token = _mlRenderToken;
-  wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
+  wrap.innerHTML =
+    '<div class="skel-line skel-line--title" style="margin-bottom:6px;width:45%"></div>' +
+    '<div class="skel-line skel-line--sub" style="margin-bottom:20px;width:30%"></div>' +
+    '<div class="hist-mov-card hist-skel" style="margin-bottom:20px;height:200px"></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px">' +
+      '<div class="prod-stat-card hist-skel" style="height:96px"></div>' +
+      '<div class="prod-stat-card hist-skel" style="height:96px"></div>' +
+    '</div>' +
+    '<div class="hist-mov-card hist-skel">' +
+      '<div class="skel-line skel-line--title" style="margin-bottom:12px"></div>' +
+      '<div class="skel-line skel-line--sub" style="margin-bottom:10px"></div>' +
+      '<div class="skel-line skel-line--sub"></div>' +
+    '</div>';
+  await _mlMinDelay(280);
+  if (_token !== _mlRenderToken) return;
 
   var res;
   try {
@@ -1837,10 +1866,36 @@ function _computeHealthScore(signals) {
   return Math.round((okCount / available.length) * 100);
 }
 
+// Aba dona de cada sinal, para o link de acao no card de atencao —
+// nunca criar um destino novo, reaproveitar a navegacao existente.
+var SIGNAL_ACTION_TAB = {
+  sync:      { tab: "escritorio",  label: "Ver sincronização" },
+  caixa:     { tab: "escritorio",  label: "Ver turno" },
+  conflicts: { tab: "incidentes",  label: "Resolver" },
+};
+
 function _healthScoreHtml(store, stock, session, conflicts) {
   var signals = _mlOperationalSignals(store, stock, session, conflicts);
   var score = _computeHealthScore(signals);
   var scoreColor = score >= 85 ? "var(--success,#16a34a)" : score >= 60 ? "var(--warning,#d97706)" : "var(--danger,#dc2626)";
+
+  var needsAttention = signals.filter(function(s) { return s.available && !s.ok; });
+  var allGood = signals.filter(function(s) { return s.available && s.ok; });
+  var noData = signals.filter(function(s) { return !s.available; });
+
+  function signalRow(s, actionable) {
+    var action = actionable ? SIGNAL_ACTION_TAB[s.key] : null;
+    var icon = !s.available ? "minus-circle" : (s.ok ? "check-circle-2" : "alert-triangle");
+    var color = !s.available ? "var(--text4)" : (s.ok ? "var(--success,#16a34a)" : "var(--warning,#d97706)");
+    return '<div style="display:flex;align-items:center;gap:8px">' +
+      '<i data-lucide="' + icon + '" style="width:14px;height:14px;color:' + color + ';flex-shrink:0"></i>' +
+      '<div style="flex:1;min-width:0">' +
+        '<span style="font-size:12.5px;color:var(--text2)">' + s.label + '</span>' +
+        '<span style="font-size:11px;color:var(--text4)"> — ' + s.detail + '</span>' +
+      '</div>' +
+      (action ? '<button onclick="window._mlSwitchTab(\'' + action.tab + '\')" style="font-size:11px;font-weight:700;color:var(--primary,#5b21b6);background:none;border:none;cursor:pointer;font-family:inherit;flex-shrink:0;padding:2px 0">' + action.label + ' →</button>' : '') +
+    '</div>';
+  }
 
   return '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Estado operacional</div>' +
     '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;margin-bottom:24px">' +
@@ -1853,19 +1908,27 @@ function _healthScoreHtml(store, stock, session, conflicts) {
           '<div style="font-size:11px;color:var(--text4)">Pontuação de 0 a 100, com base nos sinais disponíveis</div>' +
         '</div>' +
       '</div>' +
-      '<div style="display:flex;flex-direction:column;gap:9px">' +
-        signals.map(function(s) {
-          var icon = !s.available ? "minus-circle" : (s.ok ? "check-circle-2" : "alert-triangle");
-          var color = !s.available ? "var(--text4)" : (s.ok ? "var(--success,#16a34a)" : "var(--warning,#d97706)");
-          return '<div style="display:flex;align-items:center;gap:8px">' +
-            '<i data-lucide="' + icon + '" style="width:14px;height:14px;color:' + color + ';flex-shrink:0"></i>' +
-            '<div style="flex:1;min-width:0">' +
-              '<span style="font-size:12.5px;color:var(--text2)">' + s.label + '</span>' +
-              '<span style="font-size:11px;color:var(--text4)"> — ' + s.detail + '</span>' +
-            '</div>' +
-          '</div>';
-        }).join("") +
-      '</div>' +
+
+      (needsAttention.length ? (
+        '<div style="font-size:10.5px;font-weight:700;color:var(--warning,#d97706);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">Requer atenção</div>' +
+        '<div style="display:flex;flex-direction:column;gap:9px;margin-bottom:16px">' +
+          needsAttention.map(function(s) { return signalRow(s, true); }).join("") +
+        '</div>'
+      ) : '') +
+
+      (allGood.length ? (
+        '<div style="font-size:10.5px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">Tudo OK</div>' +
+        '<div style="display:flex;flex-direction:column;gap:9px' + (noData.length ? ';margin-bottom:16px' : '') + '">' +
+          allGood.map(function(s) { return signalRow(s, false); }).join("") +
+        '</div>'
+      ) : '') +
+
+      (noData.length ? (
+        '<div style="font-size:10.5px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">Sem dados ainda</div>' +
+        '<div style="display:flex;flex-direction:column;gap:9px">' +
+          noData.map(function(s) { return signalRow(s, false); }).join("") +
+        '</div>'
+      ) : '') +
     '</div>';
 }
 
@@ -2058,18 +2121,6 @@ async function _renderResumoLoja(wrap, storeId) {
 
     _healthScoreHtml(data.store, data.stock, data.session, data.conflicts) +
 
-    '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Produtos mais vendidos</div>' +
-    (data.topProducts.length
-      ? '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:24px">' +
-        data.topProducts.slice(0, 5).map(function(p, i) {
-          return '<div style="display:flex;justify-content:space-between;margin-bottom:' + (i < 4 ? '10px' : '0') + ';font-size:13px">' +
-            '<span style="color:var(--text)">' + (i + 1) + '. ' + p.name + '</span>' +
-            '<span style="font-weight:700;color:var(--text2)">' + fmt(p.receita) + '</span>' +
-          '</div>';
-        }).join("") +
-        '</div>'
-      : '<div style="font-size:12px;color:var(--text4);margin-bottom:24px">Sem vendas registadas ainda.</div>') +
-
     '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Outros dados</div>' +
     '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;display:flex;flex-direction:column;gap:10px;margin-bottom:24px">' +
       _pendingRow("Produtos", data.products.available ? (data.products.count + " sincronizados") : data.products.message) +
@@ -2080,9 +2131,9 @@ async function _renderResumoLoja(wrap, storeId) {
 
     '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Histórico de vendas</div>' +
     (data.sales.length
-      ? '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden;margin-bottom:24px">' +
-        data.sales.slice(0, 20).map(function(s, i) {
-          return '<div style="padding:12px 16px;' + (i < Math.min(data.sales.length, 20) - 1 ? 'border-bottom:1px solid #f4f4f5;' : '') + 'display:flex;justify-content:space-between;align-items:center">' +
+      ? '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
+        data.sales.slice(0, 5).map(function(s, i) {
+          return '<div style="padding:12px 16px;' + (i < Math.min(data.sales.length, 5) - 1 ? 'border-bottom:1px solid #f4f4f5;' : '') + 'display:flex;justify-content:space-between;align-items:center">' +
             '<div>' +
               '<div style="font-size:13px;font-weight:700;color:var(--text)">' + (s.clientName || "Cliente não identificado") + '</div>' +
               '<div style="font-size:11px;color:var(--text4)">' + (s.date ? new Date(s.date).toLocaleDateString("pt-AO") : "") + ' · ' + (s.payMethod || "") + '</div>' +
@@ -2090,11 +2141,37 @@ async function _renderResumoLoja(wrap, storeId) {
             '<div style="font-size:13px;font-weight:700;color:var(--text2)">' + fmt(s.total) + '</div>' +
           '</div>';
         }).join("") +
-        '</div>'
+        '</div>' +
+        (data.sales.length > 5
+          ? '<button onclick="window._mlShowFullHistory()" style="width:100%;text-align:center;padding:12px;font-size:12.5px;font-weight:700;color:var(--primary,#5b21b6);background:none;border:none;cursor:pointer;font-family:inherit;margin-bottom:24px">Ver histórico completo →</button>'
+          : '<div style="margin-bottom:24px"></div>')
       : '<div style="font-size:12px;color:var(--text4);margin-bottom:24px">Sem vendas registadas ainda.</div>');
+
+  _mlResumoSalesCache = data.sales;
+  _mlResumoStoreName = data.store.name;
 
   refreshIcons(wrap);
 }
+
+function _mlSaleRowHtml(s, isLast) {
+  return '<div style="padding:12px 16px;' + (isLast ? '' : 'border-bottom:1px solid #f4f4f5;') + 'display:flex;justify-content:space-between;align-items:center">' +
+    '<div>' +
+      '<div style="font-size:13px;font-weight:700;color:var(--text)">' + (s.clientName || "Cliente não identificado") + '</div>' +
+      '<div style="font-size:11px;color:var(--text4)">' + (s.date ? new Date(s.date).toLocaleDateString("pt-AO") : "") + ' · ' + (s.payMethod || "") + '</div>' +
+    '</div>' +
+    '<div style="font-size:13px;font-weight:700;color:var(--text2)">' + fmt(s.total) + '</div>' +
+  '</div>';
+}
+
+window._mlShowFullHistory = function() {
+  var sales = _mlResumoSalesCache || [];
+  openModal("Histórico — " + (_mlResumoStoreName || "loja"),
+    '<div style="max-height:65vh;overflow-y:auto;margin:-4px -20px 0;border-top:1px solid #f4f4f5">' +
+      sales.map(function(s, i) { return _mlSaleRowHtml(s, i === sales.length - 1); }).join("") +
+    '</div>'
+  );
+  refreshIcons(document.getElementById("modal-box") || document.body);
+};
 
 function _pendingRow(label, message) {
   return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px">' +
