@@ -1,5 +1,8 @@
 const DB_NAME    = "kontaki_db";
-const DB_VERSION = 22; // v22: adiciona store "bankReconciled" (conciliação bancária linha a linha)
+const DB_VERSION = 23; // v23: adiciona store "recoveryWraps" (cópia local persistente dos wraps
+                        // da Master Key por Recovery Code — antes só existiam no servidor depois
+                        // de sincronizados; agora ficam também no dispositivo para permitir
+                        // restauro 100% offline a partir de um ficheiro .ktkbackup)
 let _db = null;
 
 function openDB() {
@@ -37,6 +40,11 @@ function openDB() {
       ensure("pendingSales",     { keyPath:"id", autoIncrement:true }, [["createdAt",false],["sessionId",false],["status",false]]);
       ensure("recoveryCodes",      { keyPath:"id", autoIncrement:true }, [["userId",false],["hash",false],["usedAt",false]]);
       ensure("recoveryBackupState",{ keyPath:"key" }); // { key:"state", version, pending, lastSync }
+      // Cópia local persistente dos wraps (Master Key selada por Recovery Code)
+      // gerados em generateCodesForUser() — permite montar um .ktkbackup
+      // autossuficiente (restaurável offline), sem depender do Console.
+      // { hash, wrapVersion, iv, wrappedKey, userId, createdAt }, um por código ativo.
+      ensure("recoveryWraps", { keyPath:"hash" });
       ensure("chartOfAccounts", { keyPath:"code" }); // plano de contas PGC (classes 1-8), semeado por seedChartOfAccounts()
       ensure("journalEntries",  { keyPath:"id", autoIncrement:true },
         [["date",false],["sourceType",false],["sourceId",false]]); // lançamentos de partidas dobradas

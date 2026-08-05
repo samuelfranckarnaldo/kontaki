@@ -12,6 +12,19 @@ async function getAll() {
   }
 }
 
+// Lê todos os wraps guardados localmente — usado por backup.js para
+// montar um .ktkbackup autossuficiente (restaurável offline). Inclui
+// wraps de códigos já usados/substituídos de propósito: um backup mais
+// antigo continua restaurável com os códigos que estavam ativos na
+// altura em que foi exportado.
+export async function getAllPersistedWraps() {
+  try {
+    return await db.getAll("recoveryWraps");
+  } catch (_) {
+    return [];
+  }
+}
+
 // Gera um NOVO conjunto de 10 códigos para um utilizador — substitui
 // (histórico, nunca apaga) qualquer conjunto anterior ativo. Devolve
 // os códigos em claro UMA VEZ; localmente só se guardam os hashes.
@@ -87,6 +100,24 @@ export async function generateCodesForUser(userId) {
       const wrapped = await wrapMasterKeyWithRecoveryCode(masterKey, code, storeId);
       wraps.push({ hash: hash, wrapVersion: wrapped.wrapVersion, iv: wrapped.iv, wrappedKey: wrapped.wrappedKey });
     }
+  }
+
+  // Guarda os wraps também localmente (não só no envio ao servidor) —
+  // é o que permite montar um .ktkbackup autossuficiente mais tarde,
+  // restaurável offline sem depender do Console. Os wraps de códigos
+  // regenerados anteriormente (agora usedAt != null) ficam para trás de
+  // propósito: um backup antigo continua restaurável com os códigos que
+  // estavam ativos quando foi criado — é uma "fotografia" daquele momento.
+  const nowIso = new Date().toISOString();
+  for (const w of wraps) {
+    await db.put("recoveryWraps", {
+      hash: w.hash,
+      wrapVersion: w.wrapVersion,
+      iv: w.iv,
+      wrappedKey: w.wrappedKey,
+      userId: userId,
+      createdAt: nowIso,
+    });
   }
 
   await _markPendingAndTrySync(userId, codes, wraps);

@@ -1,6 +1,6 @@
 import { db, getAllStoreNames } from "./db.js";
 import { encryptBackup, decryptBackup, hashRecoveryCode, unwrapMasterKeyWithRecoveryCode } from "./crypto.js";
-import { hasMasterKey, getOrCreateMasterKey } from "./recovery-codes.js";
+import { hasMasterKey, getOrCreateMasterKey, getAllPersistedWraps } from "./recovery-codes.js";
 import { ensureStoreId } from "./invite.js";
 
 const CONSOLE_API = "https://kontaki-console.vercel.app/api";
@@ -76,6 +76,15 @@ export const backupService = {
       appVersion: APP_VERSION,
       sequence: sequence,
     });
+
+    // Embute os wraps (Master Key selada por Recovery Code) diretamente
+    // no ficheiro — sem isto, restaurar exigiria sempre contactar o
+    // Console para obter o wrappedMasterKey. Com os wraps embutidos, o
+    // .ktkbackup é autossuficiente: ficheiro + Recovery Code chegam para
+    // restaurar, mesmo sem rede. Isto muda o modelo de segurança do
+    // ficheiro — deixa de depender do Console como segundo fator de
+    // posse; ver aviso mostrado ao utilizador em downloadEncrypted().
+    payload.recoveryWraps = await getAllPersistedWraps();
 
     return { payload: payload, storeId: storeId, deviceId: deviceId };
   },
@@ -244,6 +253,57 @@ export const backupService = {
     try { backupPayload = await dlRes.json(); }
     catch { throw new Error("Resposta inválida ao transferir backup."); }
     if (!dlRes.ok) throw new Error(backupPayload.error || "Erro ao transferir backup.");
+
+    notify("A decifrar...");
+    let data;
+    try {
+      data = await decryptBackup(backupPayload, masterKey);
+    } catch (e) {
+      throw new Error("Backup corrompido, adulterado, ou código incorreto — não foi possível decifrar.");
+    }
+
+    notify("A restaurar dados...");
+    return await this.importObject(data);
+  },
+
+  // Restauro 100% local a partir de um ficheiro .ktkbackup — não contacta
+  // o Console em nenhum momento. Usa os wraps embutidos no próprio
+  // ficheiro (ver _buildEncryptedBackup) para desbloquear a Master Key
+  // localmente a partir do Recovery Code introduzido.
+  async restoreFromFile(fileText, recoveryCode, onStatus) {
+    const notify = onStatus || function () {};
+    notify("A ler ficheiro...");
+
+    let backupPayload;
+    try { backupPayload = JSON.parse(fileText); }
+    catch { throw new Error("Ficheiro de backup inválido ou corrompido."); }
+
+    if (!backupPayload.metadata || !backupPayload.recoveryWraps) {
+      throw new Error("Este ficheiro não contém as chaves de recuperação necessárias. Backups antigos (antes desta funcionalidade) só podem ser restaurados através do Console.");
+    }
+    if (!backupPayload.recoveryWraps.length) {
+      throw new Error("Este ficheiro não tem nenhum código de recuperação associado. Gera códigos de recuperação e cria um novo backup.");
+    }
+
+    notify("A validar código...");
+    const recoveryHash = await hashRecoveryCode(recoveryCode);
+    const wrap = backupPayload.recoveryWraps.find(function(w) { return w.hash === recoveryHash; });
+    if (!wrap) {
+      throw new Error("Código de recuperação inválido para este ficheiro. Usa um código que estava ativo quando este backup foi criado.");
+    }
+
+    notify("A desbloquear a chave da loja...");
+    const storeId = backupPayload.metadata.storeId;
+    let masterKey;
+    try {
+      masterKey = await unwrapMasterKeyWithRecoveryCode(
+        { wrapVersion: wrap.wrapVersion, wrappedKey: wrap.wrappedKey, iv: wrap.iv },
+        recoveryCode,
+        storeId
+      );
+    } catch (e) {
+      throw new Error("Não foi possível desbloquear a chave — código incorreto ou ficheiro corrompido.");
+    }
 
     notify("A decifrar...");
     let data;

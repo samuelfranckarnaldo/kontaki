@@ -121,20 +121,18 @@ async function _renderCfgGeral(store) {
   return (
     sectionLabel("Backup") +
     '<div class="vender-card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">' +
-    '<div style="font-size:13px;color:var(--text3);margin-bottom:4px;line-height:1.5">Exporta todos os dados da app para um ficheiro JSON. Usa para fazer backup ou transferir dados.</div>' +
+    '<div style="font-size:13px;color:var(--text3);margin-bottom:4px;line-height:1.5">A tua cópia de segurança principal. Cifrado e portátil — inclui os teus Recovery Codes, por isso pode ser restaurado neste ou noutro dispositivo, mesmo sem internet.</div>' +
     '<button onclick="window._exportBackupEncrypted()" style="width:100%;padding:13px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
     '<i data-lucide="shield-check" style="width:16px;height:16px"></i> Exportar Backup Seguro (.ktkbackup)</button>' +
-    '<div style="font-size:12px;color:var(--text4);margin-top:-4px;margin-bottom:4px">Cifrado, para recuperar a loja ou enviar ao Kontaki Console.</div>' +
+    '<div style="font-size:11.5px;color:#b45309;margin-top:-4px;margin-bottom:4px;line-height:1.45"><b>Guarda este ficheiro num local seguro.</b> Quem tiver este ficheiro e um dos teus Recovery Codes consegue recuperar todos os dados da loja — mesmo sem acesso ao Kontaki Console.</div>' +
     '<button id="btn-upload-backup" onclick="window._uploadBackupToConsole()" style="width:100%;padding:13px;background:var(--success);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
     '<i data-lucide="cloud-upload" style="width:16px;height:16px"></i> Enviar Backup para o Console</button>' +
-    '<div style="font-size:12px;color:var(--text4);margin-top:-4px;margin-bottom:4px">Envia o backup cifrado directamente, sem precisares de guardar o ficheiro.</div>' +
-    '<button onclick="window._exportBackup()" style="width:100%;padding:13px;background:none;border:1.5px solid var(--border2);color:var(--text2);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">' +
-    '<i data-lucide="download" style="width:16px;height:16px"></i> Exportar Dados (.json)</button>' +
-    '<div style="font-size:12px;color:var(--text4);margin-top:-4px;margin-bottom:4px">Em claro, para migração, análise ou suporte técnico.</div>' +
-    '<label style="display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border:2px dashed var(--border2);border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;color:var(--primary)">' +
-    '<i data-lucide="upload" style="width:16px;height:16px"></i> Importar backup' +
-    '<input type="file" accept=".json" style="display:none" onchange="window._importBackup(this)"/>' +
-    '</label>' +
+    '<div style="font-size:12px;color:var(--text4);margin-top:-4px;margin-bottom:4px">O mesmo backup cifrado, enviado directamente ao Console — sem precisares de guardar nem gerir o ficheiro.</div>' +
+    // Exportar/Importar .json (dados em claro) escondidos da UI de propósito —
+    // são ferramentas técnicas de suporte/migração, não um fluxo pensado
+    // para o utilizador comum. As funções window._exportBackup() e
+    // window._importBackup() continuam definidas e funcionais; só a
+    // entrada visual foi removida. Reativar: devolver este bloco.
     '</div>' +
 
     sectionLabel("Inventário") +

@@ -93,9 +93,9 @@ function showSetup() {
         '<i data-lucide="upload-cloud" style="width:15px;height:15px"></i> Restaurar Backup',
       '</button>',
       '<button id="setup-restore-file-btn" onclick="document.getElementById(\'setup-restore-file-input\').click()" style="display:inline-flex;align-items:center;gap:8px;background:none;border:1.5px solid #e4e4e7;border-radius:12px;padding:9px 14px;cursor:pointer;font-size:12.5px;font-weight:700;color:#3f3f46;font-family:inherit;transition:opacity .2s ease">',
-        '<i data-lucide="file-json" style="width:15px;height:15px"></i> Ficheiro de backup (.json)',
+        '<i data-lucide="file-json" style="width:15px;height:15px"></i> Ficheiro de backup (.ktkbackup)',
       '</button>',
-      '<input type="file" id="setup-restore-file-input" accept=".json" style="display:none" onchange="window._restoreBackupLogin(this)"/>',
+      '<input type="file" id="setup-restore-file-input" accept=".ktkbackup" style="display:none" onchange="window._restoreBackupLogin(this)"/>',
       '</div>',
     '</div>',
 
@@ -362,35 +362,62 @@ function showSetup() {
     }
   };
 
+  var _pendingRestoreFileText = null;
+
   window._restoreBackupLogin = async function(input) {
     var file = input.files[0];
     if (!file) return;
     input.value = "";
 
-    var spinnerOverlay = document.createElement("div");
-    spinnerOverlay.id = "restore-spinner-overlay";
-    spinnerOverlay.style.cssText = "position:fixed;inset:0;background:rgba(255,255,255,.96);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:inherit";
-    spinnerOverlay.innerHTML =
-      '<div style="width:38px;height:38px;border:3px solid #ede9fe;border-top-color:#5b21b6;border-radius:50%;animation:restoreSpin .8s linear infinite"></div>' +
-      '<div style="font-size:13.5px;font-weight:600;color:#3f3f46">A restaurar o backup\u2026</div>';
-    document.body.appendChild(spinnerOverlay);
-
-    if (!document.getElementById("restore-spin-style")) {
-      var spinStyle = document.createElement("style");
-      spinStyle.id = "restore-spin-style";
-      spinStyle.textContent = "@keyframes restoreSpin { to { transform: rotate(360deg) } }";
-      document.head.appendChild(spinStyle);
+    try {
+      _pendingRestoreFileText = await file.text();
+    } catch (err) {
+      toast("Não foi possível ler o ficheiro.", "error");
+      return;
     }
 
+    openModal("Restaurar de ficheiro",
+      '<div style="font-size:13px;color:var(--text3);line-height:1.5;margin-bottom:16px">Introduz um dos Recovery Codes que estava ativo quando este backup foi criado.</div>' +
+      '<div class="field" style="margin-bottom:14px"><label>Recovery Code</label><input id="restore-file-code" placeholder="XXXX-XXXX"/></div>' +
+      '<div id="restore-file-status" style="font-size:12.5px;color:#71717a;margin-bottom:12px;min-height:16px"></div>' +
+      '<div class="form-actions">' +
+      '<button class="btn btn-ghost btn-full" onclick="window._closeModal()">Cancelar</button>' +
+      '<button class="btn btn-primary btn-full" id="restore-file-submit" onclick="window._submitRestoreFromFile()"><i data-lucide="file-json"></i> Restaurar</button>' +
+      '</div>');
+    var mo = document.getElementById("modal-overlay");
+    if (mo) mo.style.zIndex = "10002";
+    refreshIcons(document.getElementById("modal-box"));
+  };
+
+  window._submitRestoreFromFile = async function() {
+    var codeEl = document.getElementById("restore-file-code");
+    var statusEl = document.getElementById("restore-file-status");
+    var submitBtn = document.getElementById("restore-file-submit");
+    var code = codeEl ? codeEl.value.trim() : "";
+
+    if (!code) {
+      if (statusEl) statusEl.textContent = "Introduz o Recovery Code.";
+      return;
+    }
+    if (!_pendingRestoreFileText) {
+      if (statusEl) statusEl.textContent = "Ficheiro perdido — seleciona-o novamente.";
+      return;
+    }
+
+    if (submitBtn) submitBtn.disabled = true;
+
     try {
-      var text = await file.text();
-      var results = await backupService.import(text);
+      var results = await backupService.restoreFromFile(_pendingRestoreFileText, code, function(msg) {
+        if (statusEl) statusEl.textContent = msg;
+      });
       var total = Object.values(results).reduce(function(a, b) { return a + b; }, 0);
+      closeModal();
       toast("Backup restaurado: " + total + " registos.", "success");
       setTimeout(function() { window.location.reload(); }, 600);
     } catch (err) {
-      spinnerOverlay.remove();
-      toast("Erro ao restaurar: " + err.message, "error");
+      if (statusEl) statusEl.textContent = "";
+      toast(err.message || "Erro ao restaurar backup.", "error");
+      if (submitBtn) submitBtn.disabled = false;
     }
   };
 
