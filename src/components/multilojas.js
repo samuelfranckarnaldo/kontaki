@@ -2235,30 +2235,40 @@ function _mlRegistoSkelRow(isLast) {
 
 async function _renderRegistos(wrap) {
   var _token = _mlRenderToken;
-  wrap.innerHTML =
-    '<div style="margin-bottom:14px">' +
-      '<div class="skel-line hist-skel" style="width:70px;height:15px;margin-bottom:6px"></div>' +
-      '<div class="skel-line hist-skel" style="width:160px;height:11px"></div>' +
-    '</div>' +
-    '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
-      _mlRegistoSkelRow(false) +
-      _mlRegistoSkelRow(false) +
-      _mlRegistoSkelRow(false) +
-      _mlRegistoSkelRow(false) +
-      _mlRegistoSkelRow(true) +
-    '</div>';
-  await _mlMinDelay(280);
-  if (_token !== _mlRenderToken) return;
 
   if (!_mlStoresCache || !_mlStoresCache.length) {
     wrap.innerHTML = _errorHtml("Sem lojas para mostrar.");
     return;
   }
 
+  var cacheKey = _mlCacheKey("registos", _mlSelectedStoreId);
+  var cached = _mlCacheGet(cacheKey);
+
+  if (cached) {
+    _mlRegistosAllEntries = cached.data;
+    _mlRenderRegistosList(wrap);
+    if (cached.isFresh) return;
+  } else {
+    wrap.innerHTML =
+      '<div style="margin-bottom:14px">' +
+        '<div class="skel-line hist-skel" style="width:70px;height:15px;margin-bottom:6px"></div>' +
+        '<div class="skel-line hist-skel" style="width:160px;height:11px"></div>' +
+      '</div>' +
+      '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
+        _mlRegistoSkelRow(false) +
+        _mlRegistoSkelRow(false) +
+        _mlRegistoSkelRow(false) +
+        _mlRegistoSkelRow(false) +
+        _mlRegistoSkelRow(true) +
+      '</div>';
+    await _mlMinDelay(280);
+    if (_token !== _mlRenderToken) return;
+  }
+
   var allEntries = await _fetchRealAuditLog();
   if (_token !== _mlRenderToken) return;
   if (allEntries === null) {
-    wrap.innerHTML = _errorHtml("Não foi possível carregar os registos.");
+    if (!cached) wrap.innerHTML = _errorHtml("Não foi possível carregar os registos.");
     return;
   }
 
@@ -2266,6 +2276,7 @@ async function _renderRegistos(wrap) {
     ? allEntries
     : allEntries.filter(function(e) { return e.storeId === _mlSelectedStoreId; });
 
+  _mlCacheSet(cacheKey, storeEntries);
   _mlRegistosAllEntries = storeEntries;
   _mlRenderRegistosList(wrap);
 }
