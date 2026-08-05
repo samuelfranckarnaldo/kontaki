@@ -93,6 +93,25 @@ async function boot() {
     document.getElementById("login-page").style.display = "none";
     document.getElementById("app").style.display = "flex";
     if (window.router) setTimeout(() => window.router.init(), 100);
+
+    // Licença já revogada localmente (offline desde o arranque) — não
+    // carrega o dashboard, mesmo com sessão restaurada. Sem isto, o
+    // router.go() nunca corre neste caminho (router.init() só liga
+    // listeners de clique) e o lockout ficava por disparar até o
+    // utilizador navegar manualmente.
+    const { getLicense, showRevokedLockout, showLicenseReplacedScreen } = await import("./license.js");
+    var _licStatus = getLicense().status;
+    if (_licStatus === "revoked") {
+      showRevokedLockout();
+      if (window.lucide) window.lucide.createIcons();
+      return;
+    }
+    if (_licStatus === "replaced") {
+      showLicenseReplacedScreen();
+      if (window.lucide) window.lucide.createIcons();
+      return;
+    }
+
     import("./components/dashboard.js").then(m => {
       if (m.loadDashboard) m.loadDashboard();
     }).catch(() => {});

@@ -5,14 +5,46 @@ import { openModal, closeModal } from "../modal.js";
 import { toast } from "../toast.js";
 import { openPicker } from "../picker.js";
 import { canOpenWorkspace } from "../license.js";
+import { CHART_OF_ACCOUNTS } from "../pgc.js";
+import { kpi, skeletonKpi } from "./historico.js";
+import { _fallbackCopy } from "../setup.js";
 
 var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
 var _mlActiveTab = "resumo";
 var _mlSelectedStoreId = "all"; // "all" ou o id (uuid) de uma loja
 var _mlRenderToken = 0; // incrementado a cada troca de aba/loja — protege contra race condition de fetches lentos
+
+// ── CACHE STALE-WHILE-REVALIDATE ─────────────────────────────────────
+// So dados (nunca HTML) sao cacheados, por chave "aba+loja". Usado
+// apenas pelas abas classificadas como "pesadas, nao criticas ao
+// segundo": Resumo, Escritorio, Registos. Incidentes/BI/Contabilidade
+// fazem sempre fetch fresco (decisoes que dependem de precisao imediata).
+var _ML_CACHE_TTL_MS = 45000;
+var _mlCache = {}; // key -> { data, savedAt }
+
+function _mlCacheKey(tab, storeId) {
+  return tab + ":" + (storeId || "all");
+}
+
+function _mlCacheGet(key) {
+  var entry = _mlCache[key];
+  if (!entry) return null;
+  var age = Date.now() - entry.savedAt;
+  return { data: entry.data, isFresh: age < _ML_CACHE_TTL_MS };
+}
+
+function _mlCacheSet(key, data) {
+  _mlCache[key] = { data: data, savedAt: Date.now() };
+}
+
+function _mlCacheClear() {
+  _mlCache = {};
+}
 var _mlResumoSalesCache = null; // vendas da loja atual no Resumo, para o modal "Ver histórico completo"
 var _mlResumoStoreName = null;
+var _mlEscritorioPendingUpdate = null; // dados novos que chegaram durante uma edicao em curso, ainda nao aplicados
+var _mlEscritorioPendingStoreId = null;
 var _mlStoresCache = null;      // [{id, name, status, lastSeenAt, salesThisMonth}, ...]
 var _mlChartInstance = null;
 var _mlAuthMode = "login"; // login | register — estado do ecrã de autenticação Workspace
@@ -168,7 +200,7 @@ window._mlOpenStoreMenu = function() {
   openModal("Mais opções",
     '<div class="hist-export-options">' +
     items.map(function(it) {
-      return '<button class="hist-export-option" onclick="window._closeModal();' + it.action + '">' +
+      return '<button class="hist-export-option" onclick="window._closeModal(); setTimeout(function(){ ' + it.action + '; }, 50);">' +
         '<div class="hist-export-icon ' + it.iconClass + '"><i data-lucide="' + it.icon + '"></i></div>' +
         '<div class="hist-export-info">' +
         '<div class="hist-export-title">' + it.label + '</div>' +
@@ -443,16 +475,61 @@ window._mlSubmitAuth = async function() {
 };
 
 function _mlShowRecoveryCodes(codes) {
+  window._mlRecoveryCodesCache = codes;
   var body =
     '<div style="font-size:12.5px;color:var(--text3);margin-bottom:14px;line-height:1.5">Guarda estes códigos num local seguro. Cada um serve para recuperar a tua senha uma única vez e não podem ser mostrados de novo.</div>' +
     '<div style="background:var(--bg,#f4f4f5);border-radius:var(--radius-sm);padding:12px;font-family:monospace;font-size:13px;line-height:2;text-align:center">' +
       codes.join("<br>") +
     '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:14px">' +
+      '<button class="btn btn-ghost" style="flex:1;padding:11px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px" onclick="window._mlCopyRecoveryCodes()">' +
+        '<i data-lucide="copy" style="width:14px;height:14px"></i> Copiar' +
+      '</button>' +
+      '<button class="btn btn-ghost" style="flex:1;padding:11px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px" onclick="window._mlDownloadRecoveryCodes()">' +
+        '<i data-lucide="download" style="width:14px;height:14px"></i> Baixar' +
+      '</button>' +
+    '</div>' +
     '<div class="form-actions" style="margin-top:16px">' +
       '<button class="btn btn-primary btn-full" onclick="window._closeModal(); window._mlReturnAfterRegister();">Já guardei, continuar</button>' +
     '</div>';
   openModal("Códigos de recuperação", body);
+  refreshIcons(document.getElementById("modal-box") || document.body);
 }
+
+window._mlCopyRecoveryCodes = function() {
+  var codes = window._mlRecoveryCodesCache || [];
+  var text = codes.join("\n");
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(function() { toast("Códigos copiados.", "success"); })
+      .catch(function() { _fallbackCopy(text); });
+  } else {
+    _fallbackCopy(text);
+  }
+};
+
+window._mlDownloadRecoveryCodes = function() {
+  var codes = window._mlRecoveryCodesCache || [];
+  var now = new Date();
+  var dataCriacao = now.toLocaleDateString("pt-AO", { day: "2-digit", month: "2-digit", year: "numeric" });
+  var isoDate = now.toISOString().slice(0, 10);
+  var conteudo =
+    "KONTAKI — CÓDIGOS DE RECUPERAÇÃO (WORKSPACE)\n" +
+    "Data de criação: " + dataCriacao + "\n" +
+    "Cada código só pode ser usado uma vez. Guarda este ficheiro num local seguro.\n" +
+    "\n" +
+    codes.join("\n") + "\n";
+  var blob = new Blob([conteudo], { type: "text/plain;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "Kontaki-workspace-recovery-" + isoDate + ".txt";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast("Ficheiro descarregado.", "success");
+};
 
 window._mlReturnAfterRegister = function() {
   toast("Conta criada.", "success");
@@ -555,18 +632,164 @@ async function _renderContent() {
   if (_mlActiveTab === "escritorio") { return _renderEscritorio(wrap); }
   if (_mlActiveTab === "registros")  { return _renderRegistos(wrap); }
   if (_mlActiveTab === "bi")         { return _renderBI(wrap); }
-  if (_mlActiveTab === "contabilidade") { return _renderContabilidadePlaceholder(wrap); }
+  if (_mlActiveTab === "contabilidade") { return _renderContabilidade(wrap); }
 }
 
-function _renderContabilidadePlaceholder(wrap) {
-  wrap.innerHTML = '<div class="empty-state">' +
-    '<i data-lucide="landmark"></i>' +
-    '<div class="empty-state-title">Em breve</div>' +
-    '<div class="empty-state-sub">A contabilidade consolidada fica disponível quando os lançamentos (PGC) forem sincronizados para o Console.</div>' +
-  '</div>';
+function _accountName(code) {
+  var acc = CHART_OF_ACCOUNTS.find(function(c) { return c.code === code; });
+  return acc ? acc.name : ("Conta " + code);
+}
+
+async function _renderContabilidade(wrap) {
+  if (_mlSelectedStoreId === "all") {
+    wrap.innerHTML =
+      '<div class="empty-state">' +
+        '<i data-lucide="landmark"></i>' +
+        '<div class="empty-state-title">Escolhe uma loja</div>' +
+        '<div class="empty-state-sub">A contabilidade é vista uma loja de cada vez. Seleciona uma loja no topo para continuar.</div>' +
+      '</div>';
+    refreshIcons(wrap);
+    return;
+  }
+
+  var store = (_mlStoresCache || []).find(function(s) { return s.id === _mlSelectedStoreId; });
+  if (!store) {
+    wrap.innerHTML = _errorHtml("Sem lojas para mostrar.");
+    return;
+  }
+
+  function skeletonContaRow() {
+    return '<div class="hist-mov-item hist-mov-item--compact hist-skel" style="border-left:3px solid var(--border)">' +
+      '<div class="skel-circle" style="width:40px;height:40px;margin-right:0"></div>' +
+      '<div style="flex:1;min-width:0;padding-left:12px">' +
+        '<div class="skel-line skel-line--title" style="width:55%"></div>' +
+        '<div class="skel-line skel-line--sub" style="width:30%"></div>' +
+      '</div>' +
+      '<div class="skel-line skel-line--price"></div>' +
+    '</div>';
+  }
+
+  wrap.innerHTML =
+    '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center" class="hist-skel">' +
+      '<div style="flex:1">' +
+        '<div class="skel-line skel-line--label"></div>' +
+        '<div class="skel-line skel-line--title" style="width:40%;margin-top:6px"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="hist-stats-grid" style="margin-bottom:18px">' +
+      skeletonKpi() + skeletonKpi() + skeletonKpi() + skeletonKpi() +
+    '</div>' +
+    '<div class="hist-mov-card">' +
+      skeletonContaRow() + skeletonContaRow() + skeletonContaRow() + skeletonContaRow() +
+    '</div>';
+
+  var res, data, balRes, balData;
+  try {
+    res = await _mlAuthFetch("/reports/multi-store/store/" + encodeURIComponent(store.id) + "/accounting");
+    data = await res.json();
+    balRes = await _mlAuthFetch("/reports/multi-store/store/" + encodeURIComponent(store.id));
+    balData = await balRes.json();
+  } catch (e) {
+    wrap.innerHTML = _errorHtml("Sem ligação à internet.");
+    return;
+  }
+  if (res.status === 401) { loadMultilojas(); return; }
+  if (!res.ok || !data || !data.success) {
+    wrap.innerHTML = _errorHtml((data && data.error) || "Erro ao carregar contabilidade.");
+    return;
+  }
+
+  var acc = data.accounting;
+  var balances = (balRes.ok && balData && balData.success && balData.balances) ? balData.balances : { cash: null, bank: null };
+
+  if (!acc.available) {
+    wrap.innerHTML =
+      '<div class="empty-state">' +
+        '<i data-lucide="landmark"></i>' +
+        '<div class="empty-state-title">Sem dados ainda</div>' +
+        '<div class="empty-state-sub">' + acc.message + ' (' + acc.period + ').</div>' +
+      '</div>';
+    refreshIcons(wrap);
+    return;
+  }
+
+  var breakdown = acc.breakdown || {};
+  var receitaCodes = Object.keys(breakdown).filter(function(code) {
+    var a = CHART_OF_ACCOUNTS.find(function(c) { return c.code === code; });
+    return a && a.tipo === "proveito" && breakdown[code];
+  }).sort(function(a, b) { return breakdown[b] - breakdown[a]; });
+  var custoCodes = Object.keys(breakdown).filter(function(code) {
+    var a = CHART_OF_ACCOUNTS.find(function(c) { return c.code === code; });
+    return a && a.tipo === "custo" && breakdown[code];
+  }).sort(function(a, b) { return breakdown[b] - breakdown[a]; });
+
+  function contaEmptyRow(msg) {
+    return '<div style="padding:16px;text-align:center;font-size:12px;color:var(--text4)">' + msg + '</div>';
+  }
+
+  function contaItemHtml(code, tone) {
+    var color = tone === "receita" ? "var(--success)" : "var(--danger)";
+    var icon = tone === "receita" ? "trending-up" : "trending-down";
+    return '<div class="hist-mov-item hist-mov-item--compact" style="border-left:3px solid ' + color + '">' +
+      '<div class="hist-mov-icon" style="background:' + color + '1a;color:' + color + '"><i data-lucide="' + icon + '" style="width:18px;height:18px"></i></div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="hist-mov-name">' + _accountName(code) + '</div>' +
+        '<div class="hist-mov-meta">Conta ' + code + '</div>' +
+      '</div>' +
+      '<div style="text-align:right;flex-shrink:0">' +
+        '<div class="hist-mov-qty" style="color:' + color + '">' + fmt(breakdown[code]) + '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  var resultadoColor = acc.resultadoLiquido >= 0 ? "var(--success)" : "var(--danger)";
+
+  var statusMeta = acc.closed
+    ? { label: "Fechado", color: "var(--text3)", bg: "var(--bg,#f4f4f5)" }
+    : { label: "Em curso", color: "var(--primary,#5b21b6)", bg: "var(--primary-light,#ede9fe)" };
+
+  wrap.innerHTML =
+    '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">' +
+      '<div>' +
+        '<div style="font-size:10.5px;font-weight:700;color:var(--primary,#5b21b6);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Contabilidade</div>' +
+        '<div style="font-size:14px;font-weight:700;color:var(--text2)">Período ' + acc.period + '</div>' +
+      '</div>' +
+      '<span style="font-size:11px;font-weight:700;color:' + statusMeta.color + ';background:' + statusMeta.bg + ';padding:4px 10px;border-radius:20px">' + statusMeta.label + '</span>' +
+    '</div>' +
+    '<div class="hist-stats-grid" style="margin-bottom:18px">' +
+      kpi("Receita", fmt(acc.totalReceita), "var(--success)", "", null) +
+      kpi("Custos", fmt(acc.totalCustos), "var(--danger)", "", null) +
+      kpi("Resultado", fmt(acc.resultadoLiquido), resultadoColor, "líquido", acc.resultadoLiquido < 0 ? "hist-kpi--danger" : null) +
+      kpi("Contas", receitaCodes.length + custoCodes.length, "var(--info)", "movimentadas", null) +
+    '</div>' +
+    ((balances.cash !== null || balances.bank !== null) ?
+    ('<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Posição de caixa</div>' +
+     '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;margin-bottom:18px">' +
+       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">' +
+         '<div>' +
+           '<div style="font-size:10.5px;color:var(--text4);margin-bottom:2px">Caixa</div>' +
+           '<div style="font-size:18px;font-weight:800;color:var(--text)">' + (balances.cash !== null ? fmt(balances.cash) : "—") + '</div>' +
+         '</div>' +
+         '<div>' +
+           '<div style="font-size:10.5px;color:var(--text4);margin-bottom:2px">Banco</div>' +
+           '<div style="font-size:18px;font-weight:800;color:var(--text)">' + (balances.bank !== null ? fmt(balances.bank) : "—") + '</div>' +
+         '</div>' +
+       '</div>' +
+       '<div style="font-size:11px;color:var(--text4)">Total combinado: ' + fmt((balances.cash||0) + (balances.bank||0)) + '</div>' +
+     '</div>') : '') +
+    '<div class="hist-mov-card">' +
+      '<div class="hist-day-label--inset"><i data-lucide="trending-up" style="width:13px;height:13px"></i>Receita por conta' + (receitaCodes.length ? ' (' + receitaCodes.length + ')' : '') + '</div>' +
+      (receitaCodes.length
+        ? receitaCodes.map(function(c) { return contaItemHtml(c, "receita"); }).join("")
+        : contaEmptyRow("Sem receita neste período")) +
+      '<div class="hist-day-label--inset"><i data-lucide="trending-down" style="width:13px;height:13px"></i>Custos por conta' + (custoCodes.length ? ' (' + custoCodes.length + ')' : '') + '</div>' +
+      (custoCodes.length
+        ? custoCodes.map(function(c) { return contaItemHtml(c, "custo"); }).join("")
+        : contaEmptyRow("Sem custos neste período")) +
+    '</div>';
+
   refreshIcons(wrap);
 }
-
 
 // ── INCIDENTES — dados reais (por loja e agregados) ─────────────────────
 
@@ -751,6 +974,40 @@ var _mlWorkspaceLastExport = null;
 var _mlWorkspaceDiffData = null;
 var _mlWorkspaceDiffError = null;
 
+function _mlApplyEscritorioData(store, d) {
+  _mlEspelhoProducts = (d.storeData.products && d.storeData.products.items) || [];
+  _mlEscritorioSession = d.storeData.session || { available: false, message: "Sem sessões sincronizadas ainda" };
+  _mlEscritorioBalances = d.storeData.balances || { cash: null, bank: null };
+  _mlWorkspaceStoreId = store.id;
+  _mlWorkspaceStoreName = store.name;
+  _mlEscritorioView = "turno";
+  _mlWorkspaceSubView = "list";
+  _mlWorkspaceEditingCatalogId = null;
+  _mlEscritorioStoreId = store.id;
+  if (!d.wsData.hasWorkspace) {
+    _mlWorkspaceCache = null;
+    _mlWorkspaceProducts = null;
+    _mlWorkspaceLastExport = d.wsData.lastExport || null;
+  } else {
+    _mlWorkspaceCache = d.wsData.workspace;
+    _mlWorkspaceProducts = d.wsData.products || [];
+  }
+  _mlInventarioReports = d.invData;
+}
+
+window._mlApplyPendingEscritorioUpdate = function() {
+  if (!_mlEscritorioPendingUpdate) return;
+  var store = (_mlStoresCache || []).find(function(s) { return s.id === _mlEscritorioPendingStoreId; });
+  if (!store) { _mlEscritorioPendingUpdate = null; _mlEscritorioPendingStoreId = null; return; }
+  var cacheKey = _mlCacheKey("escritorio", store.id);
+  _mlCacheSet(cacheKey, _mlEscritorioPendingUpdate);
+  _mlApplyEscritorioData(store, _mlEscritorioPendingUpdate);
+  _mlEscritorioPendingUpdate = null;
+  _mlEscritorioPendingStoreId = null;
+  var wrap = document.getElementById("multilojas-content");
+  if (wrap) _mlRenderEscritorioContent(wrap, store);
+};
+
 async function _renderEscritorio(wrap) {
   var _token = _mlRenderToken;
 
@@ -771,18 +1028,32 @@ async function _renderEscritorio(wrap) {
     return;
   }
 
-  wrap.innerHTML =
-    '<div class="skel-line hist-skel" style="height:40px;border-radius:var(--radius-lg);margin-bottom:14px"></div>' +
-    '<div class="hist-mov-card hist-skel">' +
-      '<div class="skel-line skel-line--label" style="margin-bottom:6px"></div>' +
-      '<div class="skel-line skel-line--title" style="margin-bottom:14px"></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
-        '<div class="skel-line hist-skel" style="height:52px;border-radius:var(--radius-sm)"></div>' +
-        '<div class="skel-line hist-skel" style="height:52px;border-radius:var(--radius-sm)"></div>' +
-      '</div>' +
-    '</div>';
-  await _mlMinDelay(280);
-  if (_token !== _mlRenderToken) return;
+  var cacheKey = _mlCacheKey("escritorio", store.id);
+  var cached = _mlCacheGet(cacheKey);
+
+  if (_mlEscritorioPendingStoreId !== store.id) {
+    _mlEscritorioPendingUpdate = null;
+    _mlEscritorioPendingStoreId = null;
+  }
+
+  if (cached) {
+    _mlApplyEscritorioData(store, cached.data);
+    _mlRenderEscritorioContent(wrap, store);
+    if (cached.isFresh) return;
+  } else {
+    wrap.innerHTML =
+      '<div class="skel-line hist-skel" style="height:40px;border-radius:var(--radius-lg);margin-bottom:14px"></div>' +
+      '<div class="hist-mov-card hist-skel">' +
+        '<div class="skel-line skel-line--label" style="margin-bottom:6px"></div>' +
+        '<div class="skel-line skel-line--title" style="margin-bottom:14px"></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+          '<div class="skel-line hist-skel" style="height:52px;border-radius:var(--radius-sm)"></div>' +
+          '<div class="skel-line hist-skel" style="height:52px;border-radius:var(--radius-sm)"></div>' +
+        '</div>' +
+      '</div>';
+    await _mlMinDelay(280);
+    if (_token !== _mlRenderToken) return;
+  }
 
   var storeRes, storeData;
   try {
@@ -790,24 +1061,15 @@ async function _renderEscritorio(wrap) {
     storeData = await storeRes.json();
   } catch (e) {
     if (_token !== _mlRenderToken) return;
-    wrap.innerHTML = _errorHtml("Sem ligação à internet.");
+    if (!cached) wrap.innerHTML = _errorHtml("Sem ligação à internet.");
     return;
   }
   if (_token !== _mlRenderToken) return;
   if (storeRes.status === 401) { loadMultilojas(); return; }
   if (!storeRes.ok || !storeData || !storeData.success) {
-    wrap.innerHTML = _errorHtml((storeData && storeData.error) || "Erro ao carregar dados da loja.");
+    if (!cached) wrap.innerHTML = _errorHtml((storeData && storeData.error) || "Erro ao carregar dados da loja.");
     return;
   }
-  _mlEspelhoProducts = (storeData.products && storeData.products.items) || [];
-  _mlEscritorioSession = storeData.session || { available: false, message: "Sem sessões sincronizadas ainda" };
-  _mlEscritorioBalances = storeData.balances || { cash: null, bank: null };
-
-  _mlWorkspaceStoreId = store.id;
-  _mlWorkspaceStoreName = store.name;
-  _mlEscritorioView = "turno";
-  _mlWorkspaceSubView = "list";
-  _mlWorkspaceEditingCatalogId = null;
 
   var wsRes, wsData;
   try {
@@ -815,24 +1077,14 @@ async function _renderEscritorio(wrap) {
     wsData = await wsRes.json();
   } catch (e) {
     if (_token !== _mlRenderToken) return;
-    wrap.innerHTML = _errorHtml("Sem ligação à internet.");
+    if (!cached) wrap.innerHTML = _errorHtml("Sem ligação à internet.");
     return;
   }
   if (_token !== _mlRenderToken) return;
   if (wsRes.status === 401) { loadMultilojas(); return; }
   if (!wsRes.ok || !wsData || !wsData.success) {
-    wrap.innerHTML = _errorHtml((wsData && wsData.error) || "Erro ao carregar workspace.");
+    if (!cached) wrap.innerHTML = _errorHtml((wsData && wsData.error) || "Erro ao carregar workspace.");
     return;
-  }
-
-  _mlEscritorioStoreId = store.id;
-  if (!wsData.hasWorkspace) {
-    _mlWorkspaceCache = null;
-    _mlWorkspaceProducts = null;
-    _mlWorkspaceLastExport = wsData.lastExport || null;
-  } else {
-    _mlWorkspaceCache = wsData.workspace;
-    _mlWorkspaceProducts = wsData.products || [];
   }
 
   var invRes, invData;
@@ -842,9 +1094,23 @@ async function _renderEscritorio(wrap) {
   } catch (e) {
     invData = null;
   }
-  _mlInventarioReports = (invData && invData.success) ? (invData.reports || []) : [];
+  var inventarioReports = (invData && invData.success) ? (invData.reports || []) : [];
 
   if (_token !== _mlRenderToken) return;
+
+  var combined = { storeData: storeData, wsData: wsData, invData: inventarioReports };
+
+  // Se entretanto o utilizador comecou a editar (raro, mas possivel se
+  // o fetch em segundo plano demorar), nao sobrescrever o que esta a
+  // fazer — guarda os dados novos para aplicar so quando ele decidir.
+  if (_mlWorkspaceSubView !== "list" && _mlEscritorioStoreId === store.id) {
+    _mlEscritorioPendingUpdate = combined;
+    _mlEscritorioPendingStoreId = store.id;
+    return;
+  }
+
+  _mlCacheSet(cacheKey, combined);
+  _mlApplyEscritorioData(store, combined);
   _mlRenderEscritorioContent(wrap, store);
 }
 
@@ -1389,7 +1655,18 @@ function _mlRenderEscritorioContent(wrap, store) {
     sectionHtml = '<div id="ml-workspace-section">' + _mlWorkspaceSectionHtml() + '</div>';
   }
 
-  wrap.innerHTML = _mlEscritorioPickerHtml() + sectionHtml;
+  var pendingBanner = (_mlEscritorioPendingUpdate && _mlEscritorioPendingStoreId === store.id)
+    ? '<div class="esc-conflict-banner">' +
+        '<i data-lucide="refresh-cw"></i>' +
+        '<div style="flex:1">' +
+          '<div class="esc-conflict-title">Existem alterações novas nesta loja</div>' +
+          '<div class="esc-conflict-sub">Os dados foram atualizados no servidor enquanto editavas. Atualizar agora?</div>' +
+        '</div>' +
+        '<button onclick="window._mlApplyPendingEscritorioUpdate()" style="font-size:11px;font-weight:700;color:#92400e;background:none;border:none;cursor:pointer;font-family:inherit;flex-shrink:0;white-space:nowrap">Atualizar</button>' +
+      '</div>'
+    : '';
+
+  wrap.innerHTML = pendingBanner + _mlEscritorioPickerHtml() + sectionHtml;
   refreshIcons(wrap);
 }
 
@@ -1696,9 +1973,15 @@ var ENTITY_LABELS = {
 function _mlAuditDetail(a) {
   var entityLabel = ENTITY_LABELS[a.entityType] || a.entityType || "registo";
   var capitalized = entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1);
-  if (a.changes && typeof a.changes === "object") {
-    var fields = Object.keys(a.changes);
+  // logAudit() no Kontaki grava "changes" como array de {field, before, after},
+  // nunca como objeto simples — por isso lemos c.field, não Object.keys().
+  if (Array.isArray(a.changes) && a.changes.length) {
+    var fields = a.changes.map(function(c) { return c && c.field; }).filter(Boolean);
     if (fields.length) return capitalized + " · " + fields.join(", ");
+  } else if (a.changes && typeof a.changes === "object" && !Array.isArray(a.changes)) {
+    // Compatibilidade com um eventual formato antigo em objeto simples.
+    var keys = Object.keys(a.changes);
+    if (keys.length) return capitalized + " · " + keys.join(", ");
   }
   return capitalized + (a.entityId ? " #" + a.entityId : "");
 }
@@ -1725,9 +2008,33 @@ async function _fetchRealAuditLog() {
   }
 }
 
+function _mlRegistoSkelRow(isLast) {
+  return '<div style="display:flex;gap:10px;padding:12px 14px;' + (isLast ? '' : 'border-bottom:1px solid #f4f4f5;') + '">' +
+    '<div class="skel-line hist-skel" style="width:15px;height:15px;border-radius:4px;flex-shrink:0;margin-top:1px"></div>' +
+    '<div style="flex:1;min-width:0">' +
+      '<div class="skel-line skel-line--title" style="margin-bottom:6px"></div>' +
+      '<div class="skel-line skel-line--sub"></div>' +
+    '</div>' +
+    '<div class="skel-line hist-skel" style="width:28px;height:10px;flex-shrink:0"></div>' +
+  '</div>';
+}
+
 async function _renderRegistos(wrap) {
   var _token = _mlRenderToken;
-  wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
+  wrap.innerHTML =
+    '<div style="margin-bottom:14px">' +
+      '<div class="skel-line hist-skel" style="width:70px;height:15px;margin-bottom:6px"></div>' +
+      '<div class="skel-line hist-skel" style="width:160px;height:11px"></div>' +
+    '</div>' +
+    '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);overflow:hidden">' +
+      _mlRegistoSkelRow(false) +
+      _mlRegistoSkelRow(false) +
+      _mlRegistoSkelRow(false) +
+      _mlRegistoSkelRow(false) +
+      _mlRegistoSkelRow(true) +
+    '</div>';
+  await _mlMinDelay(280);
+  if (_token !== _mlRenderToken) return;
 
   if (!_mlStoresCache || !_mlStoresCache.length) {
     wrap.innerHTML = _errorHtml("Sem lojas para mostrar.");
@@ -1775,47 +2082,7 @@ async function _renderRegistos(wrap) {
 
 // ── RESUMO — TODAS AS LOJAS ────────────────────────────────────────────
 
-async function _renderResumoAgregado(wrap) {
-  var _token = _mlRenderToken;
-  wrap.innerHTML =
-    '<div class="skel-line skel-line--title" style="margin-bottom:6px;width:45%"></div>' +
-    '<div class="skel-line skel-line--sub" style="margin-bottom:20px;width:30%"></div>' +
-    '<div class="hist-mov-card hist-skel" style="margin-bottom:20px;height:200px"></div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px">' +
-      '<div class="prod-stat-card hist-skel" style="height:96px"></div>' +
-      '<div class="prod-stat-card hist-skel" style="height:96px"></div>' +
-    '</div>' +
-    '<div class="hist-mov-card hist-skel">' +
-      '<div class="skel-line skel-line--title" style="margin-bottom:12px"></div>' +
-      '<div class="skel-line skel-line--sub" style="margin-bottom:10px"></div>' +
-      '<div class="skel-line skel-line--sub"></div>' +
-    '</div>';
-  await _mlMinDelay(280);
-  if (_token !== _mlRenderToken) return;
-
-  var res;
-  try {
-    res = await _mlAuthFetch("/reports/multi-store/summary?days=30");
-  } catch (e) {
-    if (_token !== _mlRenderToken) return;
-    wrap.innerHTML = _errorHtml("Sem ligação à internet. Verifica a rede e tenta novamente.");
-    return;
-  }
-  if (_token !== _mlRenderToken) return;
-
-  if (res.status === 401) { loadMultilojas(); return; }
-
-  if (!res.ok) {
-    var errData = await res.json().catch(function() { return {}; });
-    if (_token !== _mlRenderToken) return;
-    wrap.innerHTML = _errorHtml(errData.error || "Erro ao carregar o resumo.");
-    return;
-  }
-
-  var data = await res.json();
-  if (_token !== _mlRenderToken) return;
-  if (!data || !data.success) { wrap.innerHTML = _errorHtml("Resposta inválida do servidor."); return; }
-
+function _mlDrawResumoAgregado(wrap, data) {
   var multiStore = data.storeCount > 1;
 
   wrap.innerHTML =
@@ -1855,6 +2122,62 @@ async function _renderResumoAgregado(wrap) {
 
   refreshIcons(wrap);
   _renderTrendChart(data.trend.days, data.trend.values);
+}
+
+async function _renderResumoAgregado(wrap) {
+  var _token = _mlRenderToken;
+  var cacheKey = _mlCacheKey("resumo", "all");
+  var cached = _mlCacheGet(cacheKey);
+
+  if (cached) {
+    _mlDrawResumoAgregado(wrap, cached.data);
+    if (cached.isFresh) return;
+  } else {
+    wrap.innerHTML =
+      '<div class="skel-line skel-line--title" style="margin-bottom:6px;width:45%"></div>' +
+      '<div class="skel-line skel-line--sub" style="margin-bottom:20px;width:30%"></div>' +
+      '<div class="hist-mov-card hist-skel" style="margin-bottom:20px;height:200px"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px">' +
+        '<div class="prod-stat-card hist-skel" style="height:96px"></div>' +
+        '<div class="prod-stat-card hist-skel" style="height:96px"></div>' +
+      '</div>' +
+      '<div class="hist-mov-card hist-skel">' +
+        '<div class="skel-line skel-line--title" style="margin-bottom:12px"></div>' +
+        '<div class="skel-line skel-line--sub" style="margin-bottom:10px"></div>' +
+        '<div class="skel-line skel-line--sub"></div>' +
+      '</div>';
+    await _mlMinDelay(280);
+    if (_token !== _mlRenderToken) return;
+  }
+
+  var res;
+  try {
+    res = await _mlAuthFetch("/reports/multi-store/summary?days=30");
+  } catch (e) {
+    if (_token !== _mlRenderToken) return;
+    if (!cached) wrap.innerHTML = _errorHtml("Sem ligação à internet. Verifica a rede e tenta novamente.");
+    return;
+  }
+  if (_token !== _mlRenderToken) return;
+
+  if (res.status === 401) { loadMultilojas(); return; }
+
+  if (!res.ok) {
+    var errData = await res.json().catch(function() { return {}; });
+    if (_token !== _mlRenderToken) return;
+    if (!cached) wrap.innerHTML = _errorHtml(errData.error || "Erro ao carregar o resumo.");
+    return;
+  }
+
+  var data = await res.json();
+  if (_token !== _mlRenderToken) return;
+  if (!data || !data.success) {
+    if (!cached) wrap.innerHTML = _errorHtml("Resposta inválida do servidor.");
+    return;
+  }
+
+  _mlCacheSet(cacheKey, data);
+  _mlDrawResumoAgregado(wrap, data);
 }
 
 function _renderTrendChart(days, values) {
@@ -2051,13 +2374,38 @@ var PAYMENT_METHOD_LABELS = {
   multicaixa: "Multicaixa", fiado: "Fiado",
 };
 
+var PAYMENT_METHOD_ICONS = {
+  dinheiro: "wallet", transferencia: "building-2",
+  multicaixa: "credit-card", fiado: "clock",
+};
+
 function _mlPaymentLabel(method) {
   return PAYMENT_METHOD_LABELS[method] || method;
 }
 
+function _mlPaymentIcon(method) {
+  return PAYMENT_METHOD_ICONS[method] || "banknote";
+}
+
+function _mlBiSkeletonRow() {
+  return '<div class="hist-mov-item hist-mov-item--compact hist-skel">' +
+    '<div class="skel-circle" style="width:40px;height:40px;margin-right:0"></div>' +
+    '<div style="flex:1;min-width:0;padding-left:12px">' +
+      '<div class="skel-line skel-line--title" style="width:55%"></div>' +
+      '<div class="skel-line skel-line--sub" style="width:30%"></div>' +
+    '</div>' +
+    '<div class="skel-line skel-line--price"></div>' +
+  '</div>';
+}
+
 async function _renderBI(wrap) {
   var _token = _mlRenderToken;
-  wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">A carregar…</div>';
+  wrap.innerHTML =
+    '<div class="skel-line skel-line--sub" style="width:35%;margin-bottom:16px"></div>' +
+    '<div class="hist-section-label hist-skel" style="width:70px;height:12px;border-radius:6px;margin-bottom:10px"></div>' +
+    '<div class="hist-mov-card hist-skel" style="height:96px;margin-bottom:24px"></div>' +
+    '<div class="hist-section-label hist-skel" style="width:140px;height:12px;border-radius:6px;margin-bottom:10px"></div>' +
+    '<div class="hist-mov-card">' + _mlBiSkeletonRow() + _mlBiSkeletonRow() + _mlBiSkeletonRow() + '</div>';
 
   if (!_mlStoresCache || !_mlStoresCache.length) {
     wrap.innerHTML = _errorHtml("Sem lojas para mostrar.");
@@ -2089,68 +2437,81 @@ async function _renderBI(wrap) {
   var maxPaymentTotal = data.paymentMethods.length ? data.paymentMethods[0].total : 1;
 
   wrap.innerHTML =
-    '<div style="margin-bottom:14px">' +
-      '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px">BI consolidado</div>' +
-      '<div style="font-size:12px;color:var(--text3)">Todas as lojas · últimos ' + data.days + ' dias</div>' +
-    '</div>' +
+    '<div style="font-size:12.5px;font-weight:600;color:var(--text3);margin-bottom:16px">Últimos ' + data.days + ' dias</div>' +
 
-    '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Lucro bruto</div>' +
     (profit.available ? (
-      '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;margin-bottom:8px">' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">' +
-          '<div>' +
-            '<div style="font-size:10.5px;color:var(--text4);margin-bottom:2px">Margem</div>' +
-            '<div style="font-size:18px;font-weight:800;color:var(--success,#16a34a)">' + profit.margemPct + '%</div>' +
+      '<div class="hist-mov-card" style="margin-bottom:8px">' +
+        '<div class="hist-day-label--inset" style="padding-top:14px"><i data-lucide="percent" style="width:13px;height:13px"></i>Lucro bruto</div>' +
+        '<div style="padding:4px 14px 16px">' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">' +
+            '<div>' +
+              '<div style="font-size:10.5px;color:var(--text4);margin-bottom:2px">Margem</div>' +
+              '<div style="font-size:18px;font-weight:800;color:var(--success,#16a34a)">' + profit.margemPct + '%</div>' +
+            '</div>' +
+            '<div>' +
+              '<div style="font-size:10.5px;color:var(--text4);margin-bottom:2px">Lucro</div>' +
+              '<div style="font-size:18px;font-weight:800;color:var(--text)">' + fmt(profit.receita - profit.custo) + '</div>' +
+            '</div>' +
           '</div>' +
-          '<div>' +
-            '<div style="font-size:10.5px;color:var(--text4);margin-bottom:2px">Lucro</div>' +
-            '<div style="font-size:18px;font-weight:800;color:var(--text)">' + fmt(profit.receita - profit.custo) + '</div>' +
-          '</div>' +
+          '<div style="font-size:11px;color:var(--text4)">Receita: ' + fmt(profit.receita) + ' · Custo: ' + fmt(profit.custo) + '</div>' +
         '</div>' +
-        '<div style="font-size:11px;color:var(--text4)">Receita: ' + fmt(profit.receita) + ' · Custo: ' + fmt(profit.custo) + '</div>' +
       '</div>' +
       (profit.coveragePct < 100
         ? '<div style="font-size:11px;color:var(--text4);margin-bottom:24px">Baseado em ' + profit.coveragePct + '% da receita do período — vendas mais antigas ainda não têm dados de custo por item.</div>'
         : '<div style="margin-bottom:24px"></div>')
     ) : (
-      '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px;margin-bottom:24px;text-align:center">' +
-        '<div style="font-size:12.5px;color:var(--text3)">Sem dados de custo suficientes neste período ainda.</div>' +
-        '<div style="font-size:11px;color:var(--text4);margin-top:4px">O lucro bruto passa a aparecer à medida que novas vendas forem sincronizadas.</div>' +
+      '<div class="hist-mov-card" style="margin-bottom:24px">' +
+        '<div class="hist-day-label--inset" style="padding-top:14px"><i data-lucide="percent" style="width:13px;height:13px"></i>Lucro bruto</div>' +
+        '<div style="padding:4px 16px 18px;text-align:center">' +
+          '<div style="font-size:12.5px;color:var(--text3)">Sem dados de custo suficientes neste período ainda.</div>' +
+          '<div style="font-size:11px;color:var(--text4);margin-top:4px">O lucro bruto passa a aparecer à medida que novas vendas forem sincronizadas.</div>' +
+        '</div>' +
       '</div>'
     )) +
 
-    '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Produtos mais vendidos</div>' +
     (data.topProducts.length
-      ? '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:24px">' +
+      ? '<div class="hist-mov-card" style="margin-bottom:24px">' +
+        '<div class="hist-day-label--inset"><i data-lucide="package" style="width:13px;height:13px"></i>Produtos mais vendidos</div>' +
         data.topProducts.map(function(p, i) {
-          return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:' + (i < data.topProducts.length - 1 ? '10px' : '0') + ';font-size:13px">' +
-            '<span style="color:var(--text)">' + (i + 1) + '. ' + p.name + '</span>' +
-            '<div style="text-align:right">' +
-              '<div style="font-weight:700;color:var(--text2)">' + fmt(p.receita) + '</div>' +
-              '<div style="font-size:10.5px;color:var(--text4)">' + p.qty + ' un.</div>' +
+          var rankColors = ["#d97706", "#71717a", "#b45309"];
+          var rankBg = ["#fef3c7", "#f4f4f5", "#fed7aa"];
+          var color = i < 3 ? rankColors[i] : "var(--text4)";
+          var bg = i < 3 ? rankBg[i] : "var(--border2)";
+          return '<div class="hist-mov-item hist-mov-item--compact">' +
+            '<div class="hist-mov-icon" style="background:' + bg + ';color:' + color + ';font-weight:800;font-size:13px">' + (i + 1) + '</div>' +
+            '<div style="flex:1;min-width:0">' +
+              '<div class="hist-mov-name">' + p.name + '</div>' +
+              '<div class="hist-mov-meta">' + p.qty + ' un. vendidas</div>' +
+            '</div>' +
+            '<div style="text-align:right;flex-shrink:0">' +
+              '<div class="hist-mov-qty" style="color:var(--text)">' + fmt(p.receita) + '</div>' +
             '</div>' +
           '</div>';
         }).join("") +
         '</div>'
-      : '<div style="font-size:12px;color:var(--text4);margin-bottom:24px">Sem vendas registadas neste período.</div>') +
+      : '<div class="hist-mov-card" style="margin-bottom:24px"><div class="hist-day-label--inset"><i data-lucide="package" style="width:13px;height:13px"></i>Produtos mais vendidos</div><div style="padding:16px;text-align:center;font-size:12px;color:var(--text4)">Sem vendas registadas neste período.</div></div>') +
 
-    '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">Métodos de pagamento</div>' +
     (data.paymentMethods.length
-      ? '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:14px 16px">' +
+      ? '<div class="hist-mov-card">' +
+        '<div class="hist-day-label--inset"><i data-lucide="credit-card" style="width:13px;height:13px"></i>Métodos de pagamento</div>' +
         data.paymentMethods.map(function(m, i) {
           var pct = Math.round((m.total / maxPaymentTotal) * 100);
-          return '<div style="margin-bottom:' + (i < data.paymentMethods.length - 1 ? '14px' : '0') + '">' +
-            '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">' +
-              '<span style="font-size:13px;font-weight:700;color:var(--text)">' + _mlPaymentLabel(m.method) + '</span>' +
-              '<span style="font-size:12px;font-weight:700;color:var(--text2)">' + fmt(m.total) + ' · ' + m.count + ' venda' + (m.count !== 1 ? 's' : '') + '</span>' +
+          return '<div class="hist-mov-item hist-mov-item--compact" style="flex-direction:column;align-items:stretch;gap:8px">' +
+            '<div style="display:flex;align-items:center;gap:12px">' +
+              '<div class="hist-mov-icon" style="background:var(--primary-light);color:var(--primary,#5b21b6)"><i data-lucide="' + _mlPaymentIcon(m.method) + '" style="width:18px;height:18px"></i></div>' +
+              '<div style="flex:1;min-width:0">' +
+                '<div class="hist-mov-name">' + _mlPaymentLabel(m.method) + '</div>' +
+                '<div class="hist-mov-meta">' + m.count + ' venda' + (m.count !== 1 ? 's' : '') + '</div>' +
+              '</div>' +
+              '<div class="hist-mov-qty" style="color:var(--text)">' + fmt(m.total) + '</div>' +
             '</div>' +
-            '<div style="height:6px;background:#f4f4f5;border-radius:3px;overflow:hidden">' +
+            '<div style="height:6px;background:var(--border2);border-radius:3px;overflow:hidden;margin-left:52px">' +
               '<div style="height:100%;width:' + pct + '%;background:var(--primary,#5b21b6);border-radius:3px"></div>' +
             '</div>' +
           '</div>';
         }).join("") +
         '</div>'
-      : '<div style="font-size:12px;color:var(--text4)">Sem vendas registadas neste período.</div>');
+      : '<div class="hist-mov-card"><div class="hist-day-label--inset"><i data-lucide="credit-card" style="width:13px;height:13px"></i>Métodos de pagamento</div><div style="padding:16px;text-align:center;font-size:12px;color:var(--text4)">Sem vendas registadas neste período.</div></div>');
 
   refreshIcons(wrap);
 }
@@ -2171,51 +2532,7 @@ function _mlMinDelay(ms) {
   return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
 
-async function _renderResumoLoja(wrap, storeId) {
-  wrap.innerHTML =
-    '<div class="skel-line skel-line--title" style="margin-bottom:6px;width:50%"></div>' +
-    '<div class="skel-line skel-line--sub" style="margin-bottom:20px;width:30%"></div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px">' +
-      '<div class="prod-stat-card hist-skel" style="height:96px"></div>' +
-      '<div class="prod-stat-card hist-skel" style="height:96px"></div>' +
-    '</div>' +
-    '<div class="hist-mov-card hist-skel" style="margin-bottom:24px">' +
-      '<div class="skel-line skel-line--title" style="margin-bottom:12px"></div>' +
-      '<div class="skel-line skel-line--sub" style="margin-bottom:10px"></div>' +
-      '<div class="skel-line skel-line--sub" style="margin-bottom:10px"></div>' +
-      '<div class="skel-line skel-line--sub"></div>' +
-    '</div>' +
-    '<div class="skel-line skel-line--title" style="margin-bottom:10px;width:40%"></div>' +
-    '<div class="hist-sale-card hist-skel"><div class="skel-circle"></div><div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div><div class="skel-line skel-line--price"></div></div>' +
-    '<div class="hist-sale-card hist-skel"><div class="skel-circle"></div><div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div><div class="skel-line skel-line--price"></div></div>' +
-    '<div class="hist-sale-card hist-skel"><div class="skel-circle"></div><div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div><div class="skel-line skel-line--price"></div></div>';
-  var _token = _mlRenderToken;
-  await _mlMinDelay(280);
-  if (_token !== _mlRenderToken) return;
-
-  var res;
-  try {
-    res = await _mlAuthFetch("/reports/multi-store/store/" + encodeURIComponent(storeId));
-  } catch (e) {
-    if (_token !== _mlRenderToken) return;
-    wrap.innerHTML = _errorHtml("Sem ligação à internet. Verifica a rede e tenta novamente.");
-    return;
-  }
-  if (_token !== _mlRenderToken) return;
-
-  if (res.status === 401) { loadMultilojas(); return; }
-
-  if (!res.ok) {
-    var errData = await res.json().catch(function() { return {}; });
-    if (_token !== _mlRenderToken) return;
-    wrap.innerHTML = _errorHtml(errData.error || "Erro ao carregar a loja.");
-    return;
-  }
-
-  var data = await res.json();
-  if (_token !== _mlRenderToken) return;
-  if (!data || !data.success) { wrap.innerHTML = _errorHtml("Resposta inválida do servidor."); return; }
-
+function _mlDrawResumoLoja(wrap, storeId, data) {
   var totalVendas = data.sales.reduce(function(a, s) { return a + (s.total || 0); }, 0);
 
   wrap.innerHTML =
@@ -2259,6 +2576,66 @@ async function _renderResumoLoja(wrap, storeId) {
   _mlResumoStoreName = data.store.name;
 
   refreshIcons(wrap);
+}
+
+async function _renderResumoLoja(wrap, storeId) {
+  var _token = _mlRenderToken;
+  var cacheKey = _mlCacheKey("resumo", storeId);
+  var cached = _mlCacheGet(cacheKey);
+
+  if (cached) {
+    _mlDrawResumoLoja(wrap, storeId, cached.data);
+    if (cached.isFresh) return;
+  } else {
+    wrap.innerHTML =
+      '<div class="skel-line skel-line--title" style="margin-bottom:6px;width:50%"></div>' +
+      '<div class="skel-line skel-line--sub" style="margin-bottom:20px;width:30%"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px">' +
+        '<div class="prod-stat-card hist-skel" style="height:96px"></div>' +
+        '<div class="prod-stat-card hist-skel" style="height:96px"></div>' +
+      '</div>' +
+      '<div class="hist-mov-card hist-skel" style="margin-bottom:24px">' +
+        '<div class="skel-line skel-line--title" style="margin-bottom:12px"></div>' +
+        '<div class="skel-line skel-line--sub" style="margin-bottom:10px"></div>' +
+        '<div class="skel-line skel-line--sub" style="margin-bottom:10px"></div>' +
+        '<div class="skel-line skel-line--sub"></div>' +
+      '</div>' +
+      '<div class="skel-line skel-line--title" style="margin-bottom:10px;width:40%"></div>' +
+      '<div class="hist-sale-card hist-skel"><div class="skel-circle"></div><div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div><div class="skel-line skel-line--price"></div></div>' +
+      '<div class="hist-sale-card hist-skel"><div class="skel-circle"></div><div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div><div class="skel-line skel-line--price"></div></div>' +
+      '<div class="hist-sale-card hist-skel"><div class="skel-circle"></div><div style="flex:1"><div class="skel-line skel-line--title"></div><div class="skel-line skel-line--sub"></div></div><div class="skel-line skel-line--price"></div></div>';
+    await _mlMinDelay(280);
+    if (_token !== _mlRenderToken) return;
+  }
+
+  var res;
+  try {
+    res = await _mlAuthFetch("/reports/multi-store/store/" + encodeURIComponent(storeId));
+  } catch (e) {
+    if (_token !== _mlRenderToken) return;
+    if (!cached) wrap.innerHTML = _errorHtml("Sem ligação à internet. Verifica a rede e tenta novamente.");
+    return;
+  }
+  if (_token !== _mlRenderToken) return;
+
+  if (res.status === 401) { loadMultilojas(); return; }
+
+  if (!res.ok) {
+    var errData = await res.json().catch(function() { return {}; });
+    if (_token !== _mlRenderToken) return;
+    if (!cached) wrap.innerHTML = _errorHtml(errData.error || "Erro ao carregar a loja.");
+    return;
+  }
+
+  var data = await res.json();
+  if (_token !== _mlRenderToken) return;
+  if (!data || !data.success) {
+    if (!cached) wrap.innerHTML = _errorHtml("Resposta inválida do servidor.");
+    return;
+  }
+
+  _mlCacheSet(cacheKey, data);
+  _mlDrawResumoLoja(wrap, storeId, data);
 }
 
 function _mlSaleRowHtml(s, isLast) {

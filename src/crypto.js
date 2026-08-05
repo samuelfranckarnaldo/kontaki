@@ -236,11 +236,66 @@ export async function verifyLicenseSignature(fields, signatureB64) {
 
 // Nonce aleatório enviado a cada pedido de /verify e /activate, incluído
 // na assinatura do servidor — impede replay de uma resposta antiga
-// capturada (ver verifyLicenseSignature acima).
+// capturada (ver verifyLicenseSignature acima). Reaproveitado também
+// para /messages (ver verifyMessagesSignature abaixo).
 export function generateNonce() {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// ── VERIFICAÇÃO DE MENSAGENS (Console → Kontaki) ──────────────────────────
+// Chave própria, isolada da de licenciamento — mesmo raciocínio de
+// isolamento de raio de impacto do ADR-0007. Sem isto, uma mensagem
+// bloqueante forjada ("actualização obrigatória, app bloqueada") pode
+// parar qualquer loja; e sem o nonce/serverTime amarrados à assinatura,
+// uma resposta antiga capturada poderia ser reproduzida para reviver
+// uma mensagem já desativada pelo Kill Switch (ver ADR-0007, secção
+// Não-decisões, e o plano de Kill Switch).
+
+const MESSAGE_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEMiNUBZ6H1BLLwi568QIh7ID/n9yu
+5aQqTdnrLy7nV/+K2Vt6DkmVG82xMVrTcdXPhhqP6PV5J/MW+9aGjlsacg==
+-----END PUBLIC KEY-----`;
+
+let _messagePublicKeyCache = null;
+async function getMessagePublicKey() {
+  if (_messagePublicKeyCache) return _messagePublicKeyCache;
+  const keyData = pemToArrayBuffer(MESSAGE_PUBLIC_KEY_PEM);
+  _messagePublicKeyCache = await crypto.subtle.importKey(
+    "spki", keyData, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]
+  );
+  return _messagePublicKeyCache;
+}
+
+// Reconstrói exatamente a mesma string canónica que o servidor assinou
+// — tem de bater certo campo a campo, pela mesma ordem, com
+// canonicalizeMessages() em api/routes/messages.js.
+function canonicalizeMessages(messages) {
+  return messages.map(function(m) {
+    return [
+      m.id, m.body, m.type, m.display_mode, m.severity, m.priority,
+      m.min_app_version || "", m.max_app_version || "",
+      m.action_type || "", m.action_value || "",
+      m.created_at, m.expires_at || "",
+    ].join("|");
+  }).join(";");
+}
+
+export async function verifyMessagesSignature(messages, nonce, serverTime, signatureB64) {
+  try {
+    if (!signatureB64) return false;
+    const data = nonce + ":" + serverTime + ":" + canonicalizeMessages(messages);
+    const key = await getMessagePublicKey();
+    const sigBuf = derToRawSignature(signatureB64);
+    const dataBuf = new TextEncoder().encode(data);
+    return await crypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" }, key, sigBuf, dataBuf
+    );
+  } catch (e) {
+    console.error("Erro ao verificar assinatura de mensagens:", e);
+    return false;
+  }
 }
 
 // ── BACKUP CIFRADO (envelope de duas camadas) ─────────────────────────────

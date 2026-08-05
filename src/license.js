@@ -1,4 +1,5 @@
 import { db } from "./db.js";
+import { generateNonce, verifyLicenseSignature } from "./crypto.js";
 
 var _license = null;
 
@@ -22,7 +23,7 @@ export var PLANS = {
       "historico","scanner","venda_rapida","dashboard",
       "fatura_pdf","fatura_whatsapp","pedidos_aguardados","filtro_categorias",
       "contabilidade","exportar_relatorios","inventario_periodico",
-      "relatorios_estoque","fornecedores",
+      "relatorios_estoque","fornecedores","pdf_contabilidade",
     ],
   },
   pro: {
@@ -52,6 +53,31 @@ export var PLANS = {
   },
 };
 
+// Pro ganha as duas features novas separadamente do resto — mantém o
+// array principal do Pro legível, sem crescer numa linha só.
+PLANS.pro.features.push("business_intelligence", "workspace", "pdf_contabilidade");
+
+// ── Pontos de entrada únicos: licença (a loja paga por isto?) +
+// autorização existente de cada módulo (este utilizador pode usá-lo?).
+// As duas perguntas são independentes de propósito — juntá-las aqui
+// evita espalhar a mesma combinação de checks pelos ficheiros que as
+// usam, e centraliza qualquer mudança de regra num único sítio. ────
+
+export async function canOpenBI(user) {
+  if (!hasFeature("business_intelligence")) return { allowed: false, reason: "plan" };
+  var permMod = await import("./permissions.js");
+  if (!permMod.hasPermission(user, "ver_contabilidade")) return { allowed: false, reason: "permission" };
+  return { allowed: true, reason: null };
+}
+
+// O token do Workspace é privado a multilojas.js (_getWorkspaceToken),
+// por isso só a parte "a loja paga por isto?" vive aqui — o ecrã de
+// login do Workspace continua a decidir "este utilizador pode entrar?"
+// como já fazia, sem duplicar essa lógica aqui.
+export function canOpenWorkspace() {
+  return hasFeature("workspace");
+}
+
 var ALL_FEATURES = Array.from(new Set(
   Object.keys(PLANS).flatMap(function(k) { return PLANS[k].features; })
 ));
@@ -71,9 +97,17 @@ export async function loadLicense() {
       var now      = Date.now();
       var exp      = lic.expiresAt ? new Date(lic.expiresAt).getTime() : null;
       var daysLeft = exp ? Math.ceil((exp - now) / 86400000) : 999;
+      // 'replaced' é a única categoria de revogação que permite
+      // reactivação directa — qualquer outra (manual/fraud/null) cai no
+      // lockout total, por omissão segura (ver validateLicenseOnline).
+      var _status = lic.revoked
+        ? (lic.revokeCategory === "replaced" ? "replaced" : "revoked")
+        : (exp && daysLeft <= 0) ? "expired"
+        : (lic.plan === "trial") ? "trial"
+        : "active";
       _license = {
         plan:          lic.plan,
-        status:        lic.revoked ? "revoked" : (exp && daysLeft <= 0 ? "expired" : "active"),
+        status:        _status,
         daysLeft:      daysLeft,
         expiresAt:     lic.expiresAt,
         code:          lic.code,
@@ -129,13 +163,14 @@ export async function activateLicense(code) {
   }
 
   var deviceId = await getDeviceId();
+  var nonce = generateNonce();
 
   var res, data;
   try {
     res = await fetch(CONSOLE_API + "/activate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, deviceId }),
+      body: JSON.stringify({ code, deviceId, nonce }),
     });
     data = await res.json();
   } catch(e) {
@@ -144,6 +179,22 @@ export async function activateLicense(code) {
 
   if (!res.ok || !data.success) {
     throw new Error(data.error || "Código inválido ou já utilizado.");
+  }
+
+  // Verifica a assinatura ANTES de confiar em qualquer campo da
+  // resposta — sem isto, TLS comprometido (ex: proxy corporativo com
+  // certificado raiz injetado) poderia forjar uma "activação bem
+  // sucedida" falsa. O nonce tem de bater certo com o que foi enviado,
+  // senão a resposta pode ser um replay de um pedido anterior.
+  if (data.nonce !== nonce) {
+    throw new Error("Resposta do servidor inválida (nonce). Tenta novamente.");
+  }
+  var sigOk = await verifyLicenseSignature(
+    [nonce, "true", data.plan, data.activatedAt, data.expiresAt, data.serverTime],
+    data.signature
+  );
+  if (!sigOk) {
+    throw new Error("Não foi possível verificar a autenticidade da resposta do servidor.");
   }
 
   var licData = {
@@ -160,7 +211,7 @@ export async function activateLicense(code) {
 
   _license = {
     plan:      data.plan,
-    status:    "active",
+    status:    data.plan === "trial" ? "trial" : "active",
     daysLeft:  Math.ceil((new Date(data.expiresAt) - Date.now()) / 86400000),
     expiresAt: data.expiresAt,
     code:      code,
@@ -231,23 +282,108 @@ export function showRevokedLockout() {
   if (window.lucide) window.lucide.createIcons({ el: ov });
 }
 
+// Ecrã de substituição — licença antiga foi trocada por uma nova
+// (renovação ou mudança de plano). Ao contrário do lockout total, este
+// permite ao lojista introduzir o código novo directamente aqui, sem
+// precisar de suporte humano. Também sem botão de fechar: sair deste
+// ecrã sem activar deixaria a app presa no mesmo estado na próxima
+// navegação (router.go() bloqueia enquanto status === "replaced").
+export function showLicenseReplacedScreen() {
+  if (document.getElementById("replaced-lockout")) return;
+  var ov = document.createElement("div");
+  ov.id = "replaced-lockout";
+  ov.style.cssText = "position:fixed;inset:0;background:#fff;z-index:99998;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;font-family:inherit";
+  ov.innerHTML =
+    '<i data-lucide="refresh-cw" style="width:48px;height:48px;color:#7c3aed;margin-bottom:20px"></i>' +
+    '<div style="font-size:19px;font-weight:800;color:#1A1425;margin-bottom:10px">Licença substituída</div>' +
+    '<div style="font-size:14px;color:#6E6680;line-height:1.6;max-width:320px;margin-bottom:24px">A tua licença foi substituída por uma nova. Introduz o novo código para continuar.</div>' +
+    '<input id="replaced-code-input" placeholder="KTKI-XXXX-XXXX-XXXXXXXXXXXX" maxlength="35" style="width:100%;max-width:320px;padding:12px 14px;border:1.5px solid #E4E0EC;border-radius:12px;font-size:14px;text-align:center;margin-bottom:12px;font-family:inherit;text-transform:uppercase"/>' +
+    '<div id="replaced-error" style="font-size:12.5px;color:#dc2626;min-height:16px;margin-bottom:10px"></div>' +
+    '<button id="replaced-activate-btn" style="width:100%;max-width:320px;background:#7c3aed;color:#fff;font-weight:700;font-size:14px;padding:13px 24px;border:none;border-radius:999px;cursor:pointer;font-family:inherit;margin-bottom:14px">Ativar nova licença</button>' +
+    '<a href="https://wa.me/244934923166" style="display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;font-weight:700;font-size:13.5px;padding:12px 24px;border-radius:999px;text-decoration:none">' +
+      '<i data-lucide="message-circle" style="width:16px;height:16px"></i> Não tenho o código — Falar no WhatsApp' +
+    '</a>';
+  document.body.appendChild(ov);
+  if (window.lucide) window.lucide.createIcons({ el: ov });
+
+  var input   = document.getElementById("replaced-code-input");
+  var errEl   = document.getElementById("replaced-error");
+  var btn     = document.getElementById("replaced-activate-btn");
+
+  btn.onclick = async function () {
+    errEl.textContent = "";
+    var code = (input.value || "").trim();
+    if (!code) { errEl.textContent = "Introduz o código de licença."; return; }
+    btn.disabled = true;
+    var _origText = btn.textContent;
+    btn.textContent = "A activar…";
+    try {
+      await activateLicense(code);
+      ov.remove();
+      // Recarrega para garantir que todo o estado da app (router,
+      // gates de features, etc.) parte do zero com a licença nova.
+      window.location.reload();
+    } catch (e) {
+      errEl.textContent = e.message || "Não foi possível activar. Verifica o código.";
+      btn.disabled = false;
+      btn.textContent = _origText;
+    }
+  };
+}
+
 export async function validateLicenseOnline() {
   var lic = await db.get("settings", "license");
   if (!lic || !lic.code) return;
+
+  var nonce = generateNonce();
 
   try {
     var res = await fetch(CONSOLE_API + "/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: lic.code, deviceId: lic.deviceId }),
+      body: JSON.stringify({ code: lic.code, deviceId: lic.deviceId, nonce }),
     });
     var data = await res.json();
 
+    // Verifica autenticidade da resposta ANTES de agir sobre ela — sem
+    // isto, TLS comprometido (ex: proxy corporativo com certificado
+    // raiz injetado) poderia forjar qualquer decisão de licenciamento.
+    // "Licença não encontrada" é o único caso deliberadamente não
+    // assinado pelo servidor (sem valor de ataque — ver licenses.js);
+    // qualquer outra resposta sem assinatura é tratada como suspeita.
+    // Falha de verificação é tratada como falha de rede: não altera o
+    // estado local, deixa a última licença válida em cache continuar a
+    // funcionar (fail-open), e regista para investigação.
+    var _isUnsignedNotFound = !data.valid && data.error === "Licença não encontrada" && !data.signature;
+    if (!_isUnsignedNotFound) {
+      if (data.nonce !== nonce) {
+        console.error("[license] resposta com nonce inesperado — possível replay.");
+        return null;
+      }
+      var _sigFields = !data.valid
+        ? [nonce, "false", "", "", data.reason || "", data.revokeCategory || "", data.serverTime || ""]
+        : [nonce, "true", data.plan || "", data.expiresAt || "", "", "", data.serverTime || ""];
+      var _sigOk = await verifyLicenseSignature(_sigFields, data.signature);
+      if (!_sigOk) {
+        console.error("[license] assinatura inválida na resposta de /verify — possível interceção.");
+        return null;
+      }
+    }
+
     if (!res.ok || !data.valid) {
       if (data.reason === "revoked") {
-        await db.put("settings", { ...lic, revoked: true, status: "revoked" });
-        _license = { ...(_license||{}), status: "revoked" };
-        showRevokedLockout();
+        // 'replaced' é a única categoria que abre o ecrã de reactivação;
+        // qualquer outra (manual/fraud/null) é lockout total — omissão
+        // segura para categorias futuras que ainda não existem hoje.
+        var _isReplaced = data.revokeCategory === "replaced";
+        var _newStatus  = _isReplaced ? "replaced" : "revoked";
+        await db.put("settings", { ...lic, revoked: true, revokeCategory: data.revokeCategory || null, status: _newStatus });
+        _license = { ...(_license||{}), status: _newStatus };
+        if (_isReplaced) {
+          showLicenseReplacedScreen();
+        } else {
+          showRevokedLockout();
+        }
       } else {
         await db.put("settings", { ...lic, status: "expired" });
         _license = { ...(_license||{}), status: "expired" };

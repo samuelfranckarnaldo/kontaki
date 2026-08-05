@@ -309,6 +309,57 @@ export async function closeAccountingPeriod(period, closedByUserId) {
   return { period, totalProveitos, totalCustos, resultadoLiquido };
 }
 
+// Calcula o resumo de proveitos/custos de um periodo (YYYY-MM) sem fechar
+// o mes. Se o periodo ja foi fechado, devolve o snapshot ja gravado em
+// accountingArchive (imutavel). Se ainda esta aberto, calcula "ao vivo" a
+// partir do journalEntries, excluindo lancamentos de fecho (sourceType
+// "period_closure") — que zeram as contas de proveito/custo e distorceriam
+// o calculo se incluidos. Usado pela sincronizacao com o Console.
+export async function computePeriodSummary(period) {
+  var closure = await db.get("accountingArchive", period);
+  if (closure) {
+    return {
+      period: period,
+      closed: true,
+      totalReceita: closure.totalProveitos,
+      totalCustos: closure.totalCustos,
+      resultadoLiquido: closure.resultadoLiquido,
+      breakdown: closure.saldosPorConta,
+    };
+  }
+
+  var entries = await db.getAll("journalEntries");
+  var doMes = entries.filter(function(e) {
+    return String(e.date).slice(0, 7) === period && e.sourceType !== "period_closure";
+  });
+
+  var saldosPorConta = {};
+  doMes.forEach(function(e) {
+    (e.lines || []).forEach(function(l) {
+      var acc = CHART_OF_ACCOUNTS.find(function(c) { return c.code === l.account; });
+      if (!acc || (acc.tipo !== "proveito" && acc.tipo !== "custo")) return;
+      saldosPorConta[l.account] = saldosPorConta[l.account] || 0;
+      saldosPorConta[l.account] += acc.natureza === "credora" ? (l.credit - l.debit) : (l.debit - l.credit);
+    });
+  });
+
+  var totalReceita = 0, totalCustos = 0;
+  Object.keys(saldosPorConta).forEach(function(code) {
+    var acc = CHART_OF_ACCOUNTS.find(function(c) { return c.code === code; });
+    if (acc.tipo === "proveito") totalReceita += saldosPorConta[code];
+    else totalCustos += saldosPorConta[code];
+  });
+
+  return {
+    period: period,
+    closed: false,
+    totalReceita: totalReceita,
+    totalCustos: totalCustos,
+    resultadoLiquido: totalReceita - totalCustos,
+    breakdown: saldosPorConta,
+  };
+}
+
 // Calcula o saldo atual de uma conta a partir de todos os lançamentos —
 // usado para validar operações de Tesouraria antes de gravar (ex: nao deixar
 // retirar/levantar mais do que o saldo disponivel em Caixa/Banco).

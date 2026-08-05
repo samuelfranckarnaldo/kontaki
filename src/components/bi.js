@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { canOpenBI } from "../license.js";
 import { getUser } from "../auth.js";
 import { hasPermission } from "../permissions.js";
 import { fmt, refreshIcons } from "../utils.js";
@@ -412,6 +413,20 @@ export async function loadBI() {
       '<div style="text-align:center;padding:48px 20px;color:#a1a1aa">' +
       '<div style="font-size:14px;font-weight:600">Acesso restrito</div>' +
       '<div style="font-size:13px;margin-top:6px">Esta secção está disponível apenas para administradores.</div>' +
+      '</div>';
+    return;
+  }
+
+  // Gate por licença — BI é feature Pro (ver license.js canOpenBI)
+  var _biAccess = await canOpenBI(_user);
+  if (!_biAccess.allowed) {
+    var _biMsg = _biAccess.reason === "permission"
+      ? "Esta secção está disponível apenas para administradores."
+      : "A Análise (BI) está disponível apenas no plano Pro.";
+    wrap.innerHTML =
+      '<div style="text-align:center;padding:48px 20px;color:#a1a1aa">' +
+      '<div style="font-size:14px;font-weight:600">Acesso restrito</div>' +
+      '<div style="font-size:13px;margin-top:6px">' + _biMsg + '</div>' +
       '</div>';
     return;
   }

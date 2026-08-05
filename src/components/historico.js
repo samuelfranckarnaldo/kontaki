@@ -334,7 +334,7 @@ window._histTab = async function(tab) {
   await loadData();
 };
 
-function skeletonKpi() {
+export function skeletonKpi() {
   return '<div class="hist-kpi hist-skel"><div class="skel-line skel-line--label"></div><div class="skel-line skel-line--val"></div></div>';
 }
 function skeletonCard() {
@@ -857,7 +857,7 @@ function animateHeroValue(from, to) {
   requestAnimationFrame(step);
 }
 
-function kpi(label, val, color, sub, attentionClass) {
+export function kpi(label, val, color, sub, attentionClass) {
   var len = String(val).length;
   var sizeClass = len > 13 ? " hist-kpi-val--xs" : (len > 9 ? " hist-kpi-val--sm" : "");
   return '<div class="hist-kpi' + (attentionClass ? ' ' + attentionClass : '') + '">' +

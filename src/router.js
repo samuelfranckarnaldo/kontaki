@@ -11,7 +11,7 @@ import { initDarkMode, checkBadges, startRealtimeSync } from "./components/extra
 import { updateNotificationBadge } from "./notification-ui.js";
 import { saveScroll, restoreScroll } from "./view-state.js";
 import { loadDashboard }                    from "./components/dashboard.js";
-import { hasFeature, getLicense, showRevokedLockout } from "./license.js";
+import { hasFeature, getLicense, showRevokedLockout, showLicenseReplacedScreen } from "./license.js";
 
 var PAGES = {
   vender:    { init: initVender    },
@@ -75,8 +75,13 @@ export var router = {
     // só bloqueia extras via hasFeature(). Verificado aqui, não só na
     // revalidação periódica, para cobrir o caso de já estar revogada
     // localmente desde o arranque, sem esperar por nova rede.
-    if (getLicense().status === "revoked") {
+    var _licStatus = getLicense().status;
+    if (_licStatus === "revoked") {
       showRevokedLockout();
+      return;
+    }
+    if (_licStatus === "replaced") {
+      showLicenseReplacedScreen();
       return;
     }
 

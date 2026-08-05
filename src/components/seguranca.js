@@ -340,10 +340,17 @@ window._submitRemoveWorkspaceLink = async function() {
       body: JSON.stringify({ licenseCode: licenseCode }),
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) { toast(body.error || "Erro ao remover ligação.","error"); return; }
+    // 404 aqui significa "o servidor já não tem ligação ativa para esta
+    // loja" — ou seja, já está desligado do lado do Console. Isto pode
+    // acontecer se o estado local ficou desatualizado (ex: a ligação foi
+    // removida por outra via, ou uma resposta anterior falhou a meio).
+    // Em vez de deixar o utilizador preso (servidor diz "não ligado",
+    // app local insiste que está), tratamos como sucesso e corrigimos o
+    // estado local para bater com a realidade do servidor.
+    if (!res.ok && res.status !== 404) { toast(body.error || "Erro ao remover ligação.","error"); return; }
 
     await db.put("settings", { key: "workspaceLink", status: "removed", removedAt: new Date().toISOString() });
-    toast("Ligação removida.","success");
+    toast(res.status === 404 ? "Ligação já estava removida — estado corrigido." : "Ligação removida.","success");
     await renderSeguranca();
   } catch (e) {
     toast("Erro de rede ao remover ligação.","error");

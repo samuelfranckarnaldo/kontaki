@@ -5,6 +5,7 @@
 // bloqueante (sem fechar, só resolve por versão/expiração/desativação).
 import { db } from "./db.js";
 import { APP_VERSION } from "./version.js";
+import { generateNonce, verifyMessagesSignature } from "./crypto.js";
 
 var CONSOLE_API = "https://kontaki-console.vercel.app/api";
 
@@ -93,13 +94,35 @@ export async function syncConsoleMessages() {
     var lic = await db.get("settings", "license");
     if (!lic || !lic.code) return;
 
-    var res = await fetch(CONSOLE_API + "/messages?code=" + encodeURIComponent(lic.code));
+    var nonce = generateNonce();
+    var res = await fetch(
+      CONSOLE_API + "/messages?code=" + encodeURIComponent(lic.code) + "&nonce=" + encodeURIComponent(nonce)
+    );
     if (!res.ok) return;
 
     var data = await res.json();
-    if (data && data.success) {
-      await setCachedMessages(data.messages || []);
+    if (!data || !data.success) return;
+
+    var messages = data.messages || [];
+
+    // Verifica autenticidade do lote ANTES de o guardar em cache — sem
+    // isto, uma resposta forjada (ex: mensagem bloqueante falsa) seria
+    // aceite como se viesse do Console legítimo. Nonce inesperado ou
+    // assinatura inválida: descarta a resposta, mantém o cache anterior
+    // intacto (fail-open, coerente com o resto do sistema de licença).
+    if (messages.length > 0) {
+      if (data.nonce !== nonce) {
+        console.error("[messages] resposta com nonce inesperado — possível replay.");
+        return;
+      }
+      var sigOk = await verifyMessagesSignature(messages, nonce, data.serverTime || "", data.signature);
+      if (!sigOk) {
+        console.error("[messages] assinatura inválida no lote de mensagens — possível interceção.");
+        return;
+      }
     }
+
+    await setCachedMessages(messages);
   } catch (e) {
     // offline ou falha de rede — mantém o que já está em cache
   }
