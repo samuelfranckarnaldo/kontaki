@@ -1007,15 +1007,22 @@ window._toggleUser = async (id) => {
 window._deleteUser = async (id) => {
   const u = await db.get("users", id);
   if (!u) return;
-  confirmDialog(
-    "Eliminar " + u.name + "? Esta ação é irreversível. O histórico de vendas e sessões deste funcionário será mantido para auditoria, mas ele deixará de poder entrar no sistema.",
-    async () => {
-      await db.delete("users", id);
-      toast("Funcionário eliminado.", "success");
-      loadEquipa();
-    },
-    { title: "Eliminar funcionário", confirmText: "Eliminar", danger: true, icon: "user-x" }
-  );
+  // O botão que chama isto já fechou o modal "Mais opções" antes (ver
+  // _openTeamCardMenu). O history.back() desse fecho é assíncrono — abrir
+  // o confirmDialog demasiado cedo faz o popstate pendente fechá-lo por
+  // engano (mesma corrida já corrigida em _abrirResetPin/_abrirPermissoes
+  // com este mesmo atraso).
+  setTimeout(function() {
+    confirmDialog(
+      "Eliminar " + u.name + "? Esta ação é irreversível. O histórico de vendas e sessões deste funcionário será mantido para auditoria, mas ele deixará de poder entrar no sistema.",
+      async () => {
+        await db.delete("users", id);
+        toast("Funcionário eliminado.", "success");
+        loadEquipa();
+      },
+      { title: "Eliminar funcionário", confirmText: "Eliminar", danger: true, icon: "user-x" }
+    );
+  }, 50);
 };
 
 async function loadLoja() {
