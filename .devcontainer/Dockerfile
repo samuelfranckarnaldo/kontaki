@@ -1,12 +1,16 @@
 FROM mcr.microsoft.com/devcontainers/javascript-node:20
 
-# --- Java 17 (necessário para o Gradle/Android) ---
+# --- Java (necessário para o Gradle/Android) ---
+# Usamos "default-jdk" em vez de uma versão fixa (ex: openjdk-17-jdk)
+# porque o nome exato do pacote muda entre versões do Debian.
 RUN apt-get update && \
-    apt-get install -y openjdk-17-jdk unzip && \
+    apt-get install -y default-jdk unzip && \
     rm -rf /var/lib/apt/lists/*
 
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH="$JAVA_HOME/bin:$PATH"
+# Deteta o JAVA_HOME real e grava para persistir em todas as shells do container
+RUN JAVA_HOME_DETECTED=$(dirname $(dirname $(readlink -f $(which java)))) && \
+    echo "JAVA_HOME=$JAVA_HOME_DETECTED" >> /etc/environment && \
+    echo "export JAVA_HOME=$JAVA_HOME_DETECTED" >> /etc/bash.bashrc
 
 # --- Android SDK (command-line tools apenas — o Gradle trata do resto) ---
 ENV ANDROID_HOME=/home/node/android-sdk
