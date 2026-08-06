@@ -247,6 +247,13 @@ if (typeof window !== "undefined") {
       const syncMod = await import("./sync.js");
       await syncMod.runFullSyncCycle();
     } catch (e) {}
+    try {
+      const backupMod = await import("./backup.js");
+      // Ignora o backoff: tempo offline nao e uma falha de comunicacao,
+      // e' so ausencia de tentativa — assim que a rede volta, tenta logo
+      // em vez de esperar o backoff de uma falha real anterior.
+      await backupMod.backupService.autoBackupIfNeeded("network_online", { skipBackoff: true });
+    } catch (e) {}
   });
 
   // Revalidação periódica — verifica navigator.onLine a cada minuto,

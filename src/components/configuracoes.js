@@ -310,6 +310,10 @@ window._uploadBackupToConsole = async () => {
     licMod.showUpgradeBanner("Backup disponível a partir do plano Pro. Contacta a Introxeer para upgrade.");
     return;
   }
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    toast("Sem ligação à Internet. Tenta novamente quando estiveres online.", "error");
+    return;
+  }
   const btn = document.getElementById("btn-upload-backup");
   if (btn) btn.disabled = true;
   try {

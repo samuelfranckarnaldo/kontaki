@@ -130,7 +130,17 @@ export const backupService = {
     } catch (e) {
       const { logger } = await import("./logger.js");
       logger.error("[uploadToConsole] fetch falhou: " + (e.name || "") + " " + (e.message || ""), e);
-      throw new Error("Falha de rede: " + (e.message || e.name || "desconhecida") + ". Ver Últimos erros.");
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        throw new Error("Sem ligação à Internet. Tenta novamente quando estiveres online.");
+      }
+      throw new Error("Não foi possível contactar o Kontaki Console. Verifica a tua ligação e tenta novamente.");
+    }
+
+    if (res.status >= 500) {
+      throw new Error("O servidor encontrou um problema. Tenta novamente mais tarde.");
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("A tua sessão expirou ou a licença precisa de atenção.");
     }
 
     let result;
@@ -183,28 +193,65 @@ export const backupService = {
   // janela de histórico em minutos se o upload fosse muito frequente.
   // DEBOUNCE_MS evita uploads duplicados se dois eventos dispararem perto
   // um do outro (ex. abrir turno logo a seguir a fechar o anterior).
-  async autoBackupIfNeeded(reason) {
+  // Backoff progressivo apos falha: 1min -> 5min -> 15min, depois
+  // fica em 15min. Evita rajadas de tentativas em rede instavel —
+  // cada gatilho (abrir turno, fecho, fallback 4h) so tenta de novo
+  // depois do backoff atual ter passado.
+  _BACKOFF_STEPS_MS: [60 * 1000, 5 * 60 * 1000, 15 * 60 * 1000],
+
+  async autoBackupIfNeeded(reason, opts) {
+    const skipBackoff = !!(opts && opts.skipBackoff);
     const { logger } = await import("./logger.js");
     try {
       const ready = await hasMasterKey();
       if (!ready) return; // loja ainda sem PIN/Recovery Codes — nada a fazer
 
-      const DEBOUNCE_MS = 5 * 60 * 1000; // 5 minutos
-      const last = await db.get("settings", "lastCloudBackupAt");
-      const lastTime = last ? new Date(last.value).getTime() : 0;
-      if (Date.now() - lastTime < DEBOUNCE_MS) {
+      const DEBOUNCE_MS = 5 * 60 * 1000; // 5 minutos (sucesso -> sucesso)
+      const lastSuccess = await db.get("settings", "lastCloudBackupAt");
+      const lastSuccessTime = lastSuccess ? new Date(lastSuccess.value).getTime() : 0;
+      if (Date.now() - lastSuccessTime < DEBOUNCE_MS) {
         logger.info("[autoBackup] ignorado (debounce): " + reason);
         return;
       }
 
+      if (!skipBackoff) {
+        const nextRetry = await db.get("settings", "backupNextAllowedRetry");
+        const nextRetryTime = nextRetry ? new Date(nextRetry.value).getTime() : 0;
+        if (Date.now() < nextRetryTime) {
+          logger.info("[autoBackup] ignorado (backoff ativo até " + nextRetry.value + "): " + reason);
+          return;
+        }
+      }
+
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        logger.info("[autoBackup] ignorado (dispositivo offline): " + reason);
+        return; // nao conta como falha — navigator.onLine e so otimizacao, nao penaliza o backoff
+      }
+
+      await db.put("settings", { key: "lastBackupAttempt", value: new Date().toISOString() });
+
       logger.info("[autoBackup] a disparar por: " + reason);
       const backupId = await this.uploadToConsole();
-      await db.put("settings", { key: "lastCloudBackupAt", value: new Date().toISOString() });
+      const now = new Date().toISOString();
+      await db.put("settings", { key: "lastCloudBackupAt", value: now });
+      await db.put("settings", { key: "lastBackupSuccess", value: now });
+      await db.put("settings", { key: "backupFailureCount", value: 0 });
+      await db.delete("settings", "backupNextAllowedRetry");
       logger.info("[autoBackup] OK — backupId: " + backupId + " (motivo: " + reason + ")");
     } catch (e) {
       // Nunca deixa o backup automático interromper o fluxo principal
       // (abrir/fechar turno tem de funcionar mesmo sem internet).
       logger.warn("[autoBackup] falhou (" + reason + "): " + (e.message || e));
+
+      const countRec = await db.get("settings", "backupFailureCount");
+      const count = (countRec ? countRec.value : 0) + 1;
+      await db.put("settings", { key: "backupFailureCount", value: count });
+      await db.put("settings", { key: "lastBackupFailure", value: new Date().toISOString() });
+
+      const stepIdx = Math.min(count - 1, this._BACKOFF_STEPS_MS.length - 1);
+      const nextRetryTime = new Date(Date.now() + this._BACKOFF_STEPS_MS[stepIdx]).toISOString();
+      await db.put("settings", { key: "backupNextAllowedRetry", value: nextRetryTime });
+      logger.info("[autoBackup] backoff: proxima tentativa automatica so apos " + nextRetryTime);
     }
   },
 
