@@ -204,10 +204,10 @@ function showKtkViewer(ktk, hashResult) {
     '</div></div>' +
 
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">' +
-    '<div class="stat-card" style="border-left:3px solid #16a34a"><div class="stat-label" style="color:#16a34a">Total vendido</div><div class="stat-val" style="color:#16a34a;font-size:14px">' + fmt(totalVendas) + '</div><div style="font-size:11px;color:#71717a">' + vendas.length + ' vendas</div></div>' +
-    '<div class="stat-card" style="border-left:3px solid '+(incidentes.length?"#dc2626":"#16a34a")+'"><div class="stat-label">Incidentes</div><div class="stat-val" style="color:'+(incidentes.length?"#dc2626":"#18181b")+'">' + incidentes.length + '</div></div>' +
-    '<div class="stat-card" style="border-left:3px solid #d97706"><div class="stat-label" style="color:#d97706">Fiado aberto</div><div class="stat-val" style="color:#d97706;font-size:13px">' + fmt(fiadoAberto) + '</div></div>' +
-    '<div class="stat-card" style="border-left:3px solid #5b21b6"><div class="stat-label" style="color:#5b21b6">Fiados pagos</div><div class="stat-val" style="color:#5b21b6">' + fiados.filter(function(f){return f.status==="paid";}).length + '</div></div>' +
+    '<div class="stat-card" style="border-left:3px solid var(--border2)"><div class="stat-label" style="color:#16a34a">Total vendido</div><div class="stat-val" style="color:#16a34a;font-size:14px">' + fmt(totalVendas) + '</div><div style="font-size:11px;color:#71717a">' + vendas.length + ' vendas</div></div>' +
+    '<div class="stat-card" style="border-left:3px solid var(--border2)"><div class="stat-label">Incidentes</div><div class="stat-val" style="color:'+(incidentes.length?"#dc2626":"#18181b")+'">' + incidentes.length + '</div></div>' +
+    '<div class="stat-card" style="border-left:3px solid var(--border2)"><div class="stat-label" style="color:#d97706">Fiado aberto</div><div class="stat-val" style="color:#d97706;font-size:13px">' + fmt(fiadoAberto) + '</div></div>' +
+    '<div class="stat-card" style="border-left:3px solid var(--border2)"><div class="stat-label" style="color:#5b21b6">Fiados pagos</div><div class="stat-val" style="color:#5b21b6">' + fiados.filter(function(f){return f.status==="paid";}).length + '</div></div>' +
     '</div>' +
     (fiadoAberto > 0 ? '<div style="background:#fef3c7;border:2px solid #fde68a;border-radius:12px;padding:14px;margin-bottom:14px">' +
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +

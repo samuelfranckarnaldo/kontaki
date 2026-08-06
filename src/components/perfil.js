@@ -1726,7 +1726,7 @@ function contaRow(label, value, color, sub) {
 }
 
 function kpi(label, value, color, icon) {
-  return '<div class="stat-card" style="border-left:3px solid '+color+'">' +
+  return '<div class="stat-card" style="border-left:3px solid var(--border2)">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
     '<div class="stat-label" style="color:'+color+';font-size:11px">'+label+'</div>' +
     '<i data-lucide="'+icon+'" style="width:14px;height:14px;color:'+color+';opacity:.6"></i>' +
