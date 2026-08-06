@@ -1,2 +1,4 @@
 *.py
 _patches_archive/
+*.keystore
+node_modules/
