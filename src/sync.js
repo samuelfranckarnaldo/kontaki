@@ -431,7 +431,7 @@ export async function syncBalances() {
       logger.error("[sync] syncBalances falhou: status=" + res.status + " body=" + resBody.slice(0, 300));
       return;
     }
-    logger.info("[sync] syncBalances OK: caixa=" + cashBalance + " banco=" + bankBalance);
+    logger.info("[sync] syncBalances OK");
   } catch (e) {
     logger.error("[sync] syncBalances erro de rede/execução", e);
   }
@@ -481,7 +481,7 @@ export async function syncAccounting() {
       logger.error("[sync] syncAccounting falhou: status=" + res.status + " body=" + resBody.slice(0, 300));
       return;
     }
-    logger.info("[sync] syncAccounting OK: periodo=" + summary.period + " receita=" + summary.totalReceita + " custos=" + summary.totalCustos);
+    logger.info("[sync] syncAccounting OK: periodo=" + summary.period);
   } catch (e) {
     logger.error("[sync] syncAccounting erro de rede/execução", e);
   }

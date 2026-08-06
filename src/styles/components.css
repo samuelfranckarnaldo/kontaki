@@ -3378,6 +3378,16 @@
 }
 .ws-auth-icon i { width: 28px; height: 28px; color: var(--primary); }
 .ws-auth-title { font-size: var(--text-xl); font-weight: var(--weight-strong); color: var(--text); margin-bottom: var(--space-2); letter-spacing: -.2px; }
+.ws-auth-cloud {
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto var(--space-3);
+  animation: wsCloudFloat 3.2s ease-in-out infinite;
+}
+.ws-auth-cloud i { width: 44px; height: 44px; color: var(--primary); stroke-width: 1.5; }
+@keyframes wsCloudFloat {
+  0%, 100% { transform: translateY(0); opacity: .85; }
+  50%      { transform: translateY(-6px); opacity: 1; }
+}
 .ws-auth-subtitle { font-size: var(--text-sm); color: var(--text3); line-height: 1.5; padding: 0 var(--space-3); }
 
 .ws-auth-features {

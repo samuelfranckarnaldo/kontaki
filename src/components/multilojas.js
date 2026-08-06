@@ -428,6 +428,66 @@ export async function loadMultilojas() {
 
 // ── AUTENTICAÇÃO — ECRÃ DE LOGIN / REGISTO / RECUPERAÇÃO ────────────────
 
+function _wsAuthGreeting() {
+  var h = new Date().getHours();
+  if (h < 12) return "Bom dia.";
+  if (h < 19) return "Boa tarde.";
+  return "Boa noite.";
+}
+
+function _wsAuthMessages() {
+  return [
+    "Vamos começar",
+    _wsAuthGreeting(),
+    "As tuas lojas, sempre à mão.",
+    "Sabe como vai o negócio, onde estiveres.",
+    "Cada loja, um só olhar.",
+    "Kontaki Workspace",
+  ];
+}
+
+var _wsAuthMsgIndex = 0;
+var _wsAuthMsgTimer = null;
+var _wsAuthTypeTimer = null;
+
+function _wsAuthTypeMessage(text, onDone) {
+  var el = document.getElementById("ws-auth-rotating-msg");
+  if (!el) return;
+  if (_wsAuthTypeTimer) clearInterval(_wsAuthTypeTimer);
+  el.textContent = "";
+  var i = 0;
+  _wsAuthTypeTimer = setInterval(function() {
+    i++;
+    el.textContent = text.slice(0, i);
+    if (i >= text.length) {
+      clearInterval(_wsAuthTypeTimer);
+      _wsAuthTypeTimer = null;
+      if (onDone) onDone();
+    }
+  }, 32);
+}
+
+function _wsAuthShowNext() {
+  var messages = _wsAuthMessages();
+  _wsAuthMsgIndex = (_wsAuthMsgIndex + 1) % messages.length;
+  _wsAuthTypeMessage(messages[_wsAuthMsgIndex]);
+}
+
+function _wsAuthStartRotation() {
+  var el = document.getElementById("ws-auth-rotating-msg");
+  if (!el) return;
+  var messages = _wsAuthMessages();
+  _wsAuthMsgIndex = 0;
+  _wsAuthTypeMessage(messages[0]);
+  if (_wsAuthMsgTimer) clearInterval(_wsAuthMsgTimer);
+  _wsAuthMsgTimer = setInterval(_wsAuthShowNext, 4200);
+}
+
+function _wsAuthStopRotation() {
+  if (_wsAuthMsgTimer) { clearInterval(_wsAuthMsgTimer); _wsAuthMsgTimer = null; }
+  if (_wsAuthTypeTimer) { clearInterval(_wsAuthTypeTimer); _wsAuthTypeTimer = null; }
+}
+
 function _mlAuthFeatureRow(label) {
   return '<div class="ws-auth-feature">' +
     '<i data-lucide="check-circle-2"></i>' +
@@ -448,14 +508,11 @@ function _renderWorkspaceAuthGate() {
   wrap.innerHTML =
     '<div class="ws-auth-wrap"><div class="ws-auth-card">' +
       '<div class="ws-auth-header">' +
+        '<div class="ws-auth-cloud"><i data-lucide="cloud"></i></div>' +
         '<div class="ws-auth-subtitle">Gere todas as tuas lojas a partir de uma única conta.</div>' +
       '</div>' +
 
-      '<div class="ws-auth-features">' +
-        _mlAuthFeatureRow("Várias lojas num único lugar") +
-        _mlAuthFeatureRow("Equipa e permissões partilhadas") +
-        _mlAuthFeatureRow("Sincronização e backup automático") +
-      '</div>' +
+      '<div id="ws-auth-rotating-msg" class="login-rotating-msg" style="font-size:16px;height:64px"></div>' +
 
       '<div class="ws-auth-form">' +
       (isLogin ? '' : '<div class="field"><label>Nome</label><input id="wsa-name" type="text" placeholder="O teu nome"></div>') +
@@ -476,6 +533,7 @@ function _renderWorkspaceAuthGate() {
     '</div></div>';
 
   refreshIcons(wrap);
+  _wsAuthStartRotation();
 }
 
 window._mlTogglePw = function(btn, inputId) {
@@ -548,6 +606,7 @@ window._mlSubmitAuth = async function() {
     return;
   }
 
+  _wsAuthStopRotation();
   toast("Sessão iniciada.", "success");
   loadMultilojas();
 };
@@ -1183,13 +1242,20 @@ async function _renderEscritorio(wrap) {
   } else {
     wrap.innerHTML =
       '<div class="skel-line hist-skel" style="height:40px;border-radius:var(--radius-lg);margin-bottom:14px"></div>' +
-      '<div class="hist-mov-card hist-skel">' +
-        '<div class="skel-line skel-line--label" style="margin-bottom:6px"></div>' +
-        '<div class="skel-line skel-line--title" style="margin-bottom:14px"></div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
-          '<div class="skel-line hist-skel" style="height:52px;border-radius:var(--radius-sm)"></div>' +
-          '<div class="skel-line hist-skel" style="height:52px;border-radius:var(--radius-sm)"></div>' +
+      '<div class="hist-skel" style="background:#fff;border:1px solid #e4e4e7;border-radius:var(--radius-lg);padding:16px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">' +
+          '<div style="flex:1">' +
+            '<div class="skel-line skel-line--label" style="width:50px;margin-bottom:6px"></div>' +
+            '<div class="skel-line skel-line--title" style="width:60%;margin-bottom:4px"></div>' +
+            '<div class="skel-line skel-line--sub" style="width:40%"></div>' +
+          '</div>' +
+          '<div class="skel-line" style="width:56px;height:22px;border-radius:20px"></div>' +
         '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+          '<div class="skel-line" style="height:52px;border-radius:var(--radius-sm)"></div>' +
+          '<div class="skel-line" style="height:52px;border-radius:var(--radius-sm)"></div>' +
+        '</div>' +
+        '<div class="skel-line" style="height:52px;border-radius:var(--radius-sm)"></div>' +
       '</div>';
     await _mlMinDelay(280);
     if (_token !== _mlRenderToken) return;
