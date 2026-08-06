@@ -40,6 +40,38 @@ window.router = router;
 
 // Bloqueia zoom por duplo-toque (o meta viewport user-scalable=no
 // nao cobre isto de forma confiavel em todos os Android/Chrome).
+// Esconde o navbar/barra de total quando o teclado virtual está aberto —
+// em Android/WebView não há forma fiável de "encolher" o layout para caber
+// no espaço livre acima do teclado (100dvh nem sempre reflete isso), então
+// em vez de tentar mantê-los ancorados corretamente, simplesmente somem
+// enquanto o teclado estiver visível (de qualquer forma ficariam cobertos
+// por ele). Aplica-se a toda a app, não só ao ecrã de Vender.
+(function detectVirtualKeyboard() {
+  if (!window.visualViewport) return;
+  var initialHeight = window.visualViewport.height;
+  var threshold = 150; // px de redução considerados "teclado aberto"
+
+  function syncAppHeight() {
+    // #app usa esta variável em vez de confiar só em vh/dvh — no Android
+    // o "layout viewport" muitas vezes não encolhe com o teclado (só o
+    // "visual viewport" encolhe), o que deixava uma faixa do fundo do app
+    // visível por baixo do conteúdo quando escondíamos o navbar.
+    document.documentElement.style.setProperty("--app-vh", window.visualViewport.height + "px");
+  }
+
+  function onViewportResize() {
+    var shrink = initialHeight - window.visualViewport.height;
+    document.body.classList.toggle("keyboard-open", shrink > threshold);
+    syncAppHeight();
+    if (!document.body.classList.contains("keyboard-open")) {
+      initialHeight = window.visualViewport.height;
+    }
+  }
+
+  syncAppHeight();
+  window.visualViewport.addEventListener("resize", onViewportResize);
+})();
+
 (function preventDoubleTapZoom() {
   var lastTouchEnd = 0;
   document.addEventListener("touchend", function (e) {

@@ -2,7 +2,25 @@ import { db }           from "../db.js";
 import { fmt, fmtDate }  from "../utils.js";
 import { toast }        from "../toast.js";
 
-// ── PDF 80mm ─────────────────────────────────────────────────────────────────
+// ── CAMADA DE IMPRESSÃO — resolução de formato ──────────────────────────────
+// Única fonte de verdade sobre a largura do recibo, lida da configuração
+// da loja (Perfil > Sistema > Impressora). "nenhuma" ainda não foi
+// configurado pelo utilizador — assume 80mm (o padrão histórico da app)
+// em vez de bloquear, para não quebrar quem já imprimia antes desta
+// configuração existir. "a4" devolve null: sinaliza para não forçar
+// nenhuma largura de página específica, deixando o comportamento padrão
+// do serviço de impressão/PDF decidir — o layout do recibo continua o
+// mesmo (talão estreito), só não força @page size numa impressora A4.
+async function resolvePrinterWidthMm() {
+  var config = await db.get("settings", "printerType");
+  var type = (config && config.value) || "termica_80";
+  if (type === "termica_58") return 58;
+  if (type === "a4") return 210;
+  return 80; // termica_80 e "nenhuma" (ainda não configurado)
+}
+
+var PX_PER_MM = 7.5; // resolução usada no canvas do recibo PNG
+
 function payMethodLabel(m) {
   return { dinheiro: "Dinheiro", transferencia: "Transferência", multicaixa: "Multicaixa", fiado: "Crédito" }[m] || m;
 }
@@ -108,7 +126,7 @@ async function buildPdfDoc(sale, store) {
   var jsPDFLib = window.jspdf ? window.jspdf.jsPDF : null;
   if (!jsPDFLib) { toast("Biblioteca PDF não carregada.", "error"); return null; }
 
-  var pageW  = 80;
+  var pageW  = await resolvePrinterWidthMm();
   var margin = 5;
   var cW     = pageW - margin * 2;
   var cX     = pageW / 2;
@@ -116,9 +134,14 @@ async function buildPdfDoc(sale, store) {
   var total  = (sale.total || 0) - (sale.totalDevolvido || 0);
   var skuMap = await getSkuMap();
 
-  // Estimar altura da página
-  var estHeight = 60 + items.length * 11 + 60 + 28 + 14;
-  var doc = new jsPDFLib({ unit: "mm", format: [pageW, estHeight] });
+  // Desenha o conteúdo completo num doc já criado e devolve a altura final
+  // usada — chamada duas vezes: (1) numa página de rascunho bem alta, só
+  // para medir quanto espaço o conteúdo real ocupa (logo, desconto por
+  // item, total por extenso em várias linhas, etc. — nada disto tinha
+  // altura própria contabilizada antes, o que podia cortar o fim do
+  // recibo, como QR code e código de verificação, sem erro nenhum);
+  // (2) na página final já com a altura exata medida, sem desperdício nem risco de corte.
+  async function renderContent(doc) {
   var y = margin;
 
   function line(dash) {
@@ -179,7 +202,11 @@ async function buildPdfDoc(sale, store) {
     var name = i.name.length > 28 ? i.name.slice(0, 25) + "..." : i.name;
     text(name, margin, "left", 7.5, true);
     if (skuMap[i.id]) text("Ref: " + skuMap[i.id], margin, "left", 6);
-    row(i.qty + " x " + fmt(i.price), fmt(i.price * i.qty), 7.5);
+    var lineTotal1 = (i.subtotal != null) ? i.subtotal : (i.price * i.qty);
+    row(i.qty + " x " + fmt(i.price), fmt(lineTotal1), 7.5);
+    if (i.discount) {
+      text("Desconto: -" + (i.discountType === "pct" ? i.discount + "%" : fmt(i.discount)), margin, "left", 6);
+    }
     y += 2.5;
   });
 
@@ -253,6 +280,17 @@ async function buildPdfDoc(sale, store) {
   doc.text("Documento de gestão interna · Sem validade fiscal AGT", cX, y, { align: "center" }); y += 3;
   doc.text("Kontaki · Introxeer", cX, y, { align: "center" });
 
+  return y;
+  }
+
+  // Passo 1: mede a altura real do conteúdo numa página de rascunho.
+  var measureDoc = new jsPDFLib({ unit: "mm", format: [pageW, 1000] });
+  var measuredY = await renderContent(measureDoc);
+
+  // Passo 2: gera o PDF final já com a altura exata medida (+ margem de fundo).
+  var doc = new jsPDFLib({ unit: "mm", format: [pageW, measuredY + margin] });
+  await renderContent(doc);
+
   return doc;
 }
 
@@ -317,10 +355,12 @@ async function printReciboHTML(saleId) {
 
     // Itens
     items.map(function(i) {
+      var lineTotal2 = (i.subtotal != null) ? i.subtotal : (i.price * i.qty);
       return "<div><div class='bold'>" + i.name + "</div>" +
              (skuMap[i.id] ? "<div class='sm'>Ref: " + skuMap[i.id] + "</div>" : "") +
+             (i.discount ? "<div class='sm' style='color:#16a34a'>Desconto: -" + (i.discountType === "pct" ? i.discount + "%" : fmt(i.discount)) + "</div>" : "") +
              "<div class='row sm'><span>" + i.qty + " x " + fmt(i.price) + "</span>" +
-             "<span class='bold' style='color:#111'>" + fmt(i.price * i.qty) + "</span></div></div>";
+             "<span class='bold' style='color:#111'>" + fmt(lineTotal2) + "</span></div></div>";
     }).join(""),
 
     "<hr class='divider-solid'/>",
@@ -374,7 +414,8 @@ async function buildReciboPNG(sale, store) {
   var items = sale.items || [];
   var total = (sale.total || 0) - (sale.totalDevolvido || 0);
   var skuMap = await getSkuMap();
-  var W = 600, pad = 28, cX = W / 2;
+  var widthMm = await resolvePrinterWidthMm();
+  var W = Math.round(widthMm * PX_PER_MM), pad = 28, cX = W / 2;
 
   // Canvas de trabalho com altura generosa; será recortado no final
   var estH = 700 + items.length * 46;
@@ -434,7 +475,11 @@ async function buildReciboPNG(sale, store) {
   items.forEach(function(i) {
     row(i.name, "", 14, true);
     if (skuMap[i.id]) row("Ref: " + skuMap[i.id], "", 11, false, "#9ca3af");
-    row(i.qty + " x " + fmt(i.price), fmt(i.price * i.qty), 12.5, false, "#6b7280");
+    var lineTotal3 = (i.subtotal != null) ? i.subtotal : (i.price * i.qty);
+    row(i.qty + " x " + fmt(i.price), fmt(lineTotal3), 12.5, false, "#6b7280");
+    if (i.discount) {
+      row("Desconto", "-" + (i.discountType === "pct" ? i.discount + "%" : fmt(i.discount)), 11, false, "#16a34a");
+    }
     y += 4;
   });
 

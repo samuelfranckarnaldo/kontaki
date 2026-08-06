@@ -833,8 +833,7 @@ async function applyProductItems(items) {
   for (const item of items) {
     const existing=byCatalogId[item.catalogId];
     if (existing) {
-      await db.put("products",{
-        ...existing,
+      const merged={
         name:item.name!==undefined?item.name:existing.name,
         barcode:item.barcode!==undefined?item.barcode:existing.barcode,
         masterBarcode:item.masterBarcode!==undefined?item.masterBarcode:existing.masterBarcode,
@@ -844,9 +843,19 @@ async function applyProductItems(items) {
         category:item.category!==undefined?item.category:existing.category,
         unit:item.unit!==undefined?item.unit:existing.unit,
         active:item.active!==undefined?item.active:existing.active,
-        catalogId:item.catalogId, updatedAt:new Date().toISOString(),
-      });
-      updated++;
+      };
+      // So grava (db.put) se algum campo relevante mudou de facto —
+      // evita reescrever todos os produtos a cada sync do catalogo do
+      // Workspace quando nada mudou (o catalogo inteiro chega sempre,
+      // mesmo sem alteracoes).
+      const changedFields=Object.keys(merged).filter(k=>merged[k]!==existing[k]);
+      if (changedFields.length) {
+        await db.put("products",{
+          ...existing, ...merged,
+          catalogId:item.catalogId, updatedAt:new Date().toISOString(),
+        });
+        updated++;
+      }
       // Produto existente ignora initialStock (decisao: catalogo nunca
       // altera stock de produto ja existente).
     } else {

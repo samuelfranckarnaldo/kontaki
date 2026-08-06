@@ -122,6 +122,7 @@ function renderMenu() {
     // ── Sistema ──
     { label: "Segurança",         sub: "Chave HMAC e auditoria",         icon: "shield",         color: "var(--bg)", iconColor: "var(--text3)", page: "seguranca",     group: "Sistema"    },
     { label: "Configurações",     sub: "Backup, logs e dados",           icon: "settings",       color: "var(--bg)", iconColor: "var(--text3)", page: "configuracoes", group: "Sistema"    },
+    { label: "Impressora",        sub: "Formato e tipo de impressão",    icon: "printer",        color: "var(--bg)", iconColor: "var(--text3)", page: "impressora",    group: "Sistema"    },
   ];
 
   const caixaItems = [
@@ -270,6 +271,7 @@ window._perfilNav = async (page) => {
   if (page === "multilojas")     await loadMultilojasPage();
   if (page === "assinatura")     await loadAssinaturaPage();
   if (page === "contactos")      await loadContactosPage();
+  if (page === "impressora")     await loadImpressoraPage();
   if (page === "seguranca")    await loadSegurancaPage();
   if (page === "turno")        await loadTurnoPage();
   if (page === "tesouraria")   await loadTesourariaPage();
@@ -286,12 +288,12 @@ var SUBPAGE_TITLES = {
   senha: "Senha", dashboard: "Business Intelligence", multilojas: "Workspace", fornecedores: "Fornecedores",
   turno: "Turno", tesouraria: "Tesouraria", seguranca: "Segurança", configuracoes: "Configurações",
   contabilidade: "Contabilidade", despesas: "Despesas", assinatura: "Assinatura",
-  contactos: "Contactos", escritorio: "Escritório", sobre: "Sobre",
+  contactos: "Contactos", escritorio: "Escritório", sobre: "Sobre", impressora: "Impressora",
   ajuda: "Ajuda", notificacoes: "Notificações",
 };
 
 function showSubpage(name) {
-  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","multilojas","fornecedores","turno","tesouraria","seguranca","configuracoes","contabilidade","despesas","assinatura","contactos","escritorio","sobre","ajuda","notificacoes"];
+  const subpages = ["stock","incidentes","equipa","loja","senha","dashboard","multilojas","fornecedores","turno","tesouraria","seguranca","configuracoes","contabilidade","despesas","assinatura","contactos","escritorio","sobre","ajuda","notificacoes","impressora"];
   subpages.forEach(s => {
     const node = el("subpage-" + s);
     if (node) node.style.display = "none";
@@ -2861,6 +2863,52 @@ window._activarLicenca = async function() {
     toast(err.message, "error");
     if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="zap"></i> Activar licença'; refreshIcons(btn); }
   }
+};
+
+var PRINTER_TYPES = [
+  { key: "nenhuma",      label: "Nenhuma",         desc: "Sem impressão configurada ainda", icon: "printer-check", width: null },
+  { key: "termica_58",   label: "Térmica 58mm",    desc: "Rolo estreito, papel de talão",   icon: "receipt",       width: 58 },
+  { key: "termica_80",   label: "Térmica 80mm",    desc: "Rolo padrão, mais usado",         icon: "receipt",       width: 80 },
+  { key: "a4",           label: "A4",              desc: "Impressora normal de folha",      icon: "file-text",     width: 210 },
+];
+
+async function loadImpressoraPage() {
+  var btn = document.getElementById("btn-back-impressora");
+  if (btn) btn.onclick = function(){ showSubpage(null); };
+  window._showSubpage = showSubpage;
+  await loadImpressora();
+}
+
+async function loadImpressora() {
+  var wrap = document.getElementById("impressora-content");
+  if (!wrap) return;
+
+  var current = await db.get("settings", "printerType");
+  var selected = (current && current.value) || "termica_80";
+
+  wrap.innerHTML =
+    '<div style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.5">Define o tipo de impressora usada para os recibos. Isto ajusta a largura da página em todos os formatos (impressão direta e PDF) — sem precisares de mexer em mais nada quando ligares uma impressora nova.</div>' +
+    '<div class="list-card">' +
+      PRINTER_TYPES.map(function(p) {
+        var active = selected === p.key;
+        return '<button onclick="window._setPrinterType(\'' + p.key + '\')" class="hist-mov-item hist-mov-item--compact" style="width:100%;border:none;background:none;padding-right:14px;font-family:inherit;text-align:left;cursor:pointer;' + (active ? 'border-left:3px solid var(--primary)' : '') + '">' +
+          '<div class="hist-mov-icon" style="background:' + (active ? "var(--primary-light)" : "var(--border2)") + ';color:' + (active ? "var(--primary)" : "var(--text4)") + '"><i data-lucide="' + p.icon + '" style="width:18px;height:18px"></i></div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div class="hist-mov-name">' + p.label + '</div>' +
+            '<div class="hist-mov-meta">' + p.desc + '</div>' +
+          '</div>' +
+          (active ? '<i data-lucide="check-circle-2" style="width:18px;height:18px;color:var(--primary);flex-shrink:0"></i>' : '') +
+        '</button>';
+      }).join("") +
+    '</div>';
+
+  refreshIcons(wrap);
+}
+
+window._setPrinterType = async function(key) {
+  await db.put("settings", { key: "printerType", value: key });
+  toast("Tipo de impressora atualizado.", "success");
+  await loadImpressora();
 };
 
 async function loadContactos() {

@@ -130,7 +130,11 @@ export async function buildEscPosBytes(saleId) {
     pushLine(b, i.name);
     bold(b, false);
     if (skuMap[i.id]) pushLine(b, "Ref: " + skuMap[i.id]);
-    pushRow(b, i.qty + " x " + fmt(i.price), fmt(i.price * i.qty));
+    var lineTotal = (i.subtotal != null) ? i.subtotal : (i.price * i.qty);
+    pushRow(b, i.qty + " x " + fmt(i.price), fmt(lineTotal));
+    if (i.discount) {
+      pushRow(b, "Desconto", "-" + (i.discountType === "pct" ? i.discount + "%" : fmt(i.discount)));
+    }
   });
 
   pushDivisor(b, "=");

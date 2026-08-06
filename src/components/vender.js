@@ -327,7 +327,7 @@ function pushToCart(p, incidentAuth) {
     ex.qty++;
     if (incidentAuth) ex.incidentAuth = incidentAuth;
   } else {
-    cart.push({ id:p.id, catalogId:p.catalogId||null, name:p.name, price:p.price, costPrice:p.costPrice||0, stock:p.stock, unit:p.unit, qty:1, incidentAuth: incidentAuth||null });
+    cart.push({ id:p.id, catalogId:p.catalogId||null, name:p.name, price:p.price, costPrice:p.costPrice||0, stock:p.stock, unit:p.unit, qty:1, incidentAuth: incidentAuth||null, discount:0, discountType:"kz" });
   }
   var results = el("search-results");
   if (results) results.style.display = "none";
@@ -444,6 +444,62 @@ window._removeItem = (id) => {
   renderCart(); renderSummary();
 };
 
+var _itemDiscountTargetId = null;
+var _itemDiscountType = "kz";
+
+window._openItemDiscount = (id) => {
+  if (!hasPermission(getUser(), "aplicar_desconto")) {
+    toast("Não tens permissão para aplicar desconto.", "error");
+    return;
+  }
+  const item = cart.find(i => i.id === Number(id));
+  if (!item) return;
+  _itemDiscountTargetId = Number(id);
+  _itemDiscountType = item.discountType || "kz";
+
+  openModal("Desconto — " + item.name,
+    '<div style="font-size:13px;color:var(--text3);line-height:1.5;margin-bottom:16px">Preço unitário: ' + fmt(item.price) + ' · Quantidade: ' + item.qty + '</div>' +
+    '<div class="ck-input-row" style="margin-bottom:14px">' +
+    '<input id="item-disc-input" type="number" placeholder="0" autocomplete="off" value="' + (item.discount || "") + '" ' +
+    'style="flex:1;border:none;outline:none;font-size:15px;font-family:inherit;background:transparent;color:var(--text)"/>' +
+    '<button type="button" id="item-disc-type-btn" onclick="window._toggleItemDiscountType()" ' +
+    'style="background:var(--border2);border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--text)">' +
+    (_itemDiscountType === "pct" ? "%" : "Kz") + '</button>' +
+    '</div>' +
+    '<div class="form-actions">' +
+    (item.discount ? '<button class="btn btn-ghost btn-full" style="color:var(--danger)" onclick="window._clearItemDiscount()">Remover desconto</button>' : '') +
+    '<button class="btn btn-primary btn-full" onclick="window._applyItemDiscount()">Aplicar</button>' +
+    '</div>');
+};
+
+window._toggleItemDiscountType = () => {
+  _itemDiscountType = _itemDiscountType === "pct" ? "kz" : "pct";
+  const btn = document.getElementById("item-disc-type-btn");
+  if (btn) btn.textContent = _itemDiscountType === "pct" ? "%" : "Kz";
+};
+
+window._applyItemDiscount = () => {
+  const item = cart.find(i => i.id === _itemDiscountTargetId);
+  if (!item) { closeModal(); return; }
+  const input = document.getElementById("item-disc-input");
+  const val = Number(input ? input.value : 0) || 0;
+  if (val < 0) { toast("O desconto não pode ser negativo.", "error"); return; }
+  if (_itemDiscountType === "pct" && val > 100) { toast("A percentagem não pode passar de 100%.", "error"); return; }
+  item.discount = val;
+  item.discountType = _itemDiscountType;
+  closeModal();
+  renderCart(); renderSummary();
+  toast(val > 0 ? "Desconto aplicado." : "Desconto removido.", "success");
+};
+
+window._clearItemDiscount = () => {
+  const item = cart.find(i => i.id === _itemDiscountTargetId);
+  if (item) { item.discount = 0; item.discountType = "kz"; }
+  closeModal();
+  renderCart(); renderSummary();
+  toast("Desconto removido.", "success");
+};
+
 window._limparCart = limpar;
 
 async function atualizarBadgePedidos() {
@@ -466,7 +522,7 @@ async function guardarPedido() {
   var user = getUser();
   var { total } = calcTotal();
   await db.add("pendingSales", {
-    items: cart.map(function(i){ return { id:i.id, catalogId:i.catalogId||null, name:i.name, price:i.price, costPrice:i.costPrice||0, qty:i.qty, subtotal:(i.price||0)*(i.qty||0) }; }),
+    items: cart.map(function(i){ return { id:i.id, catalogId:i.catalogId||null, name:i.name, price:i.price, costPrice:i.costPrice||0, qty:i.qty, discount:i.discount||0, discountType:i.discountType||"kz", subtotal:itemTotal(i) }; }),
     total: total,
     createdAt: new Date().toISOString(),
     userId: user.id,
@@ -688,10 +744,13 @@ function renderCart() {
     refreshIcons(itemsEl);
     return;
   }
+  const canDiscount = hasPermission(getUser(), "aplicar_desconto");
   let html = "";
   cart.forEach(item => {
     const isLow = item.qty >= item.stock * 0.8 && item.stock > 0;
-    const total = item.price * item.qty;
+    const gross = itemGross(item);
+    const total = itemTotal(item);
+    const hasDisc = (item.discount||0) > 0 && total < gross;
     const fullProd = products.find(p => p.id === item.id);
     const cColor = categoryColorVender(fullProd ? fullProd.category : "Outro");
     const avatarHTML = (fullProd && fullProd.imageData)
@@ -703,6 +762,8 @@ function renderCart() {
       `<div style="flex:1;min-width:0">` +
       `<div class="cart-item-name">${item.name}</div>` +
       `<div class="cart-item-sub">${fmt(item.price)} / un${isLow?" · <span style='color:var(--warning);font-weight:700'>Stock baixo</span>":""}</div>` +
+      (canDiscount ? `<button onclick="window._openItemDiscount(${item.id})" style="display:flex;align-items:center;gap:3px;background:none;border:none;padding:2px 0;margin-top:2px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:700;color:${hasDisc?"var(--success)":"var(--text4)"}">` +
+        `<i data-lucide="percent" style="width:11px;height:11px"></i>${hasDisc ? (item.discountType==="pct" ? "-"+item.discount+"%" : "-"+fmt(item.discount)) : "Desconto"}</button>` : "") +
       `</div>` +
       `<div class="qty-ctrl">` +
       `<button onclick="window._changeQty(${item.id},-1)" class="qty-ctrl-btn"><i data-lucide="minus"></i></button>` +
@@ -710,7 +771,8 @@ function renderCart() {
       `<button onclick="window._changeQty(${item.id},1)" class="qty-ctrl-btn"><i data-lucide="plus"></i></button>` +
       `</div>` +
       `<div style="flex-shrink:0;text-align:right">` +
-      `<div class="cart-item-total">${fmt(total)}</div>` +
+      (hasDisc ? `<div style="font-size:11px;color:var(--text4);text-decoration:line-through">${fmt(gross)}</div>` : "") +
+      `<div class="cart-item-total"${hasDisc?' style="color:var(--success)"':''}>${fmt(total)}</div>` +
       `<button onclick="window._removeItem(${item.id})" class="cart-item-remove">remover</button>` +
       `</div></div>`;
   });
@@ -718,7 +780,17 @@ function renderCart() {
   refreshIcons(itemsEl);
 }
 
-function itemTotal(item) { return item.price * item.qty; }
+function itemGross(item) { return item.price * item.qty; }
+
+function itemDiscountAmount(item) {
+  const gross = itemGross(item);
+  let d = item.discountType === "pct" ? gross * ((item.discount||0)/100) : (item.discount||0);
+  if (d > gross) d = gross;
+  if (d < 0) d = 0;
+  return d;
+}
+
+function itemTotal(item) { return itemGross(item) - itemDiscountAmount(item); }
 
 // ── CÁLCULO COM IVA OPCIONAL DA LOJA ──────────────────────────────────────────
 let _storeIvaCache = null;
@@ -729,7 +801,7 @@ async function getStoreIva() {
 }
 
 function calcTotal() {
-  const subtotal = cart.reduce((a, i) => a + i.price * i.qty, 0);
+  const subtotal = cart.reduce((a, i) => a + itemTotal(i), 0);
   const disc = Number((el("disc-input") ? el("disc-input").value : "") || 0);
   let da = discType === "pct" ? subtotal * (disc/100) : disc;
   if (da > subtotal) da = subtotal;
@@ -1256,7 +1328,7 @@ window._confirmarVenda = async () => {
     const notes      = notesEl ? notesEl.value.trim() : "";
 
     const sid = await db.add("sales", {
-      items: cart.map(i=>({id:i.id,catalogId:i.catalogId||null,name:i.name,price:i.price,costPrice:i.costPrice||0,qty:i.qty,subtotal:(i.price||0)*(i.qty||0)})),
+      items: cart.map(i=>({id:i.id,catalogId:i.catalogId||null,name:i.name,price:i.price,costPrice:i.costPrice||0,qty:i.qty,discount:i.discount||0,discountType:i.discountType||"kz",subtotal:itemTotal(i)})),
       subtotal, discount:da,
       ivaPct, ivaValor:ivaVal,
       notes,
@@ -1279,7 +1351,9 @@ window._confirmarVenda = async () => {
     for (const item of cart) {
       await db.add("saleItems", {
         saleId:sid, productId:item.id, productName:item.name,
-        qty:item.qty, unitPrice:item.price, total:item.price*item.qty,
+        qty:item.qty, unitPrice:item.price,
+        discount:item.discount||0, discountType:item.discountType||"kz",
+        total:itemTotal(item),
         createdAt:saleDate,
       });
     }
