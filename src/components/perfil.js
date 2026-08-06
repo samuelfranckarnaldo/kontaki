@@ -25,15 +25,7 @@ import { getLicense, loadLicense, activateLicense, PLANS, showUpgradeBanner } fr
 import { gerarRelatorioPDF } from "./extras.js";
 import { addStockMovement, getStock } from "../services.js";
 
-export async function initPerfil() {
-  const user  = getUser();
-  const store = (await db.get("settings", "store")) || {};
-
-  var avatarEl = el("perfil-avatar");
-  var nameEl   = el("perfil-name");
-
-  if (nameEl) nameEl.textContent = user.name;
-
+function _refreshLicenseCard(user, store) {
   var lic = getLicense();
   var planInfo = PLANS[lic.plan] || PLANS.basic;
 
@@ -49,6 +41,18 @@ export async function initPerfil() {
   }
 
   startLicenseCountdown(lic);
+}
+
+export async function initPerfil() {
+  const user  = getUser();
+  const store = (await db.get("settings", "store")) || {};
+
+  var avatarEl = el("perfil-avatar");
+  var nameEl   = el("perfil-name");
+
+  if (nameEl) nameEl.textContent = user.name;
+
+  _refreshLicenseCard(user, store);
 
   var crownBtn = el("perfil-crown-btn");
   if (crownBtn) {
@@ -225,8 +229,11 @@ function setupSubpageButtons() {
   });
 }
 
-window._perfilBack = function() {
+window._perfilBack = async function() {
   showSubpage(null);
+  var user = getUser();
+  var store = (await db.get("settings", "store")) || {};
+  _refreshLicenseCard(user, store);
 };
 
 var PAGE_FEATURE = {

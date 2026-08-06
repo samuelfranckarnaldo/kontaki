@@ -2168,9 +2168,12 @@ var REGISTO_CATEGORIES = [
   { key: "session",     label: "Turno" },
   { key: "treasury",    label: "Tesouraria" },
   { key: "product",     label: "Produtos" },
+  { key: "stock",       label: "Stock" },
   { key: "incident",    label: "Incidentes" },
   { key: "user",        label: "Acessos" },
 ];
+
+var _mlRegistosUserFilter = "all";
 
 var _mlRegistosFilter = "all";
 
@@ -2286,16 +2289,33 @@ async function _renderRegistos(wrap) {
 
 function _mlRenderRegistosList(wrap) {
   var storeEntries = _mlRegistosAllEntries || [];
-  var entries = _mlRegistosFilter === "all"
-    ? storeEntries
-    : storeEntries.filter(function(e) { return e.entityType === _mlRegistosFilter; });
+  var entries = storeEntries.filter(function(e) {
+    var matchesCategory = _mlRegistosFilter === "all" || e.entityType === _mlRegistosFilter;
+    var matchesUser = _mlRegistosUserFilter === "all" || e.operator === _mlRegistosUserFilter;
+    return matchesCategory && matchesUser;
+  });
 
-  var chipsHtml = '<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px">' +
+  var chipsHtml = '<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:8px;padding-bottom:2px">' +
     REGISTO_CATEGORIES.map(function(c) {
       var active = _mlRegistosFilter === c.key;
       return '<button onclick="window._mlSetRegistosFilter(\'' + c.key + '\')" style="flex-shrink:0;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;border:1.5px solid ' + (active ? "var(--primary,#5b21b6)" : "#e4e4e7") + ';background:' + (active ? "var(--primary,#5b21b6)" : "#fff") + ';color:' + (active ? "#fff" : "var(--text3)") + '">' + c.label + '</button>';
     }).join("") +
   '</div>';
+
+  var operators = [];
+  storeEntries.forEach(function(e) {
+    if (e.operator && operators.indexOf(e.operator) === -1) operators.push(e.operator);
+  });
+
+  var userChipsHtml = operators.length > 1
+    ? '<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px">' +
+      '<button onclick="window._mlSetRegistosUserFilter(\'all\')" style="flex-shrink:0;padding:5px 11px;border-radius:20px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;border:1.5px solid ' + (_mlRegistosUserFilter === "all" ? "var(--text2)" : "#e4e4e7") + ';background:' + (_mlRegistosUserFilter === "all" ? "var(--text2)" : "#fff") + ';color:' + (_mlRegistosUserFilter === "all" ? "#fff" : "var(--text3)") + '">Todos os utilizadores</button>' +
+      operators.map(function(op) {
+        var active = _mlRegistosUserFilter === op;
+        return '<button onclick="window._mlSetRegistosUserFilter(\'' + op.replace(/'/g, "\\'") + '\')" style="flex-shrink:0;padding:5px 11px;border-radius:20px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;border:1.5px solid ' + (active ? "var(--text2)" : "#e4e4e7") + ';background:' + (active ? "var(--text2)" : "#fff") + ';color:' + (active ? "#fff" : "var(--text3)") + '">' + op + '</button>';
+      }).join("") +
+      '</div>'
+    : "";
 
   var groups = [];
   var groupsByDay = {};
@@ -2336,6 +2356,7 @@ function _mlRenderRegistosList(wrap) {
       '<div style="font-size:11px;color:var(--text4)">Auditoria de alterações, dados reais</div>' +
     '</div>' +
     chipsHtml +
+    userChipsHtml +
     listHtml;
 
   refreshIcons(wrap);
@@ -2343,6 +2364,12 @@ function _mlRenderRegistosList(wrap) {
 
 window._mlSetRegistosFilter = function(key) {
   _mlRegistosFilter = key;
+  var wrap = document.getElementById("multilojas-content");
+  if (wrap) _mlRenderRegistosList(wrap);
+};
+
+window._mlSetRegistosUserFilter = function(operator) {
+  _mlRegistosUserFilter = operator;
   var wrap = document.getElementById("multilojas-content");
   if (wrap) _mlRenderRegistosList(wrap);
 };
