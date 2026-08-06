@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kontaki-v465';
+const CACHE_NAME = 'kontaki-v466';
 const BASE = self.location.pathname.replace(/\/sw\.js$/, '');
 
 const ASSETS = [
@@ -30,6 +30,8 @@ const ASSETS = [
   BASE + '/src/components/quickmode.js',
   BASE + '/src/components/configuracoes.js',
   BASE + '/src/components/camera.js',
+  BASE + '/src/components/escpos-print.js',
+  BASE + '/src/permissions.js',
   BASE + '/src/styles/base.css',
   BASE + '/src/styles/components.css',
   BASE + '/src/styles/layout.css',
@@ -73,7 +75,6 @@ const ASSETS = [
   BASE + '/src/components/despesas.js',
   BASE + '/src/components/estoque.js',
   BASE + '/src/components/extras.js',
-  BASE + '/src/components/fornecedores.js',
   BASE + '/src/components/multilojas.js',
   BASE + '/src/components/recibo-pdf.js',
   BASE + '/src/components/tesouraria.js',
@@ -131,7 +132,7 @@ self.addEventListener('fetch', function(e) {
       }).catch(function() {
         // Sem rede e sem cache — devolve index.html para SPA
         if (e.request.destination === 'document') {
-          return caches.match('/index.html');
+          return caches.match(BASE + '/index.html');
         }
       });
     })
