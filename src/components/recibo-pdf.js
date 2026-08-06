@@ -247,7 +247,7 @@ async function buildPdfDoc(sale, store) {
     var qrDataUrl = await getQrDataUrl(sale.hash);
     if (qrDataUrl) {
       try {
-        var qrSize = 22;
+        var qrSize = pageW * 0.275;
         doc.addImage(qrDataUrl, "PNG", cX - qrSize/2, y, qrSize, qrSize);
         y += qrSize + 3;
       } catch(e) {}
@@ -303,6 +303,7 @@ async function printReciboHTML(saleId) {
   var total = (sale.total || 0) - (sale.totalDevolvido || 0);
   var qrDataUrl = await getQrDataUrl(sale.hash || "");
   var skuMap = await getSkuMap();
+  var pageWidthMm = await resolvePrinterWidthMm();
 
   var html = [
     "<!DOCTYPE html><html><head><meta charset='UTF-8'>",
@@ -310,7 +311,7 @@ async function printReciboHTML(saleId) {
     "<style>",
     "  * { box-sizing:border-box; margin:0; padding:0; }",
     "  body { font-family: 'Courier New', monospace; font-size: 11px;",
-    "         width: 80mm; margin: 0 auto; padding: 8px; color: #111; }",
+    "         width: " + pageWidthMm + "mm; margin: 0 auto; padding: 8px; color: #111; }",
     "  .center { text-align: center; }",
     "  .bold   { font-weight: bold; }",
     "  .lg     { font-size: 14px; }",
@@ -325,8 +326,8 @@ async function printReciboHTML(saleId) {
     "  .hash   { font-size:16px; font-weight:bold; color:#5b21b6;",
     "            letter-spacing:3px; text-align:center; margin:6px 0; }",
     "  @media print {",
-    "    body { width: 80mm; }",
-    "    @page { size: 80mm auto; margin: 0; }",
+    "    body { width: " + pageWidthMm + "mm; }",
+    "    @page { size: " + pageWidthMm + "mm auto; margin: 0; }",
     "  }",
     "</style></head><body>",
 
@@ -378,7 +379,7 @@ async function printReciboHTML(saleId) {
 
     "<hr class='divider-dash'/>",
 
-    qrDataUrl ? "<div class='center'><img src='" + qrDataUrl + "' style='width:90px;height:90px;margin:4px auto'/></div>" : "",
+    qrDataUrl ? "<div class='center'><img src='" + qrDataUrl + "' style='width:" + (pageWidthMm * 0.28) + "mm;height:" + (pageWidthMm * 0.28) + "mm;margin:4px auto'/></div>" : "",
 
     "<div class='hash'>" + (sale.hash||"") + "</div>",
 
@@ -506,7 +507,7 @@ async function buildReciboPNG(sale, store) {
   if (qrDataUrl) {
     try {
       var qrImg = await loadImageEl(qrDataUrl);
-      var qs = 140;
+      var qs = W * 0.233;
       ctx.drawImage(qrImg, cX - qs/2, y, qs, qs);
       y += qs + 26;
     } catch(e) {}

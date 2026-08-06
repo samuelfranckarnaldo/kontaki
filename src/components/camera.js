@@ -64,11 +64,15 @@ export function initCamera(onDetected, formats) {
 
 export function openCameraForInvite(onInvite) {
   initCamera(function(rawValue) {
+    // Restrito a QR code — convites nunca são código de barras de produto;
+    // sem isto, um código de barras qualquer no enquadramento (ex: produto
+    // ao lado) dispara um falso "QR code inválido" enquanto o utilizador
+    // tenta mirar no QR do convite.
     try {
       var data = JSON.parse(rawValue);
       onInvite(data);
     } catch (e) {
       toast("QR code inválido. Pede um novo convite ao teu patrão.", "error");
     }
-  });
+  }, ["qr_code"]);
 }
