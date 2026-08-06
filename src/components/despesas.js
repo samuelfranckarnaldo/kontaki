@@ -2,7 +2,7 @@ import { db }            from "../db.js";
 import { openField }     from "../date-picker.js";
 import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast }         from "../toast.js";
-import { openModal, closeModal, confirmDialog } from "../modal.js";
+import { openModal, closeModal, confirmDialog, alertDialog } from "../modal.js";
 import { getUser }       from "../auth.js";
 import { postExpenseJournal } from "../pgc.js";
 import { logAudit } from "../logger.js";
@@ -560,7 +560,7 @@ window._updateDespesa = async function(id) {
     await postExpenseJournal(updatedExpense);
   } catch (pgcErr) {
     console.error("Erro ao re-lançar despesa editada na contabilidade:", pgcErr);
-    alert("A despesa foi actualizada, mas houve um erro ao corrigir a contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.");
+    alertDialog("A despesa foi actualizada, mas houve um erro ao corrigir a contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.", { title: "Erro na contabilidade" });
   }
 
   toast("Despesa actualizada.", "success");
@@ -626,7 +626,7 @@ window._saveDespesa = async function() {
     await postExpenseJournal(Object.assign({ id: newExpenseId }, newExpense));
   } catch (pgcErr) {
     console.error("Erro ao lançar despesa na contabilidade:", pgcErr);
-    alert("A despesa foi registada, mas houve um erro ao lançar na contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.");
+    alertDialog("A despesa foi registada, mas houve um erro ao lançar na contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.", { title: "Erro na contabilidade" });
   }
 
   toast("Despesa registada.","success");

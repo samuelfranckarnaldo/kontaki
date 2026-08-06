@@ -2,7 +2,7 @@ import { db } from "../db.js";
 import { openField } from "../date-picker.js";
 import { fmt, fmtDate, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
-import { openModal, closeModal, confirmDialog } from "../modal.js";
+import { openModal, closeModal, confirmDialog, alertDialog } from "../modal.js";
 import { getUser } from "../auth.js";
 import { hasPermission } from "../permissions.js";
 import { logAudit } from "../logger.js";
@@ -814,7 +814,7 @@ window._saveCompra = async () => {
     }
   } catch (pgcErr) {
     console.error("Erro ao lançar compra na contabilidade:", pgcErr);
-    alert("A compra foi registada, mas houve um erro ao lançar na contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.");
+    alertDialog("A compra foi registada, mas houve um erro ao lançar na contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.", { title: "Erro na contabilidade" });
   }
 
   toast("Compra registada. Stock actualizado.", "success");

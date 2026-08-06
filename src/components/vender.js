@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { fmt, fmtDate, el, val, setVal, refreshIcons, generateQR, haptic, setWakeLock } from "../utils.js";
 import { toast } from "../toast.js";
-import { openModal, closeModal, confirmDialog } from "../modal.js";
+import { openModal, closeModal, confirmDialog, alertDialog } from "../modal.js";
 import { getUser } from "../auth.js";
 import { hasPermission } from "../permissions.js";
 import { initCamera } from "./camera.js";
@@ -1391,7 +1391,7 @@ window._confirmarVenda = async () => {
       );
     } catch (pgcErr) {
       console.error("Erro ao lançar venda na contabilidade:", pgcErr);
-      alert("A venda foi registada, mas houve um erro ao lançar na contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.");
+      alertDialog("A venda foi registada, mas houve um erro ao lançar na contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.", { title: "Erro na contabilidade" });
     }
 
     const cartSnap = [...cart];

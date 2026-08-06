@@ -119,7 +119,11 @@ export async function loadTesouraria() {
   if (!wrap) return;
 
   var isAdmin = hasPermission(user, "tesouraria_avancada");
-  var ops = isAdmin ? ADMIN_OPS : CAIXA_OPS;
+  var canAjuste = hasPermission(user, "ajustar_caixa_sem_aprovacao");
+  var opsBase = isAdmin ? ADMIN_OPS : CAIXA_OPS;
+  // "Ajuste de caixa" é sensível — só aparece para quem tem a permissão
+  // (admin sempre tem, via hasPermission). Sem ela, a opção nem se mostra.
+  var ops = canAjuste ? opsBase : opsBase.filter(function(o) { return o.key !== "ajuste"; });
 
   var todosMovimentos = await db.getAll("treasuryMovements");
   var saldoCofre = todosMovimentos.reduce(function(acc, m) {

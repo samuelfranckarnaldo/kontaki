@@ -80,6 +80,34 @@ export function initModal() {
   // de Cancelar/Fechar, para evitar fecho acidental.
 }
 
+// ── AVISO CUSTOMIZADO (substitui alert() nativo) ─────────────────────────
+export function alertDialog(message, options) {
+  options = options || {};
+  var title   = options.title   || "Aviso";
+  var okText  = options.okText  || "OK";
+  var icon    = options.icon    || "alert-triangle";
+  var danger  = options.danger !== undefined ? options.danger : true;
+
+  var iconHTML = icon ?
+    `<div style="width:56px;height:56px;border-radius:16px;background:${danger?"#fee2e2":"var(--primary-light)"};
+      display:flex;align-items:center;justify-content:center;margin:0 auto 22px;box-shadow:0 2px 10px rgba(0,0,0,.06);
+      animation:cdIconPop .3s ease">
+      <i data-lucide="${icon}" style="width:26px;height:26px;color:${danger?"#dc2626":"var(--primary)"}"></i>
+    </div>` : "";
+
+  openModal(title,
+    `${iconHTML}
+    <div style="font-size:14px;color:#374151;line-height:1.6;margin-bottom:22px;white-space:pre-line">${message}</div>
+    <button id="ad-ok" class="btn" style="width:100%;padding:13px 20px;line-height:1.2;background:${danger?"#dc2626":"#5b21b6"};color:#fff;
+            border:none;border-radius:13px;font-size:14px;font-weight:700;cursor:pointer;
+            font-family:inherit;box-shadow:0 4px 14px ${danger?"rgba(220,38,38,.25)":"rgba(91,33,182,.25)"}">
+      ${okText}
+    </button>`);
+
+  var okBtn = document.getElementById("ad-ok");
+  if (okBtn) okBtn.onclick = function() { closeModal(); if (options.onOk) options.onOk(); };
+}
+
 // ── CONFIRMAÇÃO CUSTOMIZADA (substitui confirm() nativo) ────────────────────
 export function confirmDialog(message, onConfirm, options) {
   options = options || {};

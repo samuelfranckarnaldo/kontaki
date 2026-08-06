@@ -155,6 +155,66 @@ async function _renderCfgGeral(store) {
   );
 }
 
+var LOG_HUMAN_PATTERNS = [
+  [/^\[sync\] runFullSyncCycle ignorado/, "Sincronização já estava em curso"],
+  [/^\[sync\] runFullSyncCycle falhou/, "A sincronização geral falhou"],
+  [/^\[sync\] syncRegister abortado/, "Não foi possível registar a loja (dados em falta)"],
+  [/^\[sync\] syncRegister falhou/, "Falha ao registar a loja no servidor"],
+  [/^\[sync\] storeId foi atualizado/, "Identificador da loja foi atualizado automaticamente"],
+  [/^\[sync\] syncRegister OK/, "Loja registada e sincronizada com sucesso"],
+  [/^\[sync\] syncRegister erro de rede/, "Falha de ligação à internet ao registar a loja"],
+  [/^\[sync\] syncProducts abortado/, "Sincronização de produtos não pôde iniciar"],
+  [/^\[sync\] syncProducts: /, "A preparar produtos para sincronizar"],
+  [/^\[sync\] syncProducts falhou/, "Falha ao sincronizar produtos com o servidor"],
+  [/^\[sync\] syncProducts OK/, "Produtos sincronizados com sucesso"],
+  [/^\[sync\] syncProducts erro de rede/, "Falha de ligação à internet ao sincronizar produtos"],
+  [/^\[sync\] syncIncidents abortado/, "Sincronização de incidentes não pôde iniciar"],
+  [/^\[sync\] syncIncidents: /, "A preparar incidentes para sincronizar"],
+  [/^\[sync\] syncIncidents falhou/, "Falha ao sincronizar incidentes"],
+  [/^\[sync\] syncIncidents OK/, "Incidentes sincronizados com sucesso"],
+  [/^\[sync\] syncIncidents erro de rede/, "Falha de ligação à internet ao sincronizar incidentes"],
+  [/^\[sync\] syncBalances abortado/, "Sincronização de saldos não pôde iniciar"],
+  [/^\[sync\] syncBalances falhou/, "Falha ao sincronizar saldos de caixa/banco"],
+  [/^\[sync\] syncBalances OK/, "Saldos de caixa/banco sincronizados com sucesso"],
+  [/^\[sync\] syncBalances erro de rede/, "Falha de ligação à internet ao sincronizar saldos"],
+  [/^\[sync\] syncAccounting abortado/, "Sincronização de contabilidade não pôde iniciar"],
+  [/^\[sync\] syncAccounting falhou/, "Falha ao sincronizar contabilidade"],
+  [/^\[sync\] syncAccounting OK/, "Contabilidade sincronizada com sucesso"],
+  [/^\[sync\] syncAccounting erro de rede/, "Falha de ligação à internet ao sincronizar contabilidade"],
+  [/^\[sync\] syncSessions abortado/, "Sincronização de turnos não pôde iniciar"],
+  [/^\[sync\] syncSessions: /, "A preparar turnos para sincronizar"],
+  [/^\[sync\] syncSessions falhou/, "Falha ao sincronizar turnos"],
+  [/^\[sync\] syncSessions OK/, "Turnos sincronizados com sucesso"],
+  [/^\[sync\] syncSessions erro de rede/, "Falha de ligação à internet ao sincronizar turnos"],
+  [/^\[sync\] syncWorkspaceCatalog abortado/, "Sincronização do catálogo remoto não pôde iniciar"],
+  [/^\[sync\] syncWorkspaceCatalog falhou/, "Falha ao obter catálogo do Workspace"],
+  [/^\[sync\] syncWorkspaceCatalog: nenhum/, "Nenhuma atualização de catálogo disponível"],
+  [/^\[sync\] syncWorkspaceCatalog aplicado/, "Catálogo do Workspace atualizado com sucesso"],
+  [/^\[sync\] syncWorkspaceCatalog erro de rede/, "Falha de ligação à internet ao obter catálogo"],
+  [/^\[autoBackup\] ignorado/, "Cópia de segurança automática adiada"],
+  [/^\[autoBackup\] a disparar/, "A iniciar cópia de segurança automática"],
+  [/^\[autoBackup\] OK/, "Cópia de segurança automática concluída"],
+  [/^\[autoBackup\] falhou/, "Falha na cópia de segurança automática"],
+  [/^\[uploadToConsole\] fetch falhou/, "Falha de ligação ao enviar cópia de segurança"],
+  [/^\[restoreFromConsole\]/, "Falha ao restaurar cópia de segurança do servidor"],
+  [/^\[_regenerateRecoveryCodes\]/, "Falha ao gerar novos códigos de recuperação"],
+  [/^\[testBackupCrypto\]/, "Teste interno de segurança de cópias"],
+  [/^\[migration\]/, "Atualização interna de dados concluída"],
+  [/^\[recovery\] triggerPendingSync OK/, "Códigos de recuperação sincronizados"],
+  [/^\[recovery\] triggerPendingSync falhou/, "Falha ao sincronizar códigos de recuperação"],
+  [/^\[recovery\] triggerPendingSync erro/, "Falha de ligação ao sincronizar códigos de recuperação"],
+];
+
+function _cfgHumanizeLog(l) {
+  for (var i = 0; i < LOG_HUMAN_PATTERNS.length; i++) {
+    if (LOG_HUMAN_PATTERNS[i][0].test(l.message)) return LOG_HUMAN_PATTERNS[i][1];
+  }
+  // Sem padrão reconhecido — frase genérica pelo nível, nunca mostra só o texto técnico como "humano".
+  if (l.level === "error") return "Ocorreu um erro numa operação em segundo plano";
+  if (l.level === "warn")  return "Aviso numa operação em segundo plano";
+  return "Operação em segundo plano concluída";
+}
+
 async function _renderCfgRegistos() {
   const allLogs = await getLogs(30);
   const logs = _cfgLogFilter === "warnerror"
@@ -181,7 +241,8 @@ async function _renderCfgRegistos() {
           '<span style="font-weight:700;color:' + (l.level==="error"?"var(--danger)":l.level==="warn"?"var(--warning)":"var(--text3)") + '">' + l.level.toUpperCase() + '</span>' +
           '<span style="color:var(--text4)">' + new Date(l.date).toLocaleString("pt-AO") + '</span>' +
           '</div>' +
-          '<div style="color:var(--text3)">' + l.message + '</div>' +
+          '<div style="color:var(--text);font-weight:600;margin-bottom:2px">' + _cfgHumanizeLog(l) + '</div>' +
+          '<div style="color:var(--text4);font-size:10.5px;font-family:monospace;word-break:break-all">' + l.message + '</div>' +
           '</div>'
         ).join("")
     ) +

@@ -4,7 +4,7 @@ import { fmt, el, refreshIcons } from "../utils.js";
 import { toast } from "../toast.js";
 import { getUser } from "../auth.js";
 import { initCamera } from "./camera.js";
-import { confirmDialog } from "../modal.js";
+import { confirmDialog, alertDialog } from "../modal.js";
 import { getOpenIncidentForProduct, getStockIncidentPolicy } from "../services.js";
 import { showIncidentBlockedModal, showIncidentAuthModal } from "./vender.js";
 
@@ -319,7 +319,7 @@ async function finalizarQm() {
       );
     } catch (pgcErr) {
       console.error("Erro ao lançar venda (quickmode) na contabilidade:", pgcErr);
-      alert("A venda foi registada, mas houve um erro ao lançar na contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.");
+      alertDialog("A venda foi registada, mas houve um erro ao lançar na contabilidade:\n\n" + pgcErr.message + "\n\nAvisa o administrador para verificar o Diário.", { title: "Erro na contabilidade" });
     }
 
     if (navigator.vibrate) navigator.vibrate([60,40,60]);
