@@ -94,3 +94,95 @@ trabalho pendente:
 - Assinatura ECDSA de `/verify`, `/activate`, e `/messages` (ADR-0007)
 - Kill Switch manual com auditoria
 - Logs de segurança (versão manual)
+
+---
+
+## Multi-loja / Workspace
+
+### Catálogo Global (identidade de produto entre lojas)
+Hoje o `catalogId` é a identidade **local** de um produto — resolve
+sincronização, `.ktkcat`, Workspace, e incidentes, mas nunca liga o
+mesmo produto físico entre lojas diferentes. Decisão de arquitectura
+tomada em 2026-08-05, em fases:
+
+1. **Fase 1 (feito, sem mudanças):** `catalogId` continua identidade
+   só local. Não mexer.
+2. **Fase 2 (implementado em 2026-08-05):** o BI multi-loja
+   (`GET /reports/multi-store/bi`) passou a agregar produtos por
+   `masterBarcode` → `barcode` → `catalogId` → nome, em vez de só por
+   nome. Sem UI nova — só mudança na lógica de agregação.
+   Confirmado no código que `masterBarcode`/`barcode` são campos
+   manuais (input do lojista), **não** um GTIN oficial validado por
+   nenhuma base de dados externa (GS1, Open Food Facts, etc.).
+3. **Fase 3 (adiado, é este item):** um verdadeiro Catálogo Global no
+   Workspace — um "produto global" (chave: GTIN/barcode quando
+   existir) mapeia `catalogId`s de várias lojas ao mesmo produto.
+   Permitiria acrescentar depois imagem oficial, marca, categoria, IVA
+   recomendado, unidade, fornecedor — evoluindo o Workspace para uma
+   pequena base de conhecimento de produto, não só um espelho de
+   sincronização.
+
+**Decisão explícita:** não introduzir um campo GTIN validado agora.
+Motivos: (a) exigiria lookup contra uma API externa no momento de
+criar o produto, contradizendo a arquitectura offline-first; (b)
+cobertura esperada baixa no mercado angolano (muitos produtos a
+granel, reembalados, ou de fornecedores informais sem código de
+barras oficial); (c) a Fase 3 resolve o problema de identidade entre
+lojas de forma melhor de qualquer forma, com ou sem GTIN validado.
+
+**Regra desenhada para a Fase 3 (ainda não implementada):** produtos
+sem barcode **nunca** são fundidos automaticamente por semelhança de
+nome — o sistema só sugere ("Encontrámos dois produtos parecidos. São
+o mesmo?") e o dono confirma manualmente. Fusão automática por nome é
+sabidamente frágil (nomes iguais podem ser produtos diferentes; o
+mesmo produto pode ter nomes ligeiramente diferentes entre lojas).
+
+**Pré-requisito para retomar:** nenhum bloqueante técnico — é decisão
+de prioridade. Quando retomado, começar pelo schema do "produto
+global" e pela UI de reconciliação manual no Workspace.
+
+---
+
+## Multi-loja / Workspace
+
+### Catálogo Global (identidade de produto entre lojas)
+Hoje o `catalogId` é a identidade **local** de um produto — resolve
+sincronização, `.ktkcat`, Workspace, e incidentes, mas nunca liga o
+mesmo produto físico entre lojas diferentes. Decisão de arquitectura
+tomada em 2026-08-05, em fases:
+
+1. **Fase 1 (feito, sem mudanças):** `catalogId` continua identidade
+   só local. Não mexer.
+2. **Fase 2 (implementado em 2026-08-05):** o BI multi-loja
+   (`GET /reports/multi-store/bi`) passou a agregar produtos por
+   `masterBarcode` → `barcode` → `catalogId` → nome, em vez de só por
+   nome. Sem UI nova — só mudança na lógica de agregação.
+   Confirmado no código que `masterBarcode`/`barcode` são campos
+   manuais (input do lojista), **não** um GTIN oficial validado por
+   nenhuma base de dados externa (GS1, Open Food Facts, etc.).
+3. **Fase 3 (adiado, é este item):** um verdadeiro Catálogo Global no
+   Workspace — um "produto global" (chave: GTIN/barcode quando
+   existir) mapeia `catalogId`s de várias lojas ao mesmo produto.
+   Permitiria acrescentar depois imagem oficial, marca, categoria, IVA
+   recomendado, unidade, fornecedor — evoluindo o Workspace para uma
+   pequena base de conhecimento de produto, não só um espelho de
+   sincronização.
+
+**Decisão explícita:** não introduzir um campo GTIN validado agora.
+Motivos: (a) exigiria lookup contra uma API externa no momento de
+criar o produto, contradizendo a arquitectura offline-first; (b)
+cobertura esperada baixa no mercado angolano (muitos produtos a
+granel, reembalados, ou de fornecedores informais sem código de
+barras oficial); (c) a Fase 3 resolve o problema de identidade entre
+lojas de forma melhor de qualquer forma, com ou sem GTIN validado.
+
+**Regra desenhada para a Fase 3 (ainda não implementada):** produtos
+sem barcode **nunca** são fundidos automaticamente por semelhança de
+nome — o sistema só sugere ("Encontrámos dois produtos parecidos. São
+o mesmo?") e o dono confirma manualmente. Fusão automática por nome é
+sabidamente frágil (nomes iguais podem ser produtos diferentes; o
+mesmo produto pode ter nomes ligeiramente diferentes entre lojas).
+
+**Pré-requisito para retomar:** nenhum bloqueante técnico — é decisão
+de prioridade. Quando retomado, começar pelo schema do "produto
+global" e pela UI de reconciliação manual no Workspace.
