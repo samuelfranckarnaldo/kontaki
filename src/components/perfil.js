@@ -2922,9 +2922,9 @@ async function loadContactos() {
     '<div style="font-size:13px;color:#ddd6fe;margin-top:4px">Introxeer · Angola</div>' +
     '</div>' +
 
-    contactCard("WhatsApp", "Suporte técnico rápido", "message-circle", "#25D366", "https://wa.me/244934923166") +
-    contactCard("Facebook", "Introxeer", "facebook", "#1877F2", "https://www.facebook.com/profile.php?id=61591298607073") +
-    contactCard("Instagram", "@introxeer", "instagram", "#E1306C", "https://instagram.com/introxeer") +
+    contactCard("WhatsApp", "Suporte técnico rápido", CONTACT_ICON_WHATSAPP, "#25D366", "https://wa.me/244934923166") +
+    contactCard("Facebook", "Introxeer", CONTACT_ICON_FACEBOOK, "#1877F2", "https://www.facebook.com/profile.php?id=61591298607073") +
+    contactCard("Instagram", "@introxeer", CONTACT_ICON_INSTAGRAM, "#E1306C", "https://instagram.com/introxeer") +
 
     '<div style="background:#fff;border-radius:12px;padding:14px;border:1px solid #f4f4f5;margin-top:12px">' +
     '<div style="font-size:12px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Reportar problema</div>' +
@@ -2935,15 +2935,26 @@ async function loadContactos() {
   refreshIcons(wrap);
 }
 
+// icon pode ser um nome do Lucide, ou um <svg>...</svg> embutido — usado
+// para WhatsApp/Facebook/Instagram, cujos nomes não existem no subconjunto
+// de ícones empacotado em assets/lucide.min.js (ficavam sem ícone, só o
+// quadrado de fundo colorido).
 function contactCard(title, sub, icon, color, href) {
+  var iconHTML = icon.indexOf("<svg") === 0
+    ? icon
+    : '<i data-lucide="'+icon+'" style="width:20px;height:20px;color:#fff"></i>';
   return '<a href="'+href+'" target="_blank" style="display:flex;align-items:center;gap:14px;padding:14px;background:#fff;border-radius:12px;border:1px solid #f4f4f5;margin-bottom:8px;text-decoration:none">' +
-    '<div style="width:44px;height:44px;background:'+color+';border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
-    '<i data-lucide="'+icon+'" style="width:20px;height:20px;color:#fff"></i></div>' +
+    '<div style="width:44px;height:44px;background:'+color+';border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff">' +
+    iconHTML + '</div>' +
     '<div><div style="font-size:14px;font-weight:700;color:#18181b">'+title+'</div>' +
     '<div style="font-size:12px;color:#71717a;margin-top:2px">'+sub+'</div></div>' +
     '<i data-lucide="chevron-right" style="width:16px;height:16px;color:#a1a1aa;margin-left:auto"></i>' +
     '</a>';
 }
+
+var CONTACT_ICON_WHATSAPP = '<svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.472-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12.004 2C6.486 2 2 6.486 2 12.004c0 2.116.66 4.077 1.789 5.693L2 22l4.428-1.762A9.96 9.96 0 0 0 12.004 22C17.522 22 22 17.514 22 12.004 22 6.486 17.522 2 12.004 2zm0 18.09a8.06 8.06 0 0 1-4.11-1.126l-.294-.174-3.06 1.219 1.24-2.985-.192-.307a8.075 8.075 0 0 1-1.24-4.313c0-4.468 3.636-8.104 8.104-8.104s8.104 3.636 8.104 8.104-3.636 8.104-8.104 8.104z"/></svg>';
+var CONTACT_ICON_FACEBOOK = '<svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M22 12.06C22 6.505 17.523 2 12 2S2 6.505 2 12.06c0 5.02 3.657 9.184 8.438 9.94v-7.03H7.898v-2.91h2.54V9.845c0-2.508 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562v1.878h2.773l-.443 2.91h-2.33V22c4.78-.756 8.437-4.92 8.437-9.94z"/></svg>';
+var CONTACT_ICON_INSTAGRAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1"/></svg>';
 
 window._reportarProblema = function() {
   var msg = document.getElementById("report-msg");
