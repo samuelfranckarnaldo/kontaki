@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kontaki-v465';
+const CACHE_NAME = 'kontaki-v466';
 const BASE = self.location.pathname.replace(/\/sw\.js$/, '');
 
 const ASSETS = [
@@ -38,10 +38,6 @@ const ASSETS = [
   BASE + '/assets/lucide.min.js',
   BASE + '/assets/qrcode.min.js',
   BASE + '/assets/jspdf.min.js',
-  BASE + '/assets/fonts/DMSans-Regular.woff2',
-  BASE + '/assets/fonts/DMSans-Medium.woff2',
-  BASE + '/assets/fonts/DMSans-SemiBold.woff2',
-  BASE + '/assets/fonts/DMSans-Bold.woff2',
   BASE + '/assets/icons/icon-96.png',
   BASE + '/assets/icons/icon-192.png',
   BASE + '/assets/icons/icon-512.png',
