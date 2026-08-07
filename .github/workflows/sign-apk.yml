@@ -1,0 +1,57 @@
+name: Assinar APK do Kontaki
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag da release que contém o Kontaki-unsigned.apk'
+        required: true
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descarregar APK unsigned da release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${{ github.event.inputs.release_tag }}" \
+            -p "Kontaki-unsigned.apk" \
+            --repo ${{ github.repository }}
+
+      - name: Descodificar keystore
+        run: echo "${{ secrets.KONTAKI_KEYSTORE_BASE64 }}" | base64 -d > kontaki-release.keystore
+
+      - name: Zipalign
+        run: |
+          BUILD_TOOLS=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)
+          "$ANDROID_HOME/build-tools/$BUILD_TOOLS/zipalign" -v -p 4 \
+            Kontaki-unsigned.apk Kontaki-aligned.apk
+
+      - name: Assinar APK
+        run: |
+          BUILD_TOOLS=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)
+          "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner" sign \
+            --ks kontaki-release.keystore \
+            --ks-pass "pass:${{ secrets.KONTAKI_KEYSTORE_PASSWORD }}" \
+            --ks-key-alias kontaki \
+            --out Kontaki-signed.apk \
+            Kontaki-aligned.apk
+
+      - name: Verificar assinatura
+        run: |
+          BUILD_TOOLS=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)
+          "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner" verify --verbose Kontaki-signed.apk
+
+      - name: Publicar APK assinado na release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.inputs.release_tag }}" \
+            Kontaki-signed.apk \
+            --repo ${{ github.repository }} \
+            --clobber
+
+      - name: Remover keystore do runner
+        if: always()
+        run: rm -f kontaki-release.keystore
