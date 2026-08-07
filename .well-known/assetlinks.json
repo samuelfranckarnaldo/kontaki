@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.introxeer.kontaki",
+    "sha256_cert_fingerprints": ["47:C6:53:47:B2:C7:4D:52:B4:F8:75:3B:44:7D:19:6D:3B:C7:27:3E:A1:FB:88:A1:E1:85:C8:46:F0:64:5D:AF"]
+  }
+}]
