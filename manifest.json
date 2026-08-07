@@ -39,12 +39,12 @@
   "shortcuts": [
     {
       "name": "Vender",
-      "url": "/?page=vender",
+      "url": "./?page=vender",
       "description": "Abrir modo de venda"
     },
     {
       "name": "Produtos",
-      "url": "/?page=produtos",
+      "url": "./?page=produtos",
       "description": "Gerir produtos"
     }
   ]

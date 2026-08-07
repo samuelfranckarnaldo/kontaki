@@ -7,7 +7,7 @@ export async function printRecibo(sale, store, format) {
   win.document.write(
     "<!DOCTYPE html><html><head><meta charset='UTF-8'/>" +
     "<title>Recibo #" + sale.id + "</title>" +
-    "<link rel='stylesheet' href='/src/styles/print.css'/>" +
+    "<link rel='stylesheet' href='./src/styles/print.css'/>" +
     "</head><body>" +
     "<div id='print-root'>" + html + "</div>" +
     "<script>window.onload=function(){window.print();setTimeout(function(){window.close();},500);}<\/script>" +
